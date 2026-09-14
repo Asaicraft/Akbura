@@ -87,6 +87,170 @@ public sealed class ComponentUtilityIncrementalParserTests
     }
 
     [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    public void RootUtilityInsertion_WithNestedConditionalUtilities_MatchesFreshInBothDirections(
+        bool replaceWholeOpeningTag,
+        bool trackChanges)
+    {
+        const string source =
+            "<Border>\r\n" +
+            "    <Grid ColumnDefinitions=\"Auto, *\">\r\n" +
+            "        <Border {IsActive}:bg-teal-300 {!IsActive}:bg-white rounded-xl>\r\n" +
+            "            {Icon}\r\n" +
+            "        </Border>\r\n" +
+            "        <Border pr-3 {IsCollapsed}:hidden>\r\n" +
+            "            <TextBlock {IsActive}:text-grey-700 {!IsActive}:text-grey-400 Text={Text} />\r\n" +
+            "        </Border>\r\n" +
+            "    </Grid>\r\n" +
+            "</Border>\r\n";
+        const string utilities = " px-4 py-3 rounded-2xl {IsActive}:bg-white";
+
+        // An empty original value inserts at the root closing angle bracket;
+        // the following Grid uniquely anchors that zero-width local edit.
+        // The complete opening-tag replacement and untracked fallback cover
+        // different change ranges without modifying any nested markup.
+        AssertRoundTrip(
+            source,
+            containsDiagnostics: false,
+            replaceWholeOpeningTag ? "<Border>" : "",
+            replaceWholeOpeningTag ? "<Border" + utilities + ">" : utilities,
+            trackChanges,
+            uniqueAnchor: replaceWholeOpeningTag ? "<Border>" : ">\r\n    <Grid ColumnDefinitions=\"Auto, *\">");
+    }
+
+    [Theory]
+    [InlineData("Viewbox", true)]
+    [InlineData("Viewbox", false)]
+    [InlineData("ViewBox", true)]
+    [InlineData("ViewBox", false)]
+    public void ViewboxWidthUtility_TypedCharacterByCharacter_ClearsIdentifierExpectedAndMatchesFresh(
+        string componentName,
+        bool trackChanges)
+    {
+        var source =
+            "using System.Collections.ObjectModel;\r\n\r\n" +
+            "namespace PurityUIDashboard;\r\n\r\n" +
+            "param bool IsActive = false;\r\n" +
+            "param ObservableCollection<StreamGeometry> Content;\r\n\r\n" +
+            "<" + componentName + ">\r\n\r\n" +
+            "</" + componentName + ">\r\n";
+        var originalText = SourceText.From(source);
+        var original = ComponentSyntaxTree.ParseText(originalText, "Components/NavIcon.akbura");
+        var text = originalText;
+        var tree = original;
+        var openingTagStart = source.IndexOf("<" + componentName + ">", StringComparison.Ordinal);
+        Assert.True(openingTagStart >= 0);
+        var position = openingTagStart + 1 + componentName.Length;
+        var typed = string.Empty;
+        var failures = new List<string>();
+
+        AssertMatchesFresh(tree, text, containsDiagnostics: false);
+
+        // Simulate actual keystrokes: <Viewbox> -> <Viewbox > -> <Viewbox w>
+        // -> <Viewbox w-> -> <Viewbox w-3> -> <Viewbox w-30>.
+        foreach (var character in " w-30")
+        {
+            var changedText = text.WithChanges(new TextChange(new TextSpan(position, 0), character.ToString()));
+            text = trackChanges ? changedText : SourceText.From(changedText.ToString());
+            tree = tree.WithChangedText(text);
+            position++;
+            typed += character;
+
+            var failure = Record.Exception(() => AssertTypingState(tree, text, typed));
+            if (failure != null)
+            {
+                var diagnostics = string.Join(", ", GetTypingDiagnostics(tree).Select(static diagnostic => diagnostic.Code));
+                failures.Add($"After inserting '{typed}' (diagnostics: {diagnostics}): {failure.Message}");
+            }
+        }
+
+        Assert.Contains("<" + componentName + " w-30>", text.ToString(), StringComparison.Ordinal);
+        Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
+        Assert.Empty(GetTypingDiagnostics(tree));
+
+        // Backspace through the same intermediate states without replacing the parser tree.
+        foreach (var character in " w-30".Reverse())
+        {
+            Assert.Equal(character, text[position - 1]);
+            position--;
+            var changedText = text.WithChanges(new TextChange(new TextSpan(position, 1), string.Empty));
+            text = trackChanges ? changedText : SourceText.From(changedText.ToString());
+            tree = tree.WithChangedText(text);
+            typed = typed[..^1];
+
+            AssertTypingState(tree, text, typed);
+        }
+
+        Assert.True(text.ContentEquals(originalText));
+        AssertSameSyntax(new SyntaxNodeOrToken(original.GetRoot()), new SyntaxNodeOrToken(tree.GetRoot()));
+
+        static void AssertTypingState(ComponentSyntaxTree incremental, SourceText currentText, string currentUtility)
+        {
+            var missingSegment = currentUtility == " w-";
+            AssertMatchesFresh(incremental, currentText, containsDiagnostics: missingSegment);
+            var diagnostics = GetTypingDiagnostics(incremental);
+
+            if (missingSegment)
+            {
+                Assert.Contains(diagnostics, static diagnostic => diagnostic.Code == ErrorCodes.ERR_IdentifierExpected);
+            }
+            else
+            {
+                Assert.Empty(diagnostics);
+            }
+        }
+
+        static AkburaDiagnostic[] GetTypingDiagnostics(ComponentSyntaxTree syntaxTree)
+        {
+            return syntaxTree.GetRoot().DescendantNodesAndTokensAndSelf(descendIntoTrivia: true)
+                .SelectMany(static node => node.GetDiagnostics())
+                .ToArray();
+        }
+    }
+
+    [Theory]
+    [InlineData("w", "-30")]
+    [InlineData("w ", "-30")]
+    [InlineData("w-3", "0")]
+    [InlineData("w-3", ".5")]
+    [InlineData("w-3", "d")]
+    [InlineData("w-3", "auto")]
+    [InlineData("w-3", "-0")]
+    [InlineData("w-3 ", "-0")]
+    [InlineData("hover", ":w-30")]
+    [InlineData("hover ", ":w-30")]
+    [InlineData("hover:w", "-30")]
+    [InlineData("{IsActive}:w", "-30")]
+    [InlineData("Text", "=\"A\"")]
+    [InlineData("Text ", "=\"A\"")]
+    public void AttributeBoundaryInsertion_MatchesFreshInBothDirections(string attribute, string suffix)
+    {
+        var source = "<Viewbox " + attribute + ">\r\n    <TextBlock Text=\"Body\" />\r\n</Viewbox>\r\n";
+
+        AssertRoundTrip(source, false, "", suffix,
+            uniqueAnchor: ">\r\n    <TextBlock Text=\"Body\" />");
+    }
+
+    [Fact]
+    public void UtilityBoundaryReplacement_MatchesFreshInBothDirections()
+    {
+        // Replacing the closing angle bracket still extends the untouched flag on its left.
+        AssertRoundTrip("<Viewbox w>\r\n</Viewbox>\r\n", false, ">", "-30>",
+            uniqueAnchor: "<Viewbox w>");
+    }
+
+    [Fact]
+    public void UtilitySegmentSeparatorDeletion_MergesNumericTokensAndMatchesFreshInBothDirections()
+    {
+        // Removing only the separator must re-lex 3 and 0 as one numeric segment, 30.
+        AssertRoundTrip("<Viewbox w-3-0>\r\n</Viewbox>\r\n", false, "-", "",
+            uniqueAnchor: "3-0");
+    }
+
+    [Theory]
     [InlineData("page ${md}:page-desktop Text=\"AKCSS\"")]
     [InlineData("page Text=\"AKCSS\" ${md}:page-desktop")]
     [InlineData("Text=\"AKCSS\" page ${md}:page-desktop")]

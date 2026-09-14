@@ -63,6 +63,83 @@ public sealed class BlackSilenceIncrementalGenerationTests
     }
 
     [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    public void RootUtilityInsertion_WithNestedConditionalUtilities_RoundTripsAndMatchesFreshGeneration(
+        bool replaceWholeOpeningTag,
+        bool preserveTextChanges)
+    {
+        const string originalOpeningTag = "<Border>";
+        const string utilities = " px-4 py-3 rounded-2xl {IsActive}:bg-white";
+        const string editedOpeningTag = "<Border" + utilities + ">";
+        var project = new TestProject(publishDiagnostics: true);
+        var original = project.File("Page.akbura", Component(
+            "using Akbura.Markup;\r\n" +
+            "using Akbura.Styles.akcss;\r\n" +
+            "param bool IsActive = true;\r\n" +
+            "param bool IsCollapsed = false;\r\n" +
+            "param Control Icon = new TextBlock();\r\n" +
+            "param string Text = \"Item\";\r\n\r\n" +
+            "<Border>\r\n" +
+            "    <Grid ColumnDefinitions=\"Auto, *\">\r\n" +
+            "        <Border {IsActive}:bg-teal-300 {!IsActive}:bg-white rounded-xl>\r\n" +
+            "            {Icon}\r\n" +
+            "        </Border>\r\n" +
+            "        <Border pr-3 {IsCollapsed}:hidden>\r\n" +
+            "            <TextBlock {IsActive}:text-grey-700 {!IsActive}:text-grey-400 Text={Text} />\r\n" +
+            "        </Border>\r\n" +
+            "    </Grid>\r\n" +
+            "</Border>\r\n"));
+        var other = project.File("Other.akbura", Component("<Border />"));
+        var initial = Run(project, CreateDriver(project.Options, original, other));
+        Assert.All(initial.Request.Index.ComponentDescriptors, static descriptor => Assert.False(descriptor.Root.ContainsDiagnostics));
+        var initialSource = initial.Snapshot.Entries["component:Page.akbura"].Source.SourceText.ToString();
+        Assert.Equal(7, GetUtilityCandidateCount(initialSource));
+
+        var openingTagStart = original.Text.ToString().IndexOf(originalOpeningTag, StringComparison.Ordinal);
+        Assert.True(openingTagStart >= 0);
+        var editStart = replaceWholeOpeningTag ? openingTagStart : openingTagStart + "<Border".Length;
+        var originalValue = replaceWholeOpeningTag ? originalOpeningTag : string.Empty;
+        var editedValue = replaceWholeOpeningTag ? editedOpeningTag : utilities;
+
+        // Add only the root utilities; all nested controls and conditional prefixes stay unchanged.
+        // Cover both a local insertion and a full opening-tag replacement, with and without text history.
+        var editedText = original.Text.WithChanges(
+            new TextChange(new TextSpan(editStart, originalValue.Length), editedValue));
+        var edited = original.WithText(preserveTextChanges ? editedText : SourceText.From(editedText.ToString()));
+        var updated = Run(project, initial.Driver.ReplaceAdditionalText(original, edited));
+        Assert.All(updated.Request.Index.ComponentDescriptors, static descriptor => Assert.False(descriptor.Root.ContainsDiagnostics));
+        var updatedSource = updated.Snapshot.Entries["component:Page.akbura"].Source.SourceText.ToString();
+
+        Assert.NotEqual(initialSource, updatedSource);
+        Assert.Equal(11, GetUtilityCandidateCount(updatedSource));
+        AssertReusedExcept(initial, updated, "component:Page.akbura");
+        AssertParityWithFresh(project, updated, project.Options, edited, other);
+
+        var restoredText = edited.Text.WithChanges(
+            new TextChange(new TextSpan(editStart, editedValue.Length), originalValue));
+        var restored = edited.WithText(preserveTextChanges ? restoredText : SourceText.From(restoredText.ToString()));
+        var reverted = Run(project, updated.Driver.ReplaceAdditionalText(edited, restored));
+        Assert.All(reverted.Request.Index.ComponentDescriptors, static descriptor => Assert.False(descriptor.Root.ContainsDiagnostics));
+        var revertedSource = reverted.Snapshot.Entries["component:Page.akbura"].Source.SourceText.ToString();
+
+        Assert.Equal(original.Text.ToString(), restored.Text.ToString());
+        Assert.Equal(initialSource, revertedSource);
+        Assert.Equal(7, GetUtilityCandidateCount(revertedSource));
+        AssertReusedExcept(updated, reverted, "component:Page.akbura");
+        AssertParityWithFresh(project, reverted, project.Options, restored, other);
+
+        static int GetUtilityCandidateCount(string source)
+        {
+            return CSharpSyntaxTree.ParseText(source).GetRoot().DescendantNodes()
+                .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ObjectCreationExpressionSyntax>()
+                .Count(static creation => creation.Type.ToString() == "global::Akbura.Akcss.AkcssUtilityCandidateActivator");
+        }
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void UtilityPrefixedNestedTextEdit_RoundTripsAndMatchesFreshGeneration(bool preserveTextChanges)

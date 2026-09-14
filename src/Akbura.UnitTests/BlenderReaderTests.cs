@@ -270,6 +270,96 @@ public sealed class BlenderReaderTests
         Assert.Same(oldTree.Members[2].Green, right.Node!.Green);
     }
 
+    [Fact]
+    public void ReadNode_AfterMinusInsertionAtUtilityFlagBoundary_RejectsOldFlagAndReusesUnaffectedNodes()
+    {
+        const string oldCode = "using System;\r\n<Viewbox w><TextBlock /></Viewbox>";
+        var oldTree = ParseRoot(oldCode);
+        Assert.False(oldTree.ContainsDiagnostics);
+        var oldFlag = Assert.Single(oldTree.DescendantNodes().OfType<TailwindFlagAttributeSyntax>());
+        var oldBody = Assert.Single(oldTree.DescendantNodes().OfType<MarkupElementContentSyntax>());
+        var insertion = oldCode.IndexOf("w>", StringComparison.Ordinal) + 1;
+        Assert.Equal(insertion, oldFlag.FullSpan.End);
+        var newCode = oldCode.Insert(insertion, "-");
+        using var lexer = new Lexer(SourceText.From(newCode));
+        var blender = new Blender(lexer, oldTree, [new TextChangeRange(new TextSpan(insertion, 0), 1)]);
+
+        var unchangedUsing = blender.ReadNode(Lexer.LexerMode.TopLevel);
+        Assert.Same(oldTree.Members[0].Green, unchangedUsing.Node!.Green);
+        var open = unchangedUsing.Blender.ReadToken(Lexer.LexerMode.TopLevel);
+        var componentName = open.Blender.ReadToken(Lexer.LexerMode.TopLevel);
+        blender = componentName.Blender;
+
+        // The identifier itself is still "w", but its flag syntax must be reparsed
+        // because the appended '-' starts a full utility attribute.
+        Assert.Null(blender.ReadNode(Lexer.LexerMode.TopLevel).Node);
+        var utilityName = blender.ReadToken(Lexer.LexerMode.TopLevel);
+        var minus = utilityName.Blender.ReadToken(Lexer.LexerMode.TopLevel);
+        var close = minus.Blender.ReadToken(Lexer.LexerMode.TopLevel);
+        var unchangedBody = close.Blender.ReadNode(Lexer.LexerMode.TopLevel);
+
+        Assert.Equal(SyntaxKind.LessThanToken, open.Token.Kind);
+        Assert.Equal("Viewbox ", componentName.Token.ToFullString());
+        Assert.Equal(SyntaxKind.IdentifierToken, utilityName.Token.Kind);
+        Assert.Equal("w", utilityName.Token.Text);
+        Assert.Equal(SyntaxKind.MinusToken, minus.Token.Kind);
+        Assert.Equal(SyntaxKind.GreaterThanToken, close.Token.Kind);
+        Assert.Same(oldBody.Green, unchangedBody.Node!.Green);
+    }
+
+    [Theory]
+    [InlineData("0", "30")]
+    [InlineData(".5", "3.5")]
+    [InlineData("d", "3d")]
+    public void ReadNode_AfterNumericLiteralSuffixInsertion_RejectsOldLiteralAndReusesUnaffectedNodes(
+        string insertedText,
+        string expectedLiteral)
+    {
+        const string oldCode = "using System;\r\n<Viewbox w-3><TextBlock /></Viewbox>";
+        var oldTree = ParseRoot(oldCode);
+        Assert.False(oldTree.ContainsDiagnostics);
+        var oldNumber = Assert.Single(oldTree.DescendantNodes().OfType<TailwindNumericSegmentSyntax>());
+        var oldBody = Assert.Single(oldTree.DescendantNodes().OfType<MarkupElementContentSyntax>());
+        var insertion = oldCode.IndexOf("3>", StringComparison.Ordinal) + 1;
+        Assert.Equal(insertion, oldNumber.FullSpan.End);
+        var newCode = oldCode.Insert(insertion, insertedText);
+        var freshTree = ParseRoot(newCode);
+        Assert.False(freshTree.ContainsDiagnostics);
+        var freshNumber = Assert.Single(freshTree.DescendantNodes().OfType<TailwindNumericSegmentSyntax>());
+        using var lexer = new Lexer(SourceText.From(newCode));
+        var blender = new Blender(lexer, oldTree,
+            [new TextChangeRange(new TextSpan(insertion, 0), insertedText.Length)]);
+
+        var unchangedUsing = blender.ReadNode(Lexer.LexerMode.TopLevel);
+        Assert.Same(oldTree.Members[0].Green, unchangedUsing.Node!.Green);
+        var open = unchangedUsing.Blender.ReadToken(Lexer.LexerMode.TopLevel);
+        var componentName = open.Blender.ReadToken(Lexer.LexerMode.TopLevel);
+        blender = componentName.Blender;
+
+        Assert.Null(blender.ReadNode(Lexer.LexerMode.TopLevel).Node);
+        var utilityName = blender.ReadToken(Lexer.LexerMode.TopLevel);
+        var minus = utilityName.Blender.ReadToken(Lexer.LexerMode.TopLevel);
+        blender = minus.Blender;
+
+        // Extending '3' changes both the numeric segment and its terminal token.
+        // An unaffected child after the edited opening tag must remain reusable.
+        Assert.Null(blender.ReadNode(Lexer.LexerMode.TopLevel).Node);
+        var number = blender.ReadToken(Lexer.LexerMode.TopLevel);
+        var close = number.Blender.ReadToken(Lexer.LexerMode.TopLevel);
+        var unchangedBody = close.Blender.ReadNode(Lexer.LexerMode.TopLevel);
+
+        Assert.Equal(SyntaxKind.LessThanToken, open.Token.Kind);
+        Assert.Equal("Viewbox ", componentName.Token.ToFullString());
+        Assert.Equal("w", utilityName.Token.Text);
+        Assert.Equal(SyntaxKind.MinusToken, minus.Token.Kind);
+        Assert.Equal(SyntaxKind.NumericLiteralToken, number.Token.Kind);
+        Assert.Equal(expectedLiteral, number.Token.Text);
+        Assert.Equal(freshNumber.Number.Value, number.Token.Value);
+        Assert.NotSame(oldNumber.Number.Node, number.Token.Node);
+        Assert.Equal(SyntaxKind.GreaterThanToken, close.Token.Kind);
+        Assert.Same(oldBody.Green, unchangedBody.Node!.Green);
+    }
+
     private static AkburaDocumentSyntax ParseRoot(string code)
     {
         var green = ParserHelper.MakeParser(code).ParseCompilationUnit();

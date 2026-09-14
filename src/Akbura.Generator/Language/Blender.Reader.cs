@@ -212,9 +212,21 @@ internal readonly partial struct Blender
                 return true;
             }
 
-            if (!changeSpan.IsEmpty ||
-                change.NewLength == 0 ||
-                changeSpan.Start != oldSpan.End)
+            if (changeSpan.Start != oldSpan.End)
+            {
+                return false;
+            }
+
+            var underlyingNode =
+                nodeOrToken.RequiredUnderlyingNode;
+
+            var lastTerminal = underlyingNode as GreenSyntaxToken ?? underlyingNode.GetLastTerminal();
+            var isInsertion = changeSpan.IsEmpty && change.NewLength > 0;
+
+            // Other nodes retain their existing replacement/deletion reuse behavior.
+            if (!isInsertion &&
+                underlyingNode is not GreenTailwindAttributeSyntax &&
+                lastTerminal?.Kind != SyntaxKind.NumericLiteralToken)
             {
                 return false;
             }
@@ -223,9 +235,6 @@ internal readonly partial struct Blender
             {
                 return true;
             }
-
-            var underlyingNode =
-                nodeOrToken.RequiredUnderlyingNode;
 
             var markupElement =
                 underlyingNode switch
@@ -245,10 +254,6 @@ internal readonly partial struct Blender
             {
                 return true;
             }
-
-            var lastTerminal =
-                underlyingNode as GreenSyntaxToken ??
-                underlyingNode.GetLastTerminal();
 
             if (lastTerminal == null)
             {
@@ -280,12 +285,24 @@ internal readonly partial struct Blender
             var insertedCharacter =
                 text[insertedPosition];
 
+            // Boundary edits can change the attribute grammar, even across trailing whitespace.
+            if (underlyingNode is GreenTailwindAttributeSyntax &&
+                insertedCharacter is '-' or ':' or '=')
+            {
+                return true;
+            }
+
             if (lastTerminal.GetTrailingTriviaWidth() == 0 &&
                 CanCombineWithInsertedCharacter(
                     lastTerminal.Kind,
                     insertedCharacter))
             {
                 return true;
+            }
+
+            if (!isInsertion)
+            {
+                return false;
             }
 
             if (lastTerminal.GetTrailingTriviaWidth() == 0 &&
@@ -337,6 +354,9 @@ internal readonly partial struct Blender
         {
             return tokenKind switch
             {
+                SyntaxKind.NumericLiteralToken =>
+                    insertedCharacter == '.' ||
+                    SyntaxFacts.IsIdentifierPartCharacter(insertedCharacter),
                 SyntaxKind.SlashToken =>
                     insertedCharacter == '>',
                 SyntaxKind.DotToken =>

@@ -27,17 +27,31 @@ internal readonly struct ComponentForeachRootPlan
 /// </summary>
 internal readonly struct ComponentForeachPlan
 {
-    public ComponentForeachPlan(int id, int ownerElementId, IMarkupForeachOperation operation,
+    public ComponentForeachPlan(
+        int id,
+        int ownerElementId,
+        IMarkupForeachOperation operation,
+        string templateRevision,
+        string keyContractIdentity,
         ImmutableArray<ComponentForeachRootPlan> roots)
     {
         Id = id;
         OwnerElementId = ownerElementId;
         Operation = operation;
+        TemplateRevision = templateRevision;
+        KeyContractIdentity = keyContractIdentity;
         Roots = roots;
     }
 
     public int Id { get; }
+
     public int OwnerElementId { get; }
+
     public IMarkupForeachOperation Operation { get; }
+
+    public string TemplateRevision { get; }
+
+    public string KeyContractIdentity { get; }
+
     public ImmutableArray<ComponentForeachRootPlan> Roots { get; }
 }

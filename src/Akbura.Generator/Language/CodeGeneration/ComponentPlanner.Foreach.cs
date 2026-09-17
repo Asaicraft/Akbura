@@ -10,20 +10,42 @@ internal static partial class ComponentPlanner
 {
     private ref partial struct Planner
     {
-        private void BuildForeach(int ownerId, MarkupForeachStatementSyntax syntax, in TraversalContext inherited)
+        private void BuildForeach(
+            int ownerId,
+            MarkupForeachStatementSyntax syntax,
+            in TraversalContext inherited)
         {
             if (_foreachSyntaxIds.ContainsKey(syntax) ||
-                _semanticModel.GetOperation(syntax) is not IMarkupForeachOperation operation || operation.HasErrors)
+                _semanticModel.GetOperation(syntax) is not IMarkupForeachOperation operation ||
+                operation.HasErrors)
             {
                 return;
             }
 
             var id = _foreachRegions.Count;
+            var templateRevision =
+                ComponentHotReloadIdentity.CreateForeachTemplateRevision(operation);
+            var keyContractIdentity =
+                ComponentHotReloadIdentity.CreateForeachKeyContractIdentity(operation);
+
             _foreachSyntaxIds.Add(syntax, id);
             _foreachRegions.Add(default);
+
             var roots = ImmutableArray.CreateBuilder<ComponentForeachRootPlan>();
-            BuildForeachRoots(ownerId, syntax.Body, inherited, roots);
-            _foreachRegions[id] = new ComponentForeachPlan(id, ownerId, operation, roots.ToImmutable());
+
+            BuildForeachRoots(
+                ownerId,
+                syntax.Body,
+                inherited,
+                roots);
+
+            _foreachRegions[id] = new ComponentForeachPlan(
+                id,
+                ownerId,
+                operation,
+                templateRevision,
+                keyContractIdentity,
+                roots.ToImmutable());
         }
 
         private void BuildForeachRoots(int ownerId, AkburaSyntax syntax, in TraversalContext inherited,
@@ -31,7 +53,11 @@ internal static partial class ComponentPlanner
         {
             foreach (var childNode in syntax.ChildNodesAndTokens())
             {
-                if (childNode.AsNode() is not { } child) continue;
+                if (childNode.AsNode() is not { } child)
+                {
+                    continue;
+                }
+
                 if (child is MarkupElementSyntax element)
                 {
                     var parent = inherited.GetEffectiveScope();

@@ -1,8 +1,7 @@
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System;
+using Akbura.Language.Operations;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -338,6 +337,43 @@ internal static class ComponentHotReloadIdentity
         }
 
         return ComputeRenderSyntaxHash(builder.ToString());
+    }
+
+    internal static string CreateForeachTemplateRevision(IMarkupForeachOperation operation)
+    {
+        AkburaDebug.AssertNotNull(operation);
+
+        return CreateContentSyntaxIdentity(operation.Syntax.Body);
+    }
+
+    internal static string CreateForeachKeyContractIdentity(IMarkupForeachOperation operation)
+    {
+        AkburaDebug.AssertNotNull(operation);
+
+        if (operation.Key.IsDefault)
+        {
+            return string.Empty;
+        }
+
+        if (operation.KeySyntax == null)
+        {
+            throw new InvalidOperationException(
+                "A keyed foreach operation must retain the syntax that defines its key contract.");
+        }
+
+        var hash = new FingerprintHash();
+        hash.Add("foreach-key-contract");
+        hash.Add(CreateOperationSyntaxIdentity(operation.KeySyntax));
+        hash.Add(operation.IterationType.Symbol as ITypeSymbol);
+        hash.Add(operation.Key.Type);
+        hash.Add(operation.Key.Kind is { } kind ? (int)kind : -1);
+
+        // Generated foreach regions currently use EqualityComparer<TKey>.Default.
+        // Keep comparer policy in the identity so future comparer support has
+        // an explicit place in the hot reload contract.
+        hash.Add("comparer:default");
+
+        return hash.ToString();
     }
 
     private static string ComputeRenderSyntaxHash(string normalizedSyntax)

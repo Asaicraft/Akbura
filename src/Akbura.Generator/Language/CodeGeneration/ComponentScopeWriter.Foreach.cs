@@ -65,11 +65,18 @@ internal readonly ref partial struct ComponentScopeWriter
         _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName).Write(".GetForeachRegion<");
         WriteForeachTypes(plan, region);
         _writer.Write(">(").WriteIntegerLiteral(owner.RuntimeStorageId).Write(", ");
-        _writer.WriteStringLiteral(GetForeachSlot(plan, region));
+        WriteForeachRegionSlot(plan, region);
         _writer.Write(", this.InvalidState)");
     }
 
-    private static string GetForeachSlot(in ComponentPlan plan, in ComponentForeachPlan region)
+    private void WriteForeachRegionSlot(in ComponentPlan plan, in ComponentForeachPlan region)
+    {
+        _writer.Write("\"foreach:");
+        _writer.WriteIntegerLiteral(GetForeachOrdinal(plan, region));
+        _writer.Write("\"");
+    }
+
+    private static int GetForeachOrdinal(in ComponentPlan plan, in ComponentForeachPlan region)
     {
         var ordinal = 0;
         for (var i = 0; i < region.Id; i++)
@@ -79,7 +86,8 @@ internal readonly ref partial struct ComponentScopeWriter
                 ordinal++;
             }
         }
-        return "foreach:" + ordinal;
+
+        return ordinal;
     }
 
     private void WriteForeachTypes(in ComponentPlan plan, in ComponentForeachPlan region)
@@ -110,7 +118,6 @@ internal readonly ref partial struct ComponentScopeWriter
     {
         var operation = region.Operation;
         var frame = "__foreachFrame" + region.Id;
-        var revision = ComponentHotReloadIdentity.CreateContentSyntaxIdentity(operation.Syntax);
         var sourceItemType = GetForeachSourceItemType(operation.Source.Type);
         var iterationType = operation.IterationType.Symbol as ITypeSymbol;
         var nonGenericSource = sourceItemType == null;
@@ -138,7 +145,7 @@ internal readonly ref partial struct ComponentScopeWriter
             new CSharpValueWriter(_writer).WriteTypeNameWithNullableAnnotation(iterationType);
             _writer.WriteLine(")__sourceItem!,");
         }
-        _writer.WriteStringLiteral(revision).WriteLine(",");
+        _writer.WriteStringLiteral(region.TemplateRevision).WriteLine(",");
         _writer.WriteLine(GetForeachDependencies(operation) + ",");
         _writer.Write(frame).WriteLine(" =>");
         _writer.WriteLine("{");
@@ -161,7 +168,7 @@ internal readonly ref partial struct ComponentScopeWriter
             new CSharpValueWriter(_writer).WriteIdentifier(operation.IterationVariableName);
             _writer.Write(" => ");
             _writer.Write(CSharpProbeBuilder.GetMarkupLoopCodeGenerationSyntax(operation.Key)!.ToString()).WriteLine(",");
-            _writer.WriteStringLiteral(revision);
+            _writer.WriteStringLiteral(region.KeyContractIdentity);
         }
         _writer.WriteLine(");");
         _writer.CurrentIndent -= _writer.TabSize;

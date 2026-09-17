@@ -1239,17 +1239,10 @@ internal partial class AkburaSemanticModel
         Dictionary<string, AkburaSymbol> akburaSymbolsByName,
         Dictionary<string, AkburaSymbol> akburaSymbolsByCommandTypeName)
     {
-        if (csharpSymbol is ILocalSymbol markupLocal && markupLocal.DeclaringSyntaxReferences.Any(reference =>
-                reference.GetSyntax().AncestorsAndSelf().Any(node => node.HasAnnotations(
-                    CSharpProbeBinder.ProjectedSymbolAnnotationKind))))
-        {
-            return null;
-        }
-
         if (csharpSymbol is ILocalSymbol local &&
             akburaSymbolsByName.TryGetValue(local.Name, out var symbol))
         {
-            return symbol;
+            return MatchesProjectedLocalOrigin(local, symbol) ? symbol : null;
         }
 
         if (csharpSymbol is IFieldSymbol field &&
@@ -1271,6 +1264,33 @@ internal partial class AkburaSemanticModel
         }
 
         return null;
+    }
+
+    private static bool MatchesProjectedLocalOrigin(
+        ILocalSymbol local,
+        AkburaSymbol candidate)
+    {
+        foreach (var reference in local.DeclaringSyntaxReferences)
+        {
+            // Only this symbol's declaration carries its origin. An annotation
+            // on an enclosing foreach or method belongs to another symbol.
+            var declaration = reference.GetSyntax();
+
+            foreach (var annotation in declaration.GetAnnotations(
+                         CSharpProbeBinder.ProjectedSymbolAnnotationKind))
+            {
+                if (!CSharpProbeSymbolOrigin.TryParse(annotation.Data, out var origin) ||
+                    origin.Kind != candidate.Kind ||
+                    !CSharpProbeBinder.TryGetDeclarationSpan(candidate, out var declarationSpan) ||
+                    origin.DeclarationSpan != declarationSpan)
+                {
+                    return false;
+                }
+            }
+        }
+
+        // Preserve name-based mapping for legacy probes without origin metadata.
+        return true;
     }
 
     private readonly struct CSharpReferenceTarget

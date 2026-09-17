@@ -678,7 +678,7 @@ internal sealed partial class CSharpProbeBinder
             origin.Serialize());
     }
 
-    private static bool TryGetDeclarationSpan(
+    internal static bool TryGetDeclarationSpan(
         AkburaSymbol symbol,
         out TextSpan span)
     {

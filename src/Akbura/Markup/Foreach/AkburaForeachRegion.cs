@@ -15,6 +15,8 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
     private KeyContract? _keys;
     private object? _templateRevision;
     private object? _environmentRevision;
+    private AkburaForeachDependencies _dependencies;
+    private bool _sourceSnapshotComplete = true;
     private List<Occurrence> _records = [];
     private TChild[] _children = [];
     private RegionUpdate? _update;
@@ -38,15 +40,15 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
     public bool HasPendingUpdate => _update != null;
     public long SourceEpoch => _update?.Lease?.Epoch ?? _lease?.Epoch ?? 0;
 
-    public IReadOnlyList<TChild> Render(IEnumerable<TItem>? source, object templateRevision,
-        AkburaForeachDependencies dependencies, Func<AkburaForeachFrame<TItem, TChild>, LoopFlow> evaluate,
-        object? environmentRevision = null) =>
+    public IReadOnlyList<TChild> Render(
+        IEnumerable<TItem>? source, object templateRevision, AkburaForeachDependencies dependencies,
+        Func<AkburaForeachFrame<TItem, TChild>, LoopFlow> evaluate, object? environmentRevision = null) =>
         RenderCore(GetSource(source, Identity), templateRevision, dependencies, evaluate, null, environmentRevision);
 
-    public IReadOnlyList<TChild> Render<TKey>(IEnumerable<TItem>? source, object templateRevision,
-        AkburaForeachDependencies dependencies, Func<AkburaForeachFrame<TItem, TChild>, LoopFlow> evaluate,
-        Func<TItem, TKey> keySelector, object keyRevision, IEqualityComparer<TKey>? comparer = null,
-        object? environmentRevision = null)
+    public IReadOnlyList<TChild> Render<TKey>(
+        IEnumerable<TItem>? source, object templateRevision, AkburaForeachDependencies dependencies,
+        Func<AkburaForeachFrame<TItem, TChild>, LoopFlow> evaluate, Func<TItem, TKey> keySelector, object keyRevision,
+        IEqualityComparer<TKey>? comparer = null, object? environmentRevision = null)
     {
         ArgumentNullException.ThrowIfNull(keySelector);
         ArgumentNullException.ThrowIfNull(keyRevision);
@@ -54,18 +56,20 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
             GetKeyContract(keySelector, keyRevision, comparer), environmentRevision);
     }
 
-    public IReadOnlyList<TChild> Render<TSource>(IEnumerable<TSource>? source, Func<TSource, TItem> convert,
-        object templateRevision, AkburaForeachDependencies dependencies,
-        Func<AkburaForeachFrame<TItem, TChild>, LoopFlow> evaluate, object? environmentRevision = null)
+    public IReadOnlyList<TChild> Render<TSource>(
+        IEnumerable<TSource>? source, Func<TSource, TItem> convert, object templateRevision,
+        AkburaForeachDependencies dependencies, Func<AkburaForeachFrame<TItem, TChild>, LoopFlow> evaluate,
+        object? environmentRevision = null)
     {
         ArgumentNullException.ThrowIfNull(convert);
         return RenderCore(GetSource(source, convert), templateRevision, dependencies, evaluate, null, environmentRevision);
     }
 
-    public IReadOnlyList<TChild> Render<TSource, TKey>(IEnumerable<TSource>? source, Func<TSource, TItem> convert,
-        object templateRevision, AkburaForeachDependencies dependencies,
-        Func<AkburaForeachFrame<TItem, TChild>, LoopFlow> evaluate, Func<TItem, TKey> keySelector,
-        object keyRevision, IEqualityComparer<TKey>? comparer = null, object? environmentRevision = null)
+    public IReadOnlyList<TChild> Render<TSource, TKey>(
+        IEnumerable<TSource>? source, Func<TSource, TItem> convert, object templateRevision,
+        AkburaForeachDependencies dependencies, Func<AkburaForeachFrame<TItem, TChild>, LoopFlow> evaluate,
+        Func<TItem, TKey> keySelector, object keyRevision, IEqualityComparer<TKey>? comparer = null,
+        object? environmentRevision = null)
     {
         ArgumentNullException.ThrowIfNull(convert);
         ArgumentNullException.ThrowIfNull(keySelector);
@@ -74,19 +78,21 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
             GetKeyContract(keySelector, keyRevision, comparer), environmentRevision);
     }
 
-    public IReadOnlyList<TChild> RenderNonGeneric(System.Collections.IEnumerable? source,
-        Func<object?, TItem> convert, object templateRevision, AkburaForeachDependencies dependencies,
-        Func<AkburaForeachFrame<TItem, TChild>, LoopFlow> evaluate, object? environmentRevision = null)
+    public IReadOnlyList<TChild> RenderNonGeneric(
+        System.Collections.IEnumerable? source, Func<object?, TItem> convert, object templateRevision,
+        AkburaForeachDependencies dependencies, Func<AkburaForeachFrame<TItem, TChild>, LoopFlow> evaluate,
+        object? environmentRevision = null)
     {
         ArgumentNullException.ThrowIfNull(convert);
         return RenderCore(GetNonGenericSource(source, convert), templateRevision, dependencies,
             evaluate, null, environmentRevision);
     }
 
-    public IReadOnlyList<TChild> RenderNonGeneric<TKey>(System.Collections.IEnumerable? source,
-        Func<object?, TItem> convert, object templateRevision, AkburaForeachDependencies dependencies,
-        Func<AkburaForeachFrame<TItem, TChild>, LoopFlow> evaluate, Func<TItem, TKey> keySelector,
-        object keyRevision, IEqualityComparer<TKey>? comparer = null, object? environmentRevision = null)
+    public IReadOnlyList<TChild> RenderNonGeneric<TKey>(
+        System.Collections.IEnumerable? source, Func<object?, TItem> convert, object templateRevision,
+        AkburaForeachDependencies dependencies, Func<AkburaForeachFrame<TItem, TChild>, LoopFlow> evaluate,
+        Func<TItem, TKey> keySelector, object keyRevision, IEqualityComparer<TKey>? comparer = null,
+        object? environmentRevision = null)
     {
         ArgumentNullException.ThrowIfNull(convert);
         ArgumentNullException.ThrowIfNull(keySelector);
@@ -103,9 +109,13 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
 
     private static TItem Identity(TItem value) => value;
 
-    private IReadOnlyList<TChild> RenderCore(SourceAccess source, object templateRevision,
-        AkburaForeachDependencies dependencies, Func<AkburaForeachFrame<TItem, TChild>, LoopFlow> evaluate,
-        KeyContract? keys, object? environmentRevision)
+    private IReadOnlyList<TChild> RenderCore(
+        SourceAccess source,
+        object templateRevision,
+        AkburaForeachDependencies dependencies,
+        Func<AkburaForeachFrame<TItem, TChild>, LoopFlow> evaluate,
+        KeyContract? keys,
+        object? environmentRevision)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(templateRevision);
@@ -123,36 +133,65 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
         var sourceChanged = !ReferenceEquals(source, _source);
         var keyChanged = keys == null ? _keys != null : !keys.HasSameIdentity(_keys);
         var templateChanged = !_hasRendered || _invalidated || !Equals(templateRevision, _templateRevision);
+        var dependenciesChanged = _hasRendered && dependencies != _dependencies;
+
         var environmentChanged = (dependencies & (AkburaForeachDependencies.ReadsComponentEnvironment |
             AkburaForeachDependencies.HasCrossIterationState | AkburaForeachDependencies.HasOpaqueEffectsOrReads)) != 0 &&
             (environmentRevision == null || !Equals(environmentRevision, _environmentRevision));
+
         var notifier = source.Identity as System.Collections.Specialized.INotifyCollectionChanged;
         var observed = notifier != null;
         var leaseChanged = observed && (_lease == null || sourceChanged);
+
         var keyEnvironmentChanged = keys != null &&
             (dependencies & AkburaForeachDependencies.KeysReadComponentEnvironment) != 0 &&
             (environmentRevision == null || !Equals(environmentRevision, _environmentRevision));
-        var sourceDirty = sourceChanged || keyChanged || keyEnvironmentChanged || leaseChanged || _lease?.NeedsSnapshot == true ||
-            _lease?.Packets.Count > 0;
-        var enumeratePlain = !observed && (!source.IsImmutable || sourceChanged || keyChanged || !_hasRendered);
+
+        var sourceDirty = sourceChanged || keyChanged || keyEnvironmentChanged || leaseChanged ||
+            _lease?.NeedsSnapshot == true || _lease?.Packets.Count > 0;
+
         var itemDirty = HasDirtyItems &&
             (dependencies & AkburaForeachDependencies.ReadsNotifyingItemProperties) != 0;
-        if (!templateChanged && !environmentChanged && !sourceDirty && !enumeratePlain && !itemDirty && !_resumeDirty)
+
+        var needsUpdate = templateChanged || environmentChanged || dependenciesChanged ||
+            sourceDirty || itemDirty || _resumeDirty;
+
+        // Immutable source normally does not need another enumeration when its identity
+        // has not changed. The exception is an earlier streaming render stopped by break.
+        // In that case _records contain only the reached prefix.
+        //
+        // Snapshot incompleteness alone must not cause enumeration. If nothing affecting
+        // execution changed, the normal no-op fast path must remain intact.
+        var replayIncompleteImmutable = !observed &&
+            source.IsImmutable &&
+            _hasRendered &&
+            !_sourceSnapshotComplete &&
+            needsUpdate;
+
+        var enumeratePlain = !observed &&
+            (!source.IsImmutable || sourceChanged || keyChanged || !_hasRendered || replayIncompleteImmutable);
+
+        if (!needsUpdate && !enumeratePlain)
         {
             return _children;
         }
 
         var lease = leaseChanged ? new SourceLease(this, notifier!, ++_nextEpoch) : observed ? _lease : null;
+
         var update = new RegionUpdate(source, keys, lease, lease?.Sequence ?? 0,
-            templateRevision, environmentRevision, templateChanged, dependencies, _itemSequence)
+            templateRevision, environmentRevision, templateChanged, dependencies,
+            _itemSequence, _sourceSnapshotComplete)
         {
             Records = _records.Select(static record => record.Clone()).ToList(),
         };
+
         _update = update;
 
         try
         {
-            var rebuild = sourceChanged || keyChanged || keyEnvironmentChanged || leaseChanged || lease?.NeedsSnapshot == true;
+            var rebuild = sourceChanged || keyChanged || keyEnvironmentChanged ||
+                leaseChanged || lease?.NeedsSnapshot == true;
+
             if (observed && !rebuild && !ApplyPackets(update))
             {
                 rebuild = true;
@@ -169,6 +208,7 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
                     }
 
                     record.Dirty = true;
+
                     if (!rebuild && observed && keys != null)
                     {
                         var currentKey = keys.Select(record.Item);
@@ -180,9 +220,14 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
                 }
             }
 
-            var globalDirty = templateChanged || environmentChanged || _resumeDirty || (sourceDirty || itemDirty) &&
+            var globalDirty = templateChanged || environmentChanged || dependenciesChanged || _resumeDirty ||
+                (sourceDirty || itemDirty) &&
                 (dependencies & (AkburaForeachDependencies.ReadsSourceWideData |
-                    AkburaForeachDependencies.HasCrossIterationState | AkburaForeachDependencies.HasOpaqueEffectsOrReads)) != 0;
+                    AkburaForeachDependencies.HasCrossIterationState |
+                    AkburaForeachDependencies.HasOpaqueEffectsOrReads)) != 0;
+
+            // Plain sources keep streaming semantics. This includes an immutable source
+            // whose previous streaming pass stopped at break and now has to be replayed.
             if (!observed && enumeratePlain)
             {
                 RenderStreaming(update, evaluate, globalDirty, keyChanged, dependencies);
@@ -193,21 +238,30 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
                 {
                     var before = lease?.Sequence ?? 0;
                     var values = source.Enumerate().ToList();
+
                     if (lease != null && lease.Sequence != before)
                     {
                         lease.NeedsSnapshot = true;
-                        throw new InvalidOperationException("A foreach source changed during its snapshot enumeration.");
+                        throw new InvalidOperationException(
+                            "A foreach source changed during its snapshot enumeration.");
                     }
 
                     update.Sequence = before;
                     update.Records = ReconcileSnapshot(values, keys, keyChanged);
+
+                    // Enumerate().ToList() reached the natural end of the source.
+                    // The snapshot is complete even if body evaluation later stops at break.
+                    update.SourceSnapshotComplete = true;
                 }
 
                 ValidateKeys(update.Records, keys);
+
                 var stopped = false;
+
                 for (var i = 0; i < update.Records.Count; i++)
                 {
                     var record = update.Records[i];
+
                     if (stopped)
                     {
                         record.Frame = null;
@@ -219,13 +273,15 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
 
                     var indexDirty = record.Index != i &&
                         (dependencies & AkburaForeachDependencies.UsesSourceIndex) != 0;
+
                     Evaluate(update, record, i, evaluate, globalDirty || indexDirty);
                     stopped = record.Flow == LoopFlow.Break;
                 }
             }
 
             update.Children = [.. update.Records.Where(static record => record.Frame != null)
-                .SelectMany(static record => record.Frame!.Children)];
+            .SelectMany(static record => record.Frame!.Children)];
+
             foreach (var frame in update.Frames)
             {
                 frame.Prepare();
@@ -248,22 +304,29 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
         }
     }
 
-    private void RenderStreaming(RegionUpdate update,
-        Func<AkburaForeachFrame<TItem, TChild>, LoopFlow> evaluate, bool dirty, bool keyChanged,
+    private void RenderStreaming(
+        RegionUpdate update,
+        Func<AkburaForeachFrame<TItem, TChild>, LoopFlow> evaluate,
+        bool dirty,
+        bool keyChanged,
         AkburaForeachDependencies dependencies)
     {
         var desired = new List<Occurrence>();
         var oldKeys = !keyChanged && update.Keys != null ? IndexKeys(_records, update.Keys) : null;
         var seen = update.Keys != null ? new HashSet<object>(update.Keys.Comparer) : null;
+        var snapshotComplete = true;
+
         foreach (var item in update.Source.Enumerate())
         {
             var key = update.Keys?.Select(item);
+
             if (key != null && !seen!.Add(key))
             {
                 throw new InvalidOperationException("A foreach iteration key occurs more than once in this region.");
             }
 
             Occurrence record;
+
             if (oldKeys != null && oldKeys.TryGetValue(key!, out var keyed))
             {
                 record = keyed.Clone();
@@ -281,17 +344,24 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
             record.Item = item;
             record.Key = key;
             desired.Add(record);
+
             var index = desired.Count - 1;
             var indexDirty = record.Index != index &&
                 (dependencies & AkburaForeachDependencies.UsesSourceIndex) != 0;
+
             Evaluate(update, record, index, evaluate, dirty || indexDirty);
+
             if (record.Flow == LoopFlow.Break)
             {
+                // Do not probe MoveNext again just to determine whether this happened
+                // to be the last item. Reading beyond break would violate streaming semantics.
+                snapshotComplete = false;
                 break;
             }
         }
 
         update.Records = desired;
+        update.SourceSnapshotComplete = snapshotComplete;
     }
 
     private List<Occurrence> ReconcileSnapshot(List<TItem> values, KeyContract? keys, bool keyChanged)
@@ -388,7 +458,9 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
         record.Dirty = false;
     }
 
-    /// <summary>Publishes prepared frames only after their shared target collection succeeded.</summary>
+    /// <summary>
+    /// Publishes prepared frames only after their shared target collection succeeded.
+    /// </summary>
     public void Commit()
     {
         if (_update is not { } update)
@@ -398,6 +470,7 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
 
         var previous = _records;
         var previousLease = _lease;
+
         _records = update.Records;
         _children = update.Children;
         _source = update.Source;
@@ -405,18 +478,23 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
         _lease = update.Lease;
         _templateRevision = update.TemplateRevision;
         _environmentRevision = update.EnvironmentRevision;
+        _dependencies = update.Dependencies;
+        _sourceSnapshotComplete = update.SourceSnapshotComplete;
         _hasRendered = true;
         _invalidated = false;
         _resumeDirty = false;
         _update = null;
+
         _lease?.Acknowledge(update.Sequence);
         CompleteItemPropertyLeases(update);
+
         if (!ReferenceEquals(previousLease, _lease))
         {
             previousLease?.Dispose();
         }
 
         List<Exception>? failures = null;
+
         foreach (var frame in update.Frames)
         {
             TryCleanup(frame.Commit, ref failures);
@@ -426,7 +504,9 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
         ThrowCleanupFailures(failures);
     }
 
-    /// <summary>Leaves source packets unapplied for retry; it does not undo the user's source mutation.</summary>
+    /// <summary>
+    /// Leaves source packets unapplied for retry; it does not undo the user's source mutation.
+    /// </summary>
     public void Abort()
     {
         if (_update is not { } update)
@@ -538,7 +618,9 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
         }
     }
 
-    private static void ReleaseRemovedFrames(List<Occurrence> previous, List<Occurrence> desired,
+    private static void ReleaseRemovedFrames(
+        List<Occurrence> previous,
+        List<Occurrence> desired,
         ref List<Exception>? failures)
     {
         var retained = new HashSet<AkburaForeachFrame<TItem, TChild>>(
@@ -591,9 +673,17 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
         };
     }
 
-    private sealed class RegionUpdate(SourceAccess source, KeyContract? keys, SourceLease? lease,
-        long sequence, object templateRevision, object? environmentRevision, bool templateChanged,
-        AkburaForeachDependencies dependencies, long itemSequence)
+    private sealed class RegionUpdate(
+        SourceAccess source,
+        KeyContract? keys,
+        SourceLease? lease,
+        long sequence,
+        object templateRevision,
+        object? environmentRevision,
+        bool templateChanged,
+        AkburaForeachDependencies dependencies,
+        long itemSequence,
+        bool sourceSnapshotComplete)
     {
         public SourceAccess Source { get; } = source;
         public KeyContract? Keys { get; } = keys;
@@ -604,6 +694,7 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
         public bool TemplateChanged { get; } = templateChanged;
         public AkburaForeachDependencies Dependencies { get; } = dependencies;
         public long ItemSequence { get; } = itemSequence;
+        public bool SourceSnapshotComplete { get; set; } = sourceSnapshotComplete;
         public List<Occurrence> Records { get; set; } = [];
         public TChild[] Children { get; set; } = [];
         public List<AkburaForeachFrame<TItem, TChild>> Frames { get; } = [];

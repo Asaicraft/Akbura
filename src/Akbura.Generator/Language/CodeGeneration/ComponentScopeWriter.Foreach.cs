@@ -107,9 +107,9 @@ internal readonly ref partial struct ComponentScopeWriter
         WriteForeachRegionAccess(plan, region);
         _writer.WriteLine(";");
         WriteForeachRender(plan, region, context, name);
-        // A single coordinator will reconcile this contribution with static
-        // siblings and conditional regions. No per-loop target mutation.
-        _writer.Write(changed).WriteLine(" = true;");
+        // The outer collection only needs reconciliation when this region changes
+        // membership or order. Pending frames still commit through the owner frame.
+        _writer.Write(changed).Write(" |= ").Write(name).WriteLine(".ChildrenChanged;");
         _writer.Write(cursor).Write(".AdvanceDynamicRegion(").Write(name).WriteLine(".Children.Count);");
     }
 

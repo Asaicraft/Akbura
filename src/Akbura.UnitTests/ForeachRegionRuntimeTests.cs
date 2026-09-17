@@ -164,8 +164,76 @@ public sealed class ForeachRegionRuntimeTests
             Assert.Equal(1, source.EnumerationCount);
             Assert.Equal(2, calls);
             Assert.Same(children, region.Children);
+            Assert.False(region.ChildrenChanged);
+            Assert.Equal(1, region.ChildrenVersion);
             Assert.False(region.HasPendingUpdate);
             Assert.Equal(1, source.SubscriptionCount);
+        });
+    }
+
+    [Fact]
+    public async Task ChildrenVersion_TracksMembershipAndOrderInsteadOfPropertyOnlyUpdates()
+    {
+        await OnDispatcher(() =>
+        {
+            var source = new CountingObservable<int>([1, 2]);
+            using var region = new AkburaForeachRegion<int, TextBlock>(() => { });
+            var label = "first";
+
+            LoopFlow Emit(AkburaForeachFrame<int, TextBlock> frame)
+            {
+                var child = frame.GetOrCreate(0, () => new TextBlock());
+                child.Text = $"{frame.Item}:{label}";
+                frame.Emit(child);
+                return LoopFlow.Next;
+            }
+
+            region.Render(source, "body", AkburaForeachDependencies.ReadsComponentEnvironment,
+                Emit, environmentRevision: 0);
+            Assert.True(region.ChildrenChanged);
+            Assert.Equal(1, region.ChildrenVersion);
+            region.Commit();
+
+            var original = region.Children.ToArray();
+            Assert.False(region.ChildrenChanged);
+            Assert.Equal(1, region.ChildrenVersion);
+
+            region.Render(source, "body", AkburaForeachDependencies.ReadsComponentEnvironment,
+                Emit, environmentRevision: 0);
+            Assert.False(region.HasPendingUpdate);
+            Assert.False(region.ChildrenChanged);
+            Assert.Equal(1, region.ChildrenVersion);
+
+            label = "second";
+            region.Render(source, "body", AkburaForeachDependencies.ReadsComponentEnvironment,
+                Emit, environmentRevision: 1);
+            Assert.True(region.HasPendingUpdate);
+            Assert.False(region.ChildrenChanged);
+            Assert.Equal(1, region.ChildrenVersion);
+            Assert.Same(original[0], region.Children[0]);
+            Assert.Same(original[1], region.Children[1]);
+            Assert.Equal(new[] { "1:second", "2:second" }, region.Children.Select(static child => child.Text));
+            region.Commit();
+
+            source.MoveRange(0, 1, 1);
+            region.Render(source, "body", AkburaForeachDependencies.ReadsComponentEnvironment,
+                Emit, environmentRevision: 1);
+            Assert.True(region.ChildrenChanged);
+            Assert.Equal(2, region.ChildrenVersion);
+            Assert.Same(original[1], region.Children[0]);
+            Assert.Same(original[0], region.Children[1]);
+            region.Commit();
+
+            source.AddRange(2, [3]);
+            region.Render(source, "body", AkburaForeachDependencies.ReadsComponentEnvironment,
+                Emit, environmentRevision: 1);
+            Assert.True(region.ChildrenChanged);
+            Assert.Equal(3, region.ChildrenVersion);
+            region.Abort();
+
+            Assert.False(region.ChildrenChanged);
+            Assert.Equal(2, region.ChildrenVersion);
+            Assert.Equal(2, region.Children.Count);
         });
     }
 

@@ -22,6 +22,7 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
     private RegionUpdate? _update;
     private long _nextOccurrence;
     private long _nextEpoch;
+    private long _childrenVersion;
     private bool _hasRendered;
     private bool _invalidated;
     private bool _suspended;
@@ -37,6 +38,8 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
     }
 
     public IReadOnlyList<TChild> Children => _update?.Children ?? _children;
+    public bool ChildrenChanged => _update?.ChildrenChanged == true;
+    public long ChildrenVersion => ChildrenChanged ? unchecked(_childrenVersion + 1) : _childrenVersion;
     public bool HasPendingUpdate => _update != null;
     public long SourceEpoch => _update?.Lease?.Epoch ?? _lease?.Epoch ?? 0;
 
@@ -281,6 +284,7 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
 
             update.Children = [.. update.Records.Where(static record => record.Frame != null)
             .SelectMany(static record => record.Frame!.Children)];
+            update.ChildrenChanged = !SameChildren(_children, update.Children);
 
             foreach (var frame in update.Frames)
             {
@@ -430,6 +434,27 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
     private static bool SameItem(TItem first, TItem second) => typeof(TItem).IsValueType ?
         EqualityComparer<TItem>.Default.Equals(first, second) : ReferenceEquals(first, second);
 
+    private static bool SameChildren(IReadOnlyList<TChild> first, IReadOnlyList<TChild> second)
+    {
+        if (first.Count != second.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < first.Count; i++)
+        {
+            if (!SameChild(first[i], second[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool SameChild(TChild first, TChild second) => typeof(TChild).IsValueType ?
+        EqualityComparer<TChild>.Default.Equals(first, second) : ReferenceEquals(first, second);
+
     private static void Evaluate(RegionUpdate update, Occurrence record, int index,
         Func<AkburaForeachFrame<TItem, TChild>, LoopFlow> evaluate, bool dirty)
     {
@@ -473,6 +498,10 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
 
         _records = update.Records;
         _children = update.Children;
+        if (update.ChildrenChanged)
+        {
+            _childrenVersion = unchecked(_childrenVersion + 1);
+        }
         _source = update.Source;
         _keys = update.Keys;
         _lease = update.Lease;
@@ -590,6 +619,7 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
         ReleaseRemovedFrames(_records, [], ref failures);
         _records = [];
         _children = [];
+        _childrenVersion = 0;
         _source = null;
         _keys = null;
         _templateRevision = null;
@@ -695,6 +725,7 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
         public AkburaForeachDependencies Dependencies { get; } = dependencies;
         public long ItemSequence { get; } = itemSequence;
         public bool SourceSnapshotComplete { get; set; } = sourceSnapshotComplete;
+        public bool ChildrenChanged { get; set; }
         public List<Occurrence> Records { get; set; } = [];
         public TChild[] Children { get; set; } = [];
         public List<AkburaForeachFrame<TItem, TChild>> Frames { get; } = [];

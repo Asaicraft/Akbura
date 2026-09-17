@@ -8,6 +8,84 @@ namespace Akbura.UnitTests;
 [Collection(AvaloniaHeadlessCollection.Name)]
 public sealed class MarkupForeachComponentWriterTests
 {
+    [Fact]
+    public void StructuralForeach_UsesMembershipSignalAndKeepsLayoutRecoveryGuard()
+    {
+        var fixture = AkcssActivatorPlannerTests.CreateFixture(
+            "using Avalonia.Controls; using Demo; " +
+            """
+            <StackPanel>
+                $foreach (var item in Items)
+                {
+                    <TextBlock Text={item.ToString()} />
+                }
+            </StackPanel>
+            """,
+            OwnerSource);
+        var root = fixture.ComponentTree.GetRoot();
+        var component = Assert.IsType<Akbura.Language.Symbols.IAkburaComponentSymbol>(
+            fixture.SemanticModel.GetSymbolInfo(root).Symbol, exactMatch: false);
+        var generated = Akbura.Language.CodeGeneration.ComponentDocumentWriter.Generate(
+            component,
+            fixture.SemanticModel,
+            "Views/PlannerView.akbura",
+            new System.Collections.Generic.Dictionary<Akbura.Language.Syntax.AkburaSyntax, string>(),
+            mode: Akbura.Language.CodeGeneration.ComponentGenerationMode.DebugStructural);
+
+        var generatedText = generated.ToString();
+
+        Assert.Contains(
+            "__conditionalChanged0 |= __foreachRegion0.ChildrenChanged;",
+            generatedText,
+            StringComparison.Ordinal);
+
+        Assert.DoesNotContain(
+            "__conditionalChanged0 = true;",
+            generatedText,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            ".IsCollectionLayoutCurrent(",
+            generatedText,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task UnchangedForeach_RepairsExternallyInterleavedTargetLayout()
+    {
+        var type = MarkupConditionalComponentWriterTests.Compile(
+            """
+            <StackPanel>
+                $foreach (var item in Items)
+                {
+                    <TextBlock Text={item.ToString()} />
+                }
+            </StackPanel>
+            """,
+            structural: true,
+            ownerSource: OwnerSource);
+
+        await AvaloniaHeadlessTestSession.GetSession().Dispatch(() =>
+        {
+            var owner = Create(type);
+            var panel = Assert.IsType<StackPanel>(Invoke(owner, "FirstForTest"));
+            var generated = panel.Children.ToArray();
+            var foreign = new Border();
+
+            panel.Children.Insert(2, foreign);
+
+            Invoke(owner, "UpdateForTest");
+
+            Assert.Equal(generated.Length + 1, panel.Children.Count);
+            for (var i = 0; i < generated.Length; i++)
+            {
+                Assert.Same(generated[i], panel.Children[i]);
+            }
+
+            Assert.Same(foreign, panel.Children[^1]);
+        }, CancellationToken.None);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

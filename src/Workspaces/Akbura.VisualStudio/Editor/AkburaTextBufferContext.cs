@@ -1,4 +1,4 @@
-﻿using Akbura.Workspaces;
+using Akbura.Workspaces;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;

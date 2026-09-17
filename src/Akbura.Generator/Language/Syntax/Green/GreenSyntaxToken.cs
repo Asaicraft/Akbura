@@ -1,4 +1,4 @@
-﻿using Akbura.Collections;
+using Akbura.Collections;
 using System.Diagnostics;
 using System.Collections.Immutable;
 using CsharpRawNode = Microsoft.CodeAnalysis.SyntaxNode;

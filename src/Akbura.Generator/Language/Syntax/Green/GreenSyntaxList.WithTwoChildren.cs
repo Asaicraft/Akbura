@@ -1,4 +1,4 @@
-﻿using Akbura.Collections;
+using Akbura.Collections;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;

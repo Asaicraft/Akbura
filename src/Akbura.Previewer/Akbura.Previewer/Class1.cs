@@ -1,4 +1,4 @@
-﻿namespace Akbura.Previewer;
+namespace Akbura.Previewer;
 
 public class Class1
 {

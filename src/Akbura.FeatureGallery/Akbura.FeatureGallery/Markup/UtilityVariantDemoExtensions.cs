@@ -1,4 +1,4 @@
-﻿using Akbura.Markup;
+using Akbura.Markup;
 
 using Avalonia;
 using Avalonia.Input;

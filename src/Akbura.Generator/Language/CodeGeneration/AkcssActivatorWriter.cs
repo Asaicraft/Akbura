@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Binder;
+using Akbura.Language.Binder;
 using Akbura.Language.Operations;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;

@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Operations;
+using Akbura.Language.Operations;
 using Microsoft.CodeAnalysis;
 
 namespace Akbura.Language.CodeGeneration;

@@ -1,4 +1,4 @@
-﻿namespace Akbura;
+namespace Akbura;
 
 /// <summary>
 /// All methods in this class shoud be intercepted

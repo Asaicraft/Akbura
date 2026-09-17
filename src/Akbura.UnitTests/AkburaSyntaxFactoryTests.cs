@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Syntax;
+using Akbura.Language.Syntax;
 using System.Text;
 using static Akbura.Language.Syntax.SyntaxFactory;
 

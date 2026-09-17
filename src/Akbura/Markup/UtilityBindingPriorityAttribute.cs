@@ -1,4 +1,4 @@
-﻿using Avalonia.Data;
+using Avalonia.Data;
 
 namespace Akbura.Markup;
 

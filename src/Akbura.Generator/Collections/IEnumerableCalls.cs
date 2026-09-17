@@ -1,4 +1,4 @@
-﻿// This file is ported and adapted from the Roslyn (dotnet/roslyn)
+// This file is ported and adapted from the Roslyn (dotnet/roslyn)
 
 using System;
 using System.Collections;

@@ -1,4 +1,4 @@
-﻿using Akbura.ComponentTree;
+using Akbura.ComponentTree;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

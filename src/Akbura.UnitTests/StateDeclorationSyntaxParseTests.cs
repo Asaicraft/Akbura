@@ -1,4 +1,4 @@
-﻿using Akbura.Language;
+using Akbura.Language;
 using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;

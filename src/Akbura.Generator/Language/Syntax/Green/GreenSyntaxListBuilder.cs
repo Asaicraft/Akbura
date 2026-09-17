@@ -1,4 +1,4 @@
-﻿using Akbura.Collections;
+using Akbura.Collections;
 using System;
 using System.Buffers;
 using System.Collections.Generic;

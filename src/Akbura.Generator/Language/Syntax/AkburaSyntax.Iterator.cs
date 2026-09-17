@@ -1,4 +1,4 @@
-﻿using Akbura.Pools;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;

@@ -1,4 +1,4 @@
-﻿using Akbura.Workspaces;
+using Akbura.Workspaces;
 using Microsoft.VisualStudio.Text.Classification;
 
 using RoslynClassificationTypeNames =

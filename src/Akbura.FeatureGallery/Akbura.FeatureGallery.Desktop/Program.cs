@@ -1,4 +1,4 @@
-﻿using Akbura.Engine;
+using Akbura.Engine;
 using Avalonia;
 using System;
 

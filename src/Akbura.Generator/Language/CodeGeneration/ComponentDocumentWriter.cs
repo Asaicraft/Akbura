@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Symbols;
+using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;

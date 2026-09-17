@@ -1,4 +1,4 @@
-﻿using Akbura.VisualStudio.Editor;
+using Akbura.VisualStudio.Editor;
 using Akbura.Workspaces;
 using Microsoft.VisualStudio.Language.Intellisense;
 using Microsoft.VisualStudio.Shell;

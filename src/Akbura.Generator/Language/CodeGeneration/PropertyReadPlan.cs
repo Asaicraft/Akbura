@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Symbols;
+using Akbura.Language.Symbols;
 using Microsoft.CodeAnalysis;
 using System.Diagnostics;
 using AkburaPropertySymbol = Akbura.Language.Symbols.IPropertySymbol;

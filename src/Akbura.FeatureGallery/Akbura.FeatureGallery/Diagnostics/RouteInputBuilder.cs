@@ -1,4 +1,4 @@
-﻿#if DEBUG
+#if DEBUG
 using Akbura.Diagnostics;
 using Akbura.FeatureGallery.Components;
 using Avalonia.Controls;

@@ -1,4 +1,4 @@
-﻿// This file is ported and adopted from KirillOsenkov/XmlParser
+// This file is ported and adopted from KirillOsenkov/XmlParser
 
 using System;
 using System.Collections.Generic;

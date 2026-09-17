@@ -1,4 +1,4 @@
-﻿// This file is adopted and ported from dotnet/runtime
+// This file is adopted and ported from dotnet/runtime
 
 
 using System.Runtime.CompilerServices;

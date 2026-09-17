@@ -1,4 +1,4 @@
-﻿// This file is ported and adopted from roslyn
+// This file is ported and adopted from roslyn
 
 using Akbura.Pools;
 using System.Diagnostics.CodeAnalysis;

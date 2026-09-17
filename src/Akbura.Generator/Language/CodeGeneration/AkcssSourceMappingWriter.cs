@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Syntax;
+using Akbura.Language.Syntax;
 using System.Diagnostics;
 
 namespace Akbura.Language.CodeGeneration;

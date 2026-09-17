@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Syntax.Green;
+using Akbura.Language.Syntax.Green;
 using CsharpRawNode = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxNode;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;

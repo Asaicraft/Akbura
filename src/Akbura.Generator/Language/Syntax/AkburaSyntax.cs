@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Syntax.Green;
+using Akbura.Language.Syntax.Green;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using System;

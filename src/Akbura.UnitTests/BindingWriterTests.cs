@@ -1,4 +1,4 @@
-﻿using Akbura.Language;
+using Akbura.Language;
 using Akbura.Language.Binder;
 using Akbura.Language.CodeGeneration;
 using Akbura.Language.Operations;

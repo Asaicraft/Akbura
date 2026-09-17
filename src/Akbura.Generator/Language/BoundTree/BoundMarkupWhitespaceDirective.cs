@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Symbols;
+using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using BinderType = Akbura.Language.Binder.Binder;
 using System.Collections.Immutable;

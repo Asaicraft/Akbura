@@ -1,4 +1,4 @@
-﻿using Akbura.Collections;
+using Akbura.Collections;
 using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
 using Akbura.Pools;

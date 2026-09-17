@@ -1,4 +1,4 @@
-﻿// This file is ported and adopted from 
+// This file is ported and adopted from 
 
 using System;
 using System.Collections.Generic;

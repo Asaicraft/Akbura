@@ -1,4 +1,4 @@
-﻿using Avalonia.Markup.Xaml;
+using Avalonia.Markup.Xaml;
 using Avalonia.Markup.Xaml.XamlIl.Runtime;
 using System;
 using System.Collections.Generic;

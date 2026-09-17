@@ -1,4 +1,4 @@
-﻿using Akbura.Engine;
+using Akbura.Engine;
 using Akbura.FeatureGallery;
 using Avalonia;
 using Avalonia.Browser;

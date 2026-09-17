@@ -1,4 +1,4 @@
-﻿using Akbura.Pools;
+using Akbura.Pools;
 using System;
 using System.Diagnostics;
 using CSharpExpressionSyntax = Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax;

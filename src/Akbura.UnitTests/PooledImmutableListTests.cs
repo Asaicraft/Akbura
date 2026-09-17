@@ -1,4 +1,4 @@
-﻿using Akbura.Pools;
+using Akbura.Pools;
 using System.Collections;
 
 namespace Akbura.UnitTests;

@@ -1,4 +1,4 @@
-﻿using Akbura.Language.CodeGeneration;
+using Akbura.Language.CodeGeneration;
 using CSharpSymbolDefinition = Akbura.Language.Symbols.CSharpSymbolDefinition;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;

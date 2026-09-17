@@ -1,4 +1,4 @@
-﻿using Akbura.Language.CodeGeneration;
+using Akbura.Language.CodeGeneration;
 using Microsoft.CodeAnalysis;
 using Xunit;
 

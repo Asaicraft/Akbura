@@ -1,4 +1,4 @@
-﻿using Akbura.Markup;
+using Akbura.Markup;
 using System;
 using System.Collections.Generic;
 using System.Text;

@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using System.Runtime.InteropServices;
 
 namespace Akbura.Engine;

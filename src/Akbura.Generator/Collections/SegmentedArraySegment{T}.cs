@@ -1,4 +1,4 @@
-﻿using Akbura;
+using Akbura;
 using System;
 using System.Collections.Generic;
 using System.Linq;

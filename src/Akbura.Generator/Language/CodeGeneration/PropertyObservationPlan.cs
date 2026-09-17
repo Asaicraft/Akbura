@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis;
 using System.Diagnostics;
 using AkburaPropertySymbol = Akbura.Language.Symbols.IPropertySymbol;
 using RoslynPropertySymbol = Microsoft.CodeAnalysis.IPropertySymbol;

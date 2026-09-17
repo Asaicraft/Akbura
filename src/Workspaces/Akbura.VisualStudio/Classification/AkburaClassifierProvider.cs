@@ -1,4 +1,4 @@
-﻿using Akbura.VisualStudio.Editor;
+using Akbura.VisualStudio.Editor;
 using Microsoft.VisualStudio.LanguageServices;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Classification;

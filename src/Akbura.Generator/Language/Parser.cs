@@ -1,4 +1,4 @@
-﻿// this file is ported and adapted from roslyn
+// this file is ported and adapted from roslyn
 
 using Akbura.Collections;
 using Akbura.Language.Syntax;

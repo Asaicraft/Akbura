@@ -103,4 +103,9 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_UnsupportedConditionalTemplateRoot = nameof(AKBURA_SEMANTIC_UnsupportedConditionalTemplateRoot);
     public const string AKBURA_SEMANTIC_UnsupportedConditionalTemplateCapture = nameof(AKBURA_SEMANTIC_UnsupportedConditionalTemplateCapture);
     public const string AKBURA_SEMANTIC_ConditionalTemplateItemOutsideBuild = nameof(AKBURA_SEMANTIC_ConditionalTemplateItemOutsideBuild);
+    public const string AKBURA_SEMANTIC_UnsupportedForeachContentDestination = nameof(AKBURA_SEMANTIC_UnsupportedForeachContentDestination);
+    public const string AKBURA_SEMANTIC_UnsupportedForeachHeader = nameof(AKBURA_SEMANTIC_UnsupportedForeachHeader);
+    public const string AKBURA_SEMANTIC_ForeachIndexRedeclaration = nameof(AKBURA_SEMANTIC_ForeachIndexRedeclaration);
+    public const string AKBURA_SEMANTIC_UnsupportedForeachStatement = nameof(AKBURA_SEMANTIC_UnsupportedForeachStatement);
+    public const string AKBURA_SEMANTIC_ForeachKeyInvalid = nameof(AKBURA_SEMANTIC_ForeachKeyInvalid);
 }

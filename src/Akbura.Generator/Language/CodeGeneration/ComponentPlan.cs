@@ -48,6 +48,7 @@ internal enum ComponentElementScopeKind : byte
     DeferredContent,
     DataTemplate,
     ConditionalBranch,
+    ForeachIteration,
 }
 
 [Flags]
@@ -531,7 +532,8 @@ internal readonly struct ComponentPlan
         PooledImmutableList<ComponentRenderStatementPlan> renderStatements,
         AkcssComponentActivatorPlan akcss,
         PooledImmutableList<ComponentConditionalRegionPlan> conditionalRegions = default,
-        PooledImmutableList<ComponentConditionalContentPlan> conditionalContents = default)
+        PooledImmutableList<ComponentConditionalContentPlan> conditionalContents = default,
+        PooledImmutableList<ComponentForeachPlan> foreachRegions = default)
     {
         Elements = elements;
         RootElementIds = rootElementIds;
@@ -564,6 +566,7 @@ internal readonly struct ComponentPlan
         Akcss = akcss;
         ConditionalRegions = conditionalRegions;
         ConditionalContents = conditionalContents;
+        ForeachRegions = foreachRegions;
     }
 
     public PooledImmutableList<ComponentElementPlan> Elements { get; }
@@ -620,6 +623,8 @@ internal readonly struct ComponentPlan
 
     public PooledImmutableList<ComponentConditionalContentPlan> ConditionalContents { get; }
 
+    public PooledImmutableList<ComponentForeachPlan> ForeachRegions { get; }
+
     public bool HasConditionalRegions => !ConditionalRegions.IsEmpty;
 
     public bool IsEmpty => Elements.IsEmpty;
@@ -657,5 +662,6 @@ internal readonly struct ComponentPlan
         Akcss.ReturnToPool();
         ConditionalRegions.ReturnToPool();
         ConditionalContents.ReturnToPool();
+        ForeachRegions.ReturnToPool();
     }
 }

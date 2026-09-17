@@ -26,4 +26,14 @@ public struct AkburaRenderContentCursor
         VirtualSlot += reservedCapacity;
         Delta += reservedCapacity - activeCount;
     }
+
+    /// <summary>Advances one variable-width contribution without imposing a maximum child count.</summary>
+    public void AdvanceDynamicRegion(int activeCount)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(activeCount);
+        var virtualSlot = checked(VirtualSlot + 1);
+        var delta = checked(Delta + 1 - activeCount);
+        VirtualSlot = virtualSlot;
+        Delta = delta;
+    }
 }

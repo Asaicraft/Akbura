@@ -12,7 +12,7 @@ public sealed partial class AkburaRenderState
         {
             try
             {
-                pending.Abort(throwOnFailure: true);
+                AbortRevisionOwnership(pending);
             }
             catch (Exception exception)
             {
@@ -20,6 +20,7 @@ public sealed partial class AkburaRenderState
             }
         }
 
+        ReleaseForeachRegions(ref failures);
         ReleaseAllLocalScopeLifetimes(ref failures);
         ReleaseConditionalNameScopes();
 

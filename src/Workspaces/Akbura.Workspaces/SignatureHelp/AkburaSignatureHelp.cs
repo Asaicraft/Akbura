@@ -13,7 +13,7 @@ public sealed class AkburaSignatureHelp
     {
         ApplicableSpan = applicableSpan;
         Signatures = signatures.IsDefault
-            ? ImmutableArray<AkburaSignatureInformation>.Empty
+            ? []
             : signatures;
         ActiveSignature = activeSignature;
         ActiveParameter = activeParameter;

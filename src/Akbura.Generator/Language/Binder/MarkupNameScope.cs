@@ -182,7 +182,7 @@ internal sealed class MarkupNameScope
         var templateOwner = templates.GetLocalNameScopeOwner(syntax);
         for (var current = syntax; current != null; current = current.Parent)
         {
-            if (current is MarkupBlockSyntax || ReferenceEquals(current, templateOwner))
+            if (current is MarkupBlockSyntax or MarkupCodeBlockSyntax || ReferenceEquals(current, templateOwner))
             {
                 return current;
             }

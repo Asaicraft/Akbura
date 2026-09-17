@@ -1239,6 +1239,13 @@ internal partial class AkburaSemanticModel
         Dictionary<string, AkburaSymbol> akburaSymbolsByName,
         Dictionary<string, AkburaSymbol> akburaSymbolsByCommandTypeName)
     {
+        if (csharpSymbol is ILocalSymbol markupLocal && markupLocal.DeclaringSyntaxReferences.Any(reference =>
+                reference.GetSyntax().AncestorsAndSelf().Any(node => node.HasAnnotations(
+                    CSharpProbeBinder.ProjectedSymbolAnnotationKind))))
+        {
+            return null;
+        }
+
         if (csharpSymbol is ILocalSymbol local &&
             akburaSymbolsByName.TryGetValue(local.Name, out var symbol))
         {

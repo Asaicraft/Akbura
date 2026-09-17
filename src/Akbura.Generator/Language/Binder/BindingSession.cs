@@ -223,6 +223,7 @@ internal sealed class BindingSession
         {
             AkburaSyntaxKind.MarkupElementSyntax or
                 AkburaSyntaxKind.MarkupIfStatementSyntax or
+                AkburaSyntaxKind.MarkupForeachStatementSyntax or
                 AkburaSyntaxKind.MarkupPlainAttributeSyntax or
                 AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax or
                 AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
@@ -242,6 +243,7 @@ internal sealed class BindingSession
         {
             AkburaSyntaxKind.MarkupRootSyntax or
                 AkburaSyntaxKind.MarkupIfStatementSyntax or
+                AkburaSyntaxKind.MarkupForeachStatementSyntax or
                 AkburaSyntaxKind.MarkupElementSyntax or
                 AkburaSyntaxKind.MarkupElementContentSyntax or
                 AkburaSyntaxKind.MarkupInlineExpressionSyntax or

@@ -80,7 +80,7 @@ internal sealed class AkburaFormattingService :
             throw new ArgumentOutOfRangeException(nameof(position));
         }
 
-        if (typedCharacter is not ('}' or '>' or '\n'))
+        if (typedCharacter is not ('{' or '}' or ';' or '>' or '\n'))
         {
             return ImmutableArray<TextChange>.Empty;
         }

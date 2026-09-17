@@ -2591,7 +2591,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     {
         foreach (var content in markupElement.Body)
         {
-            if (content.Kind is AkburaSyntaxKind.MarkupElementContentSyntax or AkburaSyntaxKind.MarkupIfStatementSyntax)
+            if (content.Kind is AkburaSyntaxKind.MarkupElementContentSyntax or AkburaSyntaxKind.MarkupIfStatementSyntax or
+                AkburaSyntaxKind.MarkupForeachStatementSyntax)
             {
                 return true;
             }
@@ -3462,6 +3463,13 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         if (string.IsNullOrWhiteSpace(propertyName))
         {
             return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
+        }
+
+        if (IsMarkupForeachKeyDirective(markupAttribute))
+        {
+            return AkburaSymbolInfo.Success(new PropertySymbol("id", new CSharpSymbolDefinition(
+                Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Object)),
+                isImplicitlyDeclared: true));
         }
 
         if (IsMarkupDictionaryKeyDirective(markupAttribute))
@@ -4862,7 +4870,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             AkburaSyntaxKind.MarkupElementContentSyntax or
             AkburaSyntaxKind.MarkupTextLiteralSyntax or
             AkburaSyntaxKind.MarkupInlineExpressionSyntax or
-            AkburaSyntaxKind.MarkupIfStatementSyntax;
+            AkburaSyntaxKind.MarkupIfStatementSyntax or
+            AkburaSyntaxKind.MarkupForeachStatementSyntax;
     }
 
     private static bool ContainsOnlyMarkupWhitespace(string text)
@@ -5033,6 +5042,16 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
             switch (childSyntax.Kind)
             {
+                case AkburaSyntaxKind.MarkupForeachStatementSyntax:
+                    var loop = GetOperation(childSyntax) as IMarkupForeachOperation;
+                    if (loop != null)
+                    {
+                        childrenBuilder.Add(new(childSyntax, MarkupChildKind.Foreach,
+                            contentModel.AllowedChildType, whitespaceMode: whitespaceMode,
+                            isDeferred: isDeferred, foreachOperation: loop));
+                        diagnosticsBuilder.AddRange(GetCachedSemanticDiagnostics(childSyntax));
+                    }
+                    break;
                 case AkburaSyntaxKind.MarkupIfStatementSyntax:
                     var conditional = GetOperation(childSyntax) as IMarkupIfOperation;
                     if (conditional != null)

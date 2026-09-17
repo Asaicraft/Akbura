@@ -215,7 +215,7 @@ internal readonly ref struct ComponentLifecycleWriter
             _writer.CurrentIndent -= _writer.TabSize;
             _writer.WriteLine("}");
             _writer.WriteLine();
-            WriteRenderRevisionTryStart();
+            WriteRenderRevisionTryStart(!plan.ForeachRegions.IsEmpty);
         }
 
         var context = CreateComponentScopeContext(plan);
@@ -250,7 +250,7 @@ internal readonly ref struct ComponentLifecycleWriter
         if (usesStructuralHotReload)
         {
             _writer.WriteLine();
-            WriteCompleteRenderRevision();
+            WriteCompleteRenderRevision(!plan.ForeachRegions.IsEmpty);
         }
 
         _writer.Write("return ");
@@ -259,7 +259,7 @@ internal readonly ref struct ComponentLifecycleWriter
 
         if (usesStructuralHotReload)
         {
-            WriteRenderRevisionTryEnd();
+            WriteRenderRevisionTryEnd(!plan.ForeachRegions.IsEmpty);
         }
     }
 
@@ -321,7 +321,7 @@ internal readonly ref struct ComponentLifecycleWriter
         {
             WriteBeginRenderRevision();
             _writer.WriteLine();
-            WriteRenderRevisionTryStart();
+            WriteRenderRevisionTryStart(!plan.ForeachRegions.IsEmpty);
         }
         else if (plan.Lifecycle.UsesFallbackRoot)
         {
@@ -363,14 +363,14 @@ internal readonly ref struct ComponentLifecycleWriter
         if (usesStructuralHotReload)
         {
             _writer.WriteLine();
-            WriteCompleteRenderRevision();
+            WriteCompleteRenderRevision(!plan.ForeachRegions.IsEmpty);
         }
 
         WriteReturnRoot(plan);
 
         if (usesStructuralHotReload)
         {
-            WriteRenderRevisionTryEnd();
+            WriteRenderRevisionTryEnd(!plan.ForeachRegions.IsEmpty);
         }
 
         _writer.CurrentIndent -= _writer.TabSize;
@@ -425,14 +425,18 @@ internal readonly ref struct ComponentLifecycleWriter
         _writer.WriteLine("}");
     }
 
-    private void WriteRenderRevisionTryStart()
+    private void WriteRenderRevisionTryStart(bool hasForeach = false)
     {
         _writer.WriteLine("try");
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
+        if (hasForeach)
+        {
+            _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName).WriteLine(".BeginForeachFrame();");
+        }
     }
 
-    private void WriteRenderRevisionTryEnd()
+    private void WriteRenderRevisionTryEnd(bool hasForeach = false)
     {
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");
@@ -440,6 +444,10 @@ internal readonly ref struct ComponentLifecycleWriter
             "catch (global::System.Exception __exception)");
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
+        if (hasForeach)
+        {
+            _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName).WriteLine(".AbortForeachFrame();");
+        }
         _writer.Write("if (");
         _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName).Write(".HasPendingRevision");
         _writer.WriteLine(")");
@@ -455,7 +463,7 @@ internal readonly ref struct ComponentLifecycleWriter
         _writer.WriteLine("}");
     }
 
-    private void WriteCompleteRenderRevision()
+    private void WriteCompleteRenderRevision(bool hasForeach = false)
     {
         _writer.Write("if (");
         _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName).Write(".HasPendingRevision");
@@ -467,6 +475,10 @@ internal readonly ref struct ComponentLifecycleWriter
         _writer.WriteLine(".CompleteRevision();");
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");
+        if (hasForeach)
+        {
+            _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName).WriteLine(".CompleteForeachFrame();");
+        }
     }
 
     private void WritePrepareRenderRevision()

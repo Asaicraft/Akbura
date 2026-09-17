@@ -6,4 +6,5 @@ internal enum MarkupChildKind
     Text,
     Expression,
     Conditional,
+    Foreach,
 }

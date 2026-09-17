@@ -34,13 +34,13 @@ internal sealed partial class CSharpProbeBuilder
     }
 
     internal static bool IsMarkupCondition(CSharpExpressionSyntax syntax) =>
-        syntax.Parent is MarkupIfStatementSyntax or MarkupElseIfClauseSyntax;
+        syntax.Parent is MarkupIfStatementSyntax or MarkupElseIfClauseSyntax or MarkupCodeIfStatementSyntax;
 
     internal static bool HasMarkupConditionalScope(AkburaSyntax syntax)
     {
         for (var current = syntax; current != null; current = current.Parent)
         {
-            if (current is MarkupBlockSyntax)
+            if (current is MarkupBlockSyntax or MarkupCodeBlockSyntax)
             {
                 return true;
             }
@@ -54,7 +54,15 @@ internal sealed partial class CSharpProbeBuilder
     {
         for (var current = scope; current != null; current = current.Parent)
         {
-            if (current is MarkupBlockSyntax block)
+            if (current is MarkupCodeBlockSyntax codeBlock)
+            {
+                statement = WrapMarkupCodeScope(codeBlock, scope, statement);
+            }
+            else if (current is MarkupForeachKeyClauseSyntax { Parent: MarkupForeachStatementSyntax keyedLoop })
+            {
+                statement = AnnotateMarkupForeach(keyedLoop).WithStatement(CSharpSyntaxFactory.Block(statement));
+            }
+            else if (current is MarkupBlockSyntax block)
             {
                 if (block.Parent is MarkupIfStatementSyntax conditional)
                 {

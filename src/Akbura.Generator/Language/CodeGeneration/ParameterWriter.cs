@@ -689,7 +689,7 @@ internal readonly ref partial struct ParameterWriter
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
         _writer.WriteLine(
-            "if (__item is global::Avalonia.Controls.Control __contentControl &&");
+            "if ((object?)__item is global::Avalonia.Controls.Control __contentControl &&");
         _writer.CurrentIndent += _writer.TabSize;
         _writer.Write("!");
         GeneratedMemberNameWriter.WriteCollectionLogicalChildrenGetter(

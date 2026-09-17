@@ -146,6 +146,25 @@ public sealed class TypingLifecycleTests
         Assert.Null(completion.Session);
     }
 
+    [Theory]
+    [InlineData("<StackPanel>$foreach ", "(", "()")]
+    [InlineData("<StackPanel>$foreach (var item in values) ", "{", "{}")]
+    public async Task ForeachDelimiterTyping_UsesTheSharedWorkspaceServiceOverLsp(
+        string source, string opening, string expected)
+    {
+        await using var fixture = await TypingServerFixture.CreateAsync();
+        var uri = new Uri(Path.Combine(fixture.Root.FullName, "Loop.akbura"));
+        await fixture.OpenAsync(uri, version: 1, text: source);
+        var result = await fixture.Rpc.InvokeWithParameterObjectAsync<AkburaTypingResponse>(
+            LspMethods.Typing, Request(uri, version: 1, line: 0, character: source.Length, opening),
+            fixture.Cancellation.Token);
+
+        Assert.True(result.Handled);
+        Assert.False(result.Stale);
+        Assert.Equal(expected, Assert.Single(result.Edits).NewText);
+        Assert.NotNull(result.Session);
+    }
+
     private static AkburaTypingParams Request(
         Uri uri,
         int version,

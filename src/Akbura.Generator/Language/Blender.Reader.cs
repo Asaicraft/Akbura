@@ -311,6 +311,15 @@ internal readonly partial struct Blender
                 return true;
             }
 
+            // A line-feed typed after an existing carriage-return belongs to the
+            // same CRLF trivia. Relex its owner instead of leaving the new '\n'
+            // outside the reused node's full span.
+            if (insertedCharacter == '\n' && insertedPosition > 0 &&
+                text[insertedPosition - 1] == '\r')
+            {
+                return true;
+            }
+
             if ((insertedCharacter == '\r' ||
                  insertedCharacter == '\n') &&
                 (lastTerminal.Kind == SyntaxKind.GreaterThanToken ||
@@ -404,6 +413,13 @@ internal readonly partial struct Blender
                 return false;
             }
 
+            // Markup text tokens are parser-created aggregates, not lexical tokens.
+            // A directive typed at their boundary must be lexed as '$' + keyword.
+            if (node.Kind == SyntaxKind.AkTextLiteral)
+            {
+                return false;
+            }
+
             var isCSharpRawToken =
                 node.Kind == SyntaxKind.CSharpRawToken;
 
@@ -442,6 +458,9 @@ internal readonly partial struct Blender
             return mode is
                 Lexer.LexerMode.InInlineExpression or
                 Lexer.LexerMode.InMarkupCondition or
+                Lexer.LexerMode.InMarkupForeachHeader or
+                Lexer.LexerMode.InMarkupCodeStatement or
+                Lexer.LexerMode.InMarkupForeachKey or
                 Lexer.LexerMode.InExpressionUntilSemicolon or
                 Lexer.LexerMode.InExpressionUntilComma or
                 Lexer.LexerMode.InArgumentExpression or

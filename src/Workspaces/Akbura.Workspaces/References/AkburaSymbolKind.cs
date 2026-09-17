@@ -24,4 +24,6 @@ public enum AkburaSymbolKind
     AkcssClass,
     AkcssUtility,
     CSharpSymbol,
+    MarkupLoopLocal,
+    MarkupLoopIndex,
 }

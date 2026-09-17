@@ -159,6 +159,33 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             VisitCSharpOperationDefinition(node.ValueOperation));
     }
 
+    public override BoundNode? VisitMarkupForeach(BoundMarkupForeachStatement node) =>
+        node.Update(VisitCSharpOperationDefinition(node.Source), VisitCSharpSymbolDefinition(node.IterationType),
+            VisitCSharpSymbolDefinition(node.OutputType), VisitCSharpOperationDefinition(node.Key),
+            VisitMarkupForeachBody(node.Body), VisitList(node.Children));
+
+    private ImmutableArray<BoundMarkupForeachBodyItem> VisitMarkupForeachBody(
+        ImmutableArray<BoundMarkupForeachBodyItem> items)
+    {
+        using var builder = ImmutableArrayBuilder<BoundMarkupForeachBodyItem>.Rent(items.Length);
+        var changed = false;
+        foreach (var item in items)
+        {
+            var code = VisitCSharpOperationDefinition(item.Code);
+            var content = VisitMarkupChildContentList(item.Content);
+            var body = VisitMarkupForeachBody(item.Body);
+            var alternative = VisitMarkupForeachBody(item.ElseBody);
+            var loop = (BoundMarkupForeachStatement?)Visit(item.ForeachStatement);
+            changed |= !code.Equals(item.Code) || content != item.Content || body != item.Body ||
+                alternative != item.ElseBody || !ReferenceEquals(loop, item.ForeachStatement);
+            builder.Add(new(item.Syntax, code, content, body, alternative, loop));
+        }
+        return changed ? builder.ToImmutable() : items;
+    }
+
+    public override BoundNode? VisitMarkupForeachKey(BoundMarkupForeachKey node) =>
+        node.Update((IMarkupComponentSymbol?)VisitSymbol(node.ContainingComponent), VisitCSharpBindingResult(node.Binding));
+
     public override BoundNode? VisitMarkupContentSetter(BoundMarkupContentSetter node)
     {
         var containingComponent = (IMarkupComponentSymbol?)VisitSymbol(node.ContainingComponent);
@@ -750,7 +777,8 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             whitespaceMode: content.WhitespaceMode,
             isDeferred: content.IsDeferred,
             insertionMethod: content.InsertionMethod,
-            conditionalOperation: content.ConditionalOperation);
+            conditionalOperation: content.ConditionalOperation,
+            foreachOperation: content.ForeachOperation);
     }
 
     protected virtual BoundTailwindUtilityArgument VisitTailwindUtilityArgument(

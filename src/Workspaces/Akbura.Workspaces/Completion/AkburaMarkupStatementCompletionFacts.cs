@@ -4,7 +4,7 @@ internal static class AkburaMarkupStatementCompletionFacts
 {
     internal static bool IsStatement(AkburaCompletionItem item) =>
         item.Kind == AkburaCompletionKind.Keyword &&
-        item.DisplayText is "$if" or "$else if" or "$else";
+        item.DisplayText is "$if" or "$foreach" or "$else if" or "$else";
 
     internal static bool IncludesOpeningParenthesis(AkburaCompletionItem item) =>
         IsStatement(item) && item.InsertText.IndexOf('(') >= 0;

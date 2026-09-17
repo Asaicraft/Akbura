@@ -340,6 +340,9 @@ internal static class AkburaCSharpProjectionFactory
                         root,
                         embeddedContext),
 
+                AkburaCSharpCompletionContextKind.ForeachHeader =>
+                    CreateForeachHeaderProjection(semanticModel, root, embeddedContext),
+
                 AkburaCSharpCompletionContextKind.Type =>
                     CreateTypeProjection(
                         semanticModel,
@@ -458,6 +461,15 @@ internal static class AkburaCSharpProjectionFactory
         AkburaSyntax root,
         AkburaEmbeddedCSharpContext context)
     {
+        if (context.OwnerKind == Akbura.Language.Syntax.SyntaxKind.MarkupCodeStatementSyntax)
+        {
+            var code = FindSyntax<MarkupCodeStatementSyntax>(root, context);
+            if (code == null || code.Token.FullSpan != context.HostSpan)
+            {
+                throw new InvalidOperationException("The markup C# statement no longer matches the current document.");
+            }
+            return semanticModel.CreateCSharpCompletionProjection(code, context.RelativePosition);
+        }
         var syntax = FindSyntax<CSharpStatementSyntax>(root, context);
         if (syntax == null ||
             !EmbeddedCSharpSyntaxFacts.TryGetStatement(
@@ -473,6 +485,17 @@ internal static class AkburaCSharpProjectionFactory
         return semanticModel.CreateCSharpCompletionProjection(
             syntax,
             context.RelativePosition);
+    }
+
+    private static CSharpProbeProjection CreateForeachHeaderProjection(AkburaSemanticModel semanticModel,
+        AkburaSyntax root, AkburaEmbeddedCSharpContext context)
+    {
+        var syntax = FindSyntax<MarkupForeachHeaderSyntax>(root, context);
+        if (syntax == null || syntax.Token.FullSpan != context.HostSpan)
+        {
+            throw new InvalidOperationException("The foreach header no longer matches the current document.");
+        }
+        return semanticModel.CreateCSharpCompletionProjection(syntax, context.RelativePosition);
     }
 
     private static CSharpProbeProjection CreateTypeProjection(
@@ -768,7 +791,10 @@ internal static class AkburaCSharpProjectionFactory
         var activeNode = root
             .GetAnnotatedNodes(probe.ActiveAnnotation)
             .Single();
-        projectedActiveSpan = activeNode.FullSpan;
+        var originalActiveNode = probe.Root.GetAnnotatedNodes(probe.ActiveAnnotation).Single();
+        projectedActiveSpan = new TextSpan(
+            activeNode.FullSpan.Start + probe.ProjectedSpan.Start - originalActiveNode.FullSpan.Start,
+            probe.ProjectedSpan.Length);
 
         using var builder =
             ImmutableArrayBuilder<AkburaCSharpProjectionMapping>.Rent();

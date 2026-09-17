@@ -13,6 +13,7 @@ internal readonly ref partial struct ComponentScopeWriter
         var runtimeBacked = plan.Elements.ItemRef(content.OwnerElementId).UsesRuntimeStorage;
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
+        WriteForeachDestinationValidation(plan, content);
         _writer.Write("var ").Write(changed).Write(" = ");
         if (runtimeBacked)
         {
@@ -102,7 +103,7 @@ internal readonly ref partial struct ComponentScopeWriter
                     GatherConditionalValues(plan, branch.Items, values);
                 }
             }
-            else
+            else if (value.Kind != ComponentContentValueKind.Foreach)
             {
                 values.Add(index);
             }
@@ -117,7 +118,12 @@ internal readonly ref partial struct ComponentScopeWriter
         {
             var index = items.Start + i;
             ref readonly var item = ref plan.ContentItems.ItemRef(index);
-            if (item.Value.Kind == ComponentContentValueKind.Conditional)
+            if (item.Value.Kind == ComponentContentValueKind.Foreach)
+            {
+                WriteForeachRegion(plan, plan.ForeachRegions.ItemRef(item.Value.Index), context,
+                    changed, cursor);
+            }
+            else if (item.Value.Kind == ComponentContentValueKind.Conditional)
             {
                 WriteConditionalRegion(plan, plan.ConditionalRegions.ItemRef(item.Value.Index), context, changed, cursor);
             }
@@ -213,8 +219,15 @@ internal readonly ref partial struct ComponentScopeWriter
             _writer.WriteLine("}");
         }
 
-        _writer.Write(parentCursor).Write(".AdvanceRegion(").WriteIntegerLiteral(region.ReservedCapacity);
-        _writer.Write(", ").Write(activeCount).WriteLine(");");
+        if (RegionContainsForeach(plan, region))
+        {
+            _writer.Write(parentCursor).Write(".AdvanceDynamicRegion(").Write(activeCount).WriteLine(");");
+        }
+        else
+        {
+            _writer.Write(parentCursor).Write(".AdvanceRegion(").WriteIntegerLiteral(region.ReservedCapacity);
+            _writer.Write(", ").Write(activeCount).WriteLine(");");
+        }
     }
 
     private void WriteConditionalBranchState(in ComponentPlan plan, in ComponentScopePlan scope,
@@ -312,12 +325,14 @@ internal readonly ref partial struct ComponentScopeWriter
                     new ComponentFirstUpdateActionWriter(_writer, _sourceMap).WriteStructuralCommandBinding(
                         plan.CommandBindings.ItemRef(action.Index), element.RuntimeStorageId, element.Identifier, refreshClosure: true);
                 }
-                else if (action.Kind == ComponentFirstUpdateActionKind.RoutedEvent && element.ConditionalRegionId >= 0)
+                else if (action.Kind == ComponentFirstUpdateActionKind.RoutedEvent &&
+                    (element.ConditionalRegionId >= 0 || element.ScopeKind == ComponentElementScopeKind.ForeachIteration))
                 {
                     new ComponentFirstUpdateActionWriter(_writer, _sourceMap).WriteStructuralRoutedEvent(
                         plan.RoutedEvents.ItemRef(action.Index), element.RuntimeStorageId, element.Identifier, refreshClosure: true);
                 }
-                else if (action.Kind == ComponentFirstUpdateActionKind.PropertySubscription && element.ConditionalRegionId >= 0)
+                else if (action.Kind == ComponentFirstUpdateActionKind.PropertySubscription &&
+                    (element.ConditionalRegionId >= 0 || element.ScopeKind == ComponentElementScopeKind.ForeachIteration))
                 {
                     new PropertySubscriptionWriter(_writer, _sourceMap, writeInlineHandlers: true).WriteStructuralRegistration(
                         element, plan.PropertySubscriptions.ItemRef(action.Index), refreshClosure: true);
@@ -439,7 +454,22 @@ internal readonly ref partial struct ComponentScopeWriter
         {
             var index = items.Start + i;
             ref readonly var item = ref plan.ContentItems.ItemRef(index);
-            if (item.Value.Kind == ComponentContentValueKind.Conditional)
+            if (item.Value.Kind == ComponentContentValueKind.Foreach)
+            {
+                _writer.Write("foreach (var __foreachChild in ");
+                WriteForeachRegionAccess(plan, plan.ForeachRegions.ItemRef(item.Value.Index));
+                _writer.WriteLine(".Children)");
+                _writer.WriteLine("{");
+                _writer.CurrentIndent += _writer.TabSize;
+                var writer = new CollectionWriter(_writer);
+                writer.WriteStart(content.Collection, plan.Elements.ItemRef(content.OwnerElementId).Identifier);
+                _writer.Write("__foreachChild");
+                writer.WriteEnd();
+                _writer.WriteLine();
+                _writer.CurrentIndent -= _writer.TabSize;
+                _writer.WriteLine("}");
+            }
+            else if (item.Value.Kind == ComponentContentValueKind.Conditional)
             {
                 var region = plan.ConditionalRegions.ItemRef(item.Value.Index);
                 for (var branch = 0; branch < region.Branches.Length; branch++)
@@ -537,7 +567,13 @@ internal readonly ref partial struct ComponentScopeWriter
         {
             var index = items.Start + i;
             ref readonly var item = ref plan.ContentItems.ItemRef(index);
-            if (item.Value.Kind == ComponentContentValueKind.Conditional)
+            if (item.Value.Kind == ComponentContentValueKind.Foreach)
+            {
+                _writer.Write(target).Write(".AddRange(");
+                WriteForeachRegionAccess(plan, plan.ForeachRegions.ItemRef(item.Value.Index));
+                _writer.WriteLine(".Children);");
+            }
+            else if (item.Value.Kind == ComponentContentValueKind.Conditional)
             {
                 var region = plan.ConditionalRegions.ItemRef(item.Value.Index);
                 for (var branchId = 0; branchId < region.Branches.Length; branchId++)

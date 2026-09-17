@@ -1195,6 +1195,7 @@ public sealed partial class AkburaRenderState : IDisposable
         _nodeFactory = pendingRevision.Factory ?? _nodeFactory;
         _pendingRevision = null;
 
+        CompleteForeachRevision();
         CompleteConditionalNameScopes(pendingRevision);
 
         // Destructive child-scope disposal is delayed until activation/source
@@ -1214,7 +1215,7 @@ public sealed partial class AkburaRenderState : IDisposable
         }
 
         _pendingRevision = null;
-        pendingRevision.Abort(throwOnFailure: true);
+        AbortRevisionOwnership(pendingRevision);
     }
 
     /// <summary>
@@ -1390,7 +1391,7 @@ public sealed partial class AkburaRenderState : IDisposable
         _pendingRevision = null;
         try
         {
-            pendingRevision.Abort(throwOnFailure: true);
+            AbortRevisionOwnership(pendingRevision);
         }
         catch (Exception rollbackFailure)
         {

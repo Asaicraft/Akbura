@@ -5,8 +5,7 @@ using System.Collections.Immutable;
 
 namespace Akbura.Workspaces.Rename;
 
-internal sealed class AkburaRenameService :
-    IAkburaRenameService
+internal sealed class AkburaRenameService : IAkburaRenameService
 {
     private readonly AkburaFindReferencesService _references;
 
@@ -254,6 +253,7 @@ internal sealed class AkburaRenameService :
             AkburaSymbolKind.CommandParameter or
             AkburaSymbolKind.UtilityParameter or
             AkburaSymbolKind.MarkupItem or
+            AkburaSymbolKind.MarkupLoopLocal or
             AkburaSymbolKind.MarkupName or
             AkburaSymbolKind.InjectedService or
             AkburaSymbolKind.Command or
@@ -268,6 +268,11 @@ internal sealed class AkburaRenameService :
         string name)
     {
         if (string.IsNullOrWhiteSpace(name))
+        {
+            return false;
+        }
+
+        if (kind == AkburaSymbolKind.MarkupLoopLocal && name.TrimStart('@') == "index")
         {
             return false;
         }
@@ -290,8 +295,7 @@ internal sealed class AkburaRenameService :
         return SyntaxFacts.IsValidIdentifier(name);
     }
 
-    private static AkburaRenameInfo CannotRename(
-        string message)
+    private static AkburaRenameInfo CannotRename(string message)
     {
         return new AkburaRenameInfo(
             canRename: false,
@@ -301,8 +305,7 @@ internal sealed class AkburaRenameService :
             symbol: null);
     }
 
-    private sealed class AkburaDocumentUriComparer :
-        IEqualityComparer<Uri>
+    private sealed class AkburaDocumentUriComparer : IEqualityComparer<Uri>
     {
         public static AkburaDocumentUriComparer Instance { get; } =
             new();
@@ -322,10 +325,8 @@ internal sealed class AkburaRenameService :
         public int GetHashCode(Uri obj)
         {
             return obj.IsFile
-                ? StringComparer.OrdinalIgnoreCase.GetHashCode(
-                    obj.LocalPath)
-                : StringComparer.Ordinal.GetHashCode(
-                    obj.AbsoluteUri);
+                ? StringComparer.OrdinalIgnoreCase.GetHashCode(obj.LocalPath)
+                : StringComparer.Ordinal.GetHashCode(obj.AbsoluteUri);
         }
     }
 }

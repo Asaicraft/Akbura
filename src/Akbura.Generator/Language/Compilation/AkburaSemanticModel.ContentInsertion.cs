@@ -45,7 +45,7 @@ internal abstract partial class AkburaSemanticModel
         using var result = ImmutableArrayBuilder<MarkupChildContent>.Rent();
         foreach (var child in children)
         {
-            if (child.Kind == MarkupChildKind.Conditional)
+            if (child.Kind is MarkupChildKind.Conditional or MarkupChildKind.Foreach)
             {
                 // Each alternative has already selected overloads for its actual child types.
                 result.Add(child);

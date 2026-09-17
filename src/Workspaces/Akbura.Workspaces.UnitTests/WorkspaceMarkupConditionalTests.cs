@@ -26,7 +26,8 @@ public sealed class WorkspaceMarkupConditionalTests
 
         Assert.Equal(AkburaCompletionContextKind.MarkupStatement, context.Kind);
         Assert.Equal(prefix, document.Text.ToString(result.ApplicableSpan));
-        var item = Assert.Single(result.Items);
+        Assert.Equal(prefix is "" or "$" ? 2 : 1, result.Items.Length);
+        var item = Assert.Single(result.Items, static item => item.DisplayText == "$if");
         Assert.Equal("$if", item.DisplayText);
         Assert.Equal("$if ()", item.InsertText);
         Assert.Equal(1, item.CaretOffsetFromEnd);

@@ -50,6 +50,9 @@ internal sealed partial class Lexer : IDisposable
 		InCSharpArgumentList = 1 << 8,
 		InCSharpStatement = 1 << 9,
 		InMarkupCondition = 1 << 10,
+		InMarkupForeachHeader = 1 << 11,
+		InMarkupCodeStatement = 1 << 12,
+		InMarkupForeachKey = 1 << 13,
 	}
 
 	internal struct TokenInfo
@@ -171,6 +174,9 @@ internal sealed partial class Lexer : IDisposable
 				LexerMode.InCSharpParameterList => ParseCSharpParameterList(),
 				LexerMode.InCSharpArgumentList => ParseCSharpArgumentList(),
 				LexerMode.InMarkupCondition => ParseMarkupCondition(),
+				LexerMode.InMarkupForeachHeader => ParseMarkupForeachHeader(),
+				LexerMode.InMarkupCodeStatement => ParseMarkupCodeStatement(),
+				LexerMode.InMarkupForeachKey => ParseMarkupCondition(stopAtMarkupSibling: true),
 				_ => default
 			};
 

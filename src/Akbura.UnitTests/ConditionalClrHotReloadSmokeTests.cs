@@ -399,7 +399,7 @@ public sealed partial class ConditionalClrHotReloadSmokeTests
             "The enabled CLR Hot Reload child process failed.\r\n" + await stdout + "\r\n" + await stderr);
     }
 
-    private static EmitBaseline ApplyDelta(Assembly assembly, Compilation previous, Compilation updated,
+    internal static EmitBaseline ApplyDelta(Assembly assembly, Compilation previous, Compilation updated,
         EmitBaseline baseline, bool preserveTemplateClosures = false)
     {
         var edits = GetChangedGeneratedMethodEdits(previous, updated, "Demo.Page");
@@ -424,7 +424,7 @@ public sealed partial class ConditionalClrHotReloadSmokeTests
         return Assert.IsAssignableFrom<EmitBaseline>(difference.Baseline);
     }
 
-    private static EditAndContinueMethodDebugInformation ReadEditAndContinueDebugInformation(
+    internal static EditAndContinueMethodDebugInformation ReadEditAndContinueDebugInformation(
         MetadataReader reader, MethodDefinitionHandle method)
     {
         // Roslyn's PortableCustomDebugInfoKinds; the blobs are read from the
@@ -516,7 +516,7 @@ public sealed partial class ConditionalClrHotReloadSmokeTests
         }
     }
 
-    private static void InvokeMetadataUpdateHandlers(Assembly assembly, Type ownerType)
+    internal static void InvokeMetadataUpdateHandlers(Assembly assembly, Type ownerType)
     {
         // ApplyUpdate does not dispatch SDK metadata handlers. Run their documented
         // two phases explicitly, on the same UI thread as the live component.

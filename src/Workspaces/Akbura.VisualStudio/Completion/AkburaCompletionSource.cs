@@ -1211,16 +1211,7 @@ internal sealed class AkburaCompletionSource :
             return true;
         }
         if (trigger.Character is
-            '<' or '/' or ' ' or '.' or ':' or ',' or '@' or '-')
-        {
-            return true;
-        }
-
-        if (trigger.Character == '{' &&
-            AkburaMarkupEditingFacts
-                .IsMarkupExtensionTypeCompletionPosition(
-                    triggerLocation.Snapshot,
-                    triggerLocation.Position))
+            '<' or '/' or ' ' or '.' or ':' or ',' or '@' or '-' or '(' or ';' or '{')
         {
             return true;
         }

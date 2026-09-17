@@ -101,8 +101,9 @@ namespace Akbura.Language.Syntax
 		ApplyKeyword = 163,
 		InterceptKeyword = 164,
 		DollarToken = 165,
+		ForeachKeyword = 166,
 
-		LastTokenWithWellKnownText = DollarToken,
+		LastTokenWithWellKnownText = ForeachKeyword,
 
 		// DSL-specific literal
 		AkTextLiteral = 201,
@@ -228,6 +229,12 @@ namespace Akbura.Language.Syntax
 		MarkupElseIfClauseSyntax = 578,
 		MarkupElseClauseSyntax = 579,
 		MarkupBlockSyntax = 580,
+		MarkupForeachStatementSyntax = 581,
+		MarkupForeachHeaderSyntax = 582,
+		MarkupForeachKeyClauseSyntax = 583,
+		MarkupCodeBlockSyntax = 584,
+		MarkupCodeIfStatementSyntax = 585,
+		MarkupCodeStatementSyntax = 586,
 
 		// Identifiers and types
 		Type = 700,

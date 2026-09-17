@@ -49,6 +49,10 @@ internal sealed partial class CSharpProbeBinder
 
         foreach (var name in names)
         {
+            if (name == "index" && CSharpProbeBuilder.GetContainingMarkupForeach(scope) != null)
+            {
+                continue;
+            }
             if (!addedNames.Add(name))
             {
                 continue;
@@ -71,6 +75,7 @@ internal sealed partial class CSharpProbeBinder
             }
         }
 
+        AddMarkupLoopProbeMembers(scope, memberDeclarations);
         return new CSharpProbeScope(
             memberDeclarations.ToImmutable(),
             localStatements.ToImmutable());
@@ -102,6 +107,7 @@ internal sealed partial class CSharpProbeBinder
                 }
             }
         }
+        AddDeclaredIdentifierNames(csharpNode, addedNames);
 
         var diagnostics = BindingDiagnosticBag.GetInstance();
         try
@@ -120,6 +126,10 @@ internal sealed partial class CSharpProbeBinder
                          binder.GetDeclaredSymbolsForScope(
                              scopeDesignator))
                 {
+                    if (candidate.Name == "index" && CSharpProbeBuilder.GetContainingMarkupForeach(scope) != null)
+                    {
+                        continue;
+                    }
                     if (string.IsNullOrWhiteSpace(candidate.Name) ||
                         candidate.Kind == AkburaSymbolKind.CSharpSymbol ||
                         !addedNames.Add(candidate.Name))
@@ -146,6 +156,7 @@ internal sealed partial class CSharpProbeBinder
 
         AddAllComponentMethodProbeMembers(
             memberDeclarations);
+        AddMarkupLoopProbeMembers(scope, memberDeclarations);
 
         return new CSharpProbeScope(
             memberDeclarations.ToImmutable(),

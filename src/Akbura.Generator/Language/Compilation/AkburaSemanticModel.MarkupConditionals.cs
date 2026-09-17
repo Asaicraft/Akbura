@@ -33,7 +33,7 @@ internal abstract partial class AkburaSemanticModel
     {
         foreach (var child in content)
         {
-            if (child is MarkupElementContentSyntax or MarkupIfStatementSyntax)
+            if (child is MarkupElementContentSyntax or MarkupIfStatementSyntax or MarkupForeachStatementSyntax)
             {
                 return true;
             }

@@ -28,6 +28,7 @@ public sealed partial class AkburaSyntacticDocument
             start--;
             prefix = Text.ToString(TextSpan.FromBounds(start, position)).TrimEnd();
             if (!"$if".StartsWith(prefix, StringComparison.Ordinal) &&
+                !"$foreach".StartsWith(prefix, StringComparison.Ordinal) &&
                 !"$else if".StartsWith(prefix, StringComparison.Ordinal))
             {
                 return false;
@@ -64,6 +65,9 @@ public sealed partial class AkburaSyntacticDocument
                     tag.CloseToken.Span.End <= start &&
                     start <= (element.EndTag?.LessSlashToken.Span.Start ?? element.FullSpan.End),
                 MarkupBlockSyntax block => !block.OpenBraceToken.IsMissing &&
+                    block.OpenBraceToken.Span.End <= start &&
+                    start <= (block.CloseBraceToken.IsMissing ? block.FullSpan.End : block.CloseBraceToken.Span.Start),
+                MarkupCodeBlockSyntax block => !block.OpenBraceToken.IsMissing &&
                     block.OpenBraceToken.Span.End <= start &&
                     start <= (block.CloseBraceToken.IsMissing ? block.FullSpan.End : block.CloseBraceToken.Span.Start),
                 _ => false,

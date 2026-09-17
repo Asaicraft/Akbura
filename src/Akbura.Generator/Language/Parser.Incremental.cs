@@ -902,14 +902,30 @@ internal sealed partial class Parser
         ArrayBuilder<GreenMarkupComponentNameSyntax> openTags,
         ref GreenMarkupEndTagSyntax? pendingEndTag)
     {
-        if (TryReadReusableIncrementalNode<GreenMarkupContentSyntax>(out var content))
+        _markupCurrentContentTagDepth = openTags.Count;
+        if (IsMarkupForeachDirectiveStart(incremental: true))
         {
-            return content;
+            if (TryReadReusableIncrementalNode<GreenMarkupForeachStatementSyntax>(out var reusableLoop))
+            {
+                return reusableLoop;
+            }
+
+            return ParseMarkupForeachStatementSyntax(openTags, ref pendingEndTag, incremental: true);
         }
 
         if (IsMarkupConditionalDirectiveStart(incremental: true))
         {
+            if (TryReadReusableIncrementalNode<GreenMarkupIfStatementSyntax>(out var reusableConditional))
+            {
+                return reusableConditional;
+            }
+
             return ParseMarkupIfStatementSyntax(openTags, ref pendingEndTag, incremental: true);
+        }
+
+        if (TryReadReusableIncrementalNode<GreenMarkupContentSyntax>(out var content))
+        {
+            return content;
         }
 
         return PeekIncrementalTokenKind() switch
@@ -2059,8 +2075,7 @@ internal sealed partial class Parser
         return GreenSyntaxFactory.CSharpRawToken(text, parse(text));
     }
 
-    private bool TryReadReusableIncrementalNode<TNode>(out TNode node)
-        where TNode : GreenNode
+    private bool TryReadReusableIncrementalNode<TNode>(out TNode node) where TNode : GreenNode
     {
         node = null!;
 
@@ -2353,7 +2368,10 @@ internal sealed partial class Parser
         return _isIncremental &&
                _mode is Lexer.LexerMode.TopLevel or
                    Lexer.LexerMode.InAkcss or
-                   Lexer.LexerMode.InCSharpStatement &&
+                   Lexer.LexerMode.InCSharpStatement or
+                   Lexer.LexerMode.InMarkupForeachHeader or
+                   Lexer.LexerMode.InMarkupCodeStatement or
+                   Lexer.LexerMode.InMarkupForeachKey &&
                _currentToken == null &&
                _tokenOffset >= _tokenCount;
     }

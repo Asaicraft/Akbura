@@ -38,7 +38,8 @@ internal readonly ref struct ComponentValueWriter
 
         if (value.LiteralValue == null && value.Operation.Syntax != null)
         {
-            _writer.Write(value.Operation.Syntax.ToString());
+            _writer.Write(Akbura.Language.Binder.CSharpProbeBuilder
+                .GetMarkupLoopCodeGenerationSyntax(value.Operation)!.ToString());
             return;
         }
 
@@ -49,7 +50,8 @@ internal readonly ref struct ComponentValueWriter
     {
         if (!value.Operation.IsDefault && value.Operation.Syntax != null)
         {
-            _writer.Write(value.Operation.Syntax.ToString());
+            _writer.Write(Akbura.Language.Binder.CSharpProbeBuilder
+                .GetMarkupLoopCodeGenerationSyntax(value.Operation)!.ToString());
             return;
         }
 

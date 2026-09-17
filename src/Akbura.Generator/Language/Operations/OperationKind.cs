@@ -10,6 +10,8 @@ internal enum OperationKind
     MarkupElement,
     MarkupContent,
     MarkupIf,
+    MarkupForeach,
+    MarkupForeachKey,
     MarkupAttribute,
     MarkupText,
     InlineExpression,

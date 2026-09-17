@@ -1500,6 +1500,12 @@ partial class Parser
         ArrayBuilder<GreenMarkupComponentNameSyntax> openTags,
         ref GreenMarkupEndTagSyntax? pendingEndTag)
     {
+        _markupCurrentContentTagDepth = openTags.Count;
+        if (IsMarkupForeachDirectiveStart(incremental: false))
+        {
+            return ParseMarkupForeachStatementSyntax(openTags, ref pendingEndTag, incremental: false);
+        }
+
         if (IsMarkupConditionalDirectiveStart(incremental: false))
         {
             return ParseMarkupIfStatementSyntax(openTags, ref pendingEndTag, incremental: false);
@@ -1597,7 +1603,7 @@ partial class Parser
         {
             _cancellationToken.ThrowIfCancellationRequested();
 
-            if (IsMarkupConditionalDirectiveStart(incremental: false) ||
+            if (IsMarkupConditionalDirectiveStart(incremental: false) || IsMarkupForeachDirectiveStart(incremental: false) ||
                 inConditionalBlock && CurrentToken.Kind == SyntaxKind.CloseBraceToken)
             {
                 break;
@@ -1608,6 +1614,14 @@ partial class Parser
                 hasUnsupportedControlFlowDirective = true;
                 AppendUnsupportedMarkupControlFlowDirectiveText(rawText);
                 continue;
+            }
+
+            if (CurrentToken.Kind == SyntaxKind.DollarToken && PeekToken(1) is { } partialKeyword &&
+                partialKeyword.Kind == SyntaxKind.IdentifierToken && AreAdjacent(CurrentToken, partialKeyword) &&
+                partialKeyword.ValueText is { Length: > 0 } partialName &&
+                "foreach".StartsWith(partialName, StringComparison.Ordinal))
+            {
+                hasUnsupportedControlFlowDirective = true;
             }
 
             rawText.Append(EatToken().ToFullString());

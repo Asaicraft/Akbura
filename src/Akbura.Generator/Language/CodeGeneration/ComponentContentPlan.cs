@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Syntax;
+using Akbura.Language.Syntax;
 
 using Akbura.Language.Symbols;
 using Microsoft.CodeAnalysis;
@@ -14,6 +14,7 @@ internal enum ComponentContentValueKind : byte
     DeferredContent,
     Template,
     Conditional,
+    Foreach,
 }
 
 internal readonly struct ComponentContentValueReference

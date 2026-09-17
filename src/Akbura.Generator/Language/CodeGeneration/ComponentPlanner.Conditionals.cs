@@ -48,7 +48,11 @@ internal static partial class ComponentPlanner
         {
             foreach (var child in content)
             {
-                if (child.Syntax is MarkupIfStatementSyntax nested)
+                if (child.Syntax is MarkupForeachStatementSyntax foreachSyntax)
+                {
+                    BuildForeach(ownerId, foreachSyntax, context);
+                }
+                else if (child.Syntax is MarkupIfStatementSyntax nested)
                 {
                     BuildConditional(ownerId, nested, destination, context, contentModelOverride);
                 }
@@ -114,7 +118,11 @@ internal static partial class ComponentPlanner
             foreach (var child in content)
             {
                 var value = default(ComponentContentValueReference);
-                if (child.Kind == MarkupChildKind.Conditional && _conditionalSyntaxIds.TryGetValue(child.Syntax, out var region))
+                if (child.Kind == MarkupChildKind.Foreach && _foreachSyntaxIds.TryGetValue(child.Syntax, out var foreachId))
+                {
+                    value = new(ComponentContentValueKind.Foreach, foreachId);
+                }
+                else if (child.Kind == MarkupChildKind.Conditional && _conditionalSyntaxIds.TryGetValue(child.Syntax, out var region))
                 {
                     LowerConditionalRegion(region);
                     value = new(ComponentContentValueKind.Conditional, region);

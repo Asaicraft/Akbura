@@ -9,7 +9,7 @@ namespace Akbura.Language;
 
 internal sealed partial class Lexer
 {
-    private TokenInfo ParseMarkupCondition()
+    private TokenInfo ParseMarkupCondition(bool stopAtMarkupSibling = false)
     {
         var text = new StringBuilder();
         var parenDepth = 0;
@@ -31,6 +31,12 @@ internal sealed partial class Lexer
             {
                 AppendMarkupConditionComment(text);
                 continue;
+            }
+
+            if (stopAtMarkupSibling && character == '<' && parenDepth == 0 && bracketDepth == 0 && braceDepth == 0 &&
+                MarkupCodeFragmentStartsSibling(character, text))
+            {
+                break;
             }
 
             if (TryScanCSharpStringOrCharText(out var literal))

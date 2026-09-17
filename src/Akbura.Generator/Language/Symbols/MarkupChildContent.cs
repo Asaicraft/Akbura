@@ -17,7 +17,8 @@ internal readonly struct MarkupChildContent
             MarkupWhitespaceMode.Default,
         bool isDeferred = false,
         Microsoft.CodeAnalysis.IMethodSymbol? insertionMethod = null,
-        IMarkupIfOperation? conditionalOperation = null)
+        IMarkupIfOperation? conditionalOperation = null,
+        IMarkupForeachOperation? foreachOperation = null)
     {
         Syntax = syntax ??
             throw new ArgumentNullException(nameof(syntax));
@@ -32,6 +33,7 @@ internal readonly struct MarkupChildContent
         IsDeferred = isDeferred;
         InsertionMethod = insertionMethod;
         ConditionalOperation = conditionalOperation;
+        ForeachOperation = foreachOperation;
     }
 
     public MarkupContentSyntax Syntax { get; }
@@ -58,7 +60,8 @@ internal readonly struct MarkupChildContent
     public Microsoft.CodeAnalysis.IMethodSymbol? InsertionMethod { get; }
 
     public IMarkupIfOperation? ConditionalOperation { get; }
+    public IMarkupForeachOperation? ForeachOperation { get; }
 
     public MarkupChildContent WithInsertionMethod(Microsoft.CodeAnalysis.IMethodSymbol method) =>
-        new(Syntax, Kind, Type, ComponentSymbol, Text, RawText, WhitespaceMode, IsDeferred, method, ConditionalOperation);
+        new(Syntax, Kind, Type, ComponentSymbol, Text, RawText, WhitespaceMode, IsDeferred, method, ConditionalOperation, ForeachOperation);
 }

@@ -81,4 +81,7 @@ public enum AkburaCSharpCompletionContextKind
     /// A C# parameter list used by an Akbura command declaration.
     /// </summary>
     CommandParameterList,
+
+    /// <summary>A synchronous foreach declaration and source header embedded in markup.</summary>
+    ForeachHeader,
 }

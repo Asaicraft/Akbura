@@ -17,6 +17,8 @@ internal enum DeclarationKind : byte
     MarkupRoot,
     MarkupElement,
     MarkupConditionalBranch,
+    MarkupForeach,
+    MarkupCodeBlock,
     AkcssModule,
     AkcssUsing,
     AkcssStyle,

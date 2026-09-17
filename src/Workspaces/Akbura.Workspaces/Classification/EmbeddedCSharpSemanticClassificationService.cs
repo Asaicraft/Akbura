@@ -469,8 +469,16 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
             switch (node)
             {
                 case CSharpExpressionSyntax condition when condition.Parent is
-                    MarkupIfStatementSyntax or MarkupElseIfClauseSyntax:
+                    MarkupIfStatementSyntax or MarkupElseIfClauseSyntax or MarkupCodeIfStatementSyntax or MarkupForeachKeyClauseSyntax:
                     references = semanticModel.GetCSharpSymbolReferences(condition);
+                    break;
+
+                case MarkupForeachHeaderSyntax header:
+                    references = semanticModel.GetCSharpSymbolReferences(header);
+                    break;
+
+                case MarkupCodeStatementSyntax code:
+                    references = semanticModel.GetCSharpSymbolReferences(code);
                     break;
 
                 case CSharpStatementSyntax statement:

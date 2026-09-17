@@ -1,4 +1,5 @@
 using Akbura.Language.Symbols;
+using Akbura.Language.Binder;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using RoslynSymbol = Microsoft.CodeAnalysis.ISymbol;
@@ -59,6 +60,15 @@ internal static class AkburaSymbolKeyFactory
         AkburaDocumentContext context,
         RoslynSymbol symbol)
     {
+        if (TryGetProjectedLocalOrigin(symbol, out var origin))
+        {
+            return new AkburaSymbolKey(context.Project.Id,
+                string.Concat(context.Document.Uri.AbsoluteUri, "|", origin.DeclarationSpan.Start, ":",
+                    origin.DeclarationSpan.Length),
+                origin.Kind == NativeSymbolKind.MarkupLoopIndex ? AkburaSymbolKind.MarkupLoopIndex :
+                    AkburaSymbolKind.MarkupLoopLocal,
+                context.Document.Uri.AbsoluteUri);
+        }
         var original = symbol.OriginalDefinition;
         var declarationId =
             DocumentationCommentId.CreateDeclarationId(original);
@@ -106,6 +116,30 @@ internal static class AkburaSymbolKeyFactory
             AkburaSymbolKind.CSharpSymbol,
             original.ContainingSymbol?.ToDisplayString(
                 SymbolDisplayFormat.FullyQualifiedFormat));
+    }
+
+    internal static bool TryGetProjectedLocalOrigin(RoslynSymbol symbol, out CSharpProbeSymbolOrigin origin)
+    {
+        if (symbol is ILocalSymbol or Microsoft.CodeAnalysis.IPropertySymbol)
+        {
+            foreach (var reference in symbol.DeclaringSyntaxReferences)
+            {
+                for (var node = reference.GetSyntax(); node != null; node = node.Parent)
+                {
+                    foreach (var annotation in node.GetAnnotations(CSharpProbeBinder.ProjectedSymbolAnnotationKind))
+                    {
+                        if (CSharpProbeSymbolOrigin.TryParse(annotation.Data, out origin) &&
+                            origin.Name == symbol.Name && origin.Kind is
+                                NativeSymbolKind.CSharpSymbol or NativeSymbolKind.MarkupLoopIndex)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        origin = default;
+        return false;
     }
 
     private static bool ShouldUseCSharpIdentity(

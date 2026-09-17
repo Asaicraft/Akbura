@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Syntax;
+using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
@@ -36,6 +36,20 @@ internal sealed class EmbeddedCSharpClassificationService
             GreenSyntaxToken.CSharpRawToken rawToken)
         {
             return false;
+        }
+
+        if (token.Parent is MarkupForeachHeaderSyntax header)
+        {
+            var statement = header.GetRawCSharpForeach();
+            if (statement != null)
+            {
+                AddTokens(statement.DescendantTokens().Where(candidate =>
+                        candidate.Span.Start >= MarkupForeachHeaderSyntax.CSharpPrefixLength &&
+                        candidate.Span.End <= MarkupForeachHeaderSyntax.CSharpPrefixLength + token.Span.Length),
+                    token.Span.Start - MarkupForeachHeaderSyntax.CSharpPrefixLength,
+                    requestedSpan, builder, cancellationToken);
+            }
+            return true;
         }
 
         if (rawToken.RawNode is { } rawNode &&
@@ -179,7 +193,7 @@ internal sealed class EmbeddedCSharpClassificationService
         {
             switch (parent)
             {
-                case CSharpStatementSyntax:
+                case CSharpStatementSyntax or MarkupCodeStatementSyntax:
                     return CSharpSyntaxFactory
                         .ParseStatement(text);
 

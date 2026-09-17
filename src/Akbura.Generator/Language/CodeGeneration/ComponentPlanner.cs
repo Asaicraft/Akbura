@@ -138,6 +138,8 @@ internal static partial class ComponentPlanner
         private readonly Dictionary<MarkupElementSyntax, int> _syntaxElementIds;
         private readonly ArrayBuilder<ComponentConditionalRegionPlan> _conditionalRegions;
         private ImmutableArrayBuilder<ComponentConditionalContentPlan> _conditionalContents;
+        private readonly ArrayBuilder<ComponentForeachPlan> _foreachRegions;
+        private readonly Dictionary<AkburaSyntax, int> _foreachSyntaxIds;
         private int _nextCachedBindingPathId;
         private int _nextRuntimeStorageId;
         private readonly Dictionary<int, int> _localRuntimeStorageCounts;
@@ -201,6 +203,8 @@ internal static partial class ComponentPlanner
             _syntaxElementIds = new();
             _conditionalRegions = ArrayBuilder<ComponentConditionalRegionPlan>.GetInstance();
             _conditionalContents = ImmutableArrayBuilder<ComponentConditionalContentPlan>.Rent();
+            _foreachRegions = ArrayBuilder<ComponentForeachPlan>.GetInstance();
+            _foreachSyntaxIds = new();
             _nextCachedBindingPathId = 0;
             _nextRuntimeStorageId = 0;
             _localRuntimeStorageCounts = new();
@@ -292,6 +296,7 @@ internal static partial class ComponentPlanner
             owner.RenderStatements = _renderStatements.ToPooledImmutableList();
             owner.ConditionalRegions = _conditionalRegions.ToPooledImmutableList();
             owner.ConditionalContents = _conditionalContents.ToPooledImmutableList();
+            owner.ForeachRegions = _foreachRegions.ToPooledImmutableList();
         }
 
         private PooledImmutableList<ComponentElementPlan> CreateElementPlans(in AkcssComponentActivatorPlan akcss)
@@ -439,6 +444,7 @@ internal static partial class ComponentPlanner
             _pendingConditionalRegions.Free();
             _conditionalRegions.Free();
             _conditionalContents.Dispose();
+            _foreachRegions.Free();
         }
 
         private ComponentLifecyclePlan CreateLifecyclePlan(in AkcssComponentActivatorPlan akcss)
@@ -734,7 +740,8 @@ internal static partial class ComponentPlanner
                 ? GetNextRuntimeStorageId(runtimeStorageRootScopeId)
                 : -1;
             var identifier = usesRuntimeStorage
-                ? CreateRuntimeStorageExpression(type, runtimeStorageId)
+                ? CreateRuntimeStorageExpression(type, runtimeStorageId,
+                    _pendingScopes[runtimeStorageRootScopeId].Kind == ComponentElementScopeKind.ForeachIteration)
                 : nameOperation?.NameSymbol is { } name
                     ? EscapeIdentifier(name.IdentifierText)
                     : "__element" + elementId.ToString(CultureInfo.InvariantCulture);
@@ -779,6 +786,12 @@ internal static partial class ComponentPlanner
 
             foreach (var bodyContent in syntax.Body)
             {
+                if (bodyContent is MarkupForeachStatementSyntax foreachSyntax)
+                {
+                    BuildForeach(elementId, foreachSyntax, context);
+                    continue;
+                }
+
                 if (bodyContent is MarkupIfStatementSyntax conditionalSyntax)
                 {
                     if (!hasConditionalTemplateRoot)
@@ -922,6 +935,12 @@ internal static partial class ComponentPlanner
 
             foreach (var bodyContent in syntax.Body)
             {
+                if (bodyContent is MarkupForeachStatementSyntax foreachSyntax)
+                {
+                    BuildForeach(ownerElementId, foreachSyntax, inheritedContext);
+                    continue;
+                }
+
                 if (bodyContent is MarkupIfStatementSyntax conditionalSyntax)
                 {
                     if (!hasConditionalTemplateRoot)
@@ -1142,7 +1161,7 @@ internal static partial class ComponentPlanner
                 parentScopeId,
                 ownerElementId,
                 kind));
-            if (hasConditionalContent && kind is
+            if (kind == ComponentElementScopeKind.ForeachIteration || hasConditionalContent && kind is
                 ComponentElementScopeKind.DataTemplate or ComponentElementScopeKind.DeferredContent)
             {
                 _localRuntimeStorageCounts.Add(id, 0);
@@ -1172,7 +1191,7 @@ internal static partial class ComponentPlanner
         {
             foreach (var child in syntax.DescendantNodes())
             {
-                if (child is MarkupIfStatementSyntax)
+                if (child is MarkupIfStatementSyntax or MarkupForeachStatementSyntax)
                 {
                     return true;
                 }
@@ -1657,7 +1676,7 @@ internal static partial class ComponentPlanner
             ITypeSymbol targetType)
         {
             var handler = operation.ValueSyntax is MarkupDynamicAttributeValueSyntax value
-                ? value.Expression.Expression.GetRawCSharpExpression()
+                ? CSharpProbeBuilder.RewriteMarkupLoopIdentifiers(value, value.Expression.Expression.GetRawCSharpExpression()!)
                 : null;
             if (handler == null || operation.HasErrors)
             {
@@ -1776,7 +1795,7 @@ internal static partial class ComponentPlanner
                 return LowerPropertyContent(pending, pending.BoundaryValue);
             }
 
-            if (operation.Content.Any(child => child.Kind == MarkupChildKind.Conditional))
+            if (operation.Content.Any(child => child.Kind is MarkupChildKind.Conditional or MarkupChildKind.Foreach))
             {
                 return LowerConditionalContent(pending);
             }
@@ -2418,9 +2437,11 @@ internal static partial class ComponentPlanner
 
         private static string CreateRuntimeStorageExpression(
             ITypeSymbol type,
-            int localId)
+            int localId,
+            bool isForeachLocal)
         {
-            return "__akburaRenderState.GetRequired<" +
+            return (isForeachLocal ? "__akburaForeachRenderState" : "__akburaRenderState") +
+                ".GetRequired<" +
                 type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
                 ">(" +
                 localId.ToString(CultureInfo.InvariantCulture) +
@@ -2519,7 +2540,8 @@ internal static partial class ComponentPlanner
         {
             var parameterCount = GetEventHandlerParameterCount(operation);
             var expression = operation.ValueSyntax is MarkupDynamicAttributeValueSyntax dynamicValue
-                ? dynamicValue.Expression.Expression.GetRawCSharpExpression()?.ToFullString().Trim()
+                ? CSharpProbeBuilder.RewriteMarkupLoopIdentifiers(dynamicValue,
+                    dynamicValue.Expression.Expression.GetRawCSharpExpression()!).ToFullString().Trim()
                 : null;
 
             if (string.IsNullOrWhiteSpace(expression))

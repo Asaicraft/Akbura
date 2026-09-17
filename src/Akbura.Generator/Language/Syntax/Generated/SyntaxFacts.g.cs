@@ -134,6 +134,7 @@ namespace Akbura.Language.Syntax
 				SyntaxKind.ApplyKeyword => "apply",
 				SyntaxKind.InterceptKeyword => "intercept",
 				SyntaxKind.DollarToken => "$",
+				SyntaxKind.ForeachKeyword => "foreach",
 
 				_ => string.Empty,
 			};
@@ -159,6 +160,7 @@ namespace Akbura.Language.Syntax
 				case "else": return SyntaxKind.ElseKeyword;
 				case "return": return SyntaxKind.ReturnKeyword;
 				case "for": return SyntaxKind.ForKeyword;
+				case "foreach": return SyntaxKind.ForeachKeyword;
 
 				case "true": return SyntaxKind.TrueKeyword;
 				case "false": return SyntaxKind.FalseKeyword;
@@ -223,6 +225,7 @@ namespace Akbura.Language.Syntax
 				case SyntaxKind.ElseKeyword:
 				case SyntaxKind.ReturnKeyword:
 				case SyntaxKind.ForKeyword:
+				case SyntaxKind.ForeachKeyword:
 
 				case SyntaxKind.TrueKeyword:
 				case SyntaxKind.FalseKeyword:

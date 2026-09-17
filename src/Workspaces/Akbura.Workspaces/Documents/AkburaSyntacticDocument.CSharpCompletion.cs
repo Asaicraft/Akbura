@@ -119,6 +119,14 @@ public sealed partial class AkburaSyntacticDocument
         {
             switch (syntax)
             {
+                case MarkupForeachHeaderSyntax header:
+                    AddCandidate(AkburaCSharpCompletionContextKind.ForeachHeader, header,
+                        header.Token.FullSpan, priority: 0);
+                    break;
+                case MarkupCodeStatementSyntax code:
+                    AddCandidate(AkburaCSharpCompletionContextKind.Statement, code,
+                        code.Token.FullSpan, priority: 3);
+                    break;
                 case CSharpExpressionSyntax expression
                     when IsCSharpExpressionContext(expression):
                 {
@@ -179,6 +187,11 @@ public sealed partial class AkburaSyntacticDocument
             {
                 return !markupIf.OpenParenToken.IsMissing && position >= markupIf.OpenParenToken.Span.End &&
                     (markupIf.CloseParenToken.IsMissing || position <= markupIf.CloseParenToken.Span.Start);
+            }
+            if (expression.Parent is MarkupCodeIfStatementSyntax codeIf)
+            {
+                return !codeIf.OpenParenToken.IsMissing && position >= codeIf.OpenParenToken.Span.End &&
+                    (codeIf.CloseParenToken.IsMissing || position <= codeIf.CloseParenToken.Span.Start);
             }
 
             if (expression.Parent is MarkupElseIfClauseSyntax markupElseIf)

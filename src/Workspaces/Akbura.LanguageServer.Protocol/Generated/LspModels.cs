@@ -283,7 +283,7 @@ public sealed class SaveOptions
 public sealed class CompletionOptions
 {
     public string[] TriggerCharacters { get; set; } =
-        ["<", " ", ".", "{", "$", ":", "@"];
+        ["<", " ", ".", "{", "$", ":", "@", "(", ";"];
 
     public string[] AllCommitCharacters { get; set; } = ["\t", "\n"];
 
@@ -342,7 +342,7 @@ public sealed class DocumentOnTypeFormattingOptions
 {
     public string FirstTriggerCharacter { get; set; } = "}";
 
-    public string[] MoreTriggerCharacter { get; set; } = [">", "\n"];
+    public string[] MoreTriggerCharacter { get; set; } = ["{", ";", ">", "\n"];
 }
 
 public sealed class WorkspaceServerCapabilities

@@ -411,4 +411,19 @@
   <data name="AKBURA_SEMANTIC_ConditionalTemplateItemOutsideBuild" xml:space="preserve">
     <value>Template item '{0}' is only available while building its template instance. Expressions selecting or configuring complete IDataTemplate objects are outside this item's Build scope and cannot read it.</value>
   </data>
+  <data name="AKBURA_SEMANTIC_UnsupportedForeachContentDestination" xml:space="preserve">
+    <value>Markup foreach requires an accessible mutable indexed IList destination. Scalar, dictionary, array, read-only, and Add-only destinations are not supported.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_UnsupportedForeachHeader" xml:space="preserve">
+    <value>Markup foreach supports synchronous value iteration over an enumerable source. Await, ref iteration, and ref-like iteration captures are not supported.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_ForeachIndexRedeclaration" xml:space="preserve">
+    <value>The name 'index' is reserved for the read-only zero-based source index of this markup foreach.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_UnsupportedForeachStatement" xml:space="preserve">
+    <value>Statement '{0}' is not supported in a reactive markup foreach body. Use local declarations, if/else, break, or continue.</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_ForeachKeyInvalid" xml:space="preserve">
+    <value>Invalid markup foreach identity key: {0}.</value>
+  </data>
 </root>

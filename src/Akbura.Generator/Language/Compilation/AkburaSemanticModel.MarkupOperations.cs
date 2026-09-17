@@ -3768,8 +3768,7 @@ internal partial class AkburaSemanticModel
 
         membersBuilder.Add(method);
 
-        var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
-            .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
+        var probeClass = CreateMarkupHandlerProbeType(membersBuilder.ToImmutable());
 
         var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
         return BindingSession
@@ -3800,8 +3799,7 @@ internal partial class AkburaSemanticModel
 
         membersBuilder.Add(method);
 
-        var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
-            .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
+        var probeClass = CreateMarkupHandlerProbeType(membersBuilder.ToImmutable());
 
         var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
         return BindingSession
@@ -3839,8 +3837,7 @@ internal partial class AkburaSemanticModel
 
         membersBuilder.Add(method);
 
-        var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
-            .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
+        var probeClass = CreateMarkupHandlerProbeType(membersBuilder.ToImmutable());
 
         var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
         return BindingSession
@@ -3877,8 +3874,7 @@ internal partial class AkburaSemanticModel
 
         membersBuilder.Add(method);
 
-        var probeClass = CSharpSyntaxFactory.ClassDeclaration("__AkburaSemanticProbe")
-            .WithMembers(CSharpSyntaxFactory.List(membersBuilder.ToImmutable()));
+        var probeClass = CreateMarkupHandlerProbeType(membersBuilder.ToImmutable());
 
         var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
         return BindingSession
@@ -3898,6 +3894,21 @@ internal partial class AkburaSemanticModel
         return BindingSession
             .GetCSharpProbeBinder(scope, BinderUsage.Markup)
             .CreateProbeScope(markupAttribute, csharpNode, parameterNames);
+    }
+
+    private CSharp.ClassDeclarationSyntax CreateMarkupHandlerProbeType(
+        ImmutableArray<CSharp.MemberDeclarationSyntax> members)
+    {
+        var componentName = SyntaxTree.ComponentName;
+        var declaration = CSharpSyntaxFactory.ClassDeclaration(
+                string.IsNullOrWhiteSpace(componentName)
+                    ? "__AkburaSemanticProbe"
+                    : ToCSharpIdentifier(componentName))
+            .WithMembers(CSharpSyntaxFactory.List(members));
+        return string.IsNullOrWhiteSpace(componentName)
+            ? declaration
+            : declaration.WithModifiers(CSharpSyntaxFactory.TokenList(
+                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.PartialKeyword)));
     }
 
     private void AddMarkupAttributeProbeMembers(

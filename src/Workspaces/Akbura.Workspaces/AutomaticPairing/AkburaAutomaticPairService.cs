@@ -21,6 +21,11 @@ internal sealed class AkburaAutomaticPairService
             throw new ArgumentNullException(nameof(document));
         }
 
+        if (openingCharacter == '(' && document.CanStartMarkupForeach(position))
+        {
+            return new AkburaPairDecision(AkburaPairContextKind.MarkupText, openingCharacter, ")");
+        }
+
         var context = document.GetPairContext(
             position,
             cancellationToken);

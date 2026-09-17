@@ -1,4 +1,4 @@
-﻿using Akbura.Pools;
+using Akbura.Pools;
 using System.Diagnostics;
 
 namespace Akbura.Language.CodeGeneration;
@@ -72,6 +72,8 @@ internal ref struct ComponentPlanBufferOwner
 
     public PooledImmutableList<ComponentConditionalContentPlan> ConditionalContents;
 
+    public PooledImmutableList<ComponentForeachPlan> ForeachRegions;
+
     public ComponentPlan MoveToPlan(ComponentLifecyclePlan lifecycle)
     {
         Debug.Assert(_ownsBuffers);
@@ -103,7 +105,8 @@ internal ref struct ComponentPlanBufferOwner
             RenderStatements,
             Akcss,
             ConditionalRegions,
-            ConditionalContents);
+            ConditionalContents,
+            ForeachRegions);
 
         this = default;
 

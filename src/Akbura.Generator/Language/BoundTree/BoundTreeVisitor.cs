@@ -46,6 +46,8 @@ internal abstract class BoundTreeVisitor
     public virtual void VisitMarkupContent(BoundMarkupContent node) => DefaultVisit(node);
 
     public virtual void VisitMarkupIf(BoundMarkupIfStatement node) => DefaultVisit(node);
+    public virtual void VisitMarkupForeach(BoundMarkupForeachStatement node) => DefaultVisit(node);
+    public virtual void VisitMarkupForeachKey(BoundMarkupForeachKey node) => DefaultVisit(node);
 
     public virtual void VisitMarkupConditionalBranch(BoundMarkupConditionalBranch node) => DefaultVisit(node);
 
@@ -147,6 +149,8 @@ internal abstract class BoundTreeVisitor<TResult>
     public virtual TResult? VisitMarkupContent(BoundMarkupContent node) => DefaultVisit(node);
 
     public virtual TResult? VisitMarkupIf(BoundMarkupIfStatement node) => DefaultVisit(node);
+    public virtual TResult? VisitMarkupForeach(BoundMarkupForeachStatement node) => DefaultVisit(node);
+    public virtual TResult? VisitMarkupForeachKey(BoundMarkupForeachKey node) => DefaultVisit(node);
 
     public virtual TResult? VisitMarkupConditionalBranch(BoundMarkupConditionalBranch node) => DefaultVisit(node);
 
@@ -266,6 +270,10 @@ internal abstract class BoundTreeVisitor<TParameter, TResult>
         DefaultVisit(node, parameter);
 
     public virtual TResult? VisitMarkupIf(BoundMarkupIfStatement node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+    public virtual TResult? VisitMarkupForeach(BoundMarkupForeachStatement node, TParameter parameter) =>
+        DefaultVisit(node, parameter);
+    public virtual TResult? VisitMarkupForeachKey(BoundMarkupForeachKey node, TParameter parameter) =>
         DefaultVisit(node, parameter);
 
     public virtual TResult? VisitMarkupConditionalBranch(BoundMarkupConditionalBranch node, TParameter parameter) =>

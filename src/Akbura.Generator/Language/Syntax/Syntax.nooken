@@ -82,6 +82,7 @@ token UtilitiesKeyword    = "utilities";
 token AkcssKeyword        = "akcss";
 token ApplyKeyword        = "apply";
 token InterceptKeyword    = "intercept";
+token ForeachKeyword      = "foreach";
 
 [id 200]
 /*
@@ -437,6 +438,47 @@ node MarkupBlockSyntax {
     OpenBraceToken  : OpenBraceToken;
     Content         : syntaxlist<MarkupContentSyntax>;
     CloseBraceToken : CloseBraceToken;
+}
+
+node MarkupForeachStatementSyntax : MarkupStatementSyntax {
+    DollarToken     : DollarToken;
+    ForeachKeyword  : ForeachKeyword;
+    OpenParenToken  : OpenParenToken;
+    Header          : MarkupForeachHeaderSyntax;
+    KeyClause?      : MarkupForeachKeyClauseSyntax;
+    CloseParenToken : CloseParenToken;
+    Body            : MarkupCodeBlockSyntax;
+}
+
+node MarkupForeachHeaderSyntax {
+    Token : CSharpRawToken;
+}
+
+node MarkupForeachKeyClauseSyntax {
+    SemicolonToken : SemicolonToken;
+    Name           : SimpleName;
+    ColonToken     : ColonToken;
+    Expression     : CSharpExpressionSyntax;
+}
+
+node MarkupCodeBlockSyntax {
+    OpenBraceToken  : OpenBraceToken;
+    Content         : syntaxlist<MarkupContentSyntax>;
+    CloseBraceToken : CloseBraceToken;
+}
+
+node MarkupCodeIfStatementSyntax : MarkupStatementSyntax {
+    IfKeyword       : IfKeyword;
+    OpenParenToken  : OpenParenToken;
+    Condition       : CSharpExpressionSyntax;
+    CloseParenToken : CloseParenToken;
+    Body            : MarkupCodeBlockSyntax;
+    ElseKeyword?    : ElseKeyword;
+    ElseBody?       : MarkupCodeBlockSyntax;
+}
+
+node MarkupCodeStatementSyntax : MarkupStatementSyntax {
+    Token : CSharpRawToken;
 }
 
 [id 530]

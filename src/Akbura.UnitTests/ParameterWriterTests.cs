@@ -1,4 +1,4 @@
-﻿using Akbura.Language;
+using Akbura.Language;
 using Akbura.Language.CodeGeneration;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -242,7 +242,7 @@ public sealed class ParameterWriterTests
             output,
             StringComparison.Ordinal);
         Assert.Contains(
-            "if (__item is global::Avalonia.Controls.Control __contentControl &&",
+            "if ((object?)__item is global::Avalonia.Controls.Control __contentControl &&",
             output,
             StringComparison.Ordinal);
         Assert.Contains(
@@ -346,6 +346,37 @@ public sealed class ParameterWriterTests
         AssertGeneratedParametersCompile(collectionFixture);
     }
 
+    [Theory]
+    [InlineData("Avalonia.Media.StreamGeometry", false)]
+    [InlineData("Avalonia.Media.StreamGeometry", true)]
+    [InlineData("string?", false)]
+    [InlineData("string?", true)]
+    [InlineData("int", false)]
+    [InlineData("int", true)]
+    [InlineData("int?", false)]
+    [InlineData("int?", true)]
+    [InlineData("object?", false)]
+    [InlineData("object?", true)]
+    [InlineData("System.IDisposable", false)]
+    [InlineData("System.IDisposable", true)]
+    [InlineData("Avalonia.Controls.Control?", false)]
+    [InlineData("Avalonia.Controls.Control?", true)]
+    public void CollectionContent_WithDifferentElementTypes_Compiles(string elementType, bool debug)
+    {
+        foreach (var collectionType in new[]
+        {
+            "System.Collections.ObjectModel.ObservableCollection",
+            "System.Collections.Generic.List",
+            "System.Collections.Generic.IList",
+            "System.Collections.Generic.ICollection",
+        })
+        {
+            var fixture = CreateFixture($"param {collectionType}<{elementType}> Content;");
+
+            AssertGeneratedParametersCompile(fixture, debug);
+        }
+    }
+
     private static WriterFixture CreateFixture(string componentSource)
     {
         var semanticFixture = AkcssActivatorPlannerTests.CreateFixture(componentSource);
@@ -385,7 +416,7 @@ public sealed class ParameterWriterTests
         return codeWriter.GetText().ToString();
     }
 
-    private static void AssertGeneratedParametersCompile(WriterFixture fixture)
+    private static void AssertGeneratedParametersCompile(WriterFixture fixture, bool debug = false)
     {
         using var codeWriter = new CodeWriter("\r\n")
         {
@@ -417,15 +448,21 @@ public sealed class ParameterWriterTests
             "{\r\n" +
             generatedMembers +
             "}\r\n";
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+        if (debug)
+        {
+            parseOptions = parseOptions.WithPreprocessorSymbols("DEBUG");
+        }
+
         var syntaxTree = CSharpSyntaxTree.ParseText(
             generatedSource,
-            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview),
+            parseOptions,
             path: "ParameterWriterOutput.g.cs",
             encoding: Encoding.UTF8);
         GeneratedCodeAssertions.AssertDoubleUnderscoreMethodsAreHidden(
             generatedSource);
-        var errors = fixture.SemanticFixture.CSharpCompilation
-            .AddSyntaxTrees(syntaxTree)
+        var compilation = fixture.SemanticFixture.CSharpCompilation.AddSyntaxTrees(syntaxTree);
+        var errors = compilation
             .GetDiagnostics()
             .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
             .ToArray();
@@ -437,6 +474,10 @@ public sealed class ParameterWriterTests
                 errors.Select(static diagnostic => diagnostic.ToString())) +
             Environment.NewLine +
             generatedSource);
+
+        using var output = new MemoryStream();
+        var emitted = compilation.Emit(output);
+        Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
     }
 
     private static int CountOccurrences(string text, string value)

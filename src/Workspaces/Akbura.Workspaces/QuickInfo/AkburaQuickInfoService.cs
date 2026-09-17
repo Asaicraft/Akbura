@@ -92,8 +92,10 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
             {
                 InlineExpressionSyntax inline => semanticModel.GetCSharpSymbolReferences(inline),
                 CSharpExpressionSyntax condition when condition.Parent is
-                    MarkupIfStatementSyntax or MarkupElseIfClauseSyntax =>
+                    MarkupIfStatementSyntax or MarkupElseIfClauseSyntax or MarkupCodeIfStatementSyntax or MarkupForeachKeyClauseSyntax =>
                     semanticModel.GetCSharpSymbolReferences(condition),
+                MarkupForeachHeaderSyntax header => semanticModel.GetCSharpSymbolReferences(header),
+                MarkupCodeStatementSyntax code => semanticModel.GetCSharpSymbolReferences(code),
                 _ => default,
             };
             if (references.IsDefaultOrEmpty)
@@ -112,8 +114,13 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
                     GetCSharpSignature(symbolReference.CSharpDefinition.Symbol);
                 if (signature != null)
                 {
+                    var details = symbolReference.CSharpDefinition.Symbol is { } projectedSymbol &&
+                        Akbura.Workspaces.References.AkburaSymbolKeyFactory.TryGetProjectedLocalOrigin(projectedSymbol,
+                            out var origin) && origin.Kind == Akbura.Language.Symbols.SymbolKind.MarkupLoopIndex
+                        ? ImmutableArray.Create("Read-only zero-based index in the source sequence, before filtering or jumps.")
+                        : ImmutableArray<string>.Empty;
                     return new AkburaQuickInfo(symbolReference.SourceSpan,
-                        AkburaQuickInfoKind.Symbol, signature, []);
+                        AkburaQuickInfoKind.Symbol, signature, details);
                 }
             }
         }

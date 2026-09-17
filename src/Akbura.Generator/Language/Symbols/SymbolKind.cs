@@ -25,5 +25,6 @@ public enum SymbolKind
     AkcssUtility,
     AkcssProperty,
     CSharpSymbol,
+    MarkupLoopIndex,
     Error,
 }

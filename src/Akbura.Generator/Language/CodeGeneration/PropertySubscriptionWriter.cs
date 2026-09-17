@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Binder;
+using Akbura.Language.Binder;
 using Microsoft.CodeAnalysis;
 using System.Diagnostics;
 
@@ -429,7 +429,7 @@ internal readonly ref struct PropertySubscriptionWriter
     private void WriteTargetOperation(
         in CSharpOperationDefinition operation)
     {
-        var syntax = operation.Syntax;
+        var syntax = CSharpProbeBuilder.GetMarkupLoopCodeGenerationSyntax(operation);
 
         if (syntax == null)
         {

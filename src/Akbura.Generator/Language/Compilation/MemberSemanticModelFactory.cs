@@ -75,6 +75,10 @@ internal sealed class MemberSemanticModelFactory
                     return MemberSemanticModelKind.Akcss;
 
                 case AkburaSyntaxKind.MarkupRootSyntax:
+                case AkburaSyntaxKind.MarkupForeachStatementSyntax:
+                case AkburaSyntaxKind.MarkupCodeBlockSyntax:
+                case AkburaSyntaxKind.MarkupCodeIfStatementSyntax:
+                case AkburaSyntaxKind.MarkupCodeStatementSyntax:
                 case AkburaSyntaxKind.MarkupElementSyntax:
                 case AkburaSyntaxKind.MarkupElementContentSyntax:
                 case AkburaSyntaxKind.MarkupInlineExpressionSyntax:

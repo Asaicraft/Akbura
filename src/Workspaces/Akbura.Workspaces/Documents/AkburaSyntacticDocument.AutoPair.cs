@@ -51,6 +51,8 @@ public sealed partial class AkburaSyntacticDocument
 
         return token.Parent switch
         {
+            MarkupCodeBlockSyntax block =>
+                block.OpenBraceToken.Span == token.Span,
             MarkupBlockSyntax block =>
                 block.OpenBraceToken.Span == token.Span,
             AkcssStyleRuleSyntax rule =>
@@ -186,6 +188,23 @@ public sealed partial class AkburaSyntacticDocument
                     position))
             .TrimEnd();
         return prefix.EndsWith("@if", StringComparison.Ordinal);
+    }
+
+    internal bool CanStartMarkupForeach(int position)
+    {
+        ValidatePosition(position);
+        var end = GetPreviousNonWhitespace(position) + 1;
+        var start = end;
+        while (start > 0 && char.IsLetter(Text[start - 1])) start--;
+        if (start == 0 || Text[start - 1] != '$' || Text.ToString(
+                Microsoft.CodeAnalysis.Text.TextSpan.FromBounds(start, end)) != "foreach")
+        {
+            return false;
+        }
+
+        var root = SyntaxTree.GetRootSyntax();
+        return !IsInsideComment(root, start - 1) && !IsInsideMarkupLiteralValue(root, position) &&
+            !IsInsideMarkupStartTagForPair(position) && CanStartMarkupContent(root, position);
     }
 
     private bool IsInsideMarkupLiteralValue(

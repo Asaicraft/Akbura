@@ -110,7 +110,9 @@ internal sealed partial class Parser
                 }
 
                 _cancellationToken.ThrowIfCancellationRequested();
-                content.Add(incremental
+                content.Add(_markupCodeBlockTagDepth == openTags.Count
+                    ? ParseMarkupCodeContentSyntax(openTags, ref pendingEndTag, incremental)
+                    : incremental
                     ? ParseIncrementalMarkupContentSyntax(openTags, ref pendingEndTag)
                     : ParseMarkupContentSyntax(openTags, ref pendingEndTag));
             }
@@ -127,11 +129,11 @@ internal sealed partial class Parser
         }
     }
 
-    private GreenCSharpExpressionSyntax ParseMarkupConditionSyntax(bool incremental)
+    private GreenCSharpExpressionSyntax ParseMarkupConditionSyntax(bool incremental, bool foreachKey = false)
     {
         ResetLookaheadForMarkupCondition();
         var previousMode = _mode;
-        _mode = Lexer.LexerMode.InMarkupCondition;
+        _mode = foreachKey ? Lexer.LexerMode.InMarkupForeachKey : Lexer.LexerMode.InMarkupCondition;
         try
         {
             if (incremental && TryReadReusableIncrementalNode<GreenCSharpExpressionSyntax>(out var reusable))
@@ -184,6 +186,20 @@ internal sealed partial class Parser
 
     private bool CanReuseMarkupConditionalNode(GreenNode node)
     {
+        if (node is GreenMarkupCodeIfStatementSyntax or GreenMarkupCodeStatementSyntax &&
+            _markupCodeBlockTagDepth != _markupCurrentContentTagDepth)
+        {
+            return false;
+        }
+
+        if (node is GreenMarkupCodeIfStatementSyntax { ElseBody: null })
+        {
+            var codePosition = _lexer.TextWindow.Position;
+            var codeNext = _lexer.Lex(_mode);
+            _lexer.TextWindow.Reset(codePosition);
+            return codeNext.Kind != SyntaxKind.ElseKeyword;
+        }
+
         if (node is not GreenMarkupIfStatementSyntax { ElseClause: null })
         {
             return true;

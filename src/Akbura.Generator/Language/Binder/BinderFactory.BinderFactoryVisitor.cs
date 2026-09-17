@@ -93,6 +93,12 @@ internal sealed partial class BinderFactory
             return CreateMarkupBinder();
         }
 
+        public override Binder VisitMarkupForeachStatementSyntax(MarkupForeachStatementSyntax node) =>
+            CreateMarkupBinder();
+
+        public override Binder VisitMarkupCodeBlockSyntax(MarkupCodeBlockSyntax node) =>
+            CreateMarkupBinder();
+
         public override Binder VisitInlineAkcssBlockSyntax(InlineAkcssBlockSyntax node)
         {
             return CreateAkcssModuleBinder();
@@ -118,7 +124,9 @@ internal sealed partial class BinderFactory
             var declaration = RequiredDeclaration(
                 DeclarationKind.MarkupRoot,
                 DeclarationKind.MarkupElement,
-                DeclarationKind.MarkupConditionalBranch);
+                DeclarationKind.MarkupConditionalBranch,
+                DeclarationKind.MarkupForeach,
+                DeclarationKind.MarkupCodeBlock);
             var next = Factory.BindingSession.AddContainingBlockBinders(
                 Next,
                 DeclarationFacts.GetSyntax(declaration),

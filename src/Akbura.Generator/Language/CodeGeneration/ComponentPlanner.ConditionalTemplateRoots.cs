@@ -48,7 +48,8 @@ internal static partial class ComponentPlanner
                 ComponentElementFlags.UsesRuntimeStorage | ComponentElementFlags.IsConditionalTemplateRoot;
             flags |= boundary.IsDeferred ? ComponentElementFlags.IsDeferred : ComponentElementFlags.IsTemplateElement;
             _elements.Add(new PendingElementPlan(id, boundary.Syntax, symbol, type,
-                CreateRuntimeStorageExpression(type, runtimeId), boundary.OwnerElementId, boundary.ScopeId,
+                CreateRuntimeStorageExpression(type, runtimeId, isForeachLocal: false),
+                boundary.OwnerElementId, boundary.ScopeId,
                 kind, flags, children: default, pendingFirstUpdateActions: default, propertyElements: default,
                 runtimeStorageId: runtimeId, runtimeStorageRootScopeId: boundary.ScopeId));
             return id;

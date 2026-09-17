@@ -33,6 +33,8 @@ internal sealed class AkburaOperationFactory : IOperationFactory
         {
             BoundKind.MarkupComponent => CreateMarkupContentOperation((BoundMarkupComponent)boundNode),
             BoundKind.MarkupIf => CreateMarkupIfOperation((BoundMarkupIfStatement)boundNode),
+            BoundKind.MarkupForeach => CreateMarkupForeachOperation((BoundMarkupForeachStatement)boundNode),
+            BoundKind.MarkupForeachKey => CreateMarkupForeachKeyOperation((BoundMarkupForeachKey)boundNode),
             BoundKind.MarkupContentSetter => CreateMarkupContentOperation((BoundMarkupContentSetter)boundNode),
             BoundKind.MarkupNameAssignment => CreateMarkupNameAssignmentOperation((BoundMarkupNameAssignment)boundNode),
             BoundKind.MarkupDictionaryKey => CreateMarkupDictionaryKeyOperation((BoundMarkupDictionaryKey)boundNode),
@@ -209,6 +211,61 @@ internal sealed class AkburaOperationFactory : IOperationFactory
         return null;
     }
 
+    private MarkupForeachOperation CreateMarkupForeachOperation(BoundMarkupForeachStatement node)
+    {
+        using var children = ImmutableArrayBuilder<IOperation>.Rent();
+        AddLoopCSharpOperation(node.Syntax.Header, node.Source, children);
+        if (node.Syntax.KeyClause is { } key)
+        {
+            AddLoopCSharpOperation(key.Expression, node.Key, children);
+        }
+        var body = CreateMarkupForeachBody(node.Body, children);
+        return new(node.Syntax, node.Source, node.IterationType, node.OutputType, node.Key, node.KeySyntax, body,
+            children.ToImmutable(), node.HasErrors);
+    }
+
+    private ImmutableArray<MarkupForeachBodyItem> CreateMarkupForeachBody(
+        ImmutableArray<BoundMarkupForeachBodyItem> items, ImmutableArrayBuilder<IOperation> children)
+    {
+        using var body = ImmutableArrayBuilder<MarkupForeachBodyItem>.Rent(items.Length);
+        foreach (var item in items)
+        {
+            AddLoopCSharpOperation(item.Syntax, item.Code, children);
+            var nestedBody = CreateMarkupForeachBody(item.Body, children);
+            var alternative = CreateMarkupForeachBody(item.ElseBody, children);
+            IMarkupForeachOperation? loop = null;
+            if (item.ForeachStatement != null)
+            {
+                loop = CreateMarkupForeachOperation(item.ForeachStatement);
+                children.Add(loop);
+            }
+            foreach (var child in item.Content)
+            {
+                if (child.ConditionalOperation != null)
+                {
+                    children.Add(child.ConditionalOperation);
+                }
+                else if (child.ForeachOperation != null)
+                {
+                    children.Add(child.ForeachOperation);
+                }
+            }
+            body.Add(new(item.Syntax, item.Code, item.Content, nestedBody, alternative, loop));
+        }
+        return body.ToImmutable();
+    }
+
+    private void AddLoopCSharpOperation(AkburaSyntax syntax, CSharpOperationDefinition definition,
+        ImmutableArrayBuilder<IOperation> children)
+    {
+        var operation = CreateCSharpOperationTree(syntax, definition,
+            CreateCSharpOperationSymbolMapper(syntax, containingAkcssSymbol: null));
+        if (operation != null)
+        {
+            children.Add(operation);
+        }
+    }
+
     private MarkupIfOperation CreateMarkupIfOperation(BoundMarkupIfStatement node)
     {
         using var branches = ImmutableArrayBuilder<MarkupConditionalBranch>.Rent(node.Branches.Length);
@@ -269,6 +326,11 @@ internal sealed class AkburaOperationFactory : IOperationFactory
     private MarkupDictionaryKeyOperation CreateMarkupDictionaryKeyOperation(BoundMarkupDictionaryKey node) =>
         new(node.Syntax, node.ContainingComponent, node.DictionaryShape, node.Binding, node.LiteralValue,
             node.HasErrors, CreateCSharpOperationTree(node.Syntax, node.Binding.OperationDefinition,
+                CreateCSharpOperationSymbolMapper(node.Syntax, containingAkcssSymbol: null)));
+
+    private MarkupForeachKeyOperation CreateMarkupForeachKeyOperation(BoundMarkupForeachKey node) =>
+        new(node.Syntax, node.ContainingComponent, node.Binding, node.IsIterationKey, node.HasErrors,
+            CreateCSharpOperationTree(node.Syntax, node.Binding.OperationDefinition,
                 CreateCSharpOperationSymbolMapper(node.Syntax, containingAkcssSymbol: null)));
 
     private static MarkupNameAssignmentOperation CreateMarkupNameAssignmentOperation(

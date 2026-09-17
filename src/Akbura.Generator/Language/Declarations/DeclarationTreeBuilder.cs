@@ -729,6 +729,20 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
                         builder.Add(CreateMarkupBranchDeclaration(finalClause.Body));
                     }
                 }
+                else if (child is MarkupForeachStatementSyntax loop)
+                {
+                    builder.Add(new SingleSyntaxDeclaration(DeclarationKind.MarkupForeach,
+                        string.Empty, loop, _syntaxTree, _akcssSyntaxTree,
+                        ImmutableArray.Create(CreateMarkupCodeBlockDeclaration(loop.Body))));
+                }
+                else if (child is MarkupCodeIfStatementSyntax guard)
+                {
+                    builder.Add(CreateMarkupCodeBlockDeclaration(guard.Body));
+                    if (guard.ElseBody is { } alternative)
+                    {
+                        builder.Add(CreateMarkupCodeBlockDeclaration(alternative));
+                    }
+                }
             }
         }
 
@@ -754,6 +768,14 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
             CollectMarkupContentDeclarations(block.Content, children);
             return new SingleSyntaxDeclaration(DeclarationKind.MarkupConditionalBranch,
                 string.Empty, block, _syntaxTree, _akcssSyntaxTree, children.ToImmutable());
+        }
+
+        private Declaration CreateMarkupCodeBlockDeclaration(MarkupCodeBlockSyntax block)
+        {
+            using var children = ImmutableArrayBuilder<Declaration>.Rent();
+            CollectMarkupContentDeclarations(block.Content, children);
+            return new SingleSyntaxDeclaration(DeclarationKind.MarkupCodeBlock, string.Empty,
+                block, _syntaxTree, _akcssSyntaxTree, children.ToImmutable());
         }
 
         private void Add(

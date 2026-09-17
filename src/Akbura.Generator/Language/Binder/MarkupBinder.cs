@@ -196,6 +196,7 @@ internal sealed partial class MarkupBinder : Binder
         return syntax.Kind switch
         {
             AkburaSyntaxKind.MarkupIfStatementSyntax => BindMarkupIfStatement((MarkupIfStatementSyntax)syntax),
+            AkburaSyntaxKind.MarkupForeachStatementSyntax => BindMarkupForeachStatement((MarkupForeachStatementSyntax)syntax),
             AkburaSyntaxKind.MarkupElementSyntax =>
                 BindMarkupComponent(Unsafe.As<MarkupElementSyntax>(syntax)),
             AkburaSyntaxKind.MarkupPlainAttributeSyntax or
@@ -213,6 +214,7 @@ internal sealed partial class MarkupBinder : Binder
         return syntax.Kind switch
         {
             AkburaSyntaxKind.MarkupIfStatementSyntax => BindMarkupIfStatement((MarkupIfStatementSyntax)syntax),
+            AkburaSyntaxKind.MarkupForeachStatementSyntax => BindMarkupForeachStatement((MarkupForeachStatementSyntax)syntax),
             AkburaSyntaxKind.MarkupRootSyntax or
                 AkburaSyntaxKind.MarkupElementSyntax or
                 AkburaSyntaxKind.MarkupElementContentSyntax or
@@ -787,6 +789,11 @@ internal sealed partial class MarkupBinder : Binder
 
     private BoundNode BindMarkupPropertyOrEvent(MarkupAttributeSyntax markupAttribute)
     {
+        if (AkburaSemanticModel.IsMarkupForeachKeyDirective(markupAttribute))
+        {
+            return BindMarkupForeachKey((MarkupAttachedPropertyAttributeSyntax)markupAttribute);
+        }
+
         if (AkburaSemanticModel.IsMarkupDictionaryKeyDirective(markupAttribute))
         {
             return BindMarkupDictionaryKey((MarkupAttachedPropertyAttributeSyntax)markupAttribute);

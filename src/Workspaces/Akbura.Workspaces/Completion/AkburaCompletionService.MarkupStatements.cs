@@ -18,6 +18,7 @@ internal sealed partial class AkburaCompletionService
         var hasWhitespace = context.ApplicableSpan.End < next;
         var items = ImmutableArray.CreateBuilder<AkburaCompletionItem>(3);
         Add("$if", "Selects a branch using a C# boolean condition.");
+        Add("$foreach", "Renders an enumerable source into an indexed mutable child collection.");
         if (context.Kind == AkburaCompletionContextKind.MarkupConditionalContinuation)
         {
             Add("$else if", "Tests another condition after the preceding branches fail.");

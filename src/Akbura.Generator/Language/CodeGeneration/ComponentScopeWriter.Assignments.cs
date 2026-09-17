@@ -214,7 +214,7 @@ internal readonly ref partial struct ComponentScopeWriter
                     WriteConditionalInitialEnd(conditionalOneTime);
                     break;
                 case ComponentFirstUpdateActionKind.PropertySubscription:
-                    if (element.ConditionalRegionId >= 0)
+                    if (element.ConditionalRegionId >= 0 || element.RuntimeStorageRootScopeId > 0)
                     {
                         break;
                     }
@@ -222,7 +222,7 @@ internal readonly ref partial struct ComponentScopeWriter
                     subscriptions.WriteStructuralRegistration(element, plan.PropertySubscriptions.ItemRef(action.Index));
                     break;
                 case ComponentFirstUpdateActionKind.RoutedEvent:
-                    if (element.ConditionalRegionId >= 0)
+                    if (element.ConditionalRegionId >= 0 || element.RuntimeStorageRootScopeId > 0)
                     {
                         break;
                     }

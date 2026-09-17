@@ -108,6 +108,7 @@ internal sealed class AkburaFindReferencesService :
         }
 
         if (includeDeclaration &&
+            target.Key.Kind is not (AkburaSymbolKind.MarkupLoopLocal or AkburaSymbolKind.MarkupLoopIndex) &&
             target.RoslynSymbol is { } csharpSymbol)
         {
             AddCSharpDeclarations(
@@ -316,6 +317,19 @@ internal sealed class AkburaFindReferencesService :
                         semanticModel.GetCSharpSymbolReferences(attribute),
                         builder,
                         seen);
+                    break;
+
+                case MarkupForeachHeaderSyntax header:
+                    AddCSharpReferences(context, semanticModel.GetCSharpSymbolReferences(header), builder, seen);
+                    break;
+
+                case MarkupCodeStatementSyntax code:
+                    AddCSharpReferences(context, semanticModel.GetCSharpSymbolReferences(code), builder, seen);
+                    break;
+
+                case CSharpExpressionSyntax condition when condition.Parent is
+                    MarkupIfStatementSyntax or MarkupElseIfClauseSyntax or MarkupCodeIfStatementSyntax or MarkupForeachKeyClauseSyntax:
+                    AddCSharpReferences(context, semanticModel.GetCSharpSymbolReferences(condition), builder, seen);
                     break;
 
                 case CSharpStatementSyntax statement:
@@ -604,12 +618,19 @@ internal sealed class AkburaFindReferencesService :
             }
             else if (reference.CSharpDefinition.Symbol is { } csharp)
             {
+                if (AkburaSymbolKeyFactory.TryGetProjectedLocalOrigin(csharp, out var origin) &&
+                    origin.Kind != Akbura.Language.Symbols.SymbolKind.MarkupLoopIndex)
+                {
+                    AddRoslynOccurrence(context, csharp, origin.DeclarationSpan, origin.Name,
+                        isDeclaration: true, isWrite: true, builder, seen);
+                }
                 AddRoslynOccurrence(
                     context,
                     csharp,
                     reference.SourceSpan,
                     reference.Name,
-                    isDeclaration: false,
+                    isDeclaration: AkburaSymbolKeyFactory.TryGetProjectedLocalOrigin(csharp, out var declarationOrigin) &&
+                        declarationOrigin.DeclarationSpan == reference.SourceSpan,
                     IsWriteReference(reference.Syntax),
                     builder,
                     seen);

@@ -1,7 +1,5 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using System.Text;
 
 namespace Akbura;
 public static class EmptyEnumerator
@@ -13,6 +11,6 @@ public static class EmptyEnumerator
 
     private static class EmptyEnumeratorImpl<T>
     {
-        public readonly static IEnumerator<T> Instance = Unsafe.As<IEnumerator<T>>(Array.Empty<T>().GetEnumerator());
+        public readonly static IEnumerator<T> Instance = ((IEnumerable<T>)Array.Empty<T>()).GetEnumerator();
     }
 }

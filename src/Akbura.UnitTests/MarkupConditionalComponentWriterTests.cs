@@ -643,7 +643,7 @@ public sealed class MarkupConditionalComponentWriterTests
         }, CancellationToken.None);
     }
 
-    private static Type Compile(string source, bool structural, string? ownerSource = null)
+    internal static Type Compile(string source, bool structural, string? ownerSource = null)
     {
         var fixture = AkcssActivatorPlannerTests.CreateFixture("using Avalonia.Controls; using Demo; " + source,
             ownerSource ?? OwnerSource);

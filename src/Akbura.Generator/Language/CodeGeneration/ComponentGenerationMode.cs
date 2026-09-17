@@ -22,7 +22,7 @@ internal static class ComponentGenerationModeExtensions
         {
             foreach (var syntax in component.DeclarationSyntax.DescendantNodesAndSelf())
             {
-                if (syntax is MarkupIfStatementSyntax)
+                if (syntax is MarkupIfStatementSyntax or MarkupForeachStatementSyntax)
                 {
                     return ComponentGenerationMode.ReleaseConditional;
                 }

@@ -1,0 +1,17 @@
+<Project>
+  <!-- Import from test projects only. The documentation itself is the test input. -->
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)MarkdownDocumentation.cs"
+             Link="Documentation/Shared/MarkdownDocumentation.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)DocumentationExampleCatalog.cs"
+             Link="Documentation/Shared/DocumentationExampleCatalog.cs" />
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)..\..\AkburaDocs\_pages\akbura\foreach.md"
+                      LogicalName="Akbura.Documentation.akbura/foreach.md" />
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)..\..\AkburaDocs\_pages\akbura\conditional-markup.md"
+                      LogicalName="Akbura.Documentation.akbura/conditional-markup.md" />
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)..\..\AkburaDocs\_pages\akbura\grid.md"
+                      LogicalName="Akbura.Documentation.akbura/grid.md" />
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)..\..\AkburaDocs\_pages\index.md"
+                      LogicalName="Akbura.Documentation.index.md" />
+  </ItemGroup>
+</Project>

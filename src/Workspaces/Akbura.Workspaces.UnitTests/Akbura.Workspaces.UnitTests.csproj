@@ -25,4 +25,6 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <Import Project="..\..\Akbura.TestUtilities\Documentation\DocumentationExamples.props" />
+
 </Project>

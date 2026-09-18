@@ -50,4 +50,6 @@
 						  LogicalName="Akbura.UnitTests.Fixtures.AkcssPage.akbura" />
 	</ItemGroup>
 
+  <Import Project="..\Akbura.TestUtilities\Documentation\DocumentationExamples.props" />
+
 </Project>

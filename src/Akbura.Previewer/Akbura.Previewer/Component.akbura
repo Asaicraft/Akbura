@@ -13,6 +13,15 @@ state int count = 0;
 
 	<Button Content={$"Increment count to {count+1}"} Click={count++} />
 
+	$foreach (var item in new int[] {1, 2, 3, 4, 5})
+	{
+		<StackPanel>
+			<TextBlock Text={$"Hello world! {item}"}/>
+
+			<Button Content="ooo yee"/>
+		</StackPanel>
+	}
+
 	<Border>
 		{count % 2 == 0 
 			? new Border() { Width = 100, Height = 100, Background = Brushes.Red }

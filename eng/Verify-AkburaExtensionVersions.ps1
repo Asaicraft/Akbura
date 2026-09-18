@@ -17,7 +17,7 @@ function Assert-ExactVersion {
             $Expected,
             [StringComparison]::Ordinal))
     {
-        throw "$Source version '$Actual' must match Akbura version '$Expected'."
+        throw "$Source version '$Actual' must match expected version '$Expected'."
     }
 }
 
@@ -55,6 +55,14 @@ $akburaVersion = [string] (
     $properties.Project.PropertyGroup.AkburaVersion |
         Select-Object -First 1)
 
+$vscodeVersion = [string] (
+    $properties.Project.PropertyGroup.VsCodeExtensionVersion |
+        Select-Object -First 1)
+
+if ($vscodeVersion -cnotmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+    throw "VsCodeExtensionVersion must be a three-part version X.Y.Z."
+}
+
 if ([string]::IsNullOrWhiteSpace($avaloniaVersion)) {
     throw "Directory.Build.props does not define AvaloniaVersion."
 }
@@ -77,13 +85,13 @@ $packageLockVersion = [string] $packageLock["version"]
 $packageLockRootVersion = [string] $packageLock["packages"][""]["version"]
 
 Assert-CompatibleVsixVersion $vsixVersion $avaloniaVersion
-Assert-ExactVersion $packageVersion $avaloniaVersion "VS Code package.json"
-Assert-ExactVersion $packageLockVersion $avaloniaVersion "VS Code package-lock.json"
+Assert-ExactVersion $packageVersion $vscodeVersion "VS Code package.json"
+Assert-ExactVersion $packageLockVersion $vscodeVersion "VS Code package-lock.json"
 Assert-ExactVersion `
     $packageLockRootVersion `
-    $avaloniaVersion `
+    $vscodeVersion `
     "VS Code package-lock.json root package"
 
 Write-Host (
-    "Verified extension versions: Akbura and VS Code are $avaloniaVersion; " +
+    "Verified versions: Akbura/Avalonia $avaloniaVersion; VS Code $vscodeVersion; " +
     "Visual Studio VSIX is $vsixVersion.")

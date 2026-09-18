@@ -3,6 +3,7 @@
 		<AvaloniaVersion>12.0.4</AvaloniaVersion>
 		<AkburaVersion>$(AvaloniaVersion)</AkburaVersion>
 		<Version>$(AkburaVersion)</Version>
+		<VsCodeExtensionVersion>12.0.5</VsCodeExtensionVersion>
 		<Authors>Asaicraft</Authors>
 		<Company>Asaicraft</Company>
 		<Copyright>Copyright © 2025-2026 Asaicraft</Copyright>

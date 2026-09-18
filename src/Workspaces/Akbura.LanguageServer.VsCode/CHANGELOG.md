@@ -1,5 +1,11 @@
 # Change Log
 
+## 12.0.5
+
+- Added reactive markup $foreach support.
+- Added editor support for $foreach, including syntax highlighting and language services.
+- Improved Hot Reload behavior for foreach collections and keyed item identity.
+- Added documentation and executable documentation examples.
 ## 12.0.4
 
 - Aligned the extension version with Akbura and Avalonia.

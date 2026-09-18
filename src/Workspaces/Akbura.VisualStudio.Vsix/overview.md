@@ -21,6 +21,12 @@ Language support for `.akbura` and `.akcss` files in Visual Studio.
 The extension keeps its stable VSIX identity so installed copies receive future
 updates from the same Marketplace listing.
 
+## What's new in 12.0.4.3
+
+- Added editor support for reactive $foreach markup.
+- Added $foreach syntax classification and highlighting.
+- Improved language services for foreach variables, @index, navigation, rename, completion, and formatting.
+- Included the latest workspace and parser fixes.
 ## What's new in 12.0.4.2
 
 - Fixed incremental parsing while typing utilities such as `w-30`, so completed values no longer retain a stale `Identifier expected` diagnostic.
@@ -34,3 +40,4 @@ updates from the same Marketplace listing.
 
 - Aligned the extension version with Akbura and Avalonia.
 - Added Akbura artwork to the Marketplace listing and Extension Manager.
+

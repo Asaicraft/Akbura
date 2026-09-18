@@ -24,7 +24,8 @@ internal static class AkburaSyntaxClassificationFacts
         }
 
         if (token.Kind == SyntaxKind.DollarToken &&
-            token.Parent is MarkupIfStatementSyntax or MarkupElseIfClauseSyntax or MarkupElseClauseSyntax)
+            token.Parent is MarkupIfStatementSyntax or MarkupElseIfClauseSyntax or
+                MarkupElseClauseSyntax or MarkupForeachStatementSyntax)
         {
             return AkburaClassificationKind.Directive;
         }
@@ -413,6 +414,7 @@ internal static class AkburaSyntaxClassificationFacts
             SyntaxKind.ElseKeyword or
             SyntaxKind.ReturnKeyword or
             SyntaxKind.ForKeyword or
+            SyntaxKind.ForeachKeyword or
             SyntaxKind.TrueKeyword or
             SyntaxKind.FalseKeyword or
             SyntaxKind.NullKeyword or

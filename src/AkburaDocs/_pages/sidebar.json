@@ -25,6 +25,10 @@
         "link": "/akbura/conditional-markup"
       },
       {
+        "text": "Foreach Markup",
+        "link": "/akbura/foreach"
+      },
+      {
         "text": "Reactive State",
         "link": "/#reactive-state"
       },

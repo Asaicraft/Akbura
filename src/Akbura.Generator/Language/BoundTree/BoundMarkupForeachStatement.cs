@@ -46,7 +46,7 @@ internal sealed class BoundMarkupForeachStatement : BoundNode
         where TResult : default => visitor.VisitMarkupForeach(this, parameter);
 }
 
-internal readonly struct BoundMarkupForeachBodyItem
+internal sealed class BoundMarkupForeachBodyItem
 {
     public BoundMarkupForeachBodyItem(AkburaSyntax syntax, CSharpOperationDefinition code = default,
         ImmutableArray<MarkupChildContent> content = default,

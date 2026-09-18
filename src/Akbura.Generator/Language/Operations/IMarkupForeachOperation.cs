@@ -18,11 +18,12 @@ internal interface IMarkupForeachOperation : IOperation
     ImmutableArray<MarkupForeachBodyItem> Body { get; }
 }
 
-internal readonly struct MarkupForeachBodyItem
+internal sealed class MarkupForeachBodyItem
 {
-    public MarkupForeachBodyItem(AkburaSyntax syntax, CSharpOperationDefinition code,
-        ImmutableArray<MarkupChildContent> content, ImmutableArray<MarkupForeachBodyItem> body,
-        ImmutableArray<MarkupForeachBodyItem> elseBody, IMarkupForeachOperation? foreachOperation)
+    public MarkupForeachBodyItem(
+        AkburaSyntax syntax, CSharpOperationDefinition code, ImmutableArray<MarkupChildContent> content,
+        ImmutableArray<MarkupForeachBodyItem> body, ImmutableArray<MarkupForeachBodyItem> elseBody,
+        IMarkupForeachOperation? foreachOperation)
     {
         Syntax = syntax;
         Code = code;
@@ -33,7 +34,10 @@ internal readonly struct MarkupForeachBodyItem
     }
 
     public AkburaSyntax Syntax { get; }
-    /// <summary>The bound ordinary C# condition or statement, not a lowered flow result.</summary>
+
+    /// <summary>
+    /// The bound ordinary C# condition or statement, not a lowered flow result.
+    /// </summary>
     public CSharpOperationDefinition Code { get; }
     public ImmutableArray<MarkupChildContent> Content { get; }
     public ImmutableArray<MarkupForeachBodyItem> Body { get; }

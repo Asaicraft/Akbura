@@ -16,7 +16,12 @@ internal readonly ref partial struct ComponentScopeWriter
     private void WriteForeachDestinationValidation(in ComponentPlan plan, in ComponentConditionalContentPlan content)
     {
         var first = FindFirstForeach(plan, content.Items);
-        if (first < 0) return;
+        
+        if (first < 0)
+        {
+            return;
+        }
+
         _writer.Write("global::Akbura.HotReload.AkburaForeachDestination.Validate<");
         new CSharpValueWriter(_writer).WriteTypeNameWithNullableAnnotation(
             plan.ForeachRegions.ItemRef(first).Operation.OutputType.Symbol as ITypeSymbol);
@@ -191,10 +196,20 @@ internal readonly ref partial struct ComponentScopeWriter
     private static bool ForeachBodyTerminates(IEnumerable<MarkupForeachBodyItem> body)
     {
         var last = body.LastOrDefault();
+
+        if (last is null)
+        {
+            // Empty bodies fall through and need LoopFlow.Next.
+            return false;
+        }
+
         return last.Syntax is MarkupCodeStatementSyntax statement &&
-            statement.GetRawCSharpStatement() is CSharp.BreakStatementSyntax or CSharp.ContinueStatementSyntax ||
-            last.Syntax is MarkupCodeIfStatementSyntax && !last.ElseBody.IsDefaultOrEmpty &&
-            ForeachBodyTerminates(last.Body) && ForeachBodyTerminates(last.ElseBody);
+            statement.GetRawCSharpStatement() is
+                CSharp.BreakStatementSyntax or CSharp.ContinueStatementSyntax ||
+            last.Syntax is MarkupCodeIfStatementSyntax &&
+            !last.ElseBody.IsDefaultOrEmpty &&
+            ForeachBodyTerminates(last.Body) &&
+            ForeachBodyTerminates(last.ElseBody);
     }
 
     private static string GetForeachDependencies(IMarkupForeachOperation operation)

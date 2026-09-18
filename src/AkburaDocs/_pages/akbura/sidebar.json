@@ -24,6 +24,10 @@
         "link": "/akbura/conditional-markup"
       },
       {
+        "text": "Foreach Markup",
+        "link": "/akbura/foreach"
+      },
+      {
         "text": "Avalonia Styles",
         "link": "/#avalonia-styles"
       },

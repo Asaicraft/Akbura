@@ -71,6 +71,12 @@ Top-level conditionals that replace the component's root are outside this
 syntax contract. Add-only destinations also need an explicit reversible
 lifecycle contract before reactive switching can be supported.
 
+For repeated content, use [Foreach Markup](/akbura/foreach). Unlike `$if`,
+`$foreach` always requires a mutable indexed list destination, even when its
+source contains only one item. It can share that list with conditional content
+and ordinary siblings. The direct body of `$foreach` also supports local
+declarations and ordinary `if`/`else` guards with `break` and `continue`.
+
 ## Templates
 
 Conditional content can appear beneath a stable root:

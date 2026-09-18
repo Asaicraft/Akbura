@@ -2746,7 +2746,7 @@ In `.akbura` markup, the `RowDefinitions` and `ColumnDefinitions` properties sup
 <Grid
     ColumnDefinitions="*, 100, Auto"
     RowDefinitions="Auto 2* 48">
-    <!-- content -->
+    // content
 </Grid>
 ```
 
@@ -2888,7 +2888,7 @@ Invalid definitions produce a compiler diagnostic instead of being deferred unti
     ColumnDefinitions="Auto, min-max(120, *, 320), 2*"
     RowDefinitions="Auto * 48">
 
-    <!-- Grid content -->
+    // Grid content
 </Grid>
 ```
 

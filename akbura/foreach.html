@@ -1,0 +1,848 @@
+
+
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <base href="https://asaicraft.github.io/Akbura/" />
+
+    <link rel="icon" type="image/svg+xml" href="img/logo.svg">
+    <title>Foreach Markup</title>
+
+    <script>
+            if (location.search === "?dark") {
+                localStorage.setItem("color-scheme", "dark");
+            }
+
+            if (location.search === "?light") {
+                localStorage.removeItem("color-scheme");
+            }
+
+            const cls = document.documentElement.classList;
+
+            if (localStorage.getItem("color-scheme") === "dark") {
+                cls.add("dark");
+            } else {
+                cls.remove("dark");
+            }
+    </script>
+
+    <link rel="stylesheet" href="css/app.css">
+
+    <script type="importmap">
+{
+    "imports": {
+        "app.mjs": "mjs/app.mjs",
+        "vue": "lib/mjs/vue.min.mjs",
+        "@servicestack/client": "lib/mjs/servicestack-client.min.mjs",
+        "@servicestack/vue": "lib/mjs/servicestack-vue.min.mjs"
+    }
+}
+</script>
+</head>
+
+<body class="bg-white dark:bg-black dark:text-white">
+    <header id="header" class="top-0 fixed z-50 h-14 bg-white dark:bg-black opacity-90 w-full shadow">
+    <nav class="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-black">
+        <div class="mx-auto max-w-[100rem] pr-4 sm:pr-6 lg:pr-8">
+            <div class="flex h-16 justify-between">
+                <div class="flex">
+                    <div class="flex flex-shrink-0 items-center">
+                        <a class="mr-2 lg:mr-8 flex items-center" href="./">
+                            <svg class="w-8 h-8 mr-1 ml-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13m9-13v13m9-13v13" /></svg>
+                            <span class="hidden sm:block text-2xl font-semibold">AkburaDocs</span>
+                        </a>
+                    </div>
+                    <div class="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-4 lg:space-x-8">
+                        <!-- Current: "border-indigo-500 text-gray-900", Default: "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700" -->
+                                <a href="akbura" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-indigo-500 text-gray-900">
+                                    Akbura
+                                </a>
+                                <a href="akcss" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+                                    Akcss
+                                </a>
+                                <a href="diagnostics" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+                                    Diagnostics
+                                </a>
+                                <a href="whatsnew" class="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200">
+                                    What's New
+                                </a>
+                    </div>
+                </div>
+                <div class="hidden gap-8 sm:ml-6 sm:flex sm:items-center">
+                    <a href="https://asaicraft.github.io/Akbura/Gallery"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                        Gallery
+                    </a>
+
+                    <a href="https://github.com/Asaicraft/Akbura"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       aria-label="Akbura on GitHub"
+                       title="GitHub"
+                       class="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
+                        <svg class="h-6 w-6"
+                             viewBox="0 0 24 24"
+                             fill="currentColor"
+                             aria-hidden="true">
+                            <path fill-rule="evenodd"
+                                  d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.167 6.839 9.49.5.092.682-.217.682-.482 0-.237-.009-.866-.014-1.7-2.782.604-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.461-1.11-1.461-.908-.62.069-.608.069-.608 1.003.071 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.091-.646.349-1.087.635-1.337-2.221-.253-4.555-1.111-4.555-4.944 0-1.092.39-1.985 1.029-2.684-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0 1 12 6.836a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.748-1.025 2.748-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.684 0 3.842-2.337 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.337-.012 2.415-.012 2.744 0 .267.18.578.688.48A10.003 10.003 0 0 0 22 12c0-5.523-4.477-10-10-10Z"
+                                  clip-rule="evenodd" />
+                        </svg>
+                    </a>
+
+                    <dark-mode-toggle class="ml-2 w-10"></dark-mode-toggle>
+                </div>
+                <div class="-mr-2 flex items-center sm:hidden">
+                    <!-- Mobile menu button -->
+                    <button type="button" v-on:click="open=!open" class="inline-flex items-center justify-center rounded-md bg-white dark:bg-black p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:ring-offset-black" aria-controls="mobile-menu" aria-expanded="false">
+                        <span class="sr-only">Open main menu</span>
+                        <!-- Menu open: "hidden", Menu closed: "block" -->
+                        <svg :class="['h-6 w-6', open ? 'hidden' : 'block']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                        </svg>
+                        <!-- Menu open: "block", Menu closed: "hidden" -->
+                        <svg :class="['h-6 w-6', open ? 'block' : 'hidden']" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile menu, show/hide based on menu state. -->
+        <div v-cloak v-if="open" class="sm:hidden">
+            <div class="space-y-1 pb-3 pt-2">
+                <!-- Current: "border-indigo-500 bg-indigo-50 text-indigo-700", Default: "border-transparent text-gray-600 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800" -->
+                        <a href="akbura" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-indigo-500 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200">
+                            Akbura
+                        </a>
+                        <a href="akcss" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+                            Akcss
+                        </a>
+                        <a href="diagnostics" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+                            Diagnostics
+                        </a>
+                        <a href="whatsnew" class="block border-l-4 py-2 pl-3 pr-4 text-base font-medium border-transparent text-gray-600 dark:text-gray-300 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-800 dark:hover:text-gray-100">
+                            What's New
+                        </a>
+            </div>
+        </div>
+    </nav>
+</header>
+
+<script type="module">
+    import { ref } from "vue"
+    import { mount } from "app.mjs"
+
+    const Header = {
+        setup() {
+            const open = ref(false)
+            return { open }
+        }
+    }
+    mount('#header', Header)
+</script>
+
+
+    <div class="min-h-screen">
+        <main role="main" class="pt-16 pb-3">
+            
+
+
+
+
+<style>
+.active {
+	color: #0ea5e9 !important;
+}
+</style>
+<link rel="stylesheet" href="css/highlight.css">
+<link rel="stylesheet" href="css/typography.css">
+<link rel="stylesheet" href="css/lite-yt-embed.css">
+
+<div class="w-full max-w-[100rem] mx-auto">
+	<div class="flex flex-wrap">
+		<div id="sidebar" class="z-40 inset-0 flex-none bg-white dark:bg-black lg:w-64 xl:w-80">
+			<button v-cloak v-on:click="open=true" :class="['text-gray-400 hover:text-gray-500 pt-4 pl-2 absolute transform transition-all duration-200', open ? 'opacity-0 translate-x-56' : 'opacity-100']" title="Open Sidebar">
+				<svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H10m10 0l-4 4m4-4l-4-4M4 4v16"/></svg>
+			</button>
+			<div :class="['fixed bg-white dark:bg-black h-screen overflow-y-auto scrolling-touch overflow-hidden shadow lg:shadow-none transform transition-transform duration-200', open ? '' : 'translate-x-[-100%]']">
+				<nav class="sidebar lg:w-64 xl:w-80 px-1 pt-6 pb-16 overflow-y-auto font-medium text-sm lg:text-base sm:px-3 xl:px-5" aria-label="Sidebar">
+					<close-button title="Close Sidebar" class="lg:hidden -mr-2" v-on:close="open=false"></close-button>
+								<a href="https://asaicraft.github.io/Akbura/akbura/" class="block flex items-center whitespace-nowrap">
+<svg class='h-6 w-6 shrink-0 text-sky-500' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='currentColor' aria-hidden='true'><path stroke-linecap='round' stroke-linejoin='round' d='M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25'></path></svg>									<span class="p-2 pl-3 font-display font-medium text-slate-900 dark:text-white">
+Akbura									</span>
+								</a>
+						<ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/hooks" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Composable Hooks
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/axaml-integration" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Using Components in AXAML
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/xml-xaml-axaml" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										XML, XAML and AXAML differences
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/#dictionary-resources" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Dictionary Resources
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/conditional-markup" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Conditional Markup
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/foreach" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
+										Foreach Markup
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/#avalonia-styles" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Avalonia Styles
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/grid" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Grid
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/items-control" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										ItemsControl
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/dependency-injection" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Dependency Injection
+									</a>
+								</li>
+						</ul>
+				</nav>
+			</div>
+		</div>
+		<div id="doc" class="mx-auto flex">
+			<div class="mt-8 mx-auto prose lg:prose-lg">
+				
+					<section class="not-prose mb-16 md:mb-12">
+						<h1 class="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-gray-50 sm:text-5xl md:text-6xl">
+							Foreach Markup
+						</h1>
+					</section>
+
+				<div class="not-prose"></div>
+
+				<div class="content">
+					<h1 id="foreach-markup">Foreach Markup<a class="header-anchor" href="javascript:;" onclick="location.hash='#foreach-markup'" aria-label="Permalink">&ZeroWidthSpace;</a></h1>
+<p><code>$foreach</code> repeats markup directly inside a parent's collection. The statement
+is not a control: it adds no visual or logical wrapper, <code>ItemsControl</code>, or item
+container. In a <code>StackPanel</code>, the controls declared by the loop become direct
+children of that panel, alongside any ordinary or conditional siblings.</p>
+<div class="warning custom-block">
+            <p class="custom-block-title">Version compatibility</p><p>This page describes the current repository implementation. Use matching
+compiler, runtime, and editor versions that include <code>$foreach</code>. Support in an
+older published alpha package is not implied.</p>
+</div>
+<h2 id="basic-syntax">Basic syntax<a class="header-anchor" href="javascript:;" onclick="location.hash='#basic-syntax'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using System.Collections.Immutable;
+
+state ImmutableArray&lt;int&gt; array = [1, 2, 3, 4, 5];
+
+&lt;StackPanel Spacing=&quot;8&quot;&gt;
+    $foreach (var item in array)
+    {
+        &lt;TextBlock Text={$&quot;Current item is {item}&quot;} /&gt;
+    }
+&lt;/StackPanel&gt;
+</code></pre>
+<p>The iteration variable is inferred from the source, or its type can be written
+explicitly, as in <code>$foreach (int item in array)</code>. It is available in the body
+and the optional key expression, but not in its own source expression or after
+the loop.</p>
+<p>Supported headers use synchronous value iteration with one named variable over
+an <code>IEnumerable&lt;T&gt;</code> or non-generic <code>IEnumerable</code> source. Asynchronous iteration,
+<code>ref</code>/<code>ref readonly</code> iteration, deconstruction headers, and ref-like iteration
+values are not supported.</p>
+<p>An iteration can contribute no children, one child, or several children. An
+empty source contributes nothing; a <code>null</code> source and a default
+<code>ImmutableArray&lt;T&gt;</code> are also treated as empty.</p>
+<p>Use the iteration variable in expressions such as <code>Text={person.Name}</code>. A loop
+is not an <code>ItemTemplate</code> and does not automatically set each child's
+<code>DataContext</code> to its current item. Explicit bindings retain their normal
+Avalonia data-context rules.</p>
+<h2 id="where-a-loop-can-be-placed">Where a loop can be placed<a class="header-anchor" href="javascript:;" onclick="location.hash='#where-a-loop-can-be-placed'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>A loop requires an accessible, mutable, indexed <strong>destination</strong> implementing
+<code>IList&lt;T&gt;</code> or non-generic <code>IList</code>. The destination's item type must accept the
+values produced by the body. A getter-only property is supported when it
+returns a mutable list; the loop changes the list, not the property itself.</p>
+<p>Both implicit content and property-element content are supported:</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using System.Collections.Immutable;
+
+state ImmutableArray&lt;int&gt; array = [1, 2, 3];
+
+&lt;StackPanel&gt;
+    &lt;StackPanel.Children&gt;
+        &lt;TextBlock Text=&quot;Before the loop&quot; /&gt;
+
+        $foreach (var item in array)
+        {
+            &lt;TextBlock Text={$&quot;Item {item}&quot;} /&gt;
+        }
+
+        &lt;TextBlock Text=&quot;After the loop&quot; /&gt;
+    &lt;/StackPanel.Children&gt;
+&lt;/StackPanel&gt;
+</code></pre>
+<p>This is not limited to <code>Control</code> collections: a custom <code>IList&lt;int&gt;</code> property,
+for example, can receive inline <code>{item}</code> values of the matching type.</p>
+<p>A scalar property is not a supported destination. The following is invalid,
+even though the source contains exactly one item:</p>
+<pre><code class="language-akbura">// Invalid: Border.Child accepts one Control, not an indexed list.
+&lt;Border&gt;
+    $foreach (var item in new[] { 1 })
+    {
+        &lt;TextBlock Text={$&quot;Item {item}&quot;} /&gt;
+    }
+&lt;/Border&gt;
+</code></pre>
+<p>Write a <code>StackPanel</code> inside the <code>Border</code> and put the loop inside that panel when
+a panel is the intended layout. Akbura does not insert one automatically.</p>
+<p>Dictionary, array, read-only, fixed-size, and Add-only destinations are not
+supported. Implementing only <code>ICollection&lt;T&gt;</code> is not enough. When a property's
+declared interface hides the actual list's mutability, the runtime validates
+that destination before applying the loop.</p>
+<p>These restrictions concern the <strong>output collection</strong>, not the source. Arrays,
+<code>ImmutableArray&lt;T&gt;</code>, and read-only collections can still be enumerable sources.
+A loop cannot replace the component's top-level scalar root.</p>
+<h2 id="observable-sources">Observable sources<a class="header-anchor" href="javascript:;" onclick="location.hash='#observable-sources'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Use <code>ObservableCollection&lt;T&gt;</code> for a list that changes in place:</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using System.Collections.ObjectModel;
+
+state ObservableCollection&lt;int&gt; array = [1, 2, 3, 4, 5];
+
+&lt;StackPanel Spacing=&quot;8&quot;&gt;
+    &lt;Button Click={() =&gt; array.Add(array.Count + 1)}&gt;Add an item&lt;/Button&gt;
+    &lt;TextBlock Text=&quot;Starting loop&quot; /&gt;
+
+    $foreach (var item in array)
+    {
+        &lt;TextBlock Text={$&quot;Current item is {item}&quot;} /&gt;
+    }
+
+    &lt;TextBlock Text=&quot;Ending loop&quot; /&gt;
+
+    $if (array.Count &gt; 10)
+    {
+        &lt;TextBlock Text=&quot;A lot of items!&quot; /&gt;
+    }
+&lt;/StackPanel&gt;
+</code></pre>
+<p>The initial render reads the source and builds its output. After that, Akbura
+uses the source's <code>INotifyCollectionChanged</code> notifications rather than requiring
+you to assign a new collection after each mutation. The source object itself
+is checked for this interface, including when it is exposed as <code>IEnumerable&lt;T&gt;</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>Effect on iterations</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Add</code></td>
+<td>Creates records for the inserted occurrences and renders those that execution reaches.</td>
+</tr>
+<tr>
+<td><code>Remove</code></td>
+<td>Removes the corresponding occurrences and releases their owned output.</td>
+</tr>
+<tr>
+<td><code>Move</code></td>
+<td>Moves existing occurrences, retaining their compatible controls.</td>
+</tr>
+<tr>
+<td><code>Replace</code></td>
+<td>Updates the affected occurrence; a changed explicit key gives it a new identity.</td>
+</tr>
+<tr>
+<td><code>Reset</code></td>
+<td>Reads a new snapshot and reconciles it, using keys when available.</td>
+</tr>
+</tbody>
+</table>
+<p>Changing the collection also schedules an owner update, so surrounding
+expressions such as <code>array.Count &gt; 10</code> can change with it. Updates are scheduled;
+do not rely on a source mutation synchronously completing the UI update before
+<code>Add</code> or <code>Remove</code> returns. <code>ObservableCollection&lt;T&gt;</code> uses <code>Count</code>, not <code>Length</code>.</p>
+<p>Keep the observable source as the loop's source when notification-based updates
+are needed. A derived LINQ sequence such as <code>array.Where(...)</code> is a different
+source and does not automatically forward the original collection's events.
+For filtering in place, the loop body can use <code>continue</code>.</p>
+<h3 id="threading-and-lifetime">Threading and lifetime<a class="header-anchor" href="javascript:;" onclick="location.hash='#threading-and-lifetime'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>Mutate an observed collection and its observed item properties on the Avalonia
+UI thread. A background operation should dispatch its resulting changes to
+that thread. Do not mutate the source while the loop is evaluating it.</p>
+<p>Assigning a different source makes the region switch its subscription and
+reconcile the new data. Source and item-property subscriptions are released
+when their region is removed or disposed. Temporarily suspended regions stop
+observing changes and refresh their state when resumed; no manual
+<code>CollectionChanged</code> subscription is needed for ordinary markup usage.</p>
+<h2 id="immutable-and-other-enumerable-sources">Immutable and other enumerable sources<a class="header-anchor" href="javascript:;" onclick="location.hash='#immutable-and-other-enumerable-sources'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>For immutable state, assign the new value returned by the collection operation:</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using System.Collections.Immutable;
+
+state ImmutableArray&lt;int&gt; array = [1, 2, 3];
+
+&lt;StackPanel&gt;
+    &lt;Button Click={() =&gt; array = array.Add(array.Length + 1)}&gt;Add an item&lt;/Button&gt;
+
+    $foreach (var item in array; key: item)
+    {
+        &lt;TextBlock Text={$&quot;Item {item}&quot;} /&gt;
+    }
+&lt;/StackPanel&gt;
+</code></pre>
+<p>This example uses unique integers, so each value can also be its iteration key.
+For records with editable values, prefer a stable identifier such as <code>person.Id</code>.</p>
+<p>An unchanged <code>ImmutableArray&lt;T&gt;</code> can reuse its cached source records. This does
+not freeze the body: changes to its dependencies or Hot Reload can still require
+reevaluation. If an earlier pass stopped at <code>break</code>, the runtime remembers that
+only a prefix was read and replays the source when the execution path must be
+updated. It does not read past <code>break</code> merely to cache the rest of a plain source.</p>
+<p>Other non-notifying enumerables are enumerated on applicable component renders.
+Mutating an ordinary <code>List&lt;T&gt;</code> does not itself send a collection notification
+or request that render. Prefer an observable collection for in-place changes,
+or replace immutable state. Plain enumerable sources should be safe to enumerate
+again; they are not a one-shot stream consumed for the lifetime of the component.</p>
+<h2 id="iteration-identity">Iteration identity<a class="header-anchor" href="javascript:;" onclick="location.hash='#iteration-identity'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Notifications and keys solve different problems. Notifications describe what
+changed. A key identifies which retained iteration corresponds to an item when
+the runtime needs to match a new snapshot.</p>
+<h3 id="explicit-keys">Explicit keys<a class="header-anchor" href="javascript:;" onclick="location.hash='#explicit-keys'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>Add <code>; key: expression</code> after the source:</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using System.Collections.Immutable;
+
+state ImmutableArray&lt;int&gt; array = [1, 2, 3];
+
+&lt;StackPanel&gt;
+    $foreach (var item in array; key: item)
+    {
+        &lt;TextBlock Text={$&quot;Item {item}&quot;} /&gt;
+        &lt;TextBlock Text={$&quot;Square: {item * item}&quot;} /&gt;
+    }
+&lt;/StackPanel&gt;
+</code></pre>
+<p>The header key identifies the <strong>whole iteration</strong>, including both root
+controls. It is the preferred form for bodies containing multiple roots,
+local declarations, conditions, or early exits.</p>
+<p>For a source whose item type exposes <code>Id</code> and <code>Name</code>, the same syntax is
+<code>$foreach (var person in people; key: person.Id)</code> with <code>Text={person.Name}</code> in
+the body. The key should remain stable when other item values change.</p>
+<p>Keys must be non-null and unique within that loop region. The generated key
+contract uses <code>EqualityComparer&lt;TKey&gt;.Default</code>. A duplicate or runtime-null key
+fails the update; it does not silently merge two occurrences.</p>
+<p>Iteration keys are restricted to side-effect-free metadata of the current item
+and constants. <code>item</code> and <code>item.Id</code> are typical choices. The compiler rejects
+keys based on <code>index</code>, ambient state, assignments, increments, allocations, and
+method calls, even when a helper method appears pure. For example,
+<code>key: GetId(item)</code> is not a substitute for <code>key: item.Id</code>. Property getters used
+as keys must themselves be stable and free of side effects.</p>
+<h3 id="the-x.id-shorthand">The <code>x.id</code> shorthand<a class="header-anchor" href="javascript:;" onclick="location.hash='#the-x.id-shorthand'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>A loop with exactly one direct root element and no other body statements can
+put the key on that root:</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using System.Collections.Immutable;
+
+state ImmutableArray&lt;int&gt; array = [1, 2, 3];
+
+&lt;StackPanel&gt;
+    $foreach (var item in array)
+    {
+        &lt;TextBlock Text={$&quot;Item {item}&quot;} x.id={item} /&gt;
+    }
+&lt;/StackPanel&gt;
+</code></pre>
+<p>When there is no explicit header key, this root's <code>x.id</code> becomes the iteration
+key. Formatting whitespace does not prevent that shorthand. Adding another
+root or a local/conditional statement changes that rule: the compiler does not
+pick the first <code>x.id</code> as the key of an arbitrary body.</p>
+<p>In a multi-root body, or when the header already declares a key, an <code>x.id</code> on a
+root identifies that root declaration within the iteration rather than the
+whole iteration. Use the header key to keep the iteration's identity explicit
+as its body grows.</p>
+<p><code>x.id</code> is compiler metadata, not a CLR property setter. It is different from
+<code>x.Name</code>, which declares an element name, and <code>x.key</code>, which describes an entry
+in a dictionary. An element may declare <code>x.id</code> only once.</p>
+<h3 id="without-a-key">Without a key<a class="header-anchor" href="javascript:;" onclick="location.hash='#without-a-key'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
+<p>Equal values are allowed in a keyless source: <code>[7, 7, 7]</code> describes three
+occurrences, not one. Indexed observable notifications let Akbura retain the
+specific occurrence involved in a <code>Move</code> without comparing its value to every
+other item.</p>
+<p>When there is no event history to apply, keyless snapshot matching is
+positional. Use stable keys when a reordered or replaced snapshot must retain
+controls by item identity instead of by position.</p>
+<p>A key does not promise keep-alive after removal, and removing an item then
+adding it again is not the same operation as <code>Move</code>. Nor does a key prevent
+property updates: a retained control still receives current item values and
+its current index when those expressions need updating.</p>
+<h2 id="the-source-index">The source index<a class="header-anchor" href="javascript:;" onclick="location.hash='#the-source-index'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p><code>@index</code> is the read-only, zero-based index of the current occurrence in the
+<strong>source sequence</strong>. It is not the child's position in the destination list and
+is not renumbered to remove gaps left by <code>continue</code>:</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using System.Collections.Immutable;
+
+state ImmutableArray&lt;int&gt; array = [1, 2, 3, 4, 5];
+
+&lt;StackPanel&gt;
+    $foreach (var item in array)
+    {
+        if (item % 2 == 0)
+        {
+            continue;
+        }
+
+        &lt;TextBlock Text={$&quot;Item {item}, source index {@index}&quot;} /&gt;
+    }
+&lt;/StackPanel&gt;
+</code></pre>
+<p>This produces:</p>
+<pre><code class="language-text">Item 1, source index 0
+Item 3, source index 2
+Item 5, source index 4
+</code></pre>
+<p>All roots from one iteration share the same index. Inserting or moving items
+can require updating index-dependent properties of retained controls without
+recreating them.</p>
+<p>The identifier is also available as <code>index</code>; <code>@index</code> makes its loop role clear
+in markup expressions. Both spellings refer to the same read-only symbol.
+Do not assign it, redeclare it, or name the iteration variable <code>index</code>.
+<code>nameof(index)</code> remains <code>&quot;index&quot;</code>; text inside strings and member names such as
+<code>person.@index</code> are not rewritten into the loop index.</p>
+<h2 id="local-code-continue-and-break">Local code, <code>continue</code>, and <code>break</code><a class="header-anchor" href="javascript:;" onclick="location.hash='#local-code-continue-and-break'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>The direct body of <code>$foreach</code> is mixed markup and a supported subset of C#.
+It accepts local declarations, ordinary <code>if</code>/<code>else if</code>/<code>else</code>, <code>continue</code>, and
+<code>break</code>, as well as markup and nested <code>$foreach</code> statements:</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using System.Collections.ObjectModel;
+
+state ObservableCollection&lt;int&gt; array = [1, 2, 3, 4, 5];
+
+&lt;StackPanel&gt;
+    &lt;TextBlock Text=&quot;Starting loop&quot; /&gt;
+
+    $foreach (var item in array)
+    {
+        var doubled = item * 2;
+
+        if (item % 2 == 0)
+        {
+            continue;
+        }
+
+        if (item % 3 == 0)
+        {
+            break;
+        }
+
+        &lt;TextBlock Text={$&quot;Item {item}, doubled {doubled}, index {@index}&quot;} /&gt;
+    }
+
+    &lt;TextBlock Text=&quot;Ending loop&quot; /&gt;
+&lt;/StackPanel&gt;
+</code></pre>
+<p>With these values, the body renders only item <code>1</code>: item <code>2</code> is skipped, and item
+<code>3</code> stops the loop. The following <code>Ending loop</code> sibling is still rendered.</p>
+<p><code>continue</code> skips the rest of the current iteration. <code>break</code> skips the rest of
+that iteration and all later iterations of that loop. Neither operation removes
+markup that was already reached earlier in the current iteration. For example,
+a <code>TextBlock</code> written before a guard remains in the output when that guard
+executes <code>break</code>.</p>
+<p>An observable change can alter which iterations are reached. Removing the item
+that caused <code>break</code>, changing its observed data, or changing a condition's
+component dependencies may require evaluating a previously hidden suffix.
+Incremental notification handling does not make that necessary evaluation
+disappear.</p>
+<p>Local variables and pattern variables follow their C# scope and definite
+assignment rules. For example, <code>if (item is not Person person) { continue; }</code>
+allows following expressions in that iteration to use <code>person</code>.</p>
+<p>Use ordinary <code>if</code> for guards in the mixed body. Inside a nested element's
+markup body, use <a href="/akbura/conditional-markup">conditional markup</a> with <code>$if</code>
+instead. The loop's direct code context does not turn ordinary text inside a
+child control into C#.</p>
+<p>A loop body is a repeatable description of UI, not an imperative initialization
+script. Arbitrary expression statements, <code>return</code>, <code>for</code>, <code>while</code>, <code>switch</code>,
+<code>try</code>, and component declarations are not supported as direct loop-body
+statements. Put actions such as modifying a collection in event handlers or
+component methods, not in the render path. Keep parent hooks outside the loop.</p>
+<h2 id="nested-loops">Nested loops<a class="header-anchor" href="javascript:;" onclick="location.hash='#nested-loops'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>A nested loop has its own iteration variable and source index. Outer locals
+remain available. Capture the outer index in a local when both indexes are
+needed:</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using System.Collections.Immutable;
+
+state ImmutableArray&lt;int&gt; rows = [1, 2];
+
+&lt;StackPanel&gt;
+    $foreach (var row in rows)
+    {
+        var rowIndex = @index;
+
+        $foreach (var column in new[] { 10, 20 })
+        {
+            &lt;TextBlock Text={$&quot;Row {row} ({rowIndex}), column {column} ({@index})&quot;} /&gt;
+        }
+    }
+&lt;/StackPanel&gt;
+</code></pre>
+<p>The inner loop contributes directly to the same destination in this example.
+It does not create a row panel. Add an explicit panel per outer iteration when
+that is the layout you need. <code>break</code> and <code>continue</code> belong to the enclosing
+markup loop, so an inner <code>break</code> does not stop the outer loop.</p>
+<h2 id="item-changes-and-update-cost">Item changes and update cost<a class="header-anchor" href="javascript:;" onclick="location.hash='#item-changes-and-update-cost'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>A collection notification describes changes to its entries, not every change
+inside its objects. For direct member reads on an item type known to implement
+<code>INotifyPropertyChanged</code>, the compiler can request item-property observation;
+the runtime then refreshes occurrences for the changed object. An ordinary
+non-notifying property setter cannot request an update on its own. This is not
+a general deep watcher for every object reachable from an item.</p>
+<p>The work needed also depends on the body. Reading <code>@index</code> can affect a suffix
+after an insertion. Reading <code>array.Count</code> in every row can affect every reached
+row. Component state, calls with unknown effects, and changed <code>break</code> conditions
+can also require reevaluating more than the newly added item.</p>
+<p>Reevaluating an expression, enumerating the source, creating a control, and
+changing the destination list are separate operations. Compatible controls can
+be retained while their properties change. A property-only update does not by
+itself require rewriting the outer list's membership. However, the current
+runtime still processes internal records and child sequences; notification
+support is not a guarantee that every update is constant-time.</p>
+<p><code>$foreach</code> does not provide viewport virtualization. It creates the output of
+the iterations that execution reaches, even when those controls are outside a
+scrolling viewport. See <a href="/akbura/items-control">ItemsControl</a> for the separate
+item-template model; a wrapper-free loop is not a virtualizing items control.</p>
+<h2 id="hot-reload">Hot Reload<a class="header-anchor" href="javascript:;" onclick="location.hash='#hot-reload'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>For a retained loop, Hot Reload updates the body separately from the iteration
+key contract. Editing a <code>Text</code> expression does not by itself turn an unchanged
+<code>key: item.Id</code> into a different key contract. Compatible keyed iterations can
+therefore retain their controls while the new body is applied.</p>
+<p>Changing a control type or the actual key contract may require replacement.
+Changes to <code>break</code>, <code>continue</code>, and other body conditions require reevaluating
+the reached output, even if the collection sent no event. Removing a loop
+releases the resources it owns; it does not clear the entire parent collection.</p>
+<p>These rules concern a retained declaration and compatible nodes. They are not
+a promise that every structural edit, every removed iteration, or every
+changed declaration identity keeps the same control instances.</p>
+<h2 id="editor-support">Editor support<a class="header-anchor" href="javascript:;" onclick="location.hash='#editor-support'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>The shared Workspaces services provide <code>$foreach</code> completion, C# scope for its
+header and body expressions, and source-mapped symbol information. The iteration
+variable, locals, and loop index participate in that scope. Braces and
+parentheses participate in pairing, indentation, and folding through the editor
+integration.</p>
+<p>For related language rules, see <a href="/akbura/conditional-markup">Conditional Markup</a>,
+<a href="/#reactive-state">Reactive State</a>, <a href="/#binding">Binding</a>, and
+<a href="/akbura/items-control">ItemsControl</a>.</p>
+
+				</div>
+
+				<div class="not-prose"></div>
+				
+					<div class="not-prose py-8">
+						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/src/AkburaDocs/_pages/akbura/foreach.md" target="_blank" rel="noopener noreferrer">
+							Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
+						</a>
+					</div>
+
+					<div class="not-prose my-20">
+								<nav class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 sm:px-0">
+									<div class="-mt-px flex w-0 flex-1">
+											<a href="https://asaicraft.github.io/Akbura/akbura/conditional-markup" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												<!-- Heroicon name: mini/arrow-long-left -->
+												<svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+													<path fill-rule="evenodd" d="M18 10a.75.75 0 01-.75.75H4.66l2.1 1.95a.75.75 0 11-1.02 1.1l-3.5-3.25a.75.75 0 010-1.1l3.5-3.25a.75.75 0 111.02 1.1l-2.1 1.95h12.59A.75.75 0 0118 10z" clip-rule="evenodd"></path>
+												</svg>
+												Conditional Markup
+											</a>
+									</div>
+									<div class="hidden md:-mt-px md:flex"></div>
+									<div class="-mt-px flex w-0 flex-1 justify-end">
+											<a href="https://asaicraft.github.io/Akbura/#avalonia-styles" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												Avalonia Styles
+												<!-- Heroicon name: mini/arrow-long-right -->
+												<svg class="ml-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+													<path fill-rule="evenodd" d="M2 10a.75.75 0 01.75-.75h12.59l-2.1-1.95a.75.75 0 111.02-1.1l3.5 3.25a.75.75 0 010 1.1l-3.5 3.25a.75.75 0 11-1.02-1.1l2.1-1.95H2.75A.75.75 0 012 10z" clip-rule="evenodd"></path>
+												</svg>
+											</a>
+									</div>
+								</nav>
+					</div>
+			</div>
+				
+				<div class="docmap hidden 2xl:block flex-none w-64 pl-8 mr-8">
+					<div class="fixed bg-white dark:bg-black flex flex-col overflow-y-auto pt-10 px-8 pb-6" style="height:calc(100vh - 50px);">
+						<div>
+							<h5 class="text-slate-900 font-semibold mb-4 text-sm leading-6 dark:text-slate-100">
+								On This Page
+							</h5>
+							<ul class="text-slate-700 text-sm leading-6">
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#basic-syntax'" data-id="basic-syntax" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Basic syntax
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#where-a-loop-can-be-placed'" data-id="where-a-loop-can-be-placed" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Where a loop can be placed
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#observable-sources'" data-id="observable-sources" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Observable sources
+										</span>
+											<ul class="ml-4">
+													<li data-id="threading-and-lifetime" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#threading-and-lifetime'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Threading and lifetime
+														</span>
+													</li>
+											</ul>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#immutable-and-other-enumerable-sources'" data-id="immutable-and-other-enumerable-sources" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Immutable and other enumerable sources
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#iteration-identity'" data-id="iteration-identity" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Iteration identity
+										</span>
+											<ul class="ml-4">
+													<li data-id="explicit-keys" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#explicit-keys'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Explicit keys
+														</span>
+													</li>
+													<li data-id="the-x.id-shorthand" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#the-x.id-shorthand'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															The 
+														</span>
+													</li>
+													<li data-id="without-a-key" class="text-gray-500 hover:text-gray-900">
+														<span v-hash="'#without-a-key'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
+															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+															Without a key
+														</span>
+													</li>
+											</ul>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#the-source-index'" data-id="the-source-index" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											The source index
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#local-code-continue-and-break'" data-id="local-code-continue-and-break" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Local code, 
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#nested-loops'" data-id="nested-loops" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Nested loops
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#item-changes-and-update-cost'" data-id="item-changes-and-update-cost" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Item changes and update cost
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#hot-reload'" data-id="hot-reload" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Hot Reload
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#editor-support'" data-id="editor-support" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Editor support
+										</span>
+									</li>
+							</ul>
+						</div>
+					</div>
+				</div>
+				
+		</div>
+	</div>    
+</div>
+
+<script>
+//doc instructions
+if (document.querySelector('.hide-title')) {
+	const el = document.querySelector('#doc section h1') 
+	if (el) el.style.display='none'
+}
+</script>
+
+<script type="module">
+import { ref } from "vue"
+import { mount } from "app.mjs"
+
+
+	const App = {
+		setup() {
+			function nav(url) {
+				window.open(url)
+			}
+			return { nav }
+		}
+	}
+	
+const Sidebar = {
+	setup() {
+		const open = ref(true)
+		return { open }
+	}
+}
+
+mount('#doc', App)
+mount('#sidebar', Sidebar)
+</script>
+
+<script src="lib/js/highlight.js"></script>
+<script>hljs.highlightAll()</script>
+<script src="lib/js/lite-yt-embed.js"></script>
+<script src="mjs/docs.mjs" type="module"></script>
+
+        </main>
+    </div>
+
+    
+
+    <script type="module">
+            import { init } from "app.mjs";
+            init();
+    </script>
+
+    
+</body>
+</html>

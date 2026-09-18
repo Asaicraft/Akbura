@@ -9,6 +9,7 @@ Akbura
 Language
  - [Components and Markup](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
  - [Conditional Markup](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/conditional-markup.md)
+ - [Foreach Markup](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/foreach.md)
  - [Reactive State](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
  - [Dictionary Resources](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
  - [Avalonia Styles](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
@@ -31,6 +32,7 @@ Akbura
  - [XML, XAML and AXAML differences](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/xml-xaml-axaml.md): Differences between XML, XAML and AXAML
  - [Dictionary Resources](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
  - [Conditional Markup](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/conditional-markup.md)
+ - [Foreach Markup](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/foreach.md)
  - [Avalonia Styles](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
  - [Grid](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/grid.md)
  - [ItemsControl](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/items-control.md)

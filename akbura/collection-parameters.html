@@ -9,7 +9,7 @@
     <base href="https://asaicraft.github.io/Akbura/" />
 
     <link rel="icon" type="image/svg+xml" href="img/logo.svg">
-    <title>Dependency Injection</title>
+    <title>Collection Parameters</title>
 
     <script>
             if (location.search === "?dark") {
@@ -210,7 +210,7 @@ Akbura									</span>
 									</a>
 								</li>
 								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akbura/collection-parameters" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+									<a href="https://asaicraft.github.io/Akbura/akbura/collection-parameters" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
 										Collection Parameters
 									</a>
 								</li>
@@ -230,7 +230,7 @@ Akbura									</span>
 									</a>
 								</li>
 								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akbura/dependency-injection" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
+									<a href="https://asaicraft.github.io/Akbura/akbura/dependency-injection" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
 										Dependency Injection
 									</a>
 								</li>
@@ -243,223 +243,209 @@ Akbura									</span>
 				
 					<section class="not-prose mb-16 md:mb-12">
 						<h1 class="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-gray-50 sm:text-5xl md:text-6xl">
-							Dependency Injection
+							Collection Parameters
 						</h1>
 					</section>
 
 				<div class="not-prose"></div>
 
 				<div class="content">
-					<p>Akbura components can request application services with the <code>inject</code> declaration.</p>
-<pre><code class="language-akbura">inject IUserService UserService;
-</code></pre>
-<p>The generated component exposes <code>UserService</code> as a public Avalonia property and asks the configured service provider for an <code>IUserService</code> when the component is initialized.</p>
-<h2 id="register-a-service-provider">Register a service provider<a class="header-anchor" href="javascript:;" onclick="location.hash='#register-a-service-provider'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Akbura accepts any standard <code>IServiceProvider</code>.</p>
-<p>The following example uses <code>Microsoft.Extensions.DependencyInjection</code>:</p>
-<pre><code class="language-csharp">using Akbura.Engine;
-using Microsoft.Extensions.DependencyInjection;
+					<h1 id="collection-parameters">Collection Parameters<a class="header-anchor" href="javascript:;" onclick="location.hash='#collection-parameters'" aria-label="Permalink">&ZeroWidthSpace;</a></h1>
+<p>A default <code>param IList</code> or <code>param IList&lt;T&gt;</code> is an owned collection with a writable
+<strong>source setter</strong>. The component creates an <code>ObservableCollection&lt;object&gt;</code> or
+<code>ObservableCollection&lt;T&gt;</code> for itself. Assigning another collection copies its items
+into that backing and connects notifications; it never replaces the backing object.
+Each component instance owns a separate list, including when no value is supplied.</p>
+<h2 id="declaring-a-collection-parameter">Declaring a collection parameter<a class="header-anchor" href="javascript:;" onclick="location.hash='#declaring-a-collection-parameter'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Save this component as <code>ItemsPanel.akbura</code>:</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using System.Collections.Generic;
 
-var services = new ServiceCollection()
-    .AddSingleton&lt;IUserService, UserService&gt;()
-    .BuildServiceProvider();
-
-AppBuilder.Configure&lt;App&gt;()
-    .UsePlatformDetect()
-    .UseAkbura(akbura =&gt;
-    {
-        akbura.WithServiceProvider(services);
-    });
-</code></pre>
-<p><code>WithServiceProvider</code> adds the provider to the Akbura engine. Service lifetimes such as singleton, scoped, and transient are controlled by the registered provider.</p>
-<h2 id="inject-a-required-service">Inject a required service<a class="header-anchor" href="javascript:;" onclick="location.hash='#inject-a-required-service'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>A non-nullable injected type is required:</p>
-<pre><code class="language-akbura">inject IUserService UserService;
-
-state string userName = &quot;Loading...&quot;;
-
-useEffect(async () =&gt;
-{
-    var user = await UserService.GetCurrentUser();
-    userName = user.Name;
-}, []);
+param IList&lt;int&gt; Data;
 
 &lt;StackPanel&gt;
-    &lt;TextBlock Text=&quot;Current user&quot; /&gt;
-    &lt;TextBlock Text={userName} /&gt;
+    &lt;TextBlock Text={$&quot;Count: {Data.Count}&quot;} /&gt;
+    $foreach (var item in Data)
+    {
+        &lt;TextBlock Text={$&quot;Item: {item}, index: {@index}&quot;} /&gt;
+    }
 &lt;/StackPanel&gt;
 </code></pre>
-<p>Akbura resolves required services before the component performs its first update. If the provider cannot return the requested service, Akbura throws <code>AkburaServiceNotFoundException</code>.</p>
-<h2 id="inject-an-optional-service">Inject an optional service<a class="header-anchor" href="javascript:;" onclick="location.hash='#inject-an-optional-service'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Add <code>?</code> to the injected type to make the dependency optional:</p>
-<pre><code class="language-akbura">inject IClipboardService? Clipboard;
-
-&lt;Button
-    Content=&quot;Copy&quot;
-    IsEnabled={Clipboard != null}
-    Click={() =&gt; Clipboard?.SetTextAsync(&quot;Akbura&quot;)} /&gt;
+<p>The public CLR property still has the declared <code>IList&lt;int&gt;</code> type. Its getter
+always returns the same backing. The setter takes a source of that declared type.
+The associated Avalonia property is a <strong>writable direct property</strong>, not a readonly
+collection property and not a styled property containing a shared collection default.</p>
+<h2 id="optional-parameter">Optional parameter<a class="header-anchor" href="javascript:;" onclick="location.hash='#optional-parameter'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>No empty list has to be passed merely to construct the component:</p>
+<pre><code class="language-akbura">&lt;ItemsPanel /&gt;
 </code></pre>
-<p>When an optional service is not registered, the generated property remains <code>null</code> and component initialization continues normally.</p>
-<h2 id="explicit-values-take-priority">Explicit values take priority<a class="header-anchor" href="javascript:;" onclick="location.hash='#explicit-values-take-priority'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>An injected service is also a public Avalonia property. It may be supplied directly instead of being resolved from the configured provider.</p>
-<p>From another Akbura component:</p>
-<pre><code class="language-akbura">&lt;UserCard UserService={previewUserService} /&gt;
-</code></pre>
-<p>From AXAML:</p>
-<pre><code class="language-xml">&lt;components:UserCard
-    UserService=&quot;{Binding UserService}&quot; /&gt;
-</code></pre>
-<p>From C#:</p>
-<pre><code class="language-csharp">var card = new UserCard
-{
-    UserService = previewUserService
-};
-</code></pre>
-<p>When the property already contains a non-null value, Akbura keeps that value and does not call the service provider for that dependency. This is useful for previews, tests, and local overrides.</p>
-<h2 id="configuration-object-example">Configuration object example<a class="header-anchor" href="javascript:;" onclick="location.hash='#configuration-object-example'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>A service does not need to contain behavior. Configuration objects can also be injected.</p>
-<pre><code class="language-csharp">public sealed class GalleryOptions
-{
-    public string RepositoryUrl { get; set; } =
-        &quot;https://github.com/Asaicraft/Akbura&quot;;
+<p><code>Data</code> starts empty. Required non-collection parameters are still required.
+The collection is optional in both semantic diagnostics and runtime initialization.
+A declared initializer is evaluated once for each backing instance and then supplied
+through the same source connection; its collection object is not shared accidentally.</p>
+<h2 id="observable-state-source">Observable state source<a class="header-anchor" href="javascript:;" onclick="location.hash='#observable-state-source'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<pre><code class="language-akbura">using System.Collections.ObjectModel;
 
-    public string MainBranchName { get; set; } =
-        &quot;master&quot;;
+state ObservableCollection&lt;int&gt; items = [1, 2, 3];
 
-    public string PathToGallery { get; set; } =
-        &quot;src/Akbura.FeatureGallery/Akbura.FeatureGallery&quot;;
-}
+&lt;ItemsPanel Data={items} /&gt;
 </code></pre>
-<p>Register one shared instance:</p>
-<pre><code class="language-csharp">var services = new ServiceCollection()
-    .AddSingleton(new GalleryOptions())
-    .BuildServiceProvider();
-
-builder.UseAkbura(akbura =&gt;
-{
-    akbura.WithServiceProvider(services);
-});
+<p>Adding/removing items in <code>items</code> updates the component backing. Editing the backing
+updates a writable notifying source as well. Assigning a new source unsubscribes
+from the old one, reconciles the contents and subscribes to the new source.
+Reassigning the exact same source on a later component update is a no-op: it does
+not clear, enumerate or subscribe again. Assigning the backing to itself is also a
+no-op; it does not accidentally clear the list or discard its existing connection.</p>
+<h2 id="static-resource-source">Static resource source<a class="header-anchor" href="javascript:;" onclick="location.hash='#static-resource-source'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p><code>Numbers</code> must resolve to an object assignable to <code>IList&lt;int&gt;</code>, for example an
+<code>ObservableCollection&lt;int&gt;</code> in application resources:</p>
+<pre><code class="language-akbura">&lt;ItemsPanel Data=${StaticResource Numbers} /&gt;
 </code></pre>
-<p>Use it from a component:</p>
-<pre><code class="language-akbura">inject GalleryOptions GalleryOptions;
-
-param object Content;
-param string Url;
-
-&lt;HyperlinkButton
-    NavigateUri={new Uri(
-        $&quot;{GalleryOptions.RepositoryUrl}/blob/&quot; +
-        $&quot;{GalleryOptions.MainBranchName}/&quot; +
-        $&quot;{GalleryOptions.PathToGallery}/{Url}&quot;)}
-    Content={Content} /&gt;
+<p>Static resource lookup and collection observation are separate. Replacing the
+resource entry is not a dynamic resource update, but <code>INotifyCollectionChanged</code>
+events from the resolved collection continue to update the owned list.</p>
+<h2 id="datacontext-binding">DataContext binding<a class="header-anchor" href="javascript:;" onclick="location.hash='#datacontext-binding'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Here <code>Items</code> is an <code>IList&lt;int&gt;</code>-compatible property on the inherited DataContext:</p>
+<pre><code class="language-akbura">&lt;ItemsPanel Data=${Binding Items} /&gt;
 </code></pre>
-<p>The component only declares what it needs. Creation and lifetime of <code>GalleryOptions</code> remain outside the component.</p>
-<h2 id="resolution-process">Resolution process<a class="header-anchor" href="javascript:;" onclick="location.hash='#resolution-process'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>For every <code>inject</code> declaration, Akbura follows this process:</p>
-<ol>
-<li>Check whether the generated service property already contains a value.</li>
-<li>If it does, keep that value.</li>
-<li>Otherwise, request the service from the configured providers.</li>
-<li>Assign the resolved object to the generated property.</li>
-<li>Leave an unresolved optional dependency as <code>null</code>.</li>
-<li>Throw <code>AkburaServiceNotFoundException</code> for an unresolved required dependency.</li>
-</ol>
-<p>Injection happens before the first component update, so the dependency is available to the initial markup and subsequent effects.</p>
-<h2 id="multiple-service-providers">Multiple service providers<a class="header-anchor" href="javascript:;" onclick="location.hash='#multiple-service-providers'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>More than one provider may be registered:</p>
-<pre><code class="language-csharp">builder.UseAkbura(akbura =&gt;
-{
-    akbura
-        .WithServiceProvider(featureProvider)
-        .WithServiceProvider(applicationProvider);
-});
+<p>The Avalonia binding delivers a source reference to the parameter setter. If the
+DataContext implements <code>INotifyPropertyChanged</code>, replacing its <code>Items</code> property
+reconnects the parameter. Reference binding defaults to <code>OneWay</code>: the component
+must not overwrite the ViewModel property with its own backing list.</p>
+<p>This does <strong>not</strong> prevent two-way item synchronization. A writable notifying list
+can receive <code>Add</code>, <code>Remove</code>, <code>Replace</code>, <code>Move</code> and <code>Clear</code> operations from the
+component while its ViewModel property continues to reference the original list.
+No <code>Mode=TwoWay</code> is needed for this content synchronization.</p>
+<h2 id="non-generic-and-concrete-observable-declarations">Non-generic and concrete observable declarations<a class="header-anchor" href="javascript:;" onclick="location.hash='#non-generic-and-concrete-observable-declarations'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>A non-generic parameter keeps mixed items in <code>ObservableCollection&lt;object&gt;</code>:</p>
+<pre><code class="language-akbura">using System.Collections;
+using Avalonia.Controls;
+
+param IList Data;
+
+&lt;TextBlock Text={$&quot;Count: {Data.Count}&quot;} /&gt;
 </code></pre>
-<p>Providers are queried in registration order. Standard <code>IServiceProvider</code> instances automatically continue to the next provider when they return <code>null</code>.</p>
-<h2 id="custom-akbura-service-providers">Custom Akbura service providers<a class="header-anchor" href="javascript:;" onclick="location.hash='#custom-akbura-service-providers'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>For contextual resolution, implement <code>IAkburaServiceProvider</code>:</p>
-<pre><code class="language-csharp">using Akbura.Engine;
+<p>The concrete standard observable type uses the same source-setter behavior:</p>
+<pre><code class="language-akbura">using System.Collections.ObjectModel;
+using Avalonia.Controls;
 
-public sealed class FeatureServiceProvider : IAkburaServiceProvider
-{
-    private readonly FeatureState _state = new();
+param ObservableCollection&lt;int&gt; Data;
 
-    public object? GetService(
-        ref readonly InjectionInfo injectionInfo)
-    {
-        if (injectionInfo.RequestedService ==
-            typeof(FeatureState))
-        {
-            return _state;
-        }
-
-        return injectionInfo.NextProvider?
-            .GetService(in injectionInfo);
-    }
-}
+&lt;TextBlock Text={$&quot;Count: {Data.Count}&quot;} /&gt;
 </code></pre>
-<p><code>InjectionInfo</code> provides:</p>
+<p>The implementation also preserves existing support for <code>ICollection&lt;T&gt;</code> backed
+by an observable list. A public concrete <code>ObservableCollection&lt;T&gt;</code> subclass with
+a public parameterless constructor can be the backing type itself.</p>
+<p>A concrete <code>List&lt;T&gt;</code>, an arbitrary custom <code>IList&lt;T&gt;</code> class or a custom derived
+interface cannot be replaced with <code>ObservableCollection&lt;T&gt;</code> while preserving its
+CLR type. Such declarations are <strong>not</strong> silently rewritten or unsafely cast by
+this feature. Prefer <code>param IList&lt;T&gt;</code> and pass that custom list as its source.
+Legacy concrete <code>List&lt;T&gt;</code> parameter generation is unchanged. Explicit <code>param bind</code>
+and <code>param out</code> retain their existing reference-parameter semantics; the automatic
+owned-list contract described here applies to unmodified <code>param</code> declarations.</p>
+<h2 id="synchronization-contract">Synchronization contract<a class="header-anchor" href="javascript:;" onclick="location.hash='#synchronization-contract'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Property</th>
-<th>Description</th>
+<th>Source object</th>
+<th>Source to backing</th>
+<th>Backing to source</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>RequestedService</code></td>
-<td>The requested service type</td>
+<td>Writable <code>IList&lt;T&gt;</code> or <code>IList</code> implementing <code>INotifyCollectionChanged</code></td>
+<td>Event deltas</td>
+<td>Yes</td>
 </tr>
 <tr>
-<td><code>TargetControl</code></td>
-<td>The Akbura component requesting the service</td>
+<td>Readonly notifying list, including <code>ReadOnlyObservableCollection&lt;T&gt;</code></td>
+<td>Event deltas</td>
+<td>No</td>
 </tr>
 <tr>
-<td><code>FieldName</code></td>
-<td>The name declared after <code>inject</code></td>
+<td>Fixed-size notifying list</td>
+<td>Event deltas</td>
+<td>No</td>
 </tr>
 <tr>
-<td><code>IsOptional</code></td>
-<td>Whether the injected type is nullable</td>
+<td>Non-notifying list or array</td>
+<td>Snapshot when the source reference changes</td>
+<td>No</td>
 </tr>
 <tr>
-<td><code>NextProvider</code></td>
-<td>The next provider in the configured chain</td>
+<td>Enumerable without a writable indexed-list contract</td>
+<td>Snapshot; notifying sources refresh on events</td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>null</code></td>
+<td>Disconnect and empty the owned list</td>
+<td>No</td>
 </tr>
 </tbody>
 </table>
-<p>A custom provider must call <code>NextProvider</code> when it wants resolution to continue. Returning a value or returning <code>null</code> without forwarding stops the chain.</p>
-<h2 id="what-akbura-generates">What Akbura generates<a class="header-anchor" href="javascript:;" onclick="location.hash='#what-akbura-generates'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>For a declaration such as:</p>
-<pre><code class="language-akbura">inject IUserService UserService;
-</code></pre>
-<p>Akbura generates the equivalent of:</p>
-<pre><code class="language-csharp">private IUserService? __service_UserService;
-
-public static readonly
-    InjectService&lt;MyComponent, IUserService&gt;
-    UserServiceProperty =
-        InjectService.Create&lt;MyComponent, IUserService&gt;(
-            &quot;UserService&quot;,
-            static owner =&gt; owner.__service_UserService,
-            static (owner, value) =&gt;
-                owner.__SetService_UserService(value),
-            isOptional: false);
-
-public IUserService UserService
-{
-    get =&gt; __service_UserService!;
-    set =&gt; __SetService_UserService(value);
-}
-</code></pre>
-<p>The exact generated names are implementation details, but the important result is that every injected dependency becomes a settable Avalonia property backed by an <code>InjectService</code> descriptor.</p>
+<p>Both generic <code>ICollection&lt;T&gt;.IsReadOnly</code> and nongeneric <code>IList.IsReadOnly</code> /
+<code>IsFixedSize</code> are considered when present. Arrays cannot support insertion/removal
+merely because their individual elements can be assigned.</p>
+<p>A readonly source does not make the owned backing readonly. Local edits stay local;
+the next source notification makes the backing match the authoritative source again.
+For a non-notifying source, use a new list reference to publish a new snapshot. The
+runtime connection also exposes <code>Refresh()</code> for explicit refresh by custom hosts;
+ordinary component updates do not poll a non-notifying list of unchanged identity.</p>
+<p>Ordered deltas use indexes, not <code>Remove(value)</code>. Duplicate values and equal-but-distinct
+reference objects remain separate occurrences. A standard single-item <code>Move</code> remains a
+<code>Move</code> on the owned observable collection. Range notifications are translated into
+indexed operations. <code>Reset</code>, unusable indexes and a divergent readonly projection use
+a fresh source snapshot, with linear positional reconciliation instead of unconditional
+<code>Clear</code> plus <code>Add</code>. Reset, an unaddressable notification and explicit refresh relay
+replacement notifications even for unchanged references: an object may have changed
+without changing identity. Replacing the source with an equivalent snapshot does not
+produce those forced replacements. Normal indexed Add/Remove/Move events leave unrelated
+items untouched.</p>
+<p>New source items are validated before the old connection is removed. A heterogeneous
+nongeneric source containing incompatible elements is rejected. This bridge is not a
+transaction system for arbitrary user collections: a source method or an external
+collection-event handler can throw after mutating the source. Such failures are not
+reported as successful synchronization. A source altered by another listener during
+a reverse write is reconciled after the owned <code>CollectionChanged</code> event unwinds.
+Indexed source-to-backing deltas do not enumerate the complete source. Reverse
+writes currently validate a source snapshot afterwards; that validation is linear
+in the source size, even when the outgoing mutation itself was one indexed operation.</p>
+<h2 id="foreach-and-component-lifetime">Foreach and component lifetime<a class="header-anchor" href="javascript:;" onclick="location.hash='#foreach-and-component-lifetime'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p><code>$foreach</code> already observes the <strong>source object's <code>INotifyCollectionChanged</code> contract</strong>;
+it does not require a concrete <code>ObservableCollection&lt;T&gt;</code>. The parameter bridge checks
+that same interface, including generic-only custom lists. The loop subscribes to the
+stable owned list and receives its deltas without a new visual/logical wrapper.
+An unrelated parameter update does not force the bridge to enumerate or reset its source.</p>
+<p>The bridge schedules a component update after collection notifications have been
+delivered. This also refreshes expressions such as <code>Data.Count</code> outside the loop.
+It does not guarantee that every loop body is skipped: <code>@index</code>, environment reads,
+<code>break</code>, keys and body dependencies still follow the normal foreach rules.</p>
+<p>The source subscription is removed on component detachment and replaced on source
+assignment. On reattachment, the current source is authoritative and refreshed; local
+edits made while detached are not replayed back into it. A weak source listener prevents
+an application-scoped resource from retaining a discarded component. Collection events
+and mutation must occur on the owning UI thread; the bridge does not enumerate a list
+concurrently on a worker thread.</p>
+<p>Compatible Hot Reload updates retain the direct-property identity, owned list and source
+connection. The writable-source descriptor has a new contract key so it is not confused
+with an older readonly collection descriptor. Changing/removing the parameter contract
+is not treated as a compatible source update.</p>
+<h2 id="collection-content">Collection content<a class="header-anchor" href="javascript:;" onclick="location.hash='#collection-content'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p><code>Content</code> collections and collection property elements still use the generated Add
+helper and the same owned backing. Clearing/resetting collection content now synchronizes
+logical children rather than throwing the old &quot;Resetting component content&quot; exception.
+Avoid configuring the same destination simultaneously from source assignment and markup
+children unless appending those children into a writable bound source is intentional.</p>
+<p>See <a href="/akbura/foreach">Foreach Markup</a> for keys, indexes, early exits and rendering behavior.</p>
 
 				</div>
 
 				<div class="not-prose"></div>
 				
 					<div class="not-prose py-8">
-						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/src/AkburaDocs/_pages/akbura/dependency-injection.md" target="_blank" rel="noopener noreferrer">
+						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/src/AkburaDocs/_pages/akbura/collection-parameters.md" target="_blank" rel="noopener noreferrer">
 							Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
 						</a>
 					</div>
@@ -467,16 +453,23 @@ public IUserService UserService
 					<div class="not-prose my-20">
 								<nav class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 sm:px-0">
 									<div class="-mt-px flex w-0 flex-1">
-											<a href="https://asaicraft.github.io/Akbura/akbura/items-control" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+											<a href="https://asaicraft.github.io/Akbura/akbura/foreach" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
 												<!-- Heroicon name: mini/arrow-long-left -->
 												<svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 													<path fill-rule="evenodd" d="M18 10a.75.75 0 01-.75.75H4.66l2.1 1.95a.75.75 0 11-1.02 1.1l-3.5-3.25a.75.75 0 010-1.1l3.5-3.25a.75.75 0 111.02 1.1l-2.1 1.95h12.59A.75.75 0 0118 10z" clip-rule="evenodd"></path>
 												</svg>
-												ItemsControl
+												Foreach Markup
 											</a>
 									</div>
 									<div class="hidden md:-mt-px md:flex"></div>
 									<div class="-mt-px flex w-0 flex-1 justify-end">
+											<a href="https://asaicraft.github.io/Akbura/#avalonia-styles" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												Avalonia Styles
+												<!-- Heroicon name: mini/arrow-long-right -->
+												<svg class="ml-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+													<path fill-rule="evenodd" d="M2 10a.75.75 0 01.75-.75h12.59l-2.1-1.95a.75.75 0 111.02-1.1l3.5 3.25a.75.75 0 010 1.1l-3.5 3.25a.75.75 0 11-1.02-1.1l2.1-1.95H2.75A.75.75 0 012 10z" clip-rule="evenodd"></path>
+												</svg>
+											</a>
 									</div>
 								</nav>
 					</div>
@@ -490,48 +483,48 @@ public IUserService UserService
 							</h5>
 							<ul class="text-slate-700 text-sm leading-6">
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#register-a-service-provider'" data-id="register-a-service-provider" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Register a service provider
+										<span v-hash="'#declaring-a-collection-parameter'" data-id="declaring-a-collection-parameter" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Declaring a collection parameter
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#inject-a-required-service'" data-id="inject-a-required-service" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Inject a required service
+										<span v-hash="'#optional-parameter'" data-id="optional-parameter" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Optional parameter
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#inject-an-optional-service'" data-id="inject-an-optional-service" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Inject an optional service
+										<span v-hash="'#observable-state-source'" data-id="observable-state-source" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Observable state source
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#explicit-values-take-priority'" data-id="explicit-values-take-priority" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Explicit values take priority
+										<span v-hash="'#static-resource-source'" data-id="static-resource-source" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Static resource source
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#configuration-object-example'" data-id="configuration-object-example" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Configuration object example
+										<span v-hash="'#datacontext-binding'" data-id="datacontext-binding" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											DataContext binding
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#resolution-process'" data-id="resolution-process" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Resolution process
+										<span v-hash="'#non-generic-and-concrete-observable-declarations'" data-id="non-generic-and-concrete-observable-declarations" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Non-generic and concrete observable declarations
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#multiple-service-providers'" data-id="multiple-service-providers" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Multiple service providers
+										<span v-hash="'#synchronization-contract'" data-id="synchronization-contract" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Synchronization contract
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#custom-akbura-service-providers'" data-id="custom-akbura-service-providers" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Custom Akbura service providers
+										<span v-hash="'#foreach-and-component-lifetime'" data-id="foreach-and-component-lifetime" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Foreach and component lifetime
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#what-akbura-generates'" data-id="what-akbura-generates" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											What Akbura generates
+										<span v-hash="'#collection-content'" data-id="collection-content" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Collection content
 										</span>
 									</li>
 							</ul>

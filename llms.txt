@@ -33,6 +33,7 @@ Akbura
  - [Dictionary Resources](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
  - [Conditional Markup](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/conditional-markup.md)
  - [Foreach Markup](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/foreach.md)
+ - [Collection Parameters](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/collection-parameters.md)
  - [Avalonia Styles](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
  - [Grid](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/grid.md)
  - [ItemsControl](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/items-control.md)

@@ -76,6 +76,12 @@ internal sealed class AkburaBraceCompletionSession :
         }
 
         var closingPosition = openingPosition + 1;
+        if (closingPosition < snapshot.Length && snapshot[closingPosition] == ClosingBrace)
+        {
+            // The buffer may change between provider selection and Start().
+            Invalidate();
+            return;
+        }
         using var edit = SubjectBuffer.CreateEdit();
         if (!edit.Insert(
                 closingPosition,
@@ -89,6 +95,11 @@ internal sealed class AkburaBraceCompletionSession :
         }
 
         var applied = edit.Apply();
+        if (edit.Canceled || closingPosition >= applied.Length || applied[closingPosition] != ClosingBrace)
+        {
+            Invalidate();
+            return;
+        }
         _openingPoint = applied.CreateTrackingPoint(
             openingPosition,
             PointTrackingMode.Negative);

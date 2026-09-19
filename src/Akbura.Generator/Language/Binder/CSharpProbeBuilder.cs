@@ -12,9 +12,9 @@ namespace Akbura.Language.Binder;
 
 internal sealed partial class CSharpProbeBuilder
 {
-    private const string CompletionAnnotationKind =
-        "AkburaCSharpCompletionTarget";
+    private const string CompletionAnnotationKind = "AkburaCSharpCompletionTarget";
     private const string ReturnProbeAnnotationKind = "AkburaCSharpReturnProbe";
+    internal const string StatementProbeAnnotationKind = "AkburaCSharpStatementProbe";
 
     private readonly CSharpProbeBinder _binder;
 
@@ -50,6 +50,8 @@ internal sealed partial class CSharpProbeBuilder
         CSharp.StatementSyntax statement,
         bool includeAllVisibleSymbols)
     {
+        statement = statement.WithAdditionalAnnotations(
+            new SyntaxAnnotation(StatementProbeAnnotationKind));
         var precedingLocals = GetPrecedingLocalDeclarations(scope);
         var containingMethod = GetContainingComponentMethodProbe(scope);
         var excludedNames = GetParameterNames(containingMethod);
@@ -573,13 +575,8 @@ internal sealed partial class CSharpProbeBuilder
                 scope,
                 builder);
         }
-        else if (parent is CSharpBlockSyntax block)
-        {
-            AddPrecedingLocalDeclarationsFromList(
-                block.Tokens,
-                scope,
-                builder);
-        }
+        // Executable block locals are emitted by WrapExecutableBlockScope
+        // inside their original header, not hoisted above its out/pattern locals.
     }
 
     private static void AddPrecedingLocalDeclarationsFromList<TSyntax>(

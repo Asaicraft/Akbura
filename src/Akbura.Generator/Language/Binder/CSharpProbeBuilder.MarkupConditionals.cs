@@ -54,7 +54,17 @@ internal sealed partial class CSharpProbeBuilder
     {
         for (var current = scope; current != null; current = current.Parent)
         {
-            if (current is MarkupCodeBlockSyntax codeBlock)
+            if (current is CSharpBlockSyntax executableBlock)
+            {
+                statement = WrapExecutableBlockScope(executableBlock, scope, statement);
+                if (executableBlock.Parent is CSharpStatementSyntax executableOwner &&
+                    executableOwner.GetRawCSharpStatement() is CSharp.LocalFunctionStatementSyntax)
+                {
+                    // The probe method already carries the function signature.
+                    break;
+                }
+            }
+            else if (current is MarkupCodeBlockSyntax codeBlock)
             {
                 statement = WrapMarkupCodeScope(codeBlock, scope, statement);
             }

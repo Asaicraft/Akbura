@@ -214,12 +214,9 @@ internal sealed partial class CSharpProbeBinder : Binder
         var semanticModel = CreateSemanticModel(syntaxTree);
         var probeStatement = syntaxTree
             .GetCompilationUnitRoot()
-            .DescendantNodes()
-            .OfType<CSharp.MethodDeclarationSyntax>()
-            .Single(methodDeclaration => methodDeclaration.Identifier.ValueText == "__akbura_statement_probe")
-            .Body!
-            .Statements
-            .Last();
+            .GetAnnotatedNodes(CSharpProbeBuilder.StatementProbeAnnotationKind)
+            .OfType<CSharp.StatementSyntax>()
+            .Single();
 
         return BindStatementTree(syntax, semanticModel, probeStatement, isBindingPath);
     }

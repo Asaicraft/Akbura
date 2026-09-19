@@ -11,6 +11,14 @@ internal static class AkburaSyntaxClassificationFacts
             return null;
         }
 
+        // Tag delimiters are punctuation; relational operators in C# are not.
+        if ((token.Parent is MarkupStartTagSyntax or MarkupEndTagSyntax) &&
+            (token.Kind is SyntaxKind.LessThanToken or SyntaxKind.GreaterThanToken or
+                SyntaxKind.LessSlashToken or SyntaxKind.SlashGreaterToken))
+        {
+            return AkburaClassificationKind.Punctuation;
+        }
+
         var akcssClassification = GetAkcssClassification(token);
 
         if (akcssClassification is not null)

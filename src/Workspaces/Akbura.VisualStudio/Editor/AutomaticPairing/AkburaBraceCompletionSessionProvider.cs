@@ -79,21 +79,34 @@ internal sealed class AkburaBraceCompletionSessionProvider :
             var document = _parserService.GetSyntacticDocument(
                 snapshot,
                 budget.Token);
-            var decision = document.GetAutomaticPairDecision(
-                openingPoint.Position,
-                openingBrace,
-                budget.Token);
-            var openingCharacterAlreadyPresent =
-                openingPoint.Position > 0 &&
-                snapshot[openingPoint.Position - 1] == openingBrace;
-            var isStructuralAkcssBrace =
-                openingBrace == '{' &&
-                openingCharacterAlreadyPresent &&
-                document.ShouldAutoCloseCurlyBrace(
+            // Native VS may report the point ON an already inserted brace,
+            // whereas the shared typing service accepts a caret AFTER it.
+            // Inspect the existing token first; do not simulate a second '{'.
+            var structuralOpeningPosition = -1;
+            var isStructuralBrace = openingBrace == '{' &&
+                document.TryGetStructuralCurlyBraceAtCompletionPoint(
                     openingPoint.Position,
+                    out structuralOpeningPosition,
                     budget.Token);
 
-            if (!isStructuralAkcssBrace &&
+            if (isStructuralBrace &&
+                structuralOpeningPosition + 1 < snapshot.Length &&
+                snapshot[structuralOpeningPosition + 1] == closingBrace)
+            {
+                return false;
+            }
+
+            var decision = isStructuralBrace
+                ? default
+                : document.GetAutomaticPairDecision(
+                    openingPoint.Position,
+                    openingBrace,
+                    budget.Token);
+            var openingCharacterAlreadyPresent = isStructuralBrace ||
+                openingPoint.Position > 0 &&
+                snapshot[openingPoint.Position - 1] == openingBrace;
+
+            if (!isStructuralBrace &&
                 (!decision.IsFixed ||
                  decision.ClosingText[0] != closingBrace))
             {
@@ -109,7 +122,7 @@ internal sealed class AkburaBraceCompletionSessionProvider :
                 openingBrace == '{' &&
                 decision.ContextKind ==
                     AkburaPairContextKind.AkcssSyntax &&
-                !isStructuralAkcssBrace)
+                !isStructuralBrace)
             {
                 AkburaWorkspaceDiagnostics.Write(
                     AkburaWorkspaceDiagnostics.Category.AutoClosingTag,
@@ -119,11 +132,13 @@ internal sealed class AkburaBraceCompletionSessionProvider :
 
             session = new AkburaBraceCompletionSession(
                 textView,
-                openingPoint,
+                isStructuralBrace
+                    ? new SnapshotPoint(snapshot, structuralOpeningPosition)
+                    : openingPoint,
                 openingBrace,
                 closingBrace);
-            var contextName = isStructuralAkcssBrace
-                ? "StructuralAkcss"
+            var contextName = isStructuralBrace
+                ? "StructuralMarkupOrAkcss"
                 : decision.ContextKind.ToString();
             AkburaWorkspaceDiagnostics.Write(
                 AkburaWorkspaceDiagnostics.Category.AutoClosingTag,

@@ -327,6 +327,8 @@ internal sealed partial class MarkupBinder : Binder
         {
             if (!parameter.ReceivesValueFromParent ||
                 parameter.HasDefaultValue ||
+                ObservableListParameterShape.TryCreate(parameter, SemanticModel.Compilation.CSharpCompilation,
+                    out _, out _) ||
                 IsComponentParameterSet(markupElement, parameter))
             {
                 continue;

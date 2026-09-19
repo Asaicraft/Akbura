@@ -290,6 +290,11 @@ internal readonly ref partial struct ParameterWriter
         _writer.WriteLine();
         WriteCollectionBackingGetter(plan);
         _writer.WriteLine();
+        if (plan.Collection.ObservesChanges)
+        {
+            WriteCollectionBindingMembers(plan);
+            _writer.WriteLine();
+        }
 
         if (plan.IsContent)
         {
@@ -437,7 +442,9 @@ internal readonly ref partial struct ParameterWriter
     private void WriteCollectionDescriptor(in ComponentParameterPlan plan)
     {
         _writer.WriteLine("#if DEBUG");
-        _writer.Write("public static global::Akbura.ComponentTree.ReadOnlyParameter<");
+        _writer.Write(plan.Collection.ObservesChanges
+            ? "public static global::Akbura.ComponentTree.CollectionParameter<"
+            : "public static global::Akbura.ComponentTree.ReadOnlyParameter<");
         _writer.Write(_ownerTypeName);
         _writer.Write(", ");
         WriteCollectionPropertyType(plan);
@@ -445,7 +452,9 @@ internal readonly ref partial struct ParameterWriter
         WriteDescriptorName(plan.Name);
         _writer.WriteLine(" =");
         _writer.WriteLine("#else");
-        _writer.Write("public static readonly global::Akbura.ComponentTree.ReadOnlyParameter<");
+        _writer.Write(plan.Collection.ObservesChanges
+            ? "public static readonly global::Akbura.ComponentTree.CollectionParameter<"
+            : "public static readonly global::Akbura.ComponentTree.ReadOnlyParameter<");
         _writer.Write(_ownerTypeName);
         _writer.Write(", ");
         WriteCollectionPropertyType(plan);
@@ -464,7 +473,9 @@ internal readonly ref partial struct ParameterWriter
     private void WriteCollectionDescriptorFactory(in ComponentParameterPlan plan)
     {
         _writer.WriteHiddenApiAttributes();
-        _writer.Write("private static global::Akbura.ComponentTree.ReadOnlyParameter<");
+        _writer.Write(plan.Collection.ObservesChanges
+            ? "private static global::Akbura.ComponentTree.CollectionParameter<"
+            : "private static global::Akbura.ComponentTree.ReadOnlyParameter<");
         _writer.Write(_ownerTypeName);
         _writer.Write(", ");
         WriteCollectionPropertyType(plan);
@@ -496,9 +507,9 @@ internal readonly ref partial struct ParameterWriter
         bool recreate)
     {
         _writer.Write("return global::Akbura.ComponentTree.Parameter.");
-        _writer.Write(recreate
-            ? "RecreateReadOnlyForHotReload"
-            : "CreateReadOnly");
+        _writer.Write(plan.Collection.ObservesChanges
+            ? (recreate ? "RecreateCollectionForHotReload" : "CreateCollection")
+            : (recreate ? "RecreateReadOnlyForHotReload" : "CreateReadOnly"));
         _writer.Write("<");
         _writer.Write(_ownerTypeName);
         _writer.Write(", ");
@@ -516,6 +527,13 @@ internal readonly ref partial struct ParameterWriter
         GeneratedMemberNameWriter.WriteCollectionGetter(
             _writer,
             plan.GeneratedName);
+        if (plan.Collection.ObservesChanges)
+        {
+            _writer.WriteLine(",");
+            _writer.Write("static (__owner, __value) => __owner.");
+            _valueWriter.WriteIdentifier(plan.Name);
+            _writer.Write(" = __value");
+        }
         _writer.WriteLine(");");
         _writer.CurrentIndent -= _writer.TabSize;
     }
@@ -538,6 +556,12 @@ internal readonly ref partial struct ParameterWriter
 
     private void WriteCollectionProperty(in ComponentParameterPlan plan)
     {
+        if (plan.Collection.ObservesChanges)
+        {
+            WriteObservableCollectionProperty(plan);
+            return;
+        }
+
         _writer.Write("public ");
         WriteCollectionPropertyType(plan);
         _writer.Write(" ");
@@ -641,9 +665,9 @@ internal readonly ref partial struct ParameterWriter
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("case global::System.Collections.Specialized.NotifyCollectionChangedAction.Reset:");
         _writer.CurrentIndent += _writer.TabSize;
-        _writer.WriteLine(
-            "throw new global::System.NotSupportedException(" +
-            "\"Resetting component content is not supported.\");");
+        GeneratedMemberNameWriter.WriteCollectionSynchronizeMethod(_writer, plan.GeneratedName);
+        _writer.WriteLine("();");
+        _writer.WriteLine("break;");
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("default:");
         _writer.CurrentIndent += _writer.TabSize;

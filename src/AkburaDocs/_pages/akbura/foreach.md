@@ -16,6 +16,10 @@ compiler, runtime, and editor versions that include `$foreach`. Support in an
 older published alpha package is not implied.
 :::
 
+For owned lists declared with `param IList` or `param IList<T>`, see
+[Collection Parameters](/akbura/collection-parameters). The loop observes the
+stable backing list; the parameter manages its external source connection.
+
 ## Basic syntax
 
 ```akbura

@@ -5,6 +5,8 @@
              Link="Documentation/Shared/MarkdownDocumentation.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DocumentationExampleCatalog.cs"
              Link="Documentation/Shared/DocumentationExampleCatalog.cs" />
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)..\..\AkburaDocs\_pages\akbura\collection-parameters.md"
+                      LogicalName="Akbura.Documentation.akbura/collection-parameters.md" />
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)..\..\AkburaDocs\_pages\akbura\foreach.md"
                       LogicalName="Akbura.Documentation.akbura/foreach.md" />
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)..\..\AkburaDocs\_pages\akbura\conditional-markup.md"

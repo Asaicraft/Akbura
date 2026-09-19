@@ -231,6 +231,14 @@ internal static class ComponentMemberPlanner
                 return false;
             }
 
+            if (ObservableListParameterShape.TryCreate(parameter, _semanticModel.Compilation.CSharpCompilation,
+                    out var ownedElementType, out var ownedBackingType))
+            {
+                collection = new ComponentParameterCollectionPlan(namedType, ownedElementType,
+                    ownedBackingType, observesChanges: true);
+                return true;
+            }
+
             var originalType = namedType.OriginalDefinition;
             if (_nonGenericListType != null &&
                 SymbolEqualityComparer.Default.Equals(originalType, _nonGenericListType))

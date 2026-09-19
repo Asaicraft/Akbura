@@ -176,14 +176,14 @@ public sealed class ParameterWriterTests
             StringComparison.Ordinal);
 
         Assert.Contains(
-            "global::Akbura.ComponentTree.Parameter.CreateReadOnly<" +
+            "global::Akbura.ComponentTree.Parameter.CreateCollection<" +
             "global::Demo.PlannerView, global::System.Collections.Generic." +
             "IList<global::Avalonia.Controls.Control>>(",
             output,
             StringComparison.Ordinal);
 
         Assert.Contains(
-            "__GetCollection_" + generatedName + ");",
+            "__GetCollection_" + generatedName + ",",
             output,
             StringComparison.Ordinal);
 

@@ -28,6 +28,10 @@
         "link": "/akbura/foreach"
       },
       {
+        "text": "Collection Parameters",
+        "link": "/akbura/collection-parameters"
+      },
+      {
         "text": "Avalonia Styles",
         "link": "/#avalonia-styles"
       },

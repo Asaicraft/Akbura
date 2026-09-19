@@ -77,6 +77,11 @@ internal readonly struct ComponentParameterPlan
             type,
             kind,
             flags);
+        // Do not reuse a readonly descriptor for the new writable-source contract.
+        if (kind == ComponentParameterKind.Collection && collection.ObservesChanges)
+        {
+            HotReloadKey += ":source-v1";
+        }
         GeneratedName = ComponentHotReloadIdentity.CreateGeneratedName(
             name,
             HotReloadKey);

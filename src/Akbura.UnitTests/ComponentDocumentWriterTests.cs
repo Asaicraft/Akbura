@@ -217,7 +217,7 @@ public sealed class ComponentDocumentWriterTests
             StringComparison.Ordinal);
         Assert.Contains(
             "global::Akbura.ComponentTree.Parameter." +
-            "RecreateReadOnlyForHotReload",
+            "RecreateCollectionForHotReload",
             generatedSource,
             StringComparison.Ordinal);
         Assert.Contains(

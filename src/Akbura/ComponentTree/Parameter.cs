@@ -4,7 +4,7 @@ using System.ComponentModel;
 
 namespace Akbura.ComponentTree;
 
-public abstract class Parameter
+public abstract partial class Parameter
 {
     private readonly object? _defaultValue;
     private readonly bool _hasDefaultValue;

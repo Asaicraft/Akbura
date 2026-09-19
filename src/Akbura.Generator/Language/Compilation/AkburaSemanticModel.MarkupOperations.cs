@@ -134,7 +134,9 @@ internal partial class AkburaSemanticModel
             return false;
         }
 
-        return property.IsAvaloniaProperty ||
+        // Source components have a generated Avalonia parameter descriptor even
+        // before the emitted CLR property/field exists in this compilation.
+        return property.IsParameter || property.IsAvaloniaProperty ||
                property.AvaloniaPropertyDefinition.Symbol is not null ||
                property.AttachedPropertyDefinition.Symbol is not null;
     }

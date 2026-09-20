@@ -145,13 +145,13 @@
     <value>Invalid real literal.</value>
   </data>
   <data name="ERR_LbraceExpected" xml:space="preserve">
-    <value>'{' expected.</value>
+    <value>'{{' expected.</value>
   </data>
   <data name="ERR_OpenEndedComment" xml:space="preserve">
     <value>Unterminated multi-line comment.</value>
   </data>
   <data name="ERR_RbraceExpected" xml:space="preserve">
-    <value>'}' expected.</value>
+    <value>'}}' expected.</value>
   </data>
   <data name="ERR_SemicolonExpected" xml:space="preserve">
     <value>';' expected.</value>

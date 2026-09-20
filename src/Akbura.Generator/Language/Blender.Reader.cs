@@ -217,10 +217,29 @@ internal readonly partial struct Blender
                 return false;
             }
 
-            var underlyingNode =
-                nodeOrToken.RequiredUnderlyingNode;
+            var underlyingNode = nodeOrToken.RequiredUnderlyingNode;
 
-            var lastTerminal = underlyingNode as GreenSyntaxToken ?? underlyingNode.GetLastTerminal();
+            var lastTerminal =
+                underlyingNode as GreenSyntaxToken ??
+                underlyingNode.GetLastTerminal();
+
+            // A boundary edit can extend a markup-extension literal through its
+            // argument/value owner. Ordinary quoted attributes use the same
+            // AkTextLiteral token kind, but must retain their existing reuse rules.
+            if (lastTerminal?.Kind == SyntaxKind.AkTextLiteral)
+            {
+                var isExtensionLiteralOwner =
+                    underlyingNode is GreenMarkupExtensionArgumentSyntax or
+                        GreenMarkupExtensionLiteralValueSyntax ||
+                    (underlyingNode is GreenMarkupTextLiteralSyntax &&
+                        nodeOrToken.Parent is MarkupExtensionLiteralValueSyntax);
+
+                if (isExtensionLiteralOwner)
+                {
+                    return true;
+                }
+            }
+
             var isInsertion = changeSpan.IsEmpty && change.NewLength > 0;
 
             // Other nodes retain their existing replacement/deletion reuse behavior.

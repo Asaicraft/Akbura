@@ -1350,7 +1350,7 @@ internal sealed partial class Parser
 
     private GreenMarkupExtensionArgumentSyntax ParseIncrementalMarkupExtensionArgumentSyntax()
     {
-        if (TryReadReusableIncrementalNode<GreenMarkupExtensionArgumentSyntax>(out var argument))
+        if (TryReadReusableMarkupExtensionLiteralOwner<GreenMarkupExtensionArgumentSyntax>(out var argument))
         {
             return argument;
         }
@@ -1370,7 +1370,7 @@ internal sealed partial class Parser
 
     private GreenMarkupExtensionValueSyntax ParseIncrementalMarkupExtensionValueSyntax()
     {
-        if (TryReadReusableIncrementalNode<GreenMarkupExtensionValueSyntax>(out var value))
+        if (TryReadReusableMarkupExtensionLiteralOwner<GreenMarkupExtensionValueSyntax>(out var value))
         {
             return value;
         }
@@ -1394,55 +1394,15 @@ internal sealed partial class Parser
 
     private GreenMarkupTextLiteralSyntax ParseIncrementalMarkupExtensionLiteralValueSyntax()
     {
-        if (TryReadReusableIncrementalNode<GreenMarkupTextLiteralSyntax>(out var literal))
+        if (TryReadReusableMarkupExtensionLiteralOwner<GreenMarkupTextLiteralSyntax>(out var literal))
         {
             return literal;
         }
 
-        var rawText = new StringBuilder();
-        var parenDepth = 0;
-        var bracketDepth = 0;
-        var braceDepth = 0;
-
-        while (PeekIncrementalTokenKind() != SyntaxKind.EndOfFileToken)
-        {
-            var kind = PeekIncrementalTokenKind();
-            if (parenDepth == 0 &&
-                bracketDepth == 0 &&
-                braceDepth == 0 &&
-                kind is SyntaxKind.CommaToken or SyntaxKind.CloseBraceToken)
-            {
-                break;
-            }
-
-            var token = ReadIncrementalToken();
-            rawText.Append(token.ToFullString());
-
-            switch (kind)
-            {
-                case SyntaxKind.OpenParenToken:
-                    parenDepth++;
-                    break;
-                case SyntaxKind.CloseParenToken when parenDepth > 0:
-                    parenDepth--;
-                    break;
-                case SyntaxKind.OpenBracketToken:
-                    bracketDepth++;
-                    break;
-                case SyntaxKind.CloseBracketToken when bracketDepth > 0:
-                    bracketDepth--;
-                    break;
-                case SyntaxKind.OpenBraceToken:
-                    braceDepth++;
-                    break;
-                case SyntaxKind.CloseBraceToken when braceDepth > 0:
-                    braceDepth--;
-                    break;
-            }
-        }
-
-        var raw = rawText.ToString();
-        return CreateMarkupTextLiteralSyntax(raw, raw.Trim());
+        // Use the same scanner as a full parse for this one literal, not a
+        // second grammar driven by reusable tokens. EatToken's incremental
+        // buffer obtains fresh lexical tokens through AddNewBlendedToken.
+        return ParseMarkupExtensionLiteralValueSyntax();
     }
 
     private GreenInlineExpressionSyntax ParseIncrementalInlineExpressionSyntax()

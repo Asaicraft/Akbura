@@ -194,9 +194,10 @@ namespace Akbura.Language.Syntax
 		TailwindFullAttributeSyntax = 556,
 		TailwindMarkupExtensionSegmentSyntax = 557,
 		MarkupExtensionConditionalPrefixSyntax = 558,
-		IncompleteTagSyntax = 576,
-		IncompletePrefixedAttributeSyntax = 577,
-		IncompleteAttributeSyntax = 578,
+		// Recovery nodes. Keep these distinct from markup statement kinds.
+		IncompleteTagSyntax = 587,
+		IncompletePrefixedAttributeSyntax = 588,
+		IncompleteAttributeSyntax = 589,
 
 		// AKCSS root
 		AkcssDocumentSyntax = 559,

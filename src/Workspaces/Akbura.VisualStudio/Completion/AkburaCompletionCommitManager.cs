@@ -148,6 +148,33 @@ internal sealed class AkburaCompletionCommitManager :
             return CommitResult.Unhandled;
         }
 
+        if (completion.Kind == AkburaCompletionKind.MarkupExtension)
+        {
+            // EdgeInclusive must include newly typed name characters, but it
+            // can also include a closing brace inserted after the list opened.
+            // Narrow the translated range before replacing anything in the buffer.
+            var trackedSpan = new TextSpan(applicableSpan.Start.Position, applicableSpan.Length);
+            if (!AkburaMarkupExtensionCompletionFacts.TryGetNameReplacementSpan(
+                    SourceText.From(currentSnapshot.GetText()), trackedSpan, out var nameSpan))
+            {
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.Completion,
+                    $"Markup extension commit rejected: item='{completion.DisplayText}', " +
+                    $"snapshot={currentSnapshot.Version.VersionNumber}, trackedSpan={trackedSpan}.");
+                // Do not delegate an unsafe range to the editor's default commit.
+                return new CommitResult(isHandled: true, CommitBehavior.CancelCommit);
+            }
+
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Completion,
+                $"Markup extension commit: item='{completion.DisplayText}', " +
+                $"sourceSnapshot={item.ApplicableToSpan.Snapshot.Version.VersionNumber}, " +
+                $"snapshot={currentSnapshot.Version.VersionNumber}, " +
+                $"trackedSpan={trackedSpan}, replacementSpan={nameSpan}.");
+            applicableSpan = new SnapshotSpan(
+                currentSnapshot, new Span(nameSpan.Start, nameSpan.Length));
+        }
+
         var namespaceImportChange = CreateNamespaceImportChange(
             currentSnapshot,
             completion.NamespaceImport,

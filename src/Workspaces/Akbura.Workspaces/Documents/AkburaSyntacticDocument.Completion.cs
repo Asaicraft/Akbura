@@ -1022,7 +1022,9 @@ public sealed partial class AkburaSyntacticDocument
         int position)
     {
         if (endTag.Parent is MarkupElementSyntax element &&
-            element.StartTag is { } startTag)
+            element.StartTag is { } startTag &&
+            !startTag.CloseToken.IsMissing &&
+            startTag.CloseToken.Kind == SyntaxKind.GreaterThanToken)
         {
             var name = startTag.Name.ToFullString().Trim();
             if (name.Length > 0)
@@ -1078,6 +1080,7 @@ public sealed partial class AkburaSyntacticDocument
             var startTag = element.StartTag;
             if (startTag == null ||
                 startTag.CloseToken.IsMissing ||
+                startTag.CloseToken.Kind != SyntaxKind.GreaterThanToken ||
                 startTag.CloseToken.Span.End > position ||
                 HasCompleteEndTagBefore(
                     element.EndTag,

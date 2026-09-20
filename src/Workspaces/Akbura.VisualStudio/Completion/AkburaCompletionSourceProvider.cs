@@ -25,12 +25,15 @@ internal sealed class AkburaCompletionSourceProvider :
     private readonly AkburaProjectedCSharpDocumentService
         _projectedDocumentService;
 
+    private readonly IAsyncCompletionBroker _completionBroker;
+
     [ImportingConstructor]
     public AkburaCompletionSourceProvider(
         ITextDocumentFactoryService textDocumentFactory,
         AkburaVisualStudioWorkspace workspaceHost,
         AkburaParserService parserService,
-        AkburaProjectedCSharpDocumentService projectedDocumentService)
+        AkburaProjectedCSharpDocumentService projectedDocumentService,
+        IAsyncCompletionBroker completionBroker)
     {
         _textDocumentFactory = textDocumentFactory ??
             throw new ArgumentNullException(
@@ -44,6 +47,9 @@ internal sealed class AkburaCompletionSourceProvider :
         _projectedDocumentService = projectedDocumentService ??
             throw new ArgumentNullException(
                 nameof(projectedDocumentService));
+
+        _completionBroker = completionBroker ??
+            throw new ArgumentNullException(nameof(completionBroker));
 
         AkburaWorkspaceDiagnostics.Write(
             AkburaWorkspaceDiagnostics.Category.Completion,
@@ -82,6 +88,15 @@ internal sealed class AkburaCompletionSourceProvider :
                     _textDocumentFactory,
                     _workspaceHost,
                     _parserService));
+
+        if (documentKind == AkburaEditorDocumentKind.Component)
+        {
+            // A live attribute session must not keep its catalog after ${.
+            // One controller per view; it unsubscribes when the view closes.
+            _ = textView.Properties.GetOrCreateSingletonProperty(
+                () => new AkburaMarkupExtensionCompletionController(
+                    textView, _parserService, _completionBroker));
+        }
 
         return textView.Properties
             .GetOrCreateSingletonProperty(

@@ -148,6 +148,34 @@ internal sealed class AkburaCompletionCommitManager :
             return CommitResult.Unhandled;
         }
 
+        // The old attribute popup may still be visible while its asynchronous
+        // context switch is pending. Do not let an immediate Tab/Enter/click
+        // commit an item from that old catalog across the new ${ opener.
+        if (applicableSpan.GetText().IndexOf("${", StringComparison.Ordinal) >= 0 &&
+            ReferenceEquals(session.TextView.TextBuffer, buffer))
+        {
+            var position = session.TextView.Caret.Position.BufferPosition
+                .TranslateTo(currentSnapshot, PointTrackingMode.Positive).Position;
+            var document = ThreadHelper.JoinableTaskFactory.Run(async () =>
+                await _parserService.GetSyntacticDocumentAsync(currentSnapshot).ConfigureAwait(false));
+            token.ThrowIfCancellationRequested();
+            if (!ReferenceEquals(currentSnapshot, buffer.CurrentSnapshot))
+            {
+                return new CommitResult(isHandled: true, CommitBehavior.CancelCommit);
+            }
+
+            var context = document.GetCompletionContext(position, token);
+            if (context.Kind == AkburaCompletionContextKind.MarkupExtensionType &&
+                (completion.Kind != AkburaCompletionKind.MarkupExtension ||
+                 applicableSpan.Start.Position != context.ApplicableSpan.Start))
+            {
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.Completion,
+                    "Stale completion commit rejected after entering a markup extension.");
+                return new CommitResult(isHandled: true, CommitBehavior.CancelCommit);
+            }
+        }
+
         if (completion.Kind == AkburaCompletionKind.MarkupExtension)
         {
             // EdgeInclusive must include newly typed name characters, but it

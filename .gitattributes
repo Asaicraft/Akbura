@@ -61,3 +61,10 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+###############################################################################
+# GitHub Linguist
+###############################################################################
+
+# Third-party libraries used by AkburaDocs
+src/AkburaDocs/wwwroot/lib/** linguist-vendored

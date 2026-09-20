@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using Akbura.Workspaces.Documents;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Akbura.Workspaces.Completion;
@@ -58,13 +60,73 @@ public static class AkburaMarkupExtensionCompletionFacts
 
         // Empty ${|} and an incomplete ${| are valid insertion points.
         // Do not reinterpret an argument/string as an extension-name edit.
-        if (end == start && start < text.Length && text[start] != '}')
+        if (end == start && start < text.Length &&
+            !char.IsWhiteSpace(text[start]) && text[start] is not ('}' or '/' or '>'))
         {
             return false;
         }
 
         replacementSpan = TextSpan.FromBounds(start, end);
         return true;
+    }
+
+    /// <summary>
+    /// Finds the current type-name context belonging to a specific ${ opener.
+    /// The opener is tracked by the host while asynchronous parsing is pending.
+    /// Text inside strings, arguments, or a different extension is not a match.
+    /// </summary>
+    public static bool TryGetTypeNameSpan(
+        AkburaSyntacticDocument document,
+        int position,
+        int openingBracePosition,
+        out TextSpan nameSpan,
+        CancellationToken cancellationToken = default)
+    {
+        if (document == null)
+        {
+            throw new ArgumentNullException(nameof(document));
+        }
+
+        nameSpan = default;
+        var text = document.Text;
+        if ((uint)position > (uint)text.Length ||
+            openingBracePosition < 1 || openingBracePosition >= text.Length ||
+            position <= openingBracePosition ||
+            text[openingBracePosition] != '{' || text[openingBracePosition - 1] != '$')
+        {
+            return false;
+        }
+
+        var context = document.GetCompletionContext(position, cancellationToken);
+        if (context.Kind != AkburaCompletionContextKind.MarkupExtensionType ||
+            context.ApplicableSpan.Start <= openingBracePosition ||
+            context.ApplicableSpan.End != position)
+        {
+            return false;
+        }
+
+        // GetCompletionContext can find another, nested ${. Do not act on it
+        // using a request that belonged to an earlier opener.
+        for (var index = openingBracePosition + 1; index < context.ApplicableSpan.Start; index++)
+        {
+            if (!char.IsWhiteSpace(text[index]))
+            {
+                return false;
+            }
+        }
+
+        nameSpan = context.ApplicableSpan;
+        return true;
+    }
+
+    /// <summary>
+    /// An old attribute session starts before ${. A type-name session starts
+    /// at the name itself. Do not restart a correctly anchored session merely
+    /// because its inclusive tracking span also picked up an auto-inserted }.
+    /// </summary>
+    public static bool IsTypeNameSession(TextSpan sessionSpan, TextSpan nameSpan)
+    {
+        return sessionSpan.Start == nameSpan.Start && sessionSpan.End >= nameSpan.End;
     }
 
     private static bool IsNameCharacter(char character)

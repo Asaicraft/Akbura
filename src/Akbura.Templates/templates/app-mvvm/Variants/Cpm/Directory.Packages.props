@@ -1,0 +1,27 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageVersion Include="Akbura" Version="AkburaVersionTemplateParameter" />
+    <PackageVersion Include="Akbura.Diagnostics" Version="AkburaVersionTemplateParameter" />
+    <PackageVersion Include="Avalonia" Version="AvaloniaVersionTemplateParameter" />
+    <PackageVersion Include="Avalonia.Desktop" Version="AvaloniaVersionTemplateParameter" />
+    <PackageVersion Include="Avalonia.Themes.Fluent" Version="AvaloniaVersionTemplateParameter" />
+    <PackageVersion Include="Avalonia.Fonts.Inter" Version="AvaloniaVersionTemplateParameter" />
+    <PackageVersion Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3" />
+    <!--#if (UseCommunityToolkit)-->
+    <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <!--#endif-->
+    <!--#if (UseReactiveUI)-->
+    <PackageVersion Include="ReactiveUI.Avalonia" Version="12.0.3" />
+    <!--#endif-->
+    <!--#if (UseMicrosoftDI)-->
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+    <!--#endif-->
+    <!--#if (UseSplat)-->
+    <PackageVersion Include="Splat" Version="19.4.1" />
+    <!--#endif-->
+  </ItemGroup>
+</Project>

@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <AvaloniaVersion>AvaloniaVersionTemplateParameter</AvaloniaVersion>
+    <AkburaVersion>AkburaVersionTemplateParameter</AkburaVersion>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <ImportDirectoryPackagesProps>false</ImportDirectoryPackagesProps>
+  </PropertyGroup>
+</Project>

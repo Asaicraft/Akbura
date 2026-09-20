@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json.schemastore.org/template",
+  "author": "Asaicraft",
+  "classifications": ["Akbura", "Avalonia", "MVVM", "Desktop", "Browser", "Android", "iOS"],
+  "description": "Akbura MVVM application with shared UI for Desktop, Browser, Android and iOS.",
+  "groupIdentity": "Akbura.App.CrossPlatform",
+  "identity": "Asaicraft.Akbura.App.CrossPlatform.CSharp",
+  "name": "Akbura Cross Platform Application",
+  "preferNameDirectory": true,
+  "shortName": "akbura.xplat",
+  "sourceName": "AkburaXplatTemplate",
+  "defaultName": "AkburaApplication",
+  "tags": { "language": "C#", "type": "solution", "editorTreatAs": "solution" },
+  "forms": {
+    "rawName": { "identifier": "identity" },
+    "mobileLower": { "identifier": "lowerCaseInvariant" },
+    "androidCharacters": { "identifier": "replace", "pattern": "[^a-z0-9_]", "replacement": "_" },
+    "iosCharacters": { "identifier": "replace", "pattern": "[^a-z0-9-]", "replacement": "-" },
+    "androidIdSuffix": { "identifier": "chain", "steps": ["mobileLower", "androidCharacters"] },
+    "iosIdSuffix": { "identifier": "chain", "steps": ["mobileLower", "iosCharacters"] }
+  },
+  "symbols": {
+    "RootNamespace": { "type": "derived", "valueSource": "name", "valueTransform": "safe_namespace", "replaces": "AkburaTemplateNamespace" },
+    "RawProjectName": { "type": "derived", "valueSource": "name", "valueTransform": "rawName", "replaces": "AkburaRawProjectNamePlaceholder" },
+    "AndroidApplicationIdSuffix": { "type": "derived", "valueSource": "name", "valueTransform": "androidIdSuffix", "replaces": "AkburaAndroidApplicationIdPlaceholder" },
+    "IosApplicationIdSuffix": { "type": "derived", "valueSource": "name", "valueTransform": "iosIdSuffix", "replaces": "AkburaIosApplicationIdPlaceholder" },
+    "Framework": { "type": "parameter", "datatype": "choice", "defaultValue": "net10.0", "replaces": "FrameworkParameter", "description": "Target framework.", "choices": [{ "choice": "net10.0", "description": ".NET 10" }] },
+    "MVVMToolkit": { "type": "parameter", "datatype": "choice", "defaultValue": "CommunityToolkit", "description": "MVVM toolkit.", "choices": [{ "choice": "CommunityToolkit" }, { "choice": "ReactiveUI" }] },
+    "MainViewPageType": { "type": "parameter", "datatype": "choice", "defaultValue": "None", "description": "Main view page shell.", "choices": [{ "choice": "None" }, { "choice": "ContentPage" }, { "choice": "TabbedPage" }, { "choice": "DrawerPage" }, { "choice": "NavigationPage" }] },
+    "AkburaVersion": { "type": "parameter", "datatype": "text", "defaultValue": "12.0.4-alpha.6", "replaces": "AkburaVersionTemplateParameter", "description": "Akbura and Akbura.Diagnostics package version." },
+    "AvaloniaVersion": { "type": "parameter", "datatype": "text", "defaultValue": "12.0.4", "replaces": "AvaloniaVersionTemplateParameter", "description": "Avalonia package version." },
+    "RemoveViewLocator": { "type": "parameter", "datatype": "bool", "defaultValue": "false", "description": "Omit the reflection-based ViewLocator." },
+    "UseCentralPackageManagement": { "type": "parameter", "datatype": "bool", "defaultValue": "true", "description": "Manage package versions in Directory.Packages.props." },
+    "DependencyInjection": { "type": "parameter", "datatype": "choice", "defaultValue": "None", "description": "Dependency injection provider.", "choices": [{ "choice": "None" }, { "choice": "Microsoft.Extensions.DependencyInjection" }, { "choice": "Splat.Locator" }] },
+    "ReactiveUIToolkitChosen": { "type": "computed", "value": "(MVVMToolkit == \"ReactiveUI\")" },
+    "CommunityToolkitChosen": { "type": "computed", "value": "(MVVMToolkit == \"CommunityToolkit\")" },
+    "UseMicrosoftDI": { "type": "computed", "value": "(DependencyInjection == \"Microsoft.Extensions.DependencyInjection\")" },
+    "UseSplat": { "type": "computed", "value": "(DependencyInjection == \"Splat.Locator\")" },
+    "UseDI": { "type": "computed", "value": "(UseMicrosoftDI || UseSplat)" },
+    "DefaultMainPageChosen": { "type": "computed", "value": "(MainViewPageType == \"None\")" },
+    "ContentMainPageChosen": { "type": "computed", "value": "(MainViewPageType == \"ContentPage\")" },
+    "TabbedMainPageChosen": { "type": "computed", "value": "(MainViewPageType == \"TabbedPage\")" },
+    "DrawerMainPageChosen": { "type": "computed", "value": "(MainViewPageType == \"DrawerPage\")" },
+    "NavigationMainPageChosen": { "type": "computed", "value": "(MainViewPageType == \"NavigationPage\")" },
+    "HostIdentifier": { "type": "bind", "binding": "HostIdentifier" }
+  },
+  "sources": [
+    { "source": "./", "target": "./", "modifiers": [
+      { "condition": "true", "exclude": ["Variants/**", ".vs/**", ".idea/**"] },
+      { "condition": "(RemoveViewLocator)", "exclude": ["AkburaXplatTemplate/ViewLocator.cs"] },
+      { "condition": "(!UseSplat)", "exclude": ["AkburaXplatTemplate/Infrastructure/SplatServiceProvider.cs"] },
+      { "condition": "(UseCentralPackageManagement)", "exclude": ["Directory.Build.props"] },
+      { "condition": "(!UseCentralPackageManagement)", "exclude": ["Directory.Packages.props"] }
+    ] },
+    { "condition": "(CommunityToolkitChosen)", "source": "./Variants/CommunityToolkit/", "target": "./AkburaXplatTemplate/ViewModels/" },
+    { "condition": "(ReactiveUIToolkitChosen)", "source": "./Variants/ReactiveUI/", "target": "./AkburaXplatTemplate/ViewModels/" },
+    { "condition": "(DefaultMainPageChosen)", "source": "./Variants/PageNone/", "target": "./AkburaXplatTemplate/Views/" },
+    { "condition": "(ContentMainPageChosen)", "source": "./Variants/PageContent/", "target": "./AkburaXplatTemplate/Views/" },
+    { "condition": "(TabbedMainPageChosen)", "source": "./Variants/PageTabbed/", "target": "./AkburaXplatTemplate/Views/" },
+    { "condition": "(DrawerMainPageChosen)", "source": "./Variants/PageDrawer/", "target": "./AkburaXplatTemplate/Views/" },
+    { "condition": "(NavigationMainPageChosen)", "source": "./Variants/PageNavigation/", "target": "./AkburaXplatTemplate/Views/" }
+  ],
+  "primaryOutputs": [
+    { "path": "AkburaXplatTemplate/AkburaXplatTemplate.csproj" },
+    { "path": "AkburaXplatTemplate.Android/AkburaXplatTemplate.Android.csproj" },
+    { "path": "AkburaXplatTemplate.Desktop/AkburaXplatTemplate.Desktop.csproj" },
+    { "path": "AkburaXplatTemplate.iOS/AkburaXplatTemplate.iOS.csproj" },
+    { "path": "AkburaXplatTemplate.Browser/AkburaXplatTemplate.Browser.csproj" },
+    { "condition": "(HostIdentifier != \"dotnetcli\" && HostIdentifier != \"dotnetcli-preview\")", "path": "AkburaXplatTemplate/ViewModels/MainViewModel.cs" },
+    { "condition": "(HostIdentifier != \"dotnetcli\" && HostIdentifier != \"dotnetcli-preview\")", "path": "AkburaXplatTemplate/Views/MainView.akbura" }
+  ],
+  "postActions": [
+    { "id": "editor", "condition": "(HostIdentifier != \"dotnetcli\" && HostIdentifier != \"dotnetcli-preview\")", "description": "Open MainView and MainViewModel", "manualInstructions": [], "actionId": "84C0DA21-51C8-4541-9940-6CA19AF04EE6", "args": { "files": "5;6" }, "continueOnError": true }
+  ]
+}

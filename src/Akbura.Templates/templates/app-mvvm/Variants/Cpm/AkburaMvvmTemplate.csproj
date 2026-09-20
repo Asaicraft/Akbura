@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>TemplateTargetFramework</TargetFramework>
+    <RootNamespace>AkburaTemplateNamespace</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Folder Include="Models\" />
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Akbura" />
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+    <!--#if (UseCommunityToolkit)-->
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <!--#endif-->
+    <!--#if (UseReactiveUI)-->
+    <PackageReference Include="ReactiveUI.Avalonia" />
+    <!--#endif-->
+    <!--#if (UseMicrosoftDI)-->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <!--#endif-->
+    <!--#if (UseSplat)-->
+    <PackageReference Include="Splat" />
+    <!--#endif-->
+  </ItemGroup>
+
+  <!--/-:msbuild-conditional:noEmit -->
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <PackageReference Include="Akbura.Diagnostics" PrivateAssets="all" />
+    <PackageReference Include="AvaloniaUI.DiagnosticsSupport" PrivateAssets="all" />
+  </ItemGroup>
+  <!--/+:msbuild-conditional:noEmit -->
+
+</Project>

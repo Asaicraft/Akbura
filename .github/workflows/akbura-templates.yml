@@ -10,6 +10,10 @@ on:
       - "src/Akbura.Diagnostics/**"
       - "src/Akbura.Generator/**"
       - "eng/Verify-AkburaTemplates.ps1"
+      - "eng/Verify-AkburaNewTemplates.ps1"
+      - "eng/Verify-AkburaXplatPlatform.ps1"
+      - "eng/Set-AkburaTemplateVersions.ps1"
+      - "eng/TemplateRuntimeProbe/**"
       - "Directory.Build.props"
       - "Directory.Packages.props"
       - ".github/workflows/akbura-templates.yml"
@@ -24,6 +28,10 @@ on:
       - "src/Akbura.Diagnostics/**"
       - "src/Akbura.Generator/**"
       - "eng/Verify-AkburaTemplates.ps1"
+      - "eng/Verify-AkburaNewTemplates.ps1"
+      - "eng/Verify-AkburaXplatPlatform.ps1"
+      - "eng/Set-AkburaTemplateVersions.ps1"
+      - "eng/TemplateRuntimeProbe/**"
       - "Directory.Build.props"
       - "Directory.Packages.props"
       - ".github/workflows/akbura-templates.yml"
@@ -44,9 +52,11 @@ jobs:
   verify:
     name: Pack and verify templates
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 240
     permissions:
       contents: read
+    outputs:
+      version: ${{ steps.versions.outputs.version }}
 
     steps:
       - name: Checkout
@@ -83,16 +93,9 @@ jobs:
           AKBURA_VERSION: ${{ steps.versions.outputs.version }}
           AVALONIA_VERSION: ${{ steps.versions.outputs.avalonia_version }}
         run: |
-          $path = "src/Akbura.Templates/templates/app/.template.config/template.json"
-          $configuration = Get-Content -LiteralPath $path -Raw |
-              ConvertFrom-Json
-          $configuration.symbols.AkburaVersion.defaultValue =
-              $env:AKBURA_VERSION
-          $configuration.symbols.AvaloniaVersion.defaultValue =
-              $env:AVALONIA_VERSION
-          $configuration |
-              ConvertTo-Json -Depth 50 |
-              Set-Content -LiteralPath $path -Encoding utf8
+          ./eng/Set-AkburaTemplateVersions.ps1 `
+              -AkburaVersion $env:AKBURA_VERSION `
+              -AvaloniaVersion $env:AVALONIA_VERSION
 
       - name: Restore package projects
         shell: bash
@@ -131,6 +134,17 @@ jobs:
             -p:PackageVersion="$VERSION" \
             -p:ContinuousIntegrationBuild=true
 
+      - name: Verify packaged template defaults
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.versions.outputs.version }}
+          AVALONIA_VERSION: ${{ steps.versions.outputs.avalonia_version }}
+        run: |
+          ./eng/Set-AkburaTemplateVersions.ps1 `
+              -AkburaVersion $env:VERSION `
+              -AvaloniaVersion $env:AVALONIA_VERSION `
+              -VerifyPackagePath "$env:ARTIFACTS_PATH/Akbura.Templates.$env:VERSION.nupkg"
+
       - name: Verify generated applications
         shell: pwsh
         env:
@@ -151,3 +165,128 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
+
+  browser:
+    name: Build and publish packaged xplat Browser
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install WebAssembly workload
+        shell: bash
+        run: sudo dotnet workload install wasm-tools --skip-manifest-update
+
+      - name: Download local CI packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: akbura-templates-${{ needs.verify.outputs.version }}
+          path: ${{ runner.temp }}/akbura-template-feed
+
+      - name: Verify packaged Browser host
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          ./eng/Verify-AkburaXplatPlatform.ps1 `
+              -Platform Browser `
+              -Version $env:VERSION `
+              -Feed "${{ runner.temp }}/akbura-template-feed" `
+              -WorkingDirectory "${{ runner.temp }}"
+
+  android:
+    name: Build packaged xplat Android
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install Android workload
+        shell: bash
+        run: sudo dotnet workload install android --skip-manifest-update
+
+      - name: Download local CI packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: akbura-templates-${{ needs.verify.outputs.version }}
+          path: ${{ runner.temp }}/akbura-template-feed
+
+      - name: Verify packaged Android host
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          ./eng/Verify-AkburaXplatPlatform.ps1 `
+              -Platform Android `
+              -Version $env:VERSION `
+              -Feed "${{ runner.temp }}/akbura-template-feed" `
+              -WorkingDirectory "${{ runner.temp }}"
+
+  ios:
+    name: Build packaged xplat iOS simulator
+    needs: verify
+    runs-on: macos-26
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install .NET 10.0.401
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.401"
+
+      - name: Verify Xcode and install iOS workload
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(xcodebuild -version | head -n 1)" = "Xcode 26.6"
+          dotnet workload install ios --version 10.0.401
+
+      - name: Download local CI packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: akbura-templates-${{ needs.verify.outputs.version }}
+          path: ${{ runner.temp }}/akbura-template-feed
+
+      - name: Verify packaged iOS simulator host
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          ./eng/Verify-AkburaXplatPlatform.ps1 `
+              -Platform iOS `
+              -Version $env:VERSION `
+              -Feed "${{ runner.temp }}/akbura-template-feed" `
+              -WorkingDirectory "${{ runner.temp }}"

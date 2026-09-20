@@ -24,7 +24,7 @@ jobs:
     name: Test and package NuGet release
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/nuget-v')
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 240
     permissions:
       contents: read
     outputs:
@@ -111,16 +111,9 @@ jobs:
           AKBURA_VERSION: ${{ steps.release.outputs.version }}
           AVALONIA_VERSION: ${{ steps.release.outputs.avalonia_version }}
         run: |
-          $path = "src/Akbura.Templates/templates/app/.template.config/template.json"
-          $configuration = Get-Content -LiteralPath $path -Raw |
-              ConvertFrom-Json
-          $configuration.symbols.AkburaVersion.defaultValue =
-              $env:AKBURA_VERSION
-          $configuration.symbols.AvaloniaVersion.defaultValue =
-              $env:AVALONIA_VERSION
-          $configuration |
-              ConvertTo-Json -Depth 50 |
-              Set-Content -LiteralPath $path -Encoding utf8
+          ./eng/Set-AkburaTemplateVersions.ps1 `
+              -AkburaVersion $env:AKBURA_VERSION `
+              -AvaloniaVersion $env:AVALONIA_VERSION
 
       - name: Restore release projects
         shell: bash
@@ -263,6 +256,17 @@ jobs:
             <<< "$templates_nuspec" > /dev/null
           grep -F "<packageType name=\"Template\"" \
             <<< "$templates_nuspec" > /dev/null
+
+      - name: Verify packaged template defaults
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          AVALONIA_VERSION: ${{ steps.release.outputs.avalonia_version }}
+        run: |
+          ./eng/Set-AkburaTemplateVersions.ps1 `
+              -AkburaVersion $env:VERSION `
+              -AvaloniaVersion $env:AVALONIA_VERSION `
+              -VerifyPackagePath "$env:ARTIFACTS_PATH/Akbura.Templates.$env:VERSION.nupkg"
 
       - name: Verify generated applications
         shell: pwsh

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+  <PropertyGroup>
+    <TargetFramework>FrameworkParameter-browser</TargetFramework>
+    <RootNamespace>AkburaTemplateNamespace.Browser</RootNamespace>
+    <OutputType>Exe</OutputType>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--#if (UseCentralPackageManagement) -->
+    <PackageReference Include="Avalonia.Browser" />
+    <!--#else -->
+    <PackageReference Include="Avalonia.Browser" Version="$(AvaloniaVersion)" />
+    <!--#endif -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AkburaRawProjectNamePlaceholder\AkburaRawProjectNamePlaceholder.csproj" />
+  </ItemGroup>
+</Project>

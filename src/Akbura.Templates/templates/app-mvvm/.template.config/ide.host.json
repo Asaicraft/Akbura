@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/ide.host",
+  "icon": "icon.png",
+  "symbolInfo": [
+    { "id": "Framework", "name": { "text": "Target framework" }, "isVisible": true },
+    { "id": "MVVMToolkit", "name": { "text": "MVVM toolkit" }, "isVisible": true },
+    { "id": "AvaloniaVersion", "name": { "text": "Avalonia version" }, "isVisible": true },
+    { "id": "AkburaVersion", "name": { "text": "Akbura version" }, "isVisible": true },
+    { "id": "DependencyInjection", "name": { "text": "Dependency injection" }, "isVisible": true },
+    { "id": "UseCentralPackageManagement", "name": { "text": "Central package management" }, "isVisible": true },
+    { "id": "RemoveViewLocator", "name": { "text": "Remove ViewLocator" }, "isVisible": true },
+    { "id": "skipRestore", "name": { "text": "Skip automatic restore" }, "isVisible": true }
+  ]
+}

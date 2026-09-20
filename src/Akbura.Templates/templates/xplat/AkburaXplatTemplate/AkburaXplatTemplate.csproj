@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>FrameworkParameter</TargetFramework>
+    <RootNamespace>AkburaTemplateNamespace</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--#if (UseCentralPackageManagement) -->
+    <PackageReference Include="Akbura" />
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+    <!--#if (ReactiveUIToolkitChosen) -->
+    <PackageReference Include="ReactiveUI.Avalonia" />
+    <!--#else -->
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <!--#endif -->
+    <!--#if (UseMicrosoftDI) -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <!--#endif -->
+    <!--#if (UseSplat) -->
+    <PackageReference Include="Splat" />
+    <!--#endif -->
+    <!--#else -->
+    <PackageReference Include="Akbura" Version="$(AkburaVersion)" />
+    <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="$(AvaloniaVersion)" />
+    <!--#if (ReactiveUIToolkitChosen) -->
+    <PackageReference Include="ReactiveUI.Avalonia" Version="12.0.3" />
+    <!--#else -->
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <!--#endif -->
+    <!--#if (UseMicrosoftDI) -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+    <!--#endif -->
+    <!--#if (UseSplat) -->
+    <PackageReference Include="Splat" Version="19.4.1" />
+    <!--#endif -->
+    <!--#endif -->
+  </ItemGroup>
+
+  <!--/-:msbuild-conditional:noEmit -->
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <!--#if (UseCentralPackageManagement) -->
+    <PackageReference Include="Akbura.Diagnostics" />
+    <PackageReference Include="AvaloniaUI.DiagnosticsSupport" />
+    <!--#else -->
+    <PackageReference Include="Akbura.Diagnostics" Version="$(AkburaVersion)" />
+    <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3" />
+    <!--#endif -->
+  </ItemGroup>
+  <!--/+:msbuild-conditional:noEmit -->
+</Project>

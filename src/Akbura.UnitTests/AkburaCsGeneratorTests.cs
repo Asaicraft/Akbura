@@ -796,11 +796,13 @@ public sealed class AkburaCsGeneratorTests
                     wrapperControl.GetType().GetProperty("Content")!.GetValue(wrapperControl));
                 Assert.IsType<Button>(
                     wrapperControl.GetType().GetProperty("Submit")!.GetValue(wrapperControl));
+                var renderedRoot = Assert.IsType<StackPanel>(wrapperControl.Child);
                 Assert.Same(wrapperControl, ((ILogical)content).LogicalParent);
-                Assert.Same(content, Assert.Single(((ILogical)wrapperControl).LogicalChildren));
-                Assert.NotSame(
-                    wrapperControl,
-                    ((ILogical)Assert.IsType<StackPanel>(wrapperControl.Child)).LogicalParent);
+                Assert.Same(wrapperControl, ((ILogical)renderedRoot).LogicalParent);
+                Assert.Collection(
+                    ((ILogical)wrapperControl).LogicalChildren,
+                    child => Assert.Same(content, child),
+                    child => Assert.Same(renderedRoot, child));
 
                 var replacement = new Border();
                 wrapperControl.GetType().GetProperty("Content")!.SetValue(
@@ -808,9 +810,10 @@ public sealed class AkburaCsGeneratorTests
                     replacement);
                 Assert.Null(((ILogical)content).LogicalParent);
                 Assert.Same(wrapperControl, ((ILogical)replacement).LogicalParent);
-                Assert.Same(
-                    replacement,
-                    Assert.Single(((ILogical)wrapperControl).LogicalChildren));
+                Assert.Collection(
+                    ((ILogical)wrapperControl).LogicalChildren,
+                    child => Assert.Same(renderedRoot, child),
+                    child => Assert.Same(replacement, child));
 
                 window.Close();
             },
@@ -913,20 +916,32 @@ public sealed class AkburaCsGeneratorTests
                 var wrapperControl = Assert.IsAssignableFrom<AkburaControl>(component.Child);
                 var content = Assert.IsType<ObservableCollection<Control>>(
                     wrapperControl.GetType().GetProperty("Content")!.GetValue(wrapperControl));
+                var renderedRoot = Assert.IsType<StackPanel>(wrapperControl.Child);
                 Assert.Equal(2, content.Count);
-                Assert.Equal(2, ((ILogical)wrapperControl).LogicalChildren.Count);
-                Assert.DoesNotContain(
-                    wrapperControl.Child!,
-                    ((ILogical)wrapperControl).LogicalChildren);
+                Assert.Same(wrapperControl, ((ILogical)renderedRoot).LogicalParent);
+                Assert.Collection(
+                    ((ILogical)wrapperControl).LogicalChildren,
+                    child => Assert.Same(content[0], child),
+                    child => Assert.Same(content[1], child),
+                    child => Assert.Same(renderedRoot, child));
 
                 var added = new Border();
                 content.Add(added);
                 Assert.Same(wrapperControl, ((ILogical)added).LogicalParent);
-                Assert.Equal(3, ((ILogical)wrapperControl).LogicalChildren.Count);
+                Assert.Collection(
+                    ((ILogical)wrapperControl).LogicalChildren,
+                    child => Assert.Same(renderedRoot, child),
+                    child => Assert.Same(content[0], child),
+                    child => Assert.Same(content[1], child),
+                    child => Assert.Same(added, child));
 
                 content.Remove(added);
                 Assert.Null(((ILogical)added).LogicalParent);
-                Assert.Equal(2, ((ILogical)wrapperControl).LogicalChildren.Count);
+                Assert.Collection(
+                    ((ILogical)wrapperControl).LogicalChildren,
+                    child => Assert.Same(renderedRoot, child),
+                    child => Assert.Same(content[0], child),
+                    child => Assert.Same(content[1], child));
 
                 window.Close();
             },

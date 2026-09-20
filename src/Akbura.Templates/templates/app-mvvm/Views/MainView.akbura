@@ -1,0 +1,176 @@
+using AkburaTemplateNamespace.ViewModels;
+
+namespace AkburaTemplateNamespace.Views;
+
+@akcss {
+    Border.card {
+        @apply p-5
+               rounded-lg
+               border-1
+               bg-slate-50
+               border-slate-200;
+
+        @if(ActualThemeVariant == ThemeVariant.Dark) {
+            @apply bg-slate-900
+                   border-slate-700;
+        }
+    }
+
+    Border.featured {
+        @apply bg-blue-50
+               border-blue-200;
+
+        @if(ActualThemeVariant == ThemeVariant.Dark) {
+            @apply bg-slate-900
+                   border-blue-800;
+        }
+    }
+
+    StackPanel.cardBody {
+        @apply gap-3;
+    }
+
+    TextBlock.pageTitle {
+        @apply text-4xl
+               font-bold;
+    }
+
+    TextBlock.pageDescription {
+        @apply text-base;
+        Opacity: 0.75d;
+    }
+
+    TextBlock.cardLabel {
+        @apply text-xs
+               font-semibold
+               text-blue-600;
+
+        @if(ActualThemeVariant == ThemeVariant.Dark) {
+            @apply text-blue-400;
+        }
+    }
+
+    TextBlock.cardTitle {
+        @apply text-xl
+               font-semibold;
+    }
+
+    TextBlock.cardBodyText {
+        @apply text-sm;
+        Opacity: 0.8d;
+    }
+
+    TextBlock.metric {
+        @apply text-4xl
+               font-bold;
+    }
+
+    Button.action {
+        @apply px-4
+               py-2;
+    }
+}
+
+<ScrollViewer
+    x.DataType="MainViewModel"
+    HorizontalScrollBarVisibility="Disabled"
+    VerticalScrollBarVisibility="Auto"
+    HorizontalContentAlignment="Stretch">
+
+    <Border
+        MaxWidth="1200"
+        HorizontalAlignment="Stretch"
+        p-4
+        ${sm}:p-6
+        ${md}:p-8>
+
+        <StackPanel gap-5>
+
+            <StackPanel gap-2>
+                <TextBlock class="pageTitle" Text="Welcome to Akbura MVVM" />
+                <TextBlock
+                    class="pageDescription"
+                    Text="Typed bindings, commands, reusable components and responsive AKCSS."
+                    TextWrapping="Wrap" />
+            </StackPanel>
+
+            <Row Columns="12" gap-4 ${md}:gap-6>
+
+                <Border class="card featured" col-span-12 ${md}:col-span-8>
+                    <StackPanel class="cardBody">
+                        <TextBlock class="cardLabel" Text="MVVM / COMMANDS" />
+                        <TextBlock class="cardTitle" Text="ViewModel owns the counter." />
+                        <TextBlock class="metric" Text=${Binding CountText} />
+                        <TextBlock
+                            class="cardBodyText"
+                            Text="PropertyChanged updates this view; ICommand controls the buttons."
+                            TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" gap-2>
+                            <Button class="action" Command=${Binding IncrementCommand}>Increase</Button>
+                            <Button class="action" Command=${Binding ResetCounterCommand}>Reset</Button>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border class="card" col-span-12 ${sm}:col-span-6 ${md}:col-span-4>
+                    <StackPanel class="cardBody">
+                        <TextBlock class="cardLabel" Text="TWO-WAY BINDING" />
+                        <TextBlock class="cardTitle" Text="Try another name." />
+                        <TextBox Text=${Binding UserName, Mode=TwoWay} PlaceholderText="Your name" />
+                        <TextBlock Text=${Binding Greeting} TextWrapping="Wrap" />
+                        <Button
+                            class="action"
+                            Command=${Binding UseExampleNameCommand}>
+                            Use example name
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <Border class="card" col-span-12 ${sm}:col-span-6 ${md}:col-span-4>
+                    <StackPanel class="cardBody">
+                        <TextBlock class="cardLabel" Text="TYPED BINDINGS" />
+                        <TextBlock class="cardTitle" Text="MainViewModel is the contract." />
+                        <TextBlock
+                            class="cardBodyText"
+                            Text="x.DataType checks binding paths. App assigns the runtime DataContext."
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <Border class="card" col-span-12 ${sm}:col-span-6 ${md}:col-span-4>
+                    <StackPanel class="cardBody">
+                        <TextBlock class="cardLabel" Text="COMPONENTS" />
+                        <TextBlock class="cardTitle" Text="Reuse a bound greeting." />
+                        <GreetingCard Message=${Binding Greeting} />
+                    </StackPanel>
+                </Border>
+
+                <Border class="card" col-span-12 ${sm}:col-span-6 ${md}:col-span-4>
+                    <StackPanel class="cardBody">
+                        <TextBlock class="cardLabel" Text="RESPONSIVE / AKCSS" />
+                        <TextBlock class="cardTitle" Text="Resize the window." />
+                        <TextBlock
+                            class="cardBodyText"
+                            Text="Row, col-span utilities, responsive prefixes and local AKCSS reshape these cards."
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <Border class="card" col-span-12>
+                    <StackPanel class="cardBody">
+                        <TextBlock class="cardLabel" Text="DEVELOPER TOOLS" />
+                        <TextBlock class="cardTitle" Text="Two diagnostics views, two perspectives." />
+                        <TextBlock
+                            class="cardBodyText"
+                            Text="In a Desktop Debug build, use F12 for Avalonia Developer Tools and Ctrl+F12 for Akbura Diagnostics."
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+            </Row>
+
+        </StackPanel>
+
+    </Border>
+
+</ScrollViewer>

@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>TemplateTargetFramework</TargetFramework>
+    <RootNamespace>AkburaTemplateNamespace</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Folder Include="Models\" />
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Akbura" Version="$(AkburaVersion)" />
+    <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Desktop" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="$(AvaloniaVersion)" />
+    <!--#if (UseCommunityToolkit)-->
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="$(CommunityToolkitMvvmVersion)" />
+    <!--#endif-->
+    <!--#if (UseReactiveUI)-->
+    <PackageReference Include="ReactiveUI.Avalonia" Version="$(ReactiveUIAvaloniaVersion)" />
+    <!--#endif-->
+    <!--#if (UseMicrosoftDI)-->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="$(MicrosoftExtensionsDependencyInjectionVersion)" />
+    <!--#endif-->
+    <!--#if (UseSplat)-->
+    <PackageReference Include="Splat" Version="$(SplatVersion)" />
+    <!--#endif-->
+  </ItemGroup>
+
+  <!--/-:msbuild-conditional:noEmit -->
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <PackageReference Include="Akbura.Diagnostics" Version="$(AkburaVersion)" PrivateAssets="all" />
+    <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="$(AvaloniaDiagnosticsSupportVersion)" PrivateAssets="all" />
+  </ItemGroup>
+  <!--/+:msbuild-conditional:noEmit -->
+
+</Project>

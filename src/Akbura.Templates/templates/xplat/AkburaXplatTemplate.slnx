@@ -1,0 +1,11 @@
+<Solution>
+  <Project Path="AkburaRawProjectNamePlaceholder.Android/AkburaRawProjectNamePlaceholder.Android.csproj">
+    <Deploy />
+  </Project>
+  <Project Path="AkburaRawProjectNamePlaceholder.Browser/AkburaRawProjectNamePlaceholder.Browser.csproj" />
+  <Project Path="AkburaRawProjectNamePlaceholder.Desktop/AkburaRawProjectNamePlaceholder.Desktop.csproj" />
+  <Project Path="AkburaRawProjectNamePlaceholder.iOS/AkburaRawProjectNamePlaceholder.iOS.csproj">
+    <Deploy />
+  </Project>
+  <Project Path="AkburaRawProjectNamePlaceholder/AkburaRawProjectNamePlaceholder.csproj" />
+</Solution>

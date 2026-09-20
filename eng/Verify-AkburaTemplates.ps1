@@ -39,12 +39,20 @@ function Assert-Condition {
 $feedPath = [IO.Path]::GetFullPath($Feed)
 $workingPath = [IO.Path]::GetFullPath($WorkingDirectory)
 $smokeRoot = Join-Path $workingPath (
-    "akbura-template-smoke-" + [Guid]::NewGuid().ToString("N"))
+    "at-" + [Guid]::NewGuid().ToString("N").Substring(0, 8))
 $hivePath = Join-Path $smokeRoot "hive"
 $projectsPath = Join-Path $smokeRoot "projects"
 $packagesPath = Join-Path $smokeRoot "packages"
 $templatePackage = Join-Path $feedPath "Akbura.Templates.$Version.nupkg"
 $diagnosticsPackage = Join-Path $feedPath "Akbura.Diagnostics.$Version.nupkg"
+$legacyMainView = Join-Path $PSScriptRoot (
+    "../src/Akbura.Templates/templates/app/Views/MainView.akbura")
+$legacyMainViewHash = "EA84C6F09A33FA88C59F0DB927949C4B4BD83EBD48CB3319828F91BD192FB15A"
+
+Assert-Condition ((Get-FileHash -Algorithm SHA256 -LiteralPath $legacyMainView).Hash -eq
+    $legacyMainViewHash) (
+    "The state-based akbura.app MainView changed. Keep this template independent " +
+    "from the new MVVM templates.")
 
 Assert-Condition (Test-Path -LiteralPath $templatePackage -PathType Leaf) (
     "Template package does not exist: $templatePackage")
@@ -64,6 +72,22 @@ try {
         "content/templates/app/GlobalUsings.akcss",
         "content/templates/app/README.md",
         "content/templates/app/Views/MainView.akbura",
+        "content/templates/app-mvvm/.template.config/template.json",
+        "content/templates/app-mvvm/.template.config/dotnetcli.host.json",
+        "content/templates/app-mvvm/.template.config/ide.host.json",
+        "content/templates/app-mvvm/Views/MainView.akbura",
+        "content/templates/app-mvvm/Variants/CommunityToolkit/ViewModels/MainViewModel.cs",
+        "content/templates/app-mvvm/Variants/ReactiveUI/ViewModels/MainViewModel.cs",
+        "content/templates/xplat/.template.config/template.json",
+        "content/templates/xplat/.template.config/dotnetcli.host.json",
+        "content/templates/xplat/.template.config/ide.host.json",
+        "content/templates/xplat/AkburaXplatTemplate.slnx",
+        "content/templates/xplat/AkburaXplatTemplate/AkburaXplatTemplate.csproj",
+        "content/templates/xplat/AkburaXplatTemplate/Views/MainView.akbura",
+        "content/templates/xplat/AkburaXplatTemplate.Desktop/AkburaXplatTemplate.Desktop.csproj",
+        "content/templates/xplat/AkburaXplatTemplate.Browser/AkburaXplatTemplate.Browser.csproj",
+        "content/templates/xplat/AkburaXplatTemplate.Android/AkburaXplatTemplate.Android.csproj",
+        "content/templates/xplat/AkburaXplatTemplate.iOS/AkburaXplatTemplate.iOS.csproj",
         "content/templates/component/.template.config/template.json",
         "content/templates/partial-component/.template.config/template.json",
         "content/templates/partial-component/NewComponent.akbura",
@@ -98,35 +122,38 @@ try {
         $metadata.packageTypes.packageType.name -eq "Template") (
         "Template package does not declare the Template package type.")
 
-    $configurationEntry = $archive.GetEntry(
-        "content/templates/app/.template.config/template.json")
-    $configurationReader = [IO.StreamReader]::new(
-        $configurationEntry.Open())
-    try {
-        $configuration = $configurationReader.ReadToEnd() |
-            ConvertFrom-Json
-    }
-    finally {
-        $configurationReader.Dispose()
-    }
+    foreach ($template in @("app", "app-mvvm", "xplat")) {
+        $configurationEntry = $archive.GetEntry(
+            "content/templates/$template/.template.config/template.json")
+        $configurationReader = [IO.StreamReader]::new(
+            $configurationEntry.Open())
+        try {
+            $configuration = $configurationReader.ReadToEnd() |
+                ConvertFrom-Json
+        }
+        finally {
+            $configurationReader.Dispose()
+        }
 
-    Assert-Condition (
-        $configuration.symbols.AkburaVersion.defaultValue -eq $Version) (
-        "App template targets Akbura " +
-        "'$($configuration.symbols.AkburaVersion.defaultValue)', " +
-        "expected '$Version'.")
-    Assert-Condition (
-        $configuration.symbols.AvaloniaVersion.defaultValue -eq
-            $AvaloniaVersion) (
-        "App template targets Avalonia " +
-        "'$($configuration.symbols.AvaloniaVersion.defaultValue)', " +
-        "expected '$AvaloniaVersion'.")
+        Assert-Condition (
+            $configuration.symbols.AkburaVersion.defaultValue -eq $Version) (
+            "$template template targets Akbura " +
+            "'$($configuration.symbols.AkburaVersion.defaultValue)', " +
+            "expected '$Version'.")
+        Assert-Condition (
+            $configuration.symbols.AvaloniaVersion.defaultValue -eq
+                $AvaloniaVersion) (
+            "$template template targets Avalonia " +
+            "'$($configuration.symbols.AvaloniaVersion.defaultValue)', " +
+            "expected '$AvaloniaVersion'.")
+    }
 
     $unexpectedEntries = @(
         $entries |
             Where-Object {
                 $_ -match "(^|/)(bin|obj)/" -or
-                $_ -match "Akbura\.Templates\.dll$"
+                $_ -match "Akbura\.Templates\.dll$" -or
+                $_ -match "^content/templates/csharp/"
             })
     Assert-Condition ($unexpectedEntries.Count -eq 0) (
         "Template package contains build output: " +
@@ -210,6 +237,30 @@ Assert-Condition ($null -ne $nugetConfig) (
 Invoke-DotNet nuget add source $feedPath `
     --name AkburaTemplateVerification `
     --configfile $nugetConfig.FullName
+
+# Explicit source mapping keeps local CI packages on the test feed when CPM is
+# enabled, while ordinary third-party dependencies resolve from nuget.org.
+$nugetSettings = [xml] (Get-Content -LiteralPath $nugetConfig.FullName -Raw)
+$mapping = $nugetSettings.CreateElement("packageSourceMapping")
+$localSource = $nugetSettings.CreateElement("packageSource")
+$localSource.SetAttribute("key", "AkburaTemplateVerification")
+$localPattern = $nugetSettings.CreateElement("package")
+$localPattern.SetAttribute("pattern", "Akbura*")
+[void] $localSource.AppendChild($localPattern)
+[void] $mapping.AppendChild($localSource)
+$remoteSource = $nugetSettings.CreateElement("packageSource")
+$nugetSource = $nugetSettings.SelectSingleNode(
+    "//*[local-name()='packageSources']" +
+    "/*[local-name()='add' and contains(@value, 'nuget.org')]")
+Assert-Condition ($null -ne $nugetSource) (
+    "The isolated NuGet.Config has no nuget.org package source.")
+$remoteSource.SetAttribute("key", $nugetSource.GetAttribute("key"))
+$remotePattern = $nugetSettings.CreateElement("package")
+$remotePattern.SetAttribute("pattern", "*")
+[void] $remoteSource.AppendChild($remotePattern)
+[void] $mapping.AppendChild($remoteSource)
+[void] $nugetSettings.configuration.AppendChild($mapping)
+$nugetSettings.Save($nugetConfig.FullName)
 
 $cases = @(
     [pscustomobject] @{
@@ -554,5 +605,12 @@ foreach ($case in $cases) {
             "$($case.Name) Release deps.json contains diagnostics.")
     }
 }
+
+& (Join-Path $PSScriptRoot "Verify-AkburaNewTemplates.ps1") `
+    -Version $Version `
+    -Hive $hivePath `
+    -Projects $projectsPath `
+    -NuGetConfig $nugetConfig.FullName `
+    -Packages $packagesPath
 
 Write-Host "Verified Akbura.Templates $Version in $smokeRoot"

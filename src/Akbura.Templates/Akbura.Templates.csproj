@@ -8,7 +8,7 @@
 		<PackageId>Akbura.Templates</PackageId>
 
 		<Title>Akbura Templates</Title>
-		<Description>Desktop application and component templates for Akbura.</Description>
+		<Description>Desktop, cross-platform, MVVM, and component templates for Akbura.</Description>
 		<PackageTags>dotnet-new;templates;akbura;avalonia</PackageTags>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageLicenseFile>LICENSE.txt</PackageLicenseFile>

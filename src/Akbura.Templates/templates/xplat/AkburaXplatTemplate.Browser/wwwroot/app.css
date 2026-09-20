@@ -1,0 +1,35 @@
+html, body, #out {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    overflow: hidden;
+    font-family: system-ui, sans-serif;
+}
+
+.akbura-splash {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: #0f172a;
+    background: #f8fafc;
+}
+
+@media (prefers-color-scheme: dark) {
+    .akbura-splash {
+        color: #f8fafc;
+        background: #0f172a;
+    }
+}
+
+.akbura-splash.splash-close {
+    transition: opacity 200ms;
+    opacity: 0;
+    pointer-events: none;
+}

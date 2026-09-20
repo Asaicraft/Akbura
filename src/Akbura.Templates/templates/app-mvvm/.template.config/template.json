@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json.schemastore.org/template",
+  "author": "Asaicraft",
+  "classifications": ["Desktop", "Avalonia", "Akbura", "MVVM", "Windows", "Linux", "macOS"],
+  "identity": "Asaicraft.Akbura.App.Mvvm.CSharp",
+  "groupIdentity": "Akbura.App.Mvvm",
+  "name": "Akbura .NET MVVM App",
+  "description": "An Akbura desktop application with typed MVVM bindings and AKCSS.",
+  "shortName": "akbura.mvvm",
+  "sourceName": "AkburaMvvmTemplate",
+  "defaultName": "AkburaApplication",
+  "preferNameDirectory": true,
+  "tags": { "language": "C#", "type": "project" },
+  "symbols": {
+    "RootNamespace": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "safe_namespace",
+      "replaces": "AkburaTemplateNamespace"
+    },
+    "Framework": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "net10.0",
+      "replaces": "TemplateTargetFramework",
+      "description": "Target framework.",
+      "choices": [{ "choice": "net10.0", "description": ".NET 10" }]
+    },
+    "MVVMToolkit": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "CommunityToolkit",
+      "description": "MVVM toolkit.",
+      "choices": [
+        { "choice": "CommunityToolkit", "description": "CommunityToolkit.Mvvm" },
+        { "choice": "ReactiveUI", "description": "ReactiveUI.Avalonia" }
+      ]
+    },
+    "UseCommunityToolkit": {
+      "type": "computed",
+      "value": "(MVVMToolkit == \"CommunityToolkit\")"
+    },
+    "UseReactiveUI": {
+      "type": "computed",
+      "value": "(MVVMToolkit == \"ReactiveUI\")"
+    },
+    "AkburaVersion": {
+      "type": "parameter",
+      "datatype": "text",
+      "defaultValue": "12.0.4-alpha.6",
+      "replaces": "AkburaVersionTemplateParameter",
+      "description": "Version used for Akbura and Akbura.Diagnostics."
+    },
+    "AvaloniaVersion": {
+      "type": "parameter",
+      "datatype": "text",
+      "defaultValue": "12.0.4",
+      "replaces": "AvaloniaVersionTemplateParameter",
+      "description": "Avalonia package version."
+    },
+    "RemoveViewLocator": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "Remove the optional typed ViewLocator DataTemplate."
+    },
+    "UseCentralPackageManagement": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "Use Directory.Packages.props for NuGet versions."
+    },
+    "DependencyInjection": {
+      "type": "parameter",
+      "datatype": "choice",
+      "defaultValue": "None",
+      "description": "Dependency injection provider.",
+      "choices": [
+        { "choice": "None", "description": "Manual composition" },
+        { "choice": "Microsoft.Extensions.DependencyInjection", "description": "Microsoft DI" },
+        { "choice": "Splat.Locator", "description": "Splat locator" }
+      ]
+    },
+    "UseMicrosoftDI": {
+      "type": "computed",
+      "value": "(DependencyInjection == \"Microsoft.Extensions.DependencyInjection\")"
+    },
+    "UseSplat": {
+      "type": "computed",
+      "value": "(DependencyInjection == \"Splat.Locator\")"
+    },
+    "UseDI": {
+      "type": "computed",
+      "value": "(UseMicrosoftDI || UseSplat)"
+    },
+    "skipRestore": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "Skip automatic package restore."
+    },
+    "HostIdentifier": {
+      "type": "bind",
+      "binding": "HostIdentifier"
+    }
+  },
+  "sources": [
+    {
+      "source": "./",
+      "target": "./",
+      "modifiers": [
+        {
+          "condition": "true",
+          "exclude": ["Variants/**", "bin/**", "obj/**", ".vs/**", ".idea/**"]
+        },
+        {
+          "condition": "(RemoveViewLocator)",
+          "exclude": ["App.axaml", "ViewLocator.cs"],
+          "rename": { "App.RemoveViewLocator.axaml": "App.axaml" }
+        },
+        {
+          "condition": "(!RemoveViewLocator)",
+          "exclude": ["App.RemoveViewLocator.axaml"]
+        },
+        {
+          "condition": "(!UseSplat)",
+          "exclude": ["Infrastructure/SplatServiceProvider.cs"]
+        }
+      ]
+    },
+    {
+      "condition": "(UseCommunityToolkit)",
+      "source": "./Variants/CommunityToolkit/",
+      "target": "./"
+    },
+    {
+      "condition": "(UseReactiveUI)",
+      "source": "./Variants/ReactiveUI/",
+      "target": "./"
+    },
+    {
+      "condition": "(UseCentralPackageManagement)",
+      "source": "./Variants/Cpm/",
+      "target": "./"
+    },
+    {
+      "condition": "(!UseCentralPackageManagement)",
+      "source": "./Variants/NoCpm/",
+      "target": "./"
+    }
+  ],
+  "primaryOutputs": [
+    { "path": "AkburaMvvmTemplate.csproj" },
+    {
+      "condition": "(HostIdentifier != \"dotnetcli\" && HostIdentifier != \"dotnetcli-preview\")",
+      "path": "Views/MainView.akbura"
+    },
+    {
+      "condition": "(HostIdentifier != \"dotnetcli\" && HostIdentifier != \"dotnetcli-preview\")",
+      "path": "ViewModels/MainViewModel.cs"
+    }
+  ],
+  "postActions": [
+    {
+      "id": "restore",
+      "condition": "(!skipRestore)",
+      "description": "Restore NuGet packages.",
+      "manualInstructions": [{ "text": "Run dotnet restore." }],
+      "actionId": "210D431B-A78B-4D2F-B762-4ED3E3EA9025",
+      "continueOnError": true
+    },
+    {
+      "id": "editor",
+      "condition": "(HostIdentifier != \"dotnetcli\" && HostIdentifier != \"dotnetcli-preview\")",
+      "description": "Open MainView and MainViewModel in the editor.",
+      "manualInstructions": [],
+      "actionId": "84C0DA21-51C8-4541-9940-6CA19AF04EE6",
+      "args": { "files": "1;2" },
+      "continueOnError": true
+    }
+  ]
+}

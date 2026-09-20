@@ -1,0 +1,81 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TemplateKind)' == 'xplat'">
+    <DefineConstants>$(DefineConstants);XPLAT_TEMPLATE</DefineConstants>
+    <TemplatePageType Condition="'$(TemplatePageType)' == ''">None</TemplatePageType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TemplateToolkit)' == 'ReactiveUI'">
+    <DefineConstants>$(DefineConstants);TEMPLATE_REACTIVE_UI</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TemplateDependencyInjection)' != '' And '$(TemplateDependencyInjection)' != 'None'">
+    <DefineConstants>$(DefineConstants);TEMPLATE_DI</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TemplateStartupProbe)' == 'true'">
+    <DefineConstants>$(DefineConstants);TEMPLATE_STARTUP</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Headless" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TemplateProject)' != ''">
+    <ProjectReference Include="$(TemplateProject)" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TemplateKind)' == 'xplat'">
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>AkburaTemplatePageType</_Parameter1>
+      <_Parameter2>$(TemplatePageType)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>AkburaTemplateDependencyInjection</_Parameter1>
+      <_Parameter2>$(TemplateDependencyInjection)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <Target Name="RequireTemplateProject" BeforeTargets="CoreCompile"
+          Condition="'$(TemplateProject)' == ''">
+    <Error Text="Pass -p:TemplateProject=/absolute/path/to/generated/project.csproj." />
+  </Target>
+
+  <Target Name="RequireTemplateKind" BeforeTargets="CoreCompile"
+          Condition="'$(TemplateKind)' != 'mvvm' And '$(TemplateKind)' != 'xplat'">
+    <Error Text="Pass -p:TemplateKind=mvvm or -p:TemplateKind=xplat." />
+  </Target>
+
+  <Target Name="RequireKnownPageType" BeforeTargets="CoreCompile"
+          Condition="'$(TemplateKind)' == 'xplat' And '$(TemplatePageType)' != 'None' And '$(TemplatePageType)' != 'ContentPage' And '$(TemplatePageType)' != 'TabbedPage' And '$(TemplatePageType)' != 'DrawerPage' And '$(TemplatePageType)' != 'NavigationPage'">
+    <Error Text="Unsupported TemplatePageType '$(TemplatePageType)'." />
+  </Target>
+
+  <Target Name="RequireTemplateToolkit" BeforeTargets="CoreCompile"
+          Condition="'$(TemplateToolkit)' != 'CommunityToolkit' And '$(TemplateToolkit)' != 'ReactiveUI'">
+    <Error Text="Pass -p:TemplateToolkit=CommunityToolkit or -p:TemplateToolkit=ReactiveUI." />
+  </Target>
+
+  <Target Name="RequireTemplateDependencyInjection" BeforeTargets="CoreCompile"
+          Condition="'$(TemplateDependencyInjection)' != 'None' And '$(TemplateDependencyInjection)' != 'Microsoft.Extensions.DependencyInjection' And '$(TemplateDependencyInjection)' != 'Splat.Locator'">
+    <Error Text="Pass a supported -p:TemplateDependencyInjection value." />
+  </Target>
+
+</Project>

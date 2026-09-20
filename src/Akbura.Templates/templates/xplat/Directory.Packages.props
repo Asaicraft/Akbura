@@ -1,0 +1,34 @@
+<Project>
+    <!-- https://learn.microsoft.com/en-us/nuget/consume-packages/central-package-management -->
+    <PropertyGroup>
+        <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    </PropertyGroup>
+    <ItemGroup>
+        <!-- Avalonia packages -->
+        <!-- Important: keep version in sync! -->
+        <PackageVersion Include="Avalonia" Version="AvaloniaVersionTemplateParameter" />
+        <PackageVersion Include="Avalonia.Themes.Fluent" Version="AvaloniaVersionTemplateParameter" />
+        <PackageVersion Include="Avalonia.Fonts.Inter" Version="AvaloniaVersionTemplateParameter" />
+        <PackageVersion Include="Avalonia.Desktop" Version="AvaloniaVersionTemplateParameter" />
+        <PackageVersion Include="Avalonia.iOS" Version="AvaloniaVersionTemplateParameter" />
+        <PackageVersion Include="Avalonia.Browser" Version="AvaloniaVersionTemplateParameter" />
+        <PackageVersion Include="Avalonia.Android" Version="AvaloniaVersionTemplateParameter" />
+        <PackageVersion Include="Akbura" Version="AkburaVersionTemplateParameter" />
+        <PackageVersion Include="Akbura.Diagnostics" Version="AkburaVersionTemplateParameter" />
+        <PackageVersion Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3" />
+        <!--#if (ReactiveUIToolkitChosen) -->
+        <PackageVersion Include="ReactiveUI.Avalonia" Version="12.0.3" />
+        <!--#elif (CommunityToolkitChosen)-->
+
+        <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+        <!--#endif -->
+
+        <!--#if (UseMicrosoftDI) -->
+        <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+        <!--#endif -->
+        <!--#if (UseSplat) -->
+        <PackageVersion Include="Splat" Version="19.4.1" />
+        <!--#endif -->
+        <PackageVersion Include="Xamarin.AndroidX.Core.SplashScreen" Version="1.2.0.2" />
+    </ItemGroup>
+</Project>

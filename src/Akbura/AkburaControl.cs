@@ -1015,17 +1015,19 @@ public abstract partial class AkburaControl : Control, IComponentTree
 
         if (oldChild != null)
         {
+            ((ISetLogicalParent)oldChild).SetParent(null);
+            LogicalChildren.Remove(oldChild);
             VisualChildren.Remove(oldChild);
-            ((ISetInheritanceParent)oldChild).SetParent(null);
         }
 
         if (newChild != null)
         {
-            ((ISetInheritanceParent)newChild).SetParent(this);
+            ((ISetLogicalParent)newChild).SetParent(this);
 
             ApplyStylesToVisualTree(newChild);
 
             VisualChildren.Add(newChild);
+            LogicalChildren.Add(newChild);
         }
     }
 

@@ -1,0 +1,16 @@
+namespace AkburaTemplateNamespace.Components;
+
+param string Message = "";
+
+<Border
+    p-4
+    rounded-lg
+    bg-blue-50
+    ${dark}:bg-slate-800>
+
+    <StackPanel gap-2>
+        <TextBlock Text="GREETING COMPONENT" FontWeight="SemiBold" />
+        <TextBlock Text={Message} TextWrapping="Wrap" />
+    </StackPanel>
+
+</Border>

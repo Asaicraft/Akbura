@@ -1,12 +1,16 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Runtime.ExceptionServices;
 using Akbura.CompilerAnotations;
 using Akbura.ComponentTree;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Data;
+using Avalonia.Data.Converters;
 using Avalonia.LogicalTree;
 using Avalonia.Styling;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Runtime.ExceptionServices;
+using System.Threading;
 
 namespace Akbura.Hooks;
 
@@ -87,7 +91,29 @@ public static class ResourceHooks
     private static bool TryRead(IResourceHost host, object key, out object? value) =>
         host.TryFindResource(key, (host as IThemeVariantHost)?.ActualThemeVariant, out value);
 
-    private static T ConvertValue<T>(object? value, T fallback) => value is T typed ? typed : fallback;
+    private static T ConvertValue<T>(object? value, T fallback)
+    {
+        if (value is null || ReferenceEquals(value, AvaloniaProperty.UnsetValue))
+            return fallback;
+
+        if (value is T typed)
+            return typed;
+
+        var converted = DefaultValueConverter.Instance.Convert(
+            value,
+            typeof(T),
+            parameter: null,
+            CultureInfo.CurrentCulture);
+
+        if (converted is BindingNotification ||
+            converted is null ||
+            ReferenceEquals(converted, AvaloniaProperty.UnsetValue))
+        {
+            return fallback;
+        }
+
+        return converted is T result ? result : fallback;
+    }
 
     private static void PublishStatic<T>(IResourceHost host, object key, T fallback, object? value,
         StaticResourceCache<T> cache, State<T> result, CancellationToken token)

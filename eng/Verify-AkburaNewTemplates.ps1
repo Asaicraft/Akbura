@@ -273,6 +273,15 @@ function Assert-GeneratedTemplate {
                 "$Name$suffix/$Name$suffix.csproj"))) (
                 "$Name is missing the $suffix project.")
         }
+        $androidProject = Join-Path $Directory (
+            "$Name.Android/$Name.Android.csproj")
+        $androidProjectXml = [xml] (
+            Get-Content -LiteralPath $androidProject -Raw)
+        $androidProperties = $androidProjectXml.Project.PropertyGroup
+        Assert-Condition (
+            $androidProperties.UseDefaultPublishRuntimeIdentifier -eq "false") (
+            "$Name Android project does not disable the default publish " +
+            "runtime identifier.")
         $mainViewHosts = @(Get-ChildItem -LiteralPath $Directory -Recurse -Filter MainViewHost.cs)
         Assert-Condition ($mainViewHosts.Count -eq 1) (
             "$Name must have exactly one selected MainViewHost.cs.")

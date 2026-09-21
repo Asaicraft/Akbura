@@ -20,6 +20,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $createdBinaryLogs = [Collections.Generic.List[string]]::new()
+$createdPropertyLogs = [Collections.Generic.List[string]]::new()
 
 if ([string]::IsNullOrWhiteSpace($Toolkit)) {
     $Toolkit = if ($Platform -eq "Browser") {
@@ -88,6 +89,104 @@ function Invoke-DotNetLogged {
     & dotnet @Arguments
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet failed ($LASTEXITCODE): $($Arguments -join ' ')"
+    }
+}
+
+function Get-MSBuildProperties {
+    param(
+        [Parameter(Mandatory)] [string] $Name,
+        [Parameter(Mandatory)] [string] $ProjectPath,
+        [Parameter(Mandatory)] [string] $Configuration,
+        [Parameter(Mandatory)] [string] $SnapshotDirectory
+    )
+
+    $propertyNames = @(
+        "RuntimeIdentifier",
+        "RuntimeIdentifiers",
+        "PublishRuntimeIdentifier",
+        "UseDefaultPublishRuntimeIdentifier",
+        "PublishTrimmed") -join ","
+    $safeName = $Name -replace '[^A-Za-z0-9_.-]', '-'
+    $propertyLog = Join-Path $SnapshotDirectory "$safeName-properties.json"
+    $arguments = @(
+        "msbuild", $ProjectPath,
+        "-nologo",
+        "-p:Configuration=$Configuration",
+        "-getProperty:$propertyNames",
+        "-getResultOutputFile:$propertyLog")
+
+    Invoke-DotNetLogged "$Name-properties" $arguments
+    Assert-Condition (Test-Path -LiteralPath $propertyLog -PathType Leaf) (
+        "MSBuild did not write the property snapshot $propertyLog.")
+    [void] $script:createdPropertyLogs.Add($propertyLog)
+
+    $json = [IO.File]::ReadAllText($propertyLog).Trim()
+    Write-Host "$Name evaluated MSBuild properties:"
+    Write-Host $json
+
+    try {
+        $document = $json | ConvertFrom-Json
+    }
+    catch {
+        throw "MSBuild did not return valid property JSON for $Name. $($_.Exception.Message)"
+    }
+
+    Assert-Condition ($null -ne $document.Properties) (
+        "MSBuild property JSON for $Name has no Properties object.")
+    $document.Properties
+}
+
+function Assert-AndroidRuntimeProperties {
+    param(
+        [Parameter(Mandatory)] [string] $ProjectPath,
+        [Parameter(Mandatory)] [string] $Configuration,
+        [Parameter(Mandatory)] [string] $SnapshotDirectory
+    )
+
+    $name = "Android-$Toolkit-$Configuration"
+    $properties = Get-MSBuildProperties $name $ProjectPath $Configuration $SnapshotDirectory
+    $runtimeIdentifier = [string] $properties.RuntimeIdentifier
+    $runtimeIdentifiersValue = [string] $properties.RuntimeIdentifiers
+    $publishRuntimeIdentifier = [string] $properties.PublishRuntimeIdentifier
+    $useDefaultPublishRuntimeIdentifier =
+        [string] $properties.UseDefaultPublishRuntimeIdentifier
+    $publishTrimmed = [string] $properties.PublishTrimmed
+    $allowedAndroidRuntimeIdentifiers = @(
+        "android-arm",
+        "android-arm64",
+        "android-x86",
+        "android-x64")
+    $runtimeIdentifiers = @($runtimeIdentifiersValue.Split(
+        [char] ';',
+        [StringSplitOptions]::RemoveEmptyEntries) |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { ![string]::IsNullOrWhiteSpace($_) })
+    $invalidRuntimeIdentifiers = @($runtimeIdentifiers | Where-Object {
+        $_ -notin $allowedAndroidRuntimeIdentifiers
+    })
+
+    Assert-Condition ($useDefaultPublishRuntimeIdentifier.Equals(
+        "false",
+        [StringComparison]::OrdinalIgnoreCase)) (
+        "$name must disable host RID inference, but " +
+        "UseDefaultPublishRuntimeIdentifier='$useDefaultPublishRuntimeIdentifier'.")
+    Assert-Condition ([string]::IsNullOrWhiteSpace($runtimeIdentifier)) (
+        "$name unexpectedly selected RuntimeIdentifier '$runtimeIdentifier'.")
+    Assert-Condition ([string]::IsNullOrWhiteSpace($publishRuntimeIdentifier)) (
+        "$name unexpectedly selected PublishRuntimeIdentifier " +
+        "'$publishRuntimeIdentifier'.")
+    Assert-Condition ($runtimeIdentifiers.Count -gt 0) (
+        "$name did not declare any Android RuntimeIdentifiers.")
+    Assert-Condition ($invalidRuntimeIdentifiers.Count -eq 0) (
+        "$name contains unsupported RuntimeIdentifiers: " +
+        "$($invalidRuntimeIdentifiers -join ';').")
+
+    if ($Configuration -eq "Release") {
+        Assert-Condition ($publishTrimmed.Equals(
+            "true",
+            [StringComparison]::OrdinalIgnoreCase)) (
+            "$name must keep Release trimming enabled, but " +
+            "PublishTrimmed='$publishTrimmed'.")
     }
 }
 
@@ -240,6 +339,16 @@ foreach ($configuration in @("Debug", "Release")) {
             "-p:EnableCodeSigning=false")
     }
 
+    if ($Platform -eq "Android") {
+        $snapshotDirectory = if ([string]::IsNullOrWhiteSpace($BinLogDirectory)) {
+            $root
+        }
+        else {
+            $BinLogDirectory
+        }
+        Assert-AndroidRuntimeProperties $project $configuration $snapshotDirectory
+    }
+
     $restoreArguments = @(
         "restore", $project,
         "-p:Configuration=$configuration") +
@@ -302,5 +411,11 @@ Remove-DirectoryWithRetry $root
 foreach ($binaryLog in $createdBinaryLogs) {
     if (Test-Path -LiteralPath $binaryLog) {
         Remove-Item -LiteralPath $binaryLog -Force
+    }
+}
+
+foreach ($propertyLog in $createdPropertyLogs) {
+    if (Test-Path -LiteralPath $propertyLog) {
+        Remove-Item -LiteralPath $propertyLog -Force
     }
 }

@@ -1,6 +1,16 @@
 name: Akbura Templates
 
 on:
+  workflow_dispatch:
+    inputs:
+      verification_mode:
+        description: Template verification depth
+        required: true
+        default: Full
+        type: choice
+        options:
+          - Smoke
+          - Full
   pull_request:
     paths:
       - "src/Akbura.Templates/**"
@@ -39,7 +49,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: akbura-templates-${{ github.ref }}
+  group: akbura-templates-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && inputs.verification_mode || 'Smoke' }}
   cancel-in-progress: true
 
 env:
@@ -47,12 +57,13 @@ env:
   DIAGNOSTICS_PROJECT: src/Akbura.Diagnostics/Akbura.Diagnostics.csproj
   TEMPLATES_PROJECT: src/Akbura.Templates/Akbura.Templates.csproj
   ARTIFACTS_PATH: artifacts/templates
+  VERIFICATION_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.verification_mode || 'Smoke' }}
 
 jobs:
   verify:
     name: Pack and verify templates
     runs-on: ubuntu-24.04
-    timeout-minutes: 240
+    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && inputs.verification_mode == 'Full' && 240 || 90 }}
     permissions:
       contents: read
     outputs:
@@ -145,18 +156,6 @@ jobs:
               -AvaloniaVersion $env:AVALONIA_VERSION `
               -VerifyPackagePath "$env:ARTIFACTS_PATH/Akbura.Templates.$env:VERSION.nupkg"
 
-      - name: Verify generated applications
-        shell: pwsh
-        env:
-          VERSION: ${{ steps.versions.outputs.version }}
-          AVALONIA_VERSION: ${{ steps.versions.outputs.avalonia_version }}
-        run: |
-          ./eng/Verify-AkburaTemplates.ps1 `
-              -Version $env:VERSION `
-              -AvaloniaVersion $env:AVALONIA_VERSION `
-              -Feed $env:ARTIFACTS_PATH `
-              -WorkingDirectory $env:RUNNER_TEMP
-
       - name: Upload template package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -166,11 +165,35 @@ jobs:
           retention-days: 14
           compression-level: 0
 
+      - name: Verify generated applications
+        timeout-minutes: ${{ env.VERIFICATION_MODE == 'Full' && 190 || 60 }}
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.versions.outputs.version }}
+          AVALONIA_VERSION: ${{ steps.versions.outputs.avalonia_version }}
+        run: |
+          ./eng/Verify-AkburaTemplates.ps1 `
+              -Version $env:VERSION `
+              -AvaloniaVersion $env:AVALONIA_VERSION `
+              -Feed $env:ARTIFACTS_PATH `
+              -WorkingDirectory $env:RUNNER_TEMP `
+              -Mode $env:VERIFICATION_MODE `
+              -BinLogDirectory "$env:RUNNER_TEMP/akbura-template-binlogs"
+
+      - name: Upload failed verification binlogs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: akbura-template-binlogs-${{ steps.versions.outputs.version }}-${{ env.VERIFICATION_MODE }}
+          path: ${{ runner.temp }}/akbura-template-binlogs/**
+          if-no-files-found: warn
+          retention-days: 14
+
   browser:
     name: Build and publish packaged xplat Browser
     needs: verify
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && inputs.verification_mode == 'Full' && 90 || 45 }}
     permissions:
       contents: read
 
@@ -196,21 +219,48 @@ jobs:
           path: ${{ runner.temp }}/akbura-template-feed
 
       - name: Verify packaged Browser host
+        timeout-minutes: 25
         shell: pwsh
         env:
           VERSION: ${{ needs.verify.outputs.version }}
         run: |
           ./eng/Verify-AkburaXplatPlatform.ps1 `
               -Platform Browser `
+              -Toolkit ReactiveUI `
               -Version $env:VERSION `
               -Feed "${{ runner.temp }}/akbura-template-feed" `
-              -WorkingDirectory "${{ runner.temp }}"
+              -WorkingDirectory "${{ runner.temp }}" `
+              -BinLogDirectory "${{ runner.temp }}/akbura-template-binlogs-browser"
+
+      - name: Verify packaged Browser host with complementary toolkit
+        if: env.VERIFICATION_MODE == 'Full'
+        timeout-minutes: 25
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          ./eng/Verify-AkburaXplatPlatform.ps1 `
+              -Platform Browser `
+              -Toolkit CommunityToolkit `
+              -Version $env:VERSION `
+              -Feed "${{ runner.temp }}/akbura-template-feed" `
+              -WorkingDirectory "${{ runner.temp }}" `
+              -BinLogDirectory "${{ runner.temp }}/akbura-template-binlogs-browser"
+
+      - name: Upload failed Browser binlogs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: akbura-template-binlogs-browser-${{ needs.verify.outputs.version }}
+          path: ${{ runner.temp }}/akbura-template-binlogs-browser/**
+          if-no-files-found: warn
+          retention-days: 14
 
   android:
     name: Build packaged xplat Android
     needs: verify
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && inputs.verification_mode == 'Full' && 90 || 45 }}
     permissions:
       contents: read
 
@@ -236,21 +286,48 @@ jobs:
           path: ${{ runner.temp }}/akbura-template-feed
 
       - name: Verify packaged Android host
+        timeout-minutes: 25
         shell: pwsh
         env:
           VERSION: ${{ needs.verify.outputs.version }}
         run: |
           ./eng/Verify-AkburaXplatPlatform.ps1 `
               -Platform Android `
+              -Toolkit CommunityToolkit `
               -Version $env:VERSION `
               -Feed "${{ runner.temp }}/akbura-template-feed" `
-              -WorkingDirectory "${{ runner.temp }}"
+              -WorkingDirectory "${{ runner.temp }}" `
+              -BinLogDirectory "${{ runner.temp }}/akbura-template-binlogs-android"
+
+      - name: Verify packaged Android host with complementary toolkit
+        if: env.VERIFICATION_MODE == 'Full'
+        timeout-minutes: 25
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          ./eng/Verify-AkburaXplatPlatform.ps1 `
+              -Platform Android `
+              -Toolkit ReactiveUI `
+              -Version $env:VERSION `
+              -Feed "${{ runner.temp }}/akbura-template-feed" `
+              -WorkingDirectory "${{ runner.temp }}" `
+              -BinLogDirectory "${{ runner.temp }}/akbura-template-binlogs-android"
+
+      - name: Upload failed Android binlogs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: akbura-template-binlogs-android-${{ needs.verify.outputs.version }}
+          path: ${{ runner.temp }}/akbura-template-binlogs-android/**
+          if-no-files-found: warn
+          retention-days: 14
 
   ios:
     name: Build packaged xplat iOS simulator
     needs: verify
     runs-on: macos-26
-    timeout-minutes: 90
+    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && inputs.verification_mode == 'Full' && 180 || 90 }}
     permissions:
       contents: read
     env:
@@ -281,12 +358,39 @@ jobs:
           path: ${{ runner.temp }}/akbura-template-feed
 
       - name: Verify packaged iOS simulator host
+        timeout-minutes: 60
         shell: pwsh
         env:
           VERSION: ${{ needs.verify.outputs.version }}
         run: |
           ./eng/Verify-AkburaXplatPlatform.ps1 `
               -Platform iOS `
+              -Toolkit CommunityToolkit `
               -Version $env:VERSION `
               -Feed "${{ runner.temp }}/akbura-template-feed" `
-              -WorkingDirectory "${{ runner.temp }}"
+              -WorkingDirectory "${{ runner.temp }}" `
+              -BinLogDirectory "${{ runner.temp }}/akbura-template-binlogs-ios"
+
+      - name: Verify packaged iOS simulator host with complementary toolkit
+        if: env.VERIFICATION_MODE == 'Full'
+        timeout-minutes: 60
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          ./eng/Verify-AkburaXplatPlatform.ps1 `
+              -Platform iOS `
+              -Toolkit ReactiveUI `
+              -Version $env:VERSION `
+              -Feed "${{ runner.temp }}/akbura-template-feed" `
+              -WorkingDirectory "${{ runner.temp }}" `
+              -BinLogDirectory "${{ runner.temp }}/akbura-template-binlogs-ios"
+
+      - name: Upload failed iOS binlogs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: akbura-template-binlogs-ios-${{ needs.verify.outputs.version }}
+          path: ${{ runner.temp }}/akbura-template-binlogs-ios/**
+          if-no-files-found: warn
+          retention-days: 14

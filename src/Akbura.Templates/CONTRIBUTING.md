@@ -77,3 +77,43 @@ Page navigation host must receive an actual thin Page shell.
 5. Build/publish platform hosts only where the corresponding .NET workload,
    SDK, simulator, or device exists. Record unavailable environments separately
    from a failed test; no skipped platform is a passed platform.
+
+## Verification modes
+
+`eng/Verify-AkburaTemplates.ps1` defaults to `Smoke`. Both modes generate and
+inspect all 24 MVVM and 120 xplat combinations without restoring or building
+them. This keeps coverage of template conditions, selected files, package
+references, page shells, CPM metadata, and ViewLocator registration inexpensive.
+
+`Smoke` then performs 24 full builds from an explicit scenario list:
+
+- six Debug MVVM builds covering both toolkits and all three DI modes;
+- six Debug xplat `MainView` builds covering both toolkits and all DI modes;
+- eight Debug xplat builds covering four non-default page types with both
+  toolkits;
+- four Release builds covering both templates and both toolkits.
+
+CPM equivalence is checked separately by restoring selected CPM/non-CPM pairs.
+Representative runtime probes cover bindings, commands, DataContext replacement,
+page navigation without ViewLocator, and every DI mode. Pull requests and pushes
+to `master` use this mode.
+
+`Full` retains the extended 136-build matrix and the complete runtime matrix.
+Use it for template-engine changes, dependency upgrades, and release validation:
+
+```powershell
+./eng/Verify-AkburaTemplates.ps1 `
+    -Version VERSION `
+    -AvaloniaVersion AVALONIA_VERSION `
+    -Feed PATH_TO_LOCAL_PACKAGES `
+    -WorkingDirectory PATH_TO_TEMP_DIRECTORY `
+    -Mode Full
+```
+
+The template workflow also exposes `Smoke` and `Full` through
+`workflow_dispatch`. Its regular platform jobs build one representative for
+Browser, Android, and iOS; `Full` additionally builds the complementary toolkit
+so every platform covers both MVVM implementations. NuGet release validation
+always selects `Full`. Successful generated directories are removed. A failed
+restore, build, or test keeps its generated directory and binary log for
+diagnosis.

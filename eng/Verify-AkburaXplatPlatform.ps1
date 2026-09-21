@@ -10,10 +10,29 @@ param(
     [string] $Feed,
 
     [Parameter(Mandatory)]
-    [string] $WorkingDirectory
+    [string] $WorkingDirectory,
+
+    [ValidateSet("CommunityToolkit", "ReactiveUI")]
+    [string] $Toolkit,
+
+    [string] $BinLogDirectory
 )
 
 $ErrorActionPreference = "Stop"
+$createdBinaryLogs = [Collections.Generic.List[string]]::new()
+
+if ([string]::IsNullOrWhiteSpace($Toolkit)) {
+    $Toolkit = if ($Platform -eq "Browser") {
+        "ReactiveUI"
+    }
+    else {
+        "CommunityToolkit"
+    }
+}
+
+if (![string]::IsNullOrWhiteSpace($BinLogDirectory)) {
+    New-Item -ItemType Directory -Path $BinLogDirectory -Force | Out-Null
+}
 
 function Invoke-DotNet {
     & dotnet @args
@@ -25,6 +44,51 @@ function Invoke-DotNet {
 function Assert-Condition {
     param([bool] $Condition, [string] $Message)
     if (!$Condition) { throw $Message }
+}
+
+function Remove-DirectoryWithRetry {
+    param([Parameter(Mandatory)] [string] $Directory)
+
+    $maxAttempts = 120
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        if (!(Test-Path -LiteralPath $Directory)) {
+            return
+        }
+
+        try {
+            [IO.Directory]::Delete($Directory, $true)
+            return
+        }
+        catch {
+            if ($attempt -eq $maxAttempts) {
+                throw
+            }
+            Start-Sleep -Milliseconds 500
+        }
+    }
+}
+
+function Invoke-DotNetLogged {
+    param(
+        [Parameter(Mandatory)] [string] $Name,
+        [Parameter(Mandatory)] [string[]] $Arguments
+    )
+
+    if ($Arguments[0] -in @("build", "test", "publish")) {
+        $Arguments += "-p:UseSharedCompilation=false"
+    }
+
+    if (![string]::IsNullOrWhiteSpace($BinLogDirectory)) {
+        $safeName = $Name -replace '[^A-Za-z0-9_.-]', '-'
+        $binaryLog = Join-Path $BinLogDirectory "$safeName.binlog"
+        $Arguments += "-bl:$binaryLog"
+        [void] $script:createdBinaryLogs.Add($binaryLog)
+    }
+
+    & dotnet @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet failed ($LASTEXITCODE): $($Arguments -join ' ')"
+    }
 }
 
 function Get-PackageGraph {
@@ -53,6 +117,7 @@ foreach ($package in @($templatePackage, $runtimePackage, $diagnosticsPackage)) 
 
 $root = Join-Path $workingPath (
     "akbura-xplat-$($Platform.ToLowerInvariant())-" +
+    "$($Toolkit.ToLowerInvariant())-" +
     [Guid]::NewGuid().ToString("N").Substring(0, 8))
 $hive = Join-Path $root "hive"
 $packages = Join-Path $root "packages"
@@ -79,7 +144,7 @@ $arguments = @(
     "--output", $projectDirectory,
     "--debug:custom-hive", $hive)
 
-if ($Platform -eq "Browser") {
+if ($Platform -eq "Browser" -and $Toolkit -eq "ReactiveUI") {
     $arguments += @(
         "--mvvm", "ReactiveUI",
         "--di", "Microsoft.Extensions.DependencyInjection",
@@ -87,7 +152,15 @@ if ($Platform -eq "Browser") {
         "--remove-view-locator", "false",
         "--main-view-page-type", "None")
 }
-elseif ($Platform -eq "Android") {
+elseif ($Platform -eq "Browser") {
+    $arguments += @(
+        "--mvvm", "CommunityToolkit",
+        "--di", "None",
+        "--cpm", "false",
+        "--remove-view-locator", "true",
+        "--main-view-page-type", "ContentPage")
+}
+elseif ($Platform -eq "Android" -and $Toolkit -eq "CommunityToolkit") {
     $arguments += @(
         "--mvvm", "CommunityToolkit",
         "--di", "Splat.Locator",
@@ -95,13 +168,29 @@ elseif ($Platform -eq "Android") {
         "--remove-view-locator", "true",
         "--main-view-page-type", "NavigationPage")
 }
-else {
+elseif ($Platform -eq "Android") {
+    $arguments += @(
+        "--mvvm", "ReactiveUI",
+        "--di", "Microsoft.Extensions.DependencyInjection",
+        "--cpm", "true",
+        "--remove-view-locator", "false",
+        "--main-view-page-type", "None")
+}
+elseif ($Toolkit -eq "CommunityToolkit") {
     $arguments += @(
         "--mvvm", "CommunityToolkit",
         "--di", "None",
         "--cpm", "true",
         "--remove-view-locator", "false",
         "--main-view-page-type", "ContentPage")
+}
+else {
+    $arguments += @(
+        "--mvvm", "ReactiveUI",
+        "--di", "Splat.Locator",
+        "--cpm", "false",
+        "--remove-view-locator", "true",
+        "--main-view-page-type", "NavigationPage")
 }
 
 Invoke-DotNet @arguments
@@ -151,11 +240,14 @@ foreach ($configuration in @("Debug", "Release")) {
             "-p:EnableCodeSigning=false")
     }
 
-    Invoke-DotNet restore $project `
-        "-p:Configuration=$configuration" `
-        @platformBuildArguments `
-        --configfile $nugetConfig.FullName `
-        --packages $packages
+    $restoreArguments = @(
+        "restore", $project,
+        "-p:Configuration=$configuration") +
+        $platformBuildArguments + @(
+        "--configfile", $nugetConfig.FullName,
+        "--packages", $packages)
+    Invoke-DotNetLogged (
+        "$Platform-$Toolkit-$configuration-restore") $restoreArguments
 
     $graph = @(Get-PackageGraph $project)
     Assert-Condition ($graph -contains "Akbura/$Version") (
@@ -165,8 +257,11 @@ foreach ($configuration in @("Debug", "Release")) {
         Assert-Condition ($graph -contains "Akbura.Diagnostics/$Version" -and
             $graph -contains "AvaloniaUI.DiagnosticsSupport/2.2.3") (
             "$Platform Debug is missing diagnostics dependencies.")
-        Invoke-DotNet build $project --configuration Debug --no-restore `
-            @platformBuildArguments
+        $buildArguments = @(
+            "build", $project,
+            "--configuration", "Debug",
+            "--no-restore") + $platformBuildArguments
+        Invoke-DotNetLogged "$Platform-$Toolkit-Debug-build" $buildArguments
     }
     else {
         Assert-Condition (!(@($graph | Where-Object {
@@ -177,8 +272,11 @@ foreach ($configuration in @("Debug", "Release")) {
 
         if ($Platform -eq "Browser") {
             $publishPath = Join-Path $root "browser-publish"
-            Invoke-DotNet publish $project --configuration Release `
-                --no-restore --output $publishPath
+            Invoke-DotNetLogged "$Platform-$Toolkit-Release-publish" @(
+                "publish", $project,
+                "--configuration", "Release",
+                "--no-restore",
+                "--output", $publishPath)
             Assert-Condition (Test-Path -LiteralPath (
                 Join-Path $publishPath "wwwroot/index.html") -PathType Leaf) (
                 "Browser publish did not produce wwwroot/index.html.")
@@ -187,10 +285,22 @@ foreach ($configuration in @("Debug", "Release")) {
                 "Browser publish did not produce the WebAssembly framework.")
         }
         else {
-            Invoke-DotNet build $project --configuration Release --no-restore `
-                @platformBuildArguments
+            $buildArguments = @(
+                "build", $project,
+                "--configuration", "Release",
+                "--no-restore") + $platformBuildArguments
+            Invoke-DotNetLogged "$Platform-$Toolkit-Release-build" $buildArguments
         }
     }
 }
 
-Write-Host "Verified packaged akbura.xplat $Platform host in Debug and Release."
+Write-Host (
+    "Verified packaged akbura.xplat $Platform/$Toolkit host in Debug and Release.")
+
+Remove-DirectoryWithRetry $root
+
+foreach ($binaryLog in $createdBinaryLogs) {
+    if (Test-Path -LiteralPath $binaryLog) {
+        Remove-Item -LiteralPath $binaryLog -Force
+    }
+}

@@ -9,16 +9,41 @@ param(
     [string] $Feed,
 
     [Parameter(Mandatory)]
-    [string] $WorkingDirectory
+    [string] $WorkingDirectory,
+
+    [ValidateSet("Smoke", "Full")]
+    [string] $Mode = "Smoke",
+
+    [string] $BinLogDirectory
 )
 
 $ErrorActionPreference = "Stop"
+$createdBinaryLogs = [Collections.Generic.List[string]]::new()
+$dotNetLogIndex = 0
+
+if (![string]::IsNullOrWhiteSpace($BinLogDirectory)) {
+    New-Item -ItemType Directory -Path $BinLogDirectory -Force | Out-Null
+}
 
 function Invoke-DotNet {
-    & dotnet @args
+    $arguments = @($args)
+    $command = [string] $arguments[0]
+    if ($command -in @("build", "test", "publish")) {
+        $arguments += "-p:UseSharedCompilation=false"
+    }
+    if (![string]::IsNullOrWhiteSpace($BinLogDirectory) -and
+        $command -in @("restore", "build", "publish", "test", "clean")) {
+        $script:dotNetLogIndex++
+        $binaryLog = Join-Path $BinLogDirectory (
+            "legacy-{0:0000}-{1}.binlog" -f $script:dotNetLogIndex, $command)
+        $arguments += "-bl:$binaryLog"
+        [void] $script:createdBinaryLogs.Add($binaryLog)
+    }
+
+    & dotnet @arguments
 
     if ($LASTEXITCODE -ne 0) {
-        throw "dotnet failed ($LASTEXITCODE): $($args -join ' ')"
+        throw "dotnet failed ($LASTEXITCODE): $($arguments -join ' ')"
     }
 }
 
@@ -33,6 +58,28 @@ function Assert-Condition {
 
     if (!$Condition) {
         throw $Message
+    }
+}
+
+function Remove-DirectoryWithRetry {
+    param([Parameter(Mandatory)] [string] $Directory)
+
+    $maxAttempts = 120
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        if (!(Test-Path -LiteralPath $Directory)) {
+            return
+        }
+
+        try {
+            [IO.Directory]::Delete($Directory, $true)
+            return
+        }
+        catch {
+            if ($attempt -eq $maxAttempts) {
+                throw
+            }
+            Start-Sleep -Milliseconds 500
+        }
     }
 }
 
@@ -611,6 +658,16 @@ foreach ($case in $cases) {
     -Hive $hivePath `
     -Projects $projectsPath `
     -NuGetConfig $nugetConfig.FullName `
-    -Packages $packagesPath
+    -Packages $packagesPath `
+    -Mode $Mode `
+    -BinLogDirectory $BinLogDirectory
 
-Write-Host "Verified Akbura.Templates $Version in $smokeRoot"
+Remove-DirectoryWithRetry $smokeRoot
+
+foreach ($binaryLog in $createdBinaryLogs) {
+    if (Test-Path -LiteralPath $binaryLog) {
+        Remove-Item -LiteralPath $binaryLog -Force
+    }
+}
+
+Write-Host "Verified Akbura.Templates $Version in $Mode mode."

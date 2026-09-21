@@ -269,6 +269,7 @@ jobs:
               -VerifyPackagePath "$env:ARTIFACTS_PATH/Akbura.Templates.$env:VERSION.nupkg"
 
       - name: Verify generated applications
+        timeout-minutes: 180
         shell: pwsh
         env:
           VERSION: ${{ steps.release.outputs.version }}
@@ -278,7 +279,18 @@ jobs:
               -Version $env:VERSION `
               -AvaloniaVersion $env:AVALONIA_VERSION `
               -Feed $env:ARTIFACTS_PATH `
-              -WorkingDirectory $env:RUNNER_TEMP
+              -WorkingDirectory $env:RUNNER_TEMP `
+              -Mode Full `
+              -BinLogDirectory "$env:RUNNER_TEMP/akbura-template-binlogs"
+
+      - name: Upload failed template verification binlogs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: akbura-template-binlogs-${{ steps.release.outputs.version }}-Full
+          path: ${{ runner.temp }}/akbura-template-binlogs/**
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Upload NuGet release packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

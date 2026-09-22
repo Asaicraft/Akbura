@@ -43,6 +43,10 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Test template verification planner
+        shell: pwsh
+        run: ./eng/Test-AkburaTemplateVerificationPlan.ps1
+
       - name: Verify release tag and version
         id: release
         shell: bash
@@ -268,8 +272,9 @@ jobs:
               -AvaloniaVersion $env:AVALONIA_VERSION `
               -VerifyPackagePath "$env:ARTIFACTS_PATH/Akbura.Templates.$env:VERSION.nupkg"
 
-      - name: Verify generated applications
-        timeout-minutes: 180
+      # Release publishing trusts the separately required local Full run.
+      # This bounded CI sample is an additional, replayable safety net.
+      - name: Prepare Sampled template verification plan
         shell: pwsh
         env:
           VERSION: ${{ steps.release.outputs.version }}
@@ -280,14 +285,49 @@ jobs:
               -AvaloniaVersion $env:AVALONIA_VERSION `
               -Feed $env:ARTIFACTS_PATH `
               -WorkingDirectory $env:RUNNER_TEMP `
-              -Mode Full `
+              -Mode Sampled `
+              -PlanOutputPath "$env:RUNNER_TEMP/template-verification-plan.json" `
+              -PlanOnly
+
+      - name: Upload Sampled template verification plan
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: akbura-template-verification-plan-${{ steps.release.outputs.version }}-Sampled
+          path: ${{ runner.temp }}/template-verification-plan.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Run Sampled template verification
+        timeout-minutes: 90
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          AVALONIA_VERSION: ${{ steps.release.outputs.avalonia_version }}
+        run: |
+          ./eng/Verify-AkburaTemplates.ps1 `
+              -Version $env:VERSION `
+              -AvaloniaVersion $env:AVALONIA_VERSION `
+              -Feed $env:ARTIFACTS_PATH `
+              -WorkingDirectory $env:RUNNER_TEMP `
+              -Mode Sampled `
+              -SelectionManifest "$env:RUNNER_TEMP/template-verification-plan.json" `
+              -ReportOutputPath "$env:RUNNER_TEMP/template-verification-report.json" `
               -BinLogDirectory "$env:RUNNER_TEMP/akbura-template-binlogs"
+
+      - name: Upload Sampled template verification report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: akbura-template-verification-report-${{ steps.release.outputs.version }}-Sampled
+          path: ${{ runner.temp }}/template-verification-report.json
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Upload failed template verification binlogs
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: akbura-template-binlogs-${{ steps.release.outputs.version }}-Full
+          name: akbura-template-binlogs-${{ steps.release.outputs.version }}-Sampled
           path: ${{ runner.temp }}/akbura-template-binlogs/**
           if-no-files-found: warn
           retention-days: 30

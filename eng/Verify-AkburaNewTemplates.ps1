@@ -4,11 +4,14 @@ param(
     [Parameter(Mandatory)] [string] $Projects,
     [Parameter(Mandatory)] [string] $NuGetConfig,
     [Parameter(Mandatory)] [string] $Packages,
-    [ValidateSet("Smoke", "Full")] [string] $Mode = "Smoke",
+    [ValidateSet("Sampled", "Smoke", "Full")] [string] $Mode = "Smoke",
+    [Parameter(Mandatory)] [string] $SelectionManifest,
+    [Parameter(Mandatory)] [string] $ReportOutputPath,
     [string] $BinLogDirectory
 )
 
 $ErrorActionPreference = "Stop"
+Import-Module (Join-Path $PSScriptRoot "AkburaTemplateVerificationPlan.psm1") -Force
 
 if (![string]::IsNullOrWhiteSpace($BinLogDirectory)) {
     New-Item -ItemType Directory -Path $BinLogDirectory -Force | Out-Null
@@ -96,6 +99,96 @@ function Remove-SuccessfulDirectory {
     }
 }
 
+$catalog = @(Get-AkburaTemplateCaseCatalog)
+$plan = Read-AkburaTemplateVerificationPlan `
+    -Path $SelectionManifest `
+    -Catalog $catalog
+Assert-Condition ($plan.Mode -eq $Mode) (
+    "Verification plan mode '$($plan.Mode)' does not match '$Mode'.")
+
+$structuralResults = [Collections.Generic.List[object]]::new()
+$structuralResultLookup =
+    [Collections.Generic.Dictionary[string, object]]::new(
+        [StringComparer]::Ordinal)
+foreach ($caseId in @($plan.StructuralCaseIds)) {
+    $result = [pscustomobject] [ordered] @{
+        CaseId = $caseId
+        Status = "Planned"
+        DurationMilliseconds = 0
+    }
+    $structuralResults.Add($result)
+    $structuralResultLookup.Add($caseId, $result)
+}
+
+$executionResults = [Collections.Generic.List[object]]::new()
+$executionResultLookup =
+    [Collections.Generic.Dictionary[string, object]]::new(
+        [StringComparer]::Ordinal)
+foreach ($execution in @($plan.Executions)) {
+    $key = "$($execution.CaseId)|$($execution.Configuration)"
+    $result = [pscustomobject] [ordered] @{
+        CaseId = $execution.CaseId
+        Configuration = $execution.Configuration
+        Status = "Planned"
+        DurationMilliseconds = 0
+    }
+    $executionResults.Add($result)
+    $executionResultLookup.Add($key, $result)
+}
+
+$timings = [ordered] @{
+    StructuralGeneration = 0
+    Restore = 0
+    MainBuild = 0
+    GraphComparisons = 0
+    AdditionalChecks = 0
+    RuntimeProbes = 0
+}
+$reportStartedAtUtc = [DateTimeOffset]::UtcNow
+$currentStructuralResult = $null
+$currentExecutionResult = $null
+
+function Write-VerificationReport {
+    param(
+        [Parameter(Mandatory)] [string] $OverallStatus,
+        [string] $Failure
+    )
+
+    $report = [pscustomobject] [ordered] @{
+        SchemaVersion = 1
+        OverallStatus = $OverallStatus
+        Mode = $Mode
+        StartedAtUtc = $reportStartedAtUtc.ToString("O")
+        CompletedAtUtc = if ($OverallStatus -eq "Running") {
+            $null
+        }
+        else {
+            [DateTimeOffset]::UtcNow.ToString("O")
+        }
+        Failure = $Failure
+        Source = $plan.Source
+        Catalog = $plan.Catalog
+        Counts = [pscustomobject] [ordered] @{
+            StructuralCases = @($plan.StructuralCaseIds).Count
+            MainExecutions = @($plan.Executions).Count
+        }
+        TimingsMilliseconds = [pscustomobject] $timings
+        StructuralCases = @($structuralResults)
+        MainExecutions = @($executionResults)
+    }
+    $fullPath = [IO.Path]::GetFullPath($ReportOutputPath)
+    [IO.Directory]::CreateDirectory((Split-Path -Parent $fullPath)) | Out-Null
+    $json = $report | ConvertTo-Json -Depth 12
+    $json = ($json -replace "`r?`n", "`r`n") + "`r`n"
+    [IO.File]::WriteAllText(
+        $fullPath,
+        $json,
+        [Text.UTF8Encoding]::new($false))
+}
+
+Write-VerificationReport -OverallStatus "Running"
+
+try {
 $templateRoot = Join-Path $PSScriptRoot "../src/Akbura.Templates/templates"
 $sharedSources = @(
     @{ Desktop = "Views/MainView.akbura"; Xplat = "AkburaXplatTemplate/Views/MainView.akbura" },
@@ -451,225 +544,216 @@ $diOptions = @("None", "Microsoft.Extensions.DependencyInjection", "Splat.Locato
 $cpms = @($false, $true)
 $locatorOptions = @($false, $true)
 $pageTypes = @("None", "ContentPage", "TabbedPage", "DrawerPage", "NavigationPage")
-$index = 0
 
-foreach ($kind in @("mvvm", "xplat")) {
-    $pages = if ($kind -eq "mvvm") { @("None") } else { $pageTypes }
-    foreach ($toolkit in $toolkits) {
-        foreach ($di in $diOptions) {
-            foreach ($cpm in $cpms) {
-                foreach ($removeLocator in $locatorOptions) {
-                    foreach ($page in $pages) {
-                        $index++
-                        $name = "Structure" + $index.ToString("000")
-                        $directory = Join-Path $Projects $name
-                        $case = New-TemplateCase $name $kind $toolkit $di $cpm `
-                            $removeLocator $page
-                        New-GeneratedTemplateCase $case $directory
-                        Remove-SuccessfulDirectory $directory
-                        if (($index % 12) -eq 0) {
-                            Write-Host "Verified $index of 144 structural generations."
-                        }
-                    }
-                }
-            }
-        }
-    }
+# CI intentionally runs a bounded, cryptographically sampled subset of the
+# template configuration matrix to reduce feedback time and CI resource use.
+# Sampled CI is a best-effort regression safety net, NOT full validation.
+# Persist the selected cases before execution and replay failures from that
+# plan; never re-sample merely to obtain a green result.
+$catalogLookup = [Collections.Generic.Dictionary[string, object]]::new(
+    [StringComparer]::Ordinal)
+foreach ($case in $catalog) {
+    $catalogLookup.Add($case.Id, $case)
 }
-
-Assert-Condition ($index -eq 144) (
-    "Generated $index cases, expected all 144 new-template combinations.")
-
-$smokeBuildCases = @(
-    New-TemplateCase "MvvmCommunityDefault" "mvvm" "CommunityToolkit" "None" `
-        $false $false "None" @("Debug", "Release")
-    New-TemplateCase "MvvmCommunityMicrosoft" "mvvm" "CommunityToolkit" `
-        "Microsoft.Extensions.DependencyInjection" $true $true "None" @("Debug")
-    New-TemplateCase "MvvmCommunitySplat" "mvvm" "CommunityToolkit" `
-        "Splat.Locator" $false $true "None" @("Debug")
-    New-TemplateCase "MvvmReactiveNone" "mvvm" "ReactiveUI" "None" `
-        $true $false "None" @("Debug")
-    New-TemplateCase "MvvmReactiveMicrosoft" "mvvm" "ReactiveUI" `
-        "Microsoft.Extensions.DependencyInjection" $false $true "None" @("Debug")
-    New-TemplateCase "MvvmReactiveSplat" "mvvm" "ReactiveUI" "Splat.Locator" `
-        $true $false "None" @("Debug", "Release")
-
-    New-TemplateCase "XplatCommunityDefault" "xplat" "CommunityToolkit" "None" `
-        $true $false "None" @("Debug", "Release")
-    New-TemplateCase "XplatCommunityMicrosoft" "xplat" "CommunityToolkit" `
-        "Microsoft.Extensions.DependencyInjection" $false $true "None" @("Debug")
-    New-TemplateCase "XplatCommunitySplat" "xplat" "CommunityToolkit" `
-        "Splat.Locator" $true $true "None" @("Debug")
-    New-TemplateCase "XplatReactiveNone" "xplat" "ReactiveUI" "None" `
-        $false $false "None" @("Debug")
-    New-TemplateCase "XplatReactiveMicrosoft" "xplat" "ReactiveUI" `
-        "Microsoft.Extensions.DependencyInjection" $true $true "None" @("Debug")
-    New-TemplateCase "XplatReactiveSplat" "xplat" "ReactiveUI" "Splat.Locator" `
-        $false $false "None" @("Debug", "Release")
-
-    New-TemplateCase "ContentCommunity" "xplat" "CommunityToolkit" "None" `
-        $false $false "ContentPage" @("Debug")
-    New-TemplateCase "ContentReactive" "xplat" "ReactiveUI" "None" `
-        $true $true "ContentPage" @("Debug")
-    New-TemplateCase "TabbedCommunity" "xplat" "CommunityToolkit" "None" `
-        $true $false "TabbedPage" @("Debug")
-    New-TemplateCase "TabbedReactive" "xplat" "ReactiveUI" "None" `
-        $false $true "TabbedPage" @("Debug")
-    New-TemplateCase "DrawerCommunity" "xplat" "CommunityToolkit" "None" `
-        $false $true "DrawerPage" @("Debug")
-    New-TemplateCase "DrawerReactive" "xplat" "ReactiveUI" "None" `
-        $true $false "DrawerPage" @("Debug")
-    New-TemplateCase "NavigationCommunity" "xplat" "CommunityToolkit" "None" `
-        $true $true "NavigationPage" @("Debug")
-    New-TemplateCase "NavigationReactive" "xplat" "ReactiveUI" "None" `
-        $false $true "NavigationPage" @("Debug")
-)
-
-$fullBuildCases = @()
-if ($Mode -eq "Full") {
-    $fullIndex = 0
-    foreach ($kind in @("mvvm", "xplat")) {
-        $pages = if ($kind -eq "mvvm") { @("None") } else { $pageTypes }
-        foreach ($toolkit in $toolkits) {
-            foreach ($di in $diOptions) {
-                foreach ($cpm in $cpms) {
-                    foreach ($removeLocator in $locatorOptions) {
-                        foreach ($page in $pages) {
-                            $build = ($kind -eq "mvvm") -or ($page -eq "None") -or
-                                ($di -eq "None") -or
-                                ($page -eq "NavigationPage" -and $removeLocator)
-                            if (!$build) {
-                                continue
-                            }
-
-                            $fullIndex++
-                            $configurations = if ($kind -eq "mvvm" -or
-                                $page -eq "None") {
-                                @("Debug", "Release")
-                            }
-                            else {
-                                @("Debug")
-                            }
-                            $fullBuildCases += New-TemplateCase (
-                                "Full" + $fullIndex.ToString("000")) $kind $toolkit `
-                                $di $cpm $removeLocator $page $configurations
-                        }
-                    }
-                }
-            }
-        }
-    }
+$executionsByCase =
+    [Collections.Generic.Dictionary[string, Collections.Generic.List[string]]]::new(
+        [StringComparer]::Ordinal)
+foreach ($caseId in @($plan.StructuralCaseIds)) {
+    $executionsByCase.Add(
+        $caseId,
+        [Collections.Generic.List[string]]::new())
 }
-
-$buildCases = if ($Mode -eq "Full") {
-    $fullBuildCases
-}
-else {
-    $smokeBuildCases
+foreach ($execution in @($plan.Executions)) {
+    $executionsByCase[$execution.CaseId].Add($execution.Configuration)
 }
 
 $graphs = @{}
 $buildCount = 0
-$expectedBuildCount = if ($Mode -eq "Full") { 136 } else { 24 }
-foreach ($case in $buildCases) {
+$structuralCount = 0
+$expectedStructuralCount = @($plan.StructuralCaseIds).Count
+$expectedBuildCount = @($plan.Executions).Count
+foreach ($caseId in @($plan.StructuralCaseIds)) {
+    $structuralCount++
+    $caseDefinition = $catalogLookup[$caseId]
+    $name = "Matrix" + $structuralCount.ToString("000")
+    $configurations = @($executionsByCase[$caseId])
+    $case = New-TemplateCase $name $caseDefinition.Kind `
+        $caseDefinition.Toolkit $caseDefinition.DependencyInjection `
+        ([bool] $caseDefinition.Cpm) `
+        ([bool] $caseDefinition.RemoveViewLocator) `
+        $caseDefinition.PageType $configurations
     $binaryLogStart = $createdBinaryLogs.Count
-    $directory = Join-Path $Projects ("build-" + $case.Name)
-    New-GeneratedTemplateCase $case $directory
-    $projectPath = Get-BuildProjectPath $case $directory
-    Assert-Condition (Test-Path -LiteralPath $projectPath -PathType Leaf) (
-        "$($case.Name) does not contain build entry point $projectPath.")
+    $directory = Join-Path $Projects ("matrix-" + $name)
+    $currentStructuralResult = $structuralResultLookup[$caseId]
+    $currentStructuralResult.Status = "Running"
+    $structuralStopwatch = [Diagnostics.Stopwatch]::StartNew()
+    try {
+        New-GeneratedTemplateCase $case $directory
+        $currentStructuralResult.Status = "Passed"
+    }
+    finally {
+        $structuralStopwatch.Stop()
+        $currentStructuralResult.DurationMilliseconds =
+            $structuralStopwatch.ElapsedMilliseconds
+        $timings.StructuralGeneration +=
+            $structuralStopwatch.ElapsedMilliseconds
+    }
+    $currentStructuralResult = $null
 
-    foreach ($configuration in $case.Configurations) {
+    if (($structuralCount % 12) -eq 0 -or
+        $structuralCount -eq $expectedStructuralCount) {
+        Write-Host (
+            "Verified $structuralCount of $expectedStructuralCount " +
+            "$Mode structural generations.")
+    }
+
+    if ($configurations.Count -gt 0) {
+        $projectPath = Get-BuildProjectPath $case $directory
+        Assert-Condition (Test-Path -LiteralPath $projectPath -PathType Leaf) (
+            "$($case.Name) does not contain build entry point $projectPath.")
+    }
+
+    foreach ($configuration in $configurations) {
         $buildCount++
         Write-Host (
-            "Running $Mode build $buildCount/${expectedBuildCount}: " +
+            "Running $Mode build $buildCount/$($expectedBuildCount): " +
             "$($case.Name) $configuration.")
-        Invoke-DotNetLogged "$($case.Name)-$configuration-restore" @(
-            "restore", $projectPath,
-            "-p:Configuration=$configuration",
-            "--configfile", $NuGetConfig,
-            "--packages", $Packages)
-        $graph = @(Get-PackageGraph $projectPath)
-        Assert-RestoredPackages $case.Name $configuration $graph
+        $executionKey = "$caseId|$configuration"
+        $currentExecutionResult = $executionResultLookup[$executionKey]
+        $currentExecutionResult.Status = "Running"
+        $executionStopwatch = [Diagnostics.Stopwatch]::StartNew()
+        try {
+            $restoreStopwatch = [Diagnostics.Stopwatch]::StartNew()
+            try {
+                Invoke-DotNetLogged "$($case.Name)-$configuration-restore" @(
+                    "restore", $projectPath,
+                    "-p:Configuration=$configuration",
+                    "--configfile", $NuGetConfig,
+                    "--packages", $Packages)
+            }
+            finally {
+                $restoreStopwatch.Stop()
+                $timings.Restore += $restoreStopwatch.ElapsedMilliseconds
+            }
 
-        if ($Mode -eq "Full") {
-            $graphKey = "$($case.Kind)|$($case.Toolkit)|" +
-                "$($case.DependencyInjection)|$($case.RemoveViewLocator)|" +
-                "$($case.PageType)|$configuration"
-            if ($case.Cpm) {
-                Assert-Condition ($graphs.ContainsKey($graphKey)) (
-                    "Missing non-CPM comparison for $($case.Name).")
-                Assert-Condition (($graph -join "`n") -eq $graphs[$graphKey]) (
-                    "$($case.Name) has a different normalized package graph under CPM.")
+            $graph = @(Get-PackageGraph $projectPath)
+            Assert-RestoredPackages $case.Name $configuration $graph
+
+            if ($Mode -eq "Full") {
+                $graphKey = "$($case.Kind)|$($case.Toolkit)|" +
+                    "$($case.DependencyInjection)|$($case.RemoveViewLocator)|" +
+                    "$($case.PageType)|$configuration"
+                $graphStopwatch = [Diagnostics.Stopwatch]::StartNew()
+                try {
+                    if ($case.Cpm) {
+                        Assert-Condition ($graphs.ContainsKey($graphKey)) (
+                            "Missing non-CPM comparison for $($case.Name).")
+                        Assert-Condition (($graph -join "`n") -eq $graphs[$graphKey]) (
+                            "$($case.Name) has a different normalized package graph under CPM.")
+                    }
+                    else {
+                        $graphs[$graphKey] = $graph -join "`n"
+                    }
+                }
+                finally {
+                    $graphStopwatch.Stop()
+                    $timings.GraphComparisons +=
+                        $graphStopwatch.ElapsedMilliseconds
+                }
             }
-            else {
-                $graphs[$graphKey] = $graph -join "`n"
+
+            $buildStopwatch = [Diagnostics.Stopwatch]::StartNew()
+            try {
+                Invoke-DotNetLogged "$($case.Name)-$configuration-build" @(
+                    "build", $projectPath,
+                    "--configuration", $configuration,
+                    "--no-restore")
+                Assert-BuildOutput $case.Name $projectPath $configuration
             }
+            finally {
+                $buildStopwatch.Stop()
+                $timings.MainBuild += $buildStopwatch.ElapsedMilliseconds
+            }
+            $currentExecutionResult.Status = "Passed"
         }
-
-        Invoke-DotNetLogged "$($case.Name)-$configuration-build" @(
-            "build", $projectPath,
-            "--configuration", $configuration,
-            "--no-restore")
-        Assert-BuildOutput $case.Name $projectPath $configuration
+        finally {
+            $executionStopwatch.Stop()
+            $currentExecutionResult.DurationMilliseconds =
+                $executionStopwatch.ElapsedMilliseconds
+        }
+        $currentExecutionResult = $null
     }
 
     Remove-SuccessfulDirectory $directory
     Clear-BinaryLogsSince $binaryLogStart
 }
 
+Assert-Condition ($structuralCount -eq $expectedStructuralCount) (
+    "$Mode verification ran $structuralCount structural generations, " +
+    "expected $expectedStructuralCount.")
 Assert-Condition ($buildCount -eq $expectedBuildCount) (
     "$Mode verification ran $buildCount builds, expected $expectedBuildCount.")
 
-if ($Mode -eq "Smoke") {
-    $cpmComparisons = @(
-        New-TemplateCase "GraphMvvmCommunity" "mvvm" "CommunityToolkit" "None" `
-            $false $false "None" @("Debug")
-        New-TemplateCase "GraphMvvmReactiveSplat" "mvvm" "ReactiveUI" `
-            "Splat.Locator" $false $false "None" @("Release")
-        New-TemplateCase "GraphXplatCommunity" "xplat" "CommunityToolkit" "None" `
-            $false $false "None" @("Debug")
-        New-TemplateCase "GraphXplatReactiveSplat" "xplat" "ReactiveUI" `
-            "Splat.Locator" $false $true "NavigationPage" @("Release")
-    )
+if ($Mode -ne "Full") {
+    $graphComparisonStopwatch = [Diagnostics.Stopwatch]::StartNew()
+    try {
+        $cpmComparisons = @(
+            New-TemplateCase "GraphMvvmCommunity" "mvvm" "CommunityToolkit" "None" `
+                $false $false "None" @("Debug")
+            New-TemplateCase "GraphMvvmReactiveSplat" "mvvm" "ReactiveUI" `
+                "Splat.Locator" $false $false "None" @("Release")
+            New-TemplateCase "GraphXplatCommunity" "xplat" "CommunityToolkit" "None" `
+                $false $false "None" @("Debug")
+            New-TemplateCase "GraphXplatReactiveSplat" "xplat" "ReactiveUI" `
+                "Splat.Locator" $false $true "NavigationPage" @("Release")
+        )
 
-    foreach ($comparison in $cpmComparisons) {
-        $binaryLogStart = $createdBinaryLogs.Count
-        $pair = @()
-        $pairDirectories = @()
-        foreach ($cpm in @($false, $true)) {
-            $suffix = if ($cpm) { "Cpm" } else { "Direct" }
-            $case = New-TemplateCase "$($comparison.Name)$suffix" `
-                $comparison.Kind $comparison.Toolkit `
-                $comparison.DependencyInjection $cpm `
-                $comparison.RemoveViewLocator $comparison.PageType `
-                $comparison.Configurations
-            $directory = Join-Path $Projects ("graph-" + $case.Name)
-            New-GeneratedTemplateCase $case $directory
-            $projectPath = Get-BuildProjectPath $case $directory
-            $configuration = $case.Configurations[0]
-            Invoke-DotNetLogged "$($case.Name)-$configuration-restore" @(
-                "restore", $projectPath,
-                "-p:Configuration=$configuration",
-                "--configfile", $NuGetConfig,
-                "--packages", $Packages)
-            $graph = @(Get-PackageGraph $projectPath)
-            Assert-RestoredPackages $case.Name $configuration $graph
-            $pair += ,$graph
-            $pairDirectories += $directory
-        }
+        foreach ($comparison in $cpmComparisons) {
+            $binaryLogStart = $createdBinaryLogs.Count
+            $pair = @()
+            $pairDirectories = @()
+            foreach ($cpm in @($false, $true)) {
+                $suffix = if ($cpm) { "Cpm" } else { "Direct" }
+                $case = New-TemplateCase "$($comparison.Name)$suffix" `
+                    $comparison.Kind $comparison.Toolkit `
+                    $comparison.DependencyInjection $cpm `
+                    $comparison.RemoveViewLocator $comparison.PageType `
+                    $comparison.Configurations
+                $directory = Join-Path $Projects ("graph-" + $case.Name)
+                New-GeneratedTemplateCase $case $directory
+                $projectPath = Get-BuildProjectPath $case $directory
+                $configuration = $case.Configurations[0]
+                Invoke-DotNetLogged "$($case.Name)-$configuration-restore" @(
+                    "restore", $projectPath,
+                    "-p:Configuration=$configuration",
+                    "--configfile", $NuGetConfig,
+                    "--packages", $Packages)
+                $graph = @(Get-PackageGraph $projectPath)
+                Assert-RestoredPackages $case.Name $configuration $graph
+                $pair += ,$graph
+                $pairDirectories += $directory
+            }
 
-        Assert-Condition (($pair[0] -join "`n") -eq ($pair[1] -join "`n")) (
-            "$($comparison.Name) has different CPM and non-CPM package graphs.")
-        foreach ($directory in $pairDirectories) {
-            Remove-SuccessfulDirectory $directory
+            Assert-Condition (($pair[0] -join "`n") -eq ($pair[1] -join "`n")) (
+                "$($comparison.Name) has different CPM and non-CPM package graphs.")
+            foreach ($directory in $pairDirectories) {
+                Remove-SuccessfulDirectory $directory
+            }
+            Clear-BinaryLogsSince $binaryLogStart
         }
-        Clear-BinaryLogsSince $binaryLogStart
+    }
+    finally {
+        $graphComparisonStopwatch.Stop()
+        $timings.GraphComparisons +=
+            $graphComparisonStopwatch.ElapsedMilliseconds
     }
 }
 
 Write-Host (
-    "Verified 144 structural generations and $buildCount $Mode template builds.")
+    "Verified $structuralCount structural generations and " +
+    "$buildCount $Mode template builds.")
+
+$additionalChecksStopwatch = [Diagnostics.Stopwatch]::StartNew()
 
 # Unlike the matrix's isolated --no-restore cases, this exercises the default
 # MVVM post-action against the local CI feed.
@@ -871,6 +955,11 @@ Assert-Condition ($LASTEXITCODE -ne 0 -and
 Remove-SuccessfulDirectory $negativeDirectory
 Clear-BinaryLogsSince $binaryLogStart
 
+$additionalChecksStopwatch.Stop()
+$timings.AdditionalChecks =
+    $additionalChecksStopwatch.ElapsedMilliseconds
+$runtimeProbesStopwatch = [Diagnostics.Stopwatch]::StartNew()
+
 $probeProject = Join-Path $PSScriptRoot "TemplateRuntimeProbe/TemplateRuntimeProbe.csproj"
 $runtimeCases = @()
 if ($Mode -eq "Full") {
@@ -938,13 +1027,13 @@ foreach ($case in $runtimeCases) {
         "-p:TemplateToolkit=$($case.Toolkit)",
         "-p:TemplateDependencyInjection=None")
 
-    $cleanArguments = @("clean", $probeProject) + $properties
-    Invoke-DotNetLogged "$caseId-clean" $cleanArguments
     $restoreArguments = @(
         "restore", $probeProject) + $properties + @(
         "--configfile", $NuGetConfig,
         "--packages", $Packages)
     Invoke-DotNetLogged "$caseId-restore" $restoreArguments
+    $cleanArguments = @("clean", $probeProject) + $properties
+    Invoke-DotNetLogged "$caseId-clean" $cleanArguments
     $buildArguments = @(
         "build", $probeProject) + $properties + @(
         "--no-restore")
@@ -1020,16 +1109,16 @@ foreach ($case in $startupCases) {
 
     # The generated MVVM App attaches classic-desktop-only diagnostics in
     # Debug; its headless startup must therefore use Release.
-    $cleanArguments = @(
-        "clean", $probeProject) + $properties + @(
-        "--configuration", "Release")
-    Invoke-DotNetLogged "$caseId-release-clean" $cleanArguments
     $restoreArguments = @(
         "restore", $probeProject) + $properties + @(
         "-p:Configuration=Release",
         "--configfile", $NuGetConfig,
         "--packages", $Packages)
     Invoke-DotNetLogged "$caseId-release-restore" $restoreArguments
+    $cleanArguments = @(
+        "clean", $probeProject) + $properties + @(
+        "--configuration", "Release")
+    Invoke-DotNetLogged "$caseId-release-clean" $cleanArguments
     $testArguments = @(
         "test", $probeProject) + $properties + @(
         "--configuration", "Release",
@@ -1042,12 +1131,43 @@ foreach ($case in $startupCases) {
     Clear-BinaryLogsSince $binaryLogStart
 }
 
+$runtimeProbesStopwatch.Stop()
+$timings.RuntimeProbes = $runtimeProbesStopwatch.ElapsedMilliseconds
+
 Write-Host (
-    "Verified $Mode templates: 144 structural generations, $buildCount builds, " +
+    "Verified $Mode templates: $structuralCount structural generations, " +
+    "$buildCount builds, " +
     "$runtimeIndex functional runtime cases, and $startupIndex startup cases.")
 
 foreach ($binaryLog in $createdBinaryLogs) {
     if (Test-Path -LiteralPath $binaryLog) {
         Remove-Item -LiteralPath $binaryLog -Force
     }
+}
+
+Write-VerificationReport -OverallStatus "Passed"
+}
+catch {
+    if ($null -ne $currentStructuralResult -and
+        $currentStructuralResult.Status -eq "Running") {
+        $currentStructuralResult.Status = "Failed"
+    }
+    if ($null -ne $currentExecutionResult -and
+        $currentExecutionResult.Status -eq "Running") {
+        $currentExecutionResult.Status = "Failed"
+    }
+    foreach ($result in $structuralResults) {
+        if ($result.Status -eq "Planned") {
+            $result.Status = "NotRun"
+        }
+    }
+    foreach ($result in $executionResults) {
+        if ($result.Status -eq "Planned") {
+            $result.Status = "NotRun"
+        }
+    }
+    Write-VerificationReport `
+        -OverallStatus "Failed" `
+        -Failure $_.Exception.ToString()
+    throw
 }

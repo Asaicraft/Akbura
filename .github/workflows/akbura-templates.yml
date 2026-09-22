@@ -6,9 +6,10 @@ on:
       verification_mode:
         description: Template verification depth
         required: true
-        default: Full
+        default: Sampled
         type: choice
         options:
+          - Sampled
           - Smoke
           - Full
   pull_request:
@@ -21,6 +22,8 @@ on:
       - "src/Akbura.Generator/**"
       - "eng/Verify-AkburaTemplates.ps1"
       - "eng/Verify-AkburaNewTemplates.ps1"
+      - "eng/AkburaTemplateVerificationPlan.psm1"
+      - "eng/Test-AkburaTemplateVerificationPlan.ps1"
       - "eng/Verify-AkburaXplatPlatform.ps1"
       - "eng/Set-AkburaTemplateVersions.ps1"
       - "eng/TemplateRuntimeProbe/**"
@@ -39,6 +42,8 @@ on:
       - "src/Akbura.Generator/**"
       - "eng/Verify-AkburaTemplates.ps1"
       - "eng/Verify-AkburaNewTemplates.ps1"
+      - "eng/AkburaTemplateVerificationPlan.psm1"
+      - "eng/Test-AkburaTemplateVerificationPlan.ps1"
       - "eng/Verify-AkburaXplatPlatform.ps1"
       - "eng/Set-AkburaTemplateVersions.ps1"
       - "eng/TemplateRuntimeProbe/**"
@@ -49,7 +54,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: akbura-templates-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && inputs.verification_mode || 'Smoke' }}
+  group: akbura-templates-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && inputs.verification_mode || 'Sampled' }}
   cancel-in-progress: true
 
 env:
@@ -57,7 +62,7 @@ env:
   DIAGNOSTICS_PROJECT: src/Akbura.Diagnostics/Akbura.Diagnostics.csproj
   TEMPLATES_PROJECT: src/Akbura.Templates/Akbura.Templates.csproj
   ARTIFACTS_PATH: artifacts/templates
-  VERIFICATION_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.verification_mode || 'Smoke' }}
+  VERIFICATION_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.verification_mode || 'Sampled' }}
 
 jobs:
   verify:
@@ -79,6 +84,10 @@ jobs:
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: "10.0.x"
+
+      - name: Test template verification planner
+        shell: pwsh
+        run: ./eng/Test-AkburaTemplateVerificationPlan.ps1
 
       - name: Prepare CI package version
         id: versions
@@ -165,7 +174,32 @@ jobs:
           retention-days: 14
           compression-level: 0
 
-      - name: Verify generated applications
+      # The selected matrix is persisted before execution. A failed case must
+      # be replayed from this artifact, never replaced by a fresh sample.
+      - name: Prepare template verification plan
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.versions.outputs.version }}
+          AVALONIA_VERSION: ${{ steps.versions.outputs.avalonia_version }}
+        run: |
+          ./eng/Verify-AkburaTemplates.ps1 `
+              -Version $env:VERSION `
+              -AvaloniaVersion $env:AVALONIA_VERSION `
+              -Feed $env:ARTIFACTS_PATH `
+              -WorkingDirectory $env:RUNNER_TEMP `
+              -Mode $env:VERIFICATION_MODE `
+              -PlanOutputPath "$env:RUNNER_TEMP/template-verification-plan.json" `
+              -PlanOnly
+
+      - name: Upload template verification plan
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: akbura-template-verification-plan-${{ steps.versions.outputs.version }}-${{ env.VERIFICATION_MODE }}
+          path: ${{ runner.temp }}/template-verification-plan.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Run ${{ env.VERIFICATION_MODE }} template verification
         timeout-minutes: ${{ env.VERIFICATION_MODE == 'Full' && 190 || 60 }}
         shell: pwsh
         env:
@@ -178,7 +212,18 @@ jobs:
               -Feed $env:ARTIFACTS_PATH `
               -WorkingDirectory $env:RUNNER_TEMP `
               -Mode $env:VERIFICATION_MODE `
+              -SelectionManifest "$env:RUNNER_TEMP/template-verification-plan.json" `
+              -ReportOutputPath "$env:RUNNER_TEMP/template-verification-report.json" `
               -BinLogDirectory "$env:RUNNER_TEMP/akbura-template-binlogs"
+
+      - name: Upload template verification report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: akbura-template-verification-report-${{ steps.versions.outputs.version }}-${{ env.VERIFICATION_MODE }}
+          path: ${{ runner.temp }}/template-verification-report.json
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload failed verification binlogs
         if: failure()

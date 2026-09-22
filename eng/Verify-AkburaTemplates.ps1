@@ -11,13 +11,22 @@ param(
     [Parameter(Mandatory)]
     [string] $WorkingDirectory,
 
-    [ValidateSet("Smoke", "Full")]
+    [ValidateSet("Sampled", "Smoke", "Full")]
     [string] $Mode = "Smoke",
 
-    [string] $BinLogDirectory
+    [string] $BinLogDirectory,
+
+    [string] $SelectionManifest,
+
+    [string] $PlanOutputPath,
+
+    [string] $ReportOutputPath,
+
+    [switch] $PlanOnly
 )
 
 $ErrorActionPreference = "Stop"
+Import-Module (Join-Path $PSScriptRoot "AkburaTemplateVerificationPlan.psm1") -Force
 $createdBinaryLogs = [Collections.Generic.List[string]]::new()
 $dotNetLogIndex = 0
 
@@ -90,6 +99,7 @@ $smokeRoot = Join-Path $workingPath (
 $hivePath = Join-Path $smokeRoot "hive"
 $projectsPath = Join-Path $smokeRoot "projects"
 $packagesPath = Join-Path $smokeRoot "packages"
+$runtimePackage = Join-Path $feedPath "Akbura.$Version.nupkg"
 $templatePackage = Join-Path $feedPath "Akbura.Templates.$Version.nupkg"
 $diagnosticsPackage = Join-Path $feedPath "Akbura.Diagnostics.$Version.nupkg"
 $legacyMainView = Join-Path $PSScriptRoot (
@@ -105,6 +115,8 @@ Assert-Condition (Test-Path -LiteralPath $templatePackage -PathType Leaf) (
     "Template package does not exist: $templatePackage")
 Assert-Condition (Test-Path -LiteralPath $diagnosticsPackage -PathType Leaf) (
     "Diagnostics package does not exist: $diagnosticsPackage")
+Assert-Condition (Test-Path -LiteralPath $runtimePackage -PathType Leaf) (
+    "Runtime package does not exist: $runtimePackage")
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $archive = [IO.Compression.ZipFile]::OpenRead($templatePackage)
@@ -252,6 +264,91 @@ try {
 finally {
     $diagnosticsArchive.Dispose()
 }
+
+$sourceCommit = if (![string]::IsNullOrWhiteSpace($env:GITHUB_SHA)) {
+    $env:GITHUB_SHA
+}
+else {
+    $commit = (& git rev-parse HEAD 2>&1 | Out-String).Trim()
+    Assert-Condition ($LASTEXITCODE -eq 0 -and
+        ![string]::IsNullOrWhiteSpace($commit)) (
+        "Could not determine the source commit for the verification plan.")
+    $commit
+}
+$sourceStatus = @(& git status --porcelain 2>&1)
+Assert-Condition ($LASTEXITCODE -eq 0) (
+    "Could not determine the source working-tree state.")
+$releaseContext = [pscustomobject] [ordered] @{
+    SourceCommit = $sourceCommit
+    SourceDirty = $sourceStatus.Count -gt 0
+    AkburaVersion = $Version
+    AvaloniaVersion = $AvaloniaVersion
+    WorkflowRunId = [string] $env:GITHUB_RUN_ID
+    WorkflowRunAttempt = [string] $env:GITHUB_RUN_ATTEMPT
+    Packages = @(
+        [pscustomobject] [ordered] @{
+            Name = [IO.Path]::GetFileName($runtimePackage)
+            Sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $runtimePackage).Hash.ToLowerInvariant()
+        },
+        [pscustomobject] [ordered] @{
+            Name = [IO.Path]::GetFileName($diagnosticsPackage)
+            Sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $diagnosticsPackage).Hash.ToLowerInvariant()
+        },
+        [pscustomobject] [ordered] @{
+            Name = [IO.Path]::GetFileName($templatePackage)
+            Sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $templatePackage).Hash.ToLowerInvariant()
+        })
+}
+
+$catalog = @(Get-AkburaTemplateCaseCatalog)
+$effectivePlanPath = if (![string]::IsNullOrWhiteSpace($SelectionManifest)) {
+    [IO.Path]::GetFullPath($SelectionManifest)
+}
+elseif (![string]::IsNullOrWhiteSpace($PlanOutputPath)) {
+    [IO.Path]::GetFullPath($PlanOutputPath)
+}
+else {
+    Join-Path $workingPath "template-verification-plan.json"
+}
+$plan = Resolve-AkburaTemplateVerificationPlan `
+    -Mode $Mode `
+    -Catalog $catalog `
+    -ReleaseContext $releaseContext `
+    -SelectionManifest $SelectionManifest `
+    -PlanOutputPath $effectivePlanPath
+
+if ($PlanOnly) {
+    Write-Host (
+        "Prepared $Mode template verification plan with " +
+        "$(@($plan.StructuralCaseIds).Count) structural cases and " +
+        "$(@($plan.Executions).Count) main executions: $effectivePlanPath")
+    return
+}
+
+if ([string]::IsNullOrWhiteSpace($ReportOutputPath)) {
+    $ReportOutputPath = Join-Path $workingPath "template-verification-report.json"
+}
+$initialReportPath = [IO.Path]::GetFullPath($ReportOutputPath)
+[IO.Directory]::CreateDirectory(
+    (Split-Path -Parent $initialReportPath)) | Out-Null
+$initialReport = [pscustomobject] [ordered] @{
+    SchemaVersion = 1
+    OverallStatus = "Running"
+    Mode = $Mode
+    StartedAtUtc = [DateTimeOffset]::UtcNow.ToString("O")
+    CompletedAtUtc = $null
+    Failure = $null
+    Source = $plan.Source
+    Catalog = $plan.Catalog
+    Phase = "LegacyAndPackageChecks"
+}
+$initialReportJson = $initialReport | ConvertTo-Json -Depth 12
+$initialReportJson =
+    ($initialReportJson -replace "`r?`n", "`r`n") + "`r`n"
+[IO.File]::WriteAllText(
+    $initialReportPath,
+    $initialReportJson,
+    [Text.UTF8Encoding]::new($false))
 
 New-Item -ItemType Directory -Path $hivePath -Force | Out-Null
 New-Item -ItemType Directory -Path $projectsPath -Force | Out-Null
@@ -660,6 +757,8 @@ foreach ($case in $cases) {
     -NuGetConfig $nugetConfig.FullName `
     -Packages $packagesPath `
     -Mode $Mode `
+    -SelectionManifest $effectivePlanPath `
+    -ReportOutputPath $ReportOutputPath `
     -BinLogDirectory $BinLogDirectory
 
 Remove-DirectoryWithRetry $smokeRoot

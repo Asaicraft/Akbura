@@ -80,40 +80,85 @@ Page navigation host must receive an actual thin Page shell.
 
 ## Verification modes
 
-`eng/Verify-AkburaTemplates.ps1` defaults to `Smoke`. Both modes generate and
-inspect all 24 MVVM and 120 xplat combinations without restoring or building
-them. This keeps coverage of template conditions, selected files, package
-references, page shells, CPM metadata, and ViewLocator registration inexpensive.
+The verification scripts share one canonical catalog of 144 valid cases: 24
+`akbura.mvvm` variants and 120 `akbura.xplat` variants. A case is identified
+by its template kind, toolkit, dependency-injection mode, CPM flag,
+`RemoveViewLocator` flag, and page type. The selected cases and exact
+Debug/Release executions are written to
+`template-verification-plan.json` before any project is generated.
 
-`Smoke` then performs 24 full builds from an explicit scenario list:
+`Sampled` is the automatic push, pull-request, and NuGet pre-publish mode. It
+uses a bounded, stratified CSPRNG selection from the complete catalog:
 
-- six Debug MVVM builds covering both toolkits and all three DI modes;
-- six Debug xplat `MainView` builds covering both toolkits and all DI modes;
-- eight Debug xplat builds covering four non-default page types with both
-  toolkits;
-- four Release builds covering both templates and both toolkits.
+- six MVVM cases, one for every toolkit and DI pair, covering both boolean flags;
+- fourteen xplat cases, seven per toolkit, covering all page types and DI modes;
+- Debug for all 20 cases and four Release repeats, one per kind and toolkit.
 
-CPM equivalence is checked separately by restoring selected CPM/non-CPM pairs.
-Representative runtime probes cover bindings, commands, DataContext replacement,
-page navigation without ViewLocator, and every DI mode. Pull requests and pushes
-to `master` use this mode.
+This gives 20 structural generations and 24 main builds. Package checks, legacy
+templates, CPM graph comparisons, aliases, invalid choices, the negative typed
+binding test, and the limited runtime/startup probes remain separate checks and
+are not included in that count. Sampled is a best-effort regression safety net,
+not proof that every supported combination works.
 
-`Full` retains the extended 136-build matrix and the complete runtime matrix.
-Use it for template-engine changes, dependency upgrades, and release validation:
+`Smoke` preserves the earlier deterministic contract: all 144 cases receive
+structural generation checks and the explicit smoke list performs 20 Debug plus
+four Release main builds. Use it when a stable local diagnostic set is more
+useful than sampling.
+
+`Full` generates all 144 cases and builds every case in both Debug and Release:
+288 main builds. It also runs the extended runtime/startup checks. Full uses the
+xplat Desktop entry point; Browser, Android, and iOS are verified separately by
+`eng/Verify-AkburaXplatPlatform.ps1` in environments that provide their SDKs
+and workloads.
+
+### Release responsibility
+
+Before creating a release tag, the release maintainer must pack the future
+release versions into an isolated local feed and run Full against the exact
+source revision and packages:
 
 ```powershell
 ./eng/Verify-AkburaTemplates.ps1 `
-    -Version VERSION `
-    -AvaloniaVersion AVALONIA_VERSION `
-    -Feed PATH_TO_LOCAL_PACKAGES `
-    -WorkingDirectory PATH_TO_TEMP_DIRECTORY `
-    -Mode Full
+    -Version $akburaVersion `
+    -AvaloniaVersion $avaloniaVersion `
+    -Feed $localPackageFeed `
+    -WorkingDirectory $verificationDirectory `
+    -Mode Full `
+    -PlanOutputPath "$verificationDirectory/template-verification-plan.json" `
+    -ReportOutputPath "$verificationDirectory/template-verification-report.json" `
+    -BinLogDirectory $binLogDirectory
 ```
 
-The template workflow also exposes `Smoke` and `Full` through
-`workflow_dispatch`. Its regular platform jobs build one representative for
-Browser, Android, and iOS; `Full` additionally builds the complementary toolkit
-so every platform covers both MVVM implementations. NuGet release validation
-always selects `Full`. Successful generated directories are removed. A failed
-restore, build, or test keeps its generated directory and binary log for
-diagnosis.
+The maintainer must also run the platform verifier for both toolkits in suitable
+Browser, Android, and iOS environments. A missing workload, SDK, Xcode host,
+simulator, or device is unverified, not passed. This is an organizational release
+requirement; the GitHub environment approval does not technically prove that the
+local Full and platform runs happened.
+
+A saved plan is replayed without invoking the random selector:
+
+```powershell
+./eng/Verify-AkburaTemplates.ps1 `
+    -Version $akburaVersion `
+    -AvaloniaVersion $avaloniaVersion `
+    -Feed $localPackageFeed `
+    -WorkingDirectory $verificationDirectory `
+    -Mode Sampled `
+    -SelectionManifest "$verificationDirectory/template-verification-plan.json" `
+    -ReportOutputPath "$verificationDirectory/template-verification-replay.json" `
+    -BinLogDirectory $binLogDirectory
+```
+
+Replay validates the schema, catalog hash, source inputs, package hashes, case
+IDs, and duplicate executions. It never replaces a failed case with a new
+sample. The JSON report records planned, passed, failed, and not-run work plus
+separate structural-generation, restore, main-build, graph-comparison,
+additional-check, and runtime-probe timings. Pack and platform setup/verification
+remain distinct workflow steps with their own GitHub Actions durations.
+
+The template workflow exposes `Sampled`, `Smoke`, and `Full` through
+`workflow_dispatch`. In Sampled and Smoke, platform jobs keep one established
+representative per platform; Full additionally verifies the complementary
+toolkit. Successful generated directories and successful binlogs are removed.
+A failed restore, build, or test keeps its generated directory and binary log
+for diagnosis.

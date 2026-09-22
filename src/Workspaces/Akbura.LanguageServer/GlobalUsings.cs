@@ -17,5 +17,6 @@ global using Akbura.Workspaces.Outlining;
 global using Akbura.Workspaces.Projects;
 global using Akbura.Workspaces.Projection;
 global using Akbura.Workspaces.QuickInfo;
+global using Akbura.Workspaces.Resources;
 global using Microsoft.CodeAnalysis.Text;
 global using System.Collections.Immutable;

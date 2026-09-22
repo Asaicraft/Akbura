@@ -12,14 +12,7 @@ namespace Akbura.Workspaces.Projection;
 
 internal sealed class AkburaCSharpProjection
 {
-    public AkburaCSharpProjection(
-        CompilationUnitSyntax root,
-        AkburaCSharpProjectionMapping activeMapping,
-        ImmutableArray<AkburaCSharpProjectionMapping> mappings,
-        int projectedPosition,
-        ImmutableArray<string> stateNames,
-        AkburaCSharpImportContext importContext,
-        ImmutableArray<AkburaProjectedSymbolOrigin> syntheticSymbols)
+    public AkburaCSharpProjection(CompilationUnitSyntax root, AkburaCSharpProjectionMapping activeMapping, ImmutableArray<AkburaCSharpProjectionMapping> mappings, int projectedPosition, ImmutableArray<string> stateNames, AkburaCSharpImportContext importContext, ImmutableArray<AkburaProjectedSymbolOrigin> syntheticSymbols)
     {
         Root = root ?? throw new ArgumentNullException(nameof(root));
         ActiveMapping = activeMapping;
@@ -65,8 +58,7 @@ internal sealed class AkburaCSharpProjection
 
     public ImmutableArray<AkburaProjectedSymbolOrigin> SyntheticSymbols { get; }
 
-    public AkburaCSharpProjection WithProjectedPosition(
-        int projectedPosition)
+    public AkburaCSharpProjection WithProjectedPosition(int projectedPosition)
     {
         if (projectedPosition < ActiveMapping.ProjectedSpan.Start ||
             projectedPosition > ActiveMapping.ProjectedSpan.End)
@@ -90,21 +82,16 @@ internal sealed class AkburaCSharpProjection
             SyntheticSymbols);
     }
 
-    public bool TryGetSyntheticOrigin(
-        SyntaxNode declarationSyntax,
-        out AkburaProjectedSymbolOrigin origin)
+    public bool TryGetSyntheticOrigin(SyntaxNode declarationSyntax, out AkburaProjectedSymbolOrigin origin)
     {
         if (declarationSyntax == null)
         {
             throw new ArgumentNullException(nameof(declarationSyntax));
         }
 
-        for (var current = declarationSyntax;
-             current != null;
-             current = current.Parent)
+        for (var current = declarationSyntax; current != null; current = current.Parent)
         {
-            foreach (var annotation in current.GetAnnotations(
-                         CSharpProbeBinder.ProjectedSymbolAnnotationKind))
+            foreach (var annotation in current.GetAnnotations(CSharpProbeBinder.ProjectedSymbolAnnotationKind))
             {
                 if (!CSharpProbeSymbolOrigin.TryParse(
                         annotation.Data,
@@ -137,9 +124,7 @@ internal sealed class AkburaCSharpProjection
             StateNames.Contains(name, StringComparer.Ordinal);
     }
 
-    public bool TryMapToHost(
-        TextSpan projectedSpan,
-        out TextSpan hostSpan)
+    public bool TryMapToHost(TextSpan projectedSpan, out TextSpan hostSpan)
     {
         foreach (var mapping in Mappings)
         {
@@ -160,9 +145,7 @@ internal sealed class AkburaCSharpProjection
     }
 
 
-    public bool TryMapToProjected(
-        TextSpan hostSpan,
-        out TextSpan projectedSpan)
+    public bool TryMapToProjected(TextSpan hostSpan, out TextSpan projectedSpan)
     {
         foreach (var mapping in Mappings)
         {
@@ -182,9 +165,7 @@ internal sealed class AkburaCSharpProjection
         return false;
     }
 
-    public bool TryMapPositionToHost(
-        int projectedPosition,
-        out int hostPosition)
+    public bool TryMapPositionToHost(int projectedPosition, out int hostPosition)
     {
         foreach (var mapping in Mappings)
         {
@@ -204,9 +185,7 @@ internal sealed class AkburaCSharpProjection
         return false;
     }
 
-    public bool TryMapPositionToProjected(
-        int hostPosition,
-        out int projectedPosition)
+    public bool TryMapPositionToProjected(int hostPosition, out int projectedPosition)
     {
         foreach (var mapping in Mappings)
         {
@@ -232,10 +211,7 @@ internal sealed class AkburaCSharpProjection
             value.End <= container.End;
     }
 
-    private static TextSpan Translate(
-        TextSpan value,
-        TextSpan source,
-        TextSpan target)
+    private static TextSpan Translate(TextSpan value, TextSpan source, TextSpan target)
     {
         return new TextSpan(
             target.Start + value.Start - source.Start,
@@ -248,12 +224,7 @@ internal static class AkburaCSharpProjectionFactory
     private const string UsingMappingAnnotationKind =
         "AkburaCSharpUsingMapping";
 
-    public static bool TryCreate(
-        AkburaSyntacticDocument syntacticDocument,
-        AkburaDocumentContext semanticContext,
-        AkburaCSharpCompletionContext completionContext,
-        out AkburaCSharpProjection projection,
-        CancellationToken cancellationToken = default)
+    public static bool TryCreate(AkburaSyntacticDocument syntacticDocument, AkburaDocumentContext semanticContext, AkburaCSharpCompletionContext completionContext, out AkburaCSharpProjection projection, CancellationToken cancellationToken = default)
     {
         return TryCreate(
             syntacticDocument,
@@ -268,12 +239,7 @@ internal static class AkburaCSharpProjectionFactory
             cancellationToken);
     }
 
-    public static bool TryCreate(
-        AkburaSyntacticDocument syntacticDocument,
-        AkburaDocumentContext semanticContext,
-        AkburaEmbeddedCSharpContext embeddedContext,
-        out AkburaCSharpProjection projection,
-        CancellationToken cancellationToken = default)
+    public static bool TryCreate(AkburaSyntacticDocument syntacticDocument, AkburaDocumentContext semanticContext, AkburaEmbeddedCSharpContext embeddedContext, out AkburaCSharpProjection projection, CancellationToken cancellationToken = default)
     {
         return TryCreate(
             syntacticDocument,
@@ -284,13 +250,7 @@ internal static class AkburaCSharpProjectionFactory
             cancellationToken);
     }
 
-    public static bool TryCreate(
-        AkburaSyntacticDocument syntacticDocument,
-        AkburaDocumentContext semanticContext,
-        AkburaEmbeddedCSharpContext embeddedContext,
-        out AkburaCSharpProjection projection,
-        out string? failureReason,
-        CancellationToken cancellationToken = default)
+    public static bool TryCreate(AkburaSyntacticDocument syntacticDocument, AkburaDocumentContext semanticContext, AkburaEmbeddedCSharpContext embeddedContext, out AkburaCSharpProjection projection, out string? failureReason, CancellationToken cancellationToken = default)
     {
         failureReason = null;
 
@@ -434,10 +394,7 @@ internal static class AkburaCSharpProjectionFactory
         return true;
     }
 
-    private static CSharpProbeProjection CreateExpressionProjection(
-        AkburaSemanticModel semanticModel,
-        AkburaSyntax root,
-        AkburaEmbeddedCSharpContext context)
+    private static CSharpProbeProjection CreateExpressionProjection(AkburaSemanticModel semanticModel, AkburaSyntax root, AkburaEmbeddedCSharpContext context)
     {
         var syntax = FindSyntax<CSharpExpressionSyntax>(root, context);
         if (syntax == null ||
@@ -456,10 +413,7 @@ internal static class AkburaCSharpProjectionFactory
             context.RelativePosition);
     }
 
-    private static CSharpProbeProjection CreateStatementProjection(
-        AkburaSemanticModel semanticModel,
-        AkburaSyntax root,
-        AkburaEmbeddedCSharpContext context)
+    private static CSharpProbeProjection CreateStatementProjection(AkburaSemanticModel semanticModel, AkburaSyntax root, AkburaEmbeddedCSharpContext context)
     {
         if (context.OwnerKind == Akbura.Language.Syntax.SyntaxKind.MarkupCodeStatementSyntax)
         {
@@ -487,8 +441,7 @@ internal static class AkburaCSharpProjectionFactory
             context.RelativePosition);
     }
 
-    private static CSharpProbeProjection CreateForeachHeaderProjection(AkburaSemanticModel semanticModel,
-        AkburaSyntax root, AkburaEmbeddedCSharpContext context)
+    private static CSharpProbeProjection CreateForeachHeaderProjection(AkburaSemanticModel semanticModel, AkburaSyntax root, AkburaEmbeddedCSharpContext context)
     {
         var syntax = FindSyntax<MarkupForeachHeaderSyntax>(root, context);
         if (syntax == null || syntax.Token.FullSpan != context.HostSpan)
@@ -498,11 +451,7 @@ internal static class AkburaCSharpProjectionFactory
         return semanticModel.CreateCSharpCompletionProjection(syntax, context.RelativePosition);
     }
 
-    private static CSharpProbeProjection CreateTypeProjection(
-        AkburaSemanticModel semanticModel,
-        AkburaSyntax root,
-        AkburaSyntacticDocument syntacticDocument,
-        AkburaEmbeddedCSharpContext context)
+    private static CSharpProbeProjection CreateTypeProjection(AkburaSemanticModel semanticModel, AkburaSyntax root, AkburaSyntacticDocument syntacticDocument, AkburaEmbeddedCSharpContext context)
     {
         var syntax = FindSyntax<CSharpTypeSyntax>(root, context);
         if (syntax != null &&
@@ -511,6 +460,23 @@ internal static class AkburaCSharpProjectionFactory
             return semanticModel.CreateCSharpCompletionProjection(
                 syntax,
                 context.RelativePosition);
+        }
+
+        var dataTypeAttribute = FindSyntax<MarkupAttributeSyntax>(
+            root,
+            context);
+        if (dataTypeAttribute != null &&
+            AkburaSemanticModel.IsMarkupDataTypeDirective(
+                dataTypeAttribute))
+        {
+            var parsedType = CSharpSyntaxFactory.ParseTypeName(
+                syntacticDocument.Text.ToString(
+                    context.HostSpan));
+            return semanticModel
+                .CreateMarkupDataTypeCompletionProjection(
+                    dataTypeAttribute,
+                    parsedType,
+                    context.RelativePosition);
         }
 
         var declaration = FindSyntax<AkburaSyntax>(
@@ -533,10 +499,7 @@ internal static class AkburaCSharpProjectionFactory
             context.RelativePosition);
     }
 
-    private static CSharpProbeProjection CreateUsingProjection(
-        AkburaSemanticModel semanticModel,
-        AkburaSyntax root,
-        AkburaEmbeddedCSharpContext context)
+    private static CSharpProbeProjection CreateUsingProjection(AkburaSemanticModel semanticModel, AkburaSyntax root, AkburaEmbeddedCSharpContext context)
     {
         var akcssUsing = FindSyntax<AkcssUsingDirectiveSyntax>(
             root,
@@ -568,11 +531,7 @@ internal static class AkburaCSharpProjectionFactory
             context.RelativePosition);
     }
 
-    private static CSharpProbeProjection
-        CreateCommandParameterProjection(
-            AkburaSemanticModel semanticModel,
-            AkburaSyntax root,
-            AkburaEmbeddedCSharpContext context)
+    private static CSharpProbeProjection CreateCommandParameterProjection(AkburaSemanticModel semanticModel, AkburaSyntax root, AkburaEmbeddedCSharpContext context)
     {
         var syntax = FindSyntax<CSharpParameterListSyntax>(root, context);
         if (syntax == null ||
@@ -587,10 +546,7 @@ internal static class AkburaCSharpProjectionFactory
             context.RelativePosition);
     }
 
-    private static TSyntax? FindSyntax<TSyntax>(
-        AkburaSyntax root,
-        AkburaEmbeddedCSharpContext context)
-        where TSyntax : AkburaSyntax
+    private static TSyntax? FindSyntax<TSyntax>(AkburaSyntax root, AkburaEmbeddedCSharpContext context) where TSyntax : AkburaSyntax
     {
         return root.DescendantNodes()
             .OfType<TSyntax>()
@@ -599,10 +555,7 @@ internal static class AkburaCSharpProjectionFactory
                 candidate.FullSpan == context.OwnerSpan);
     }
 
-    private static bool TryGetCurrentContext(
-        AkburaSyntacticDocument syntacticDocument,
-        AkburaDocumentContext semanticContext,
-        out AkburaDocumentContext currentContext)
+    private static bool TryGetCurrentContext(AkburaSyntacticDocument syntacticDocument, AkburaDocumentContext semanticContext, out AkburaDocumentContext currentContext)
     {
         var semanticDocument = semanticContext.Document;
         if (semanticDocument.Text.ContentEquals(
@@ -654,12 +607,7 @@ internal static class AkburaCSharpProjectionFactory
         }
     }
 
-    private static CompilationUnitSyntax AddUsingMappings(
-        AkburaSyntacticDocument document,
-        AkburaEmbeddedCSharpContext context,
-        CSharpProbeProjection probe,
-        out TextSpan projectedActiveSpan,
-        out ImmutableArray<AkburaCSharpProjectionMapping> mappings)
+    private static CompilationUnitSyntax AddUsingMappings(AkburaSyntacticDocument document, AkburaEmbeddedCSharpContext context, CSharpProbeProjection probe, out TextSpan projectedActiveSpan, out ImmutableArray<AkburaCSharpProjectionMapping> mappings)
     {
         var root = probe.Root;
         var replacements = new Dictionary<
@@ -675,8 +623,7 @@ internal static class AkburaCSharpProjectionFactory
             context.HostPosition,
             out var akcssRegion);
 
-        foreach (var hostUsing in hostRoot.DescendantNodes()
-                     .OfType<Akbura.Language.Syntax.UsingDirectiveSyntax>())
+        foreach (var hostUsing in hostRoot.DescendantNodes().OfType<Akbura.Language.Syntax.UsingDirectiveSyntax>())
         {
             if (hostUsing.FullSpan == context.OwnerSpan ||
                 AkburaUsingEditService.IsAkcssUsingDirective(hostUsing))
@@ -730,8 +677,7 @@ internal static class AkburaCSharpProjectionFactory
                 hostSpan));
         }
 
-        foreach (var hostUsing in hostRoot.DescendantNodes()
-                     .OfType<AkcssUsingDirectiveSyntax>())
+        foreach (var hostUsing in hostRoot.DescendantNodes().OfType<AkcssUsingDirectiveSyntax>())
         {
             if (!hasAkcssRegion ||
                 hostUsing.FullSpan == context.OwnerSpan ||
@@ -820,9 +766,7 @@ internal static class AkburaCSharpProjectionFactory
 
     private readonly struct UsingMappingSource
     {
-        public UsingMappingSource(
-            SyntaxAnnotation annotation,
-            TextSpan hostSpan)
+        public UsingMappingSource(SyntaxAnnotation annotation, TextSpan hostSpan)
         {
             Annotation = annotation;
             HostSpan = hostSpan;

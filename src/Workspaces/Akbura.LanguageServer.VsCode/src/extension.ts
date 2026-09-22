@@ -7,6 +7,9 @@ import { promisify } from 'node:util';
 import * as vscode from 'vscode';
 
 import { AkburaTypingController } from './editor/AkburaTypingController.js';
+import {
+    AkburaResourceDocumentSynchronizer
+} from './resourceDocuments/AkburaResourceDocumentSynchronizer.js';
 
 import {
     Executable,
@@ -27,6 +30,8 @@ let outputChannel: vscode.OutputChannel;
 let activeLaunchKey: string | undefined;
 let lifecycleTail: Promise<void> = Promise.resolve();
 let configurationUpdatesInProgress = 0;
+let resourceDocumentSynchronizer:
+    AkburaResourceDocumentSynchronizer | undefined;
 
 const validatedDotnetHosts = new Set<string>();
 
@@ -52,6 +57,10 @@ export async function activate(
     );
 
     context.subscriptions.push(outputChannel);
+
+    resourceDocumentSynchronizer =
+        new AkburaResourceDocumentSynchronizer(outputChannel);
+    context.subscriptions.push(resourceDocumentSynchronizer);
 
     const typingController = new AkburaTypingController(
         () => client,
@@ -164,6 +173,7 @@ export async function deactivate(): Promise<void> {
 
             client = undefined;
             activeLaunchKey = undefined;
+            resourceDocumentSynchronizer?.stop(current);
 
             if (current != null) {
                 await current.stop();
@@ -197,6 +207,7 @@ function restartLanguageServer(
 
             client = undefined;
             activeLaunchKey = undefined;
+            resourceDocumentSynchronizer?.stop(previous);
 
             if (previous != null) {
                 try {
@@ -245,14 +256,26 @@ function restartLanguageServer(
 
             try {
                 await next.start();
+                await resourceDocumentSynchronizer?.start(next);
                 activeLaunchKey = launch.key;
 
                 outputChannel.appendLine(
                     '[Akbura] Language server started.'
                 );
             } catch (error) {
+                resourceDocumentSynchronizer?.stop(next);
                 client = undefined;
                 activeLaunchKey = undefined;
+
+                try {
+                    await next.stop();
+                } catch (stopError) {
+                    outputChannel.appendLine(
+                        '[Akbura] Failed client could not be stopped ' +
+                        `cleanly: ${formatError(stopError)}`
+                    );
+                }
+
                 throw error;
             }
         }
@@ -265,6 +288,11 @@ function createLanguageClientOptions(
     LanguageClientOptions {
     return {
         workspaceFolder: launch.workspaceFolder,
+        /*
+         * Keep .axaml out of this selector. Resource documents use
+         * the dedicated synchronizer, while the installed XAML
+         * extension remains responsible for XAML language features.
+         */
         documentSelector: [
             {
                 scheme: 'file',

@@ -20,10 +20,7 @@ internal sealed class AkburaProjectLoadCoordinator : IAsyncDisposable
     private int _activeLoadCount;
     private int _disposeState;
 
-    public AkburaProjectLoadCoordinator(
-        AkburaLanguageServerServices services,
-        AkburaRequestExecutionQueue queue,
-        IAkburaProjectLoader? loader = null)
+    public AkburaProjectLoadCoordinator(AkburaLanguageServerServices services, AkburaRequestExecutionQueue queue, IAkburaProjectLoader? loader = null)
     {
         _services = services ??
             throw new ArgumentNullException(nameof(services));
@@ -32,9 +29,7 @@ internal sealed class AkburaProjectLoadCoordinator : IAsyncDisposable
         _loader.Changed += OnProjectContextChanged;
     }
 
-    public Task StartAsync(
-        AkburaServerSnapshot snapshot,
-        CancellationToken cancellationToken)
+    public Task StartAsync(AkburaServerSnapshot snapshot, CancellationToken cancellationToken)
     {
         foreach (var folder in snapshot.WorkspaceFolders.Values)
         {
@@ -49,10 +44,7 @@ internal sealed class AkburaProjectLoadCoordinator : IAsyncDisposable
         return ReloadAllAsync(cancellationToken);
     }
 
-    public async Task UpdateWorkspaceFoldersAsync(
-        ImmutableArray<AkburaWorkspaceFolderState> added,
-        ImmutableArray<Uri> removed,
-        CancellationToken cancellationToken)
+    public async Task UpdateWorkspaceFoldersAsync(ImmutableArray<AkburaWorkspaceFolderState> added, ImmutableArray<Uri> removed, CancellationToken cancellationToken)
     {
         foreach (var uri in removed)
         {
@@ -72,9 +64,7 @@ internal sealed class AkburaProjectLoadCoordinator : IAsyncDisposable
                 .ConfigureAwait(false);
         }
     }
-    public Task HandleWatchedFilesAsync(
-        DidChangeWatchedFilesParams parameters,
-        CancellationToken cancellationToken)
+    public Task HandleWatchedFilesAsync(DidChangeWatchedFilesParams parameters, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(parameters);
         if (!parameters.Changes.Any(static change =>
@@ -86,9 +76,7 @@ internal sealed class AkburaProjectLoadCoordinator : IAsyncDisposable
         return ScheduleReloadAsync("watched files", cancellationToken);
     }
 
-    public Task ScheduleReloadAsync(
-        string reason,
-        CancellationToken cancellationToken)
+    public Task ScheduleReloadAsync(string reason, CancellationToken cancellationToken)
     {
         if (Volatile.Read(ref _disposeState) != 0)
         {
@@ -128,9 +116,7 @@ internal sealed class AkburaProjectLoadCoordinator : IAsyncDisposable
         _shutdown.Dispose();
     }
 
-    private async Task RunDebouncedReloadAsync(
-        string reason,
-        CancellationToken cancellationToken)
+    private async Task RunDebouncedReloadAsync(string reason, CancellationToken cancellationToken)
     {
         try
         {
@@ -153,8 +139,7 @@ internal sealed class AkburaProjectLoadCoordinator : IAsyncDisposable
         }
     }
 
-    private async Task ReloadAllAsync(
-        CancellationToken cancellationToken)
+    private async Task ReloadAllAsync(CancellationToken cancellationToken)
     {
         foreach (var request in _roots.Values)
         {
@@ -164,9 +149,7 @@ internal sealed class AkburaProjectLoadCoordinator : IAsyncDisposable
         }
     }
 
-    private async Task LoadAsync(
-        AkburaProjectLoadRequest request,
-        CancellationToken cancellationToken)
+    private async Task LoadAsync(AkburaProjectLoadRequest request, CancellationToken cancellationToken)
     {
         await _loadGate.WaitAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -300,9 +283,7 @@ internal sealed class AkburaProjectLoadCoordinator : IAsyncDisposable
         }
     }
 
-    private async Task ApplyAsync(
-        AkburaProjectLoadResult result,
-        CancellationToken cancellationToken)
+    private async Task ApplyAsync(AkburaProjectLoadResult result, CancellationToken cancellationToken)
     {
         await _queue.ExecuteAsync<object?>(
                 AkburaInternalMethods.ApplyLoadedProjects,
@@ -311,11 +292,7 @@ internal sealed class AkburaProjectLoadCoordinator : IAsyncDisposable
             .ConfigureAwait(false);
     }
 
-    private Task ReportProgressAsync(
-        string token,
-        string kind,
-        string message,
-        CancellationToken cancellationToken)
+    private Task ReportProgressAsync(string token, string kind, string message, CancellationToken cancellationToken)
     {
         var value = JsonSerializer.SerializeToElement(
             new
@@ -360,9 +337,7 @@ internal sealed class AkburaProjectLoadCoordinator : IAsyncDisposable
                 : null;
     }
 
-    private void OnProjectContextChanged(
-        object? sender,
-        ProjectContextChangedEventArgs eventArgs)
+    private void OnProjectContextChanged(object? sender, ProjectContextChangedEventArgs eventArgs)
     {
         if (Volatile.Read(ref _activeLoadCount) != 0)
         {
@@ -378,7 +353,7 @@ internal sealed class AkburaProjectLoadCoordinator : IAsyncDisposable
             _shutdown.Token);
     }
 
-    private static bool IsReloadRelevant(string uriText)
+    internal static bool IsReloadRelevant(string uriText)
     {
         if (!Uri.TryCreate(uriText, UriKind.Absolute, out var uri) ||
             !uri.IsFile)
@@ -390,6 +365,7 @@ internal sealed class AkburaProjectLoadCoordinator : IAsyncDisposable
         var extension = Path.GetExtension(uri.LocalPath);
         return extension.Equals(".akbura", StringComparison.OrdinalIgnoreCase) ||
             extension.Equals(".akcss", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".axaml", StringComparison.OrdinalIgnoreCase) ||
             extension.Equals(".csproj", StringComparison.OrdinalIgnoreCase) ||
             extension.Equals(".sln", StringComparison.OrdinalIgnoreCase) ||
             extension.Equals(".slnx", StringComparison.OrdinalIgnoreCase) ||

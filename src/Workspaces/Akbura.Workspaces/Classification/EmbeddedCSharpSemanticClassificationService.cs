@@ -20,11 +20,7 @@ namespace Akbura.Workspaces.Classification;
 
 internal sealed class EmbeddedCSharpSemanticClassificationService
 {
-    private static void AddDeclaredTypeClassifications(
-        AkburaSemanticModel semanticModel,
-        CSharpTypeSyntax typeSyntax,
-        TextSpan requestedSpan,
-        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
+    private static void AddDeclaredTypeClassifications(AkburaSemanticModel semanticModel, CSharpTypeSyntax typeSyntax, TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         var typeSymbol =
             GetDeclaredTypeSymbol(
@@ -43,11 +39,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
             builder);
     }
 
-    internal static void AddTypeClassifications(
-        CSharpTypeSyntax typeSyntax,
-        RoslynITypeSymbol typeSymbol,
-        TextSpan requestedSpan,
-        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
+    internal static void AddTypeClassifications(CSharpTypeSyntax typeSyntax, RoslynITypeSymbol typeSymbol, TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         if (typeSymbol.TypeKind ==
             TypeKind.Error)
@@ -79,12 +71,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
             builder);
     }
 
-    internal static void AddTypeClassifications(
-        CSharp.TypeSyntax syntax,
-        RoslynITypeSymbol typeSymbol,
-        int sourceOffset,
-        TextSpan requestedSpan,
-        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
+    internal static void AddTypeClassifications(CSharp.TypeSyntax syntax, RoslynITypeSymbol typeSymbol, int sourceOffset, TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         switch (syntax)
         {
@@ -194,12 +181,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         }
     }
 
-    private static void AddMappedClassification(
-        TextSpan csharpSpan,
-        int sourceOffset,
-        TextSpan requestedSpan,
-        AkburaClassificationKind classification,
-        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
+    private static void AddMappedClassification(TextSpan csharpSpan, int sourceOffset, TextSpan requestedSpan, AkburaClassificationKind classification, ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         if (csharpSpan.Length == 0)
         {
@@ -223,12 +205,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
                 classification));
     }
 
-    private static void AddSimpleTypeNameClassifications(
-        CSharp.SimpleNameSyntax syntax,
-        RoslynITypeSymbol typeSymbol,
-        int sourceOffset,
-        TextSpan requestedSpan,
-        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
+    private static void AddSimpleTypeNameClassifications(CSharp.SimpleNameSyntax syntax, RoslynITypeSymbol typeSymbol, int sourceOffset, TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         switch (syntax)
         {
@@ -259,12 +236,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         }
     }
 
-    private static void AddGenericTypeArgumentClassifications(
-        CSharp.GenericNameSyntax genericName,
-        RoslynITypeSymbol typeSymbol,
-        int sourceOffset,
-        TextSpan requestedSpan,
-        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
+    private static void AddGenericTypeArgumentClassifications(CSharp.GenericNameSyntax genericName, RoslynITypeSymbol typeSymbol, int sourceOffset, TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         if (typeSymbol is not INamedTypeSymbol namedType)
         {
@@ -282,9 +254,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
                 syntaxArguments.Count,
                 symbolArguments.Length);
 
-        for (var index = 0;
-             index < count;
-             index++)
+        for (var index = 0; index < count; index++)
         {
             AddTypeClassifications(
                 syntaxArguments[index],
@@ -295,21 +265,16 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         }
     }
 
-    private static void AddQualifiedTypeClassifications(
-        CSharp.QualifiedNameSyntax qualifiedName,
-        RoslynITypeSymbol typeSymbol,
-        int sourceOffset,
-        TextSpan requestedSpan,
-        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
+    private static void AddQualifiedTypeClassifications(CSharp.QualifiedNameSyntax qualifiedName, RoslynITypeSymbol typeSymbol, int sourceOffset, TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
-        if (typeSymbol is INamedTypeSymbol
-            {
-                ContainingType: not null
-            } namedType)
+        if (typeSymbol is INamedTypeSymbol namedType)
         {
-            AddTypeClassifications(
+            var containingSymbol = namedType.ContainingType is { } containingType
+                ? (INamespaceOrTypeSymbol)containingType
+                : namedType.ContainingNamespace;
+            AddNamespaceOrTypeClassifications(
                 qualifiedName.Left,
-                namedType.ContainingType,
+                containingSymbol,
                 sourceOffset,
                 requestedSpan,
                 builder);
@@ -323,12 +288,87 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
             builder);
     }
 
-    private static void AddTupleTypeClassifications(
-        CSharp.TupleTypeSyntax tupleType,
-        INamedTypeSymbol tupleSymbol,
-        int sourceOffset,
-        TextSpan requestedSpan,
-        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
+    private static void AddNamespaceOrTypeClassifications(CSharp.NameSyntax syntax, INamespaceOrTypeSymbol symbol, int sourceOffset, TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
+    {
+        switch (syntax)
+        {
+            case CSharp.QualifiedNameSyntax qualifiedName:
+            {
+                var containingSymbol = symbol switch
+                {
+                    INamedTypeSymbol { ContainingType: { } containingType } =>
+                        (INamespaceOrTypeSymbol)containingType,
+                    INamedTypeSymbol namedType =>
+                        namedType.ContainingNamespace,
+                    INamespaceSymbol namespaceSymbol =>
+                        namespaceSymbol.ContainingNamespace,
+                    _ => null,
+                };
+                if (containingSymbol != null)
+                {
+                    AddNamespaceOrTypeClassifications(
+                        qualifiedName.Left,
+                        containingSymbol,
+                        sourceOffset,
+                        requestedSpan,
+                        builder);
+                }
+
+                AddSimpleNamespaceOrTypeClassifications(
+                    qualifiedName.Right,
+                    symbol,
+                    sourceOffset,
+                    requestedSpan,
+                    builder);
+                return;
+            }
+
+            case CSharp.AliasQualifiedNameSyntax aliasQualifiedName:
+                AddSimpleNamespaceOrTypeClassifications(
+                    aliasQualifiedName.Name,
+                    symbol,
+                    sourceOffset,
+                    requestedSpan,
+                    builder);
+                return;
+
+            case CSharp.SimpleNameSyntax simpleName:
+                AddSimpleNamespaceOrTypeClassifications(
+                    simpleName,
+                    symbol,
+                    sourceOffset,
+                    requestedSpan,
+                    builder);
+                return;
+        }
+    }
+
+    private static void AddSimpleNamespaceOrTypeClassifications(CSharp.SimpleNameSyntax syntax, INamespaceOrTypeSymbol symbol, int sourceOffset, TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
+    {
+        if (symbol is RoslynITypeSymbol typeSymbol)
+        {
+            AddSimpleTypeNameClassifications(
+                syntax,
+                typeSymbol,
+                sourceOffset,
+                requestedSpan,
+                builder);
+            return;
+        }
+
+        var classification = GetRoslynClassification(symbol);
+        if (classification != null)
+        {
+            AddMappedClassification(
+                syntax.Identifier.Span,
+                sourceOffset,
+                requestedSpan,
+                classification.Value,
+                builder);
+        }
+    }
+
+    private static void AddTupleTypeClassifications(CSharp.TupleTypeSyntax tupleType, INamedTypeSymbol tupleSymbol, int sourceOffset, TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         var syntaxElements =
             tupleType.Elements;
@@ -341,9 +381,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
                 syntaxElements.Count,
                 symbolElements.Length);
 
-        for (var index = 0;
-             index < count;
-             index++)
+        for (var index = 0; index < count; index++)
         {
             AddTypeClassifications(
                 syntaxElements[index].Type,
@@ -369,12 +407,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         return typeSymbol;
     }
 
-    private static void AddTypeNameClassification(
-        TextSpan csharpSpan,
-        RoslynITypeSymbol typeSymbol,
-        int sourceOffset,
-        TextSpan requestedSpan,
-        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
+    private static void AddTypeNameClassification(TextSpan csharpSpan, RoslynITypeSymbol typeSymbol, int sourceOffset, TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         var classification =
             GetRoslynClassification(
@@ -403,9 +436,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
                 classification.Value));
     }
 
-    private static RoslynITypeSymbol? GetDeclaredTypeSymbol(
-        AkburaSemanticModel semanticModel,
-        CSharpTypeSyntax typeSyntax)
+    private static RoslynITypeSymbol? GetDeclaredTypeSymbol(AkburaSemanticModel semanticModel, CSharpTypeSyntax typeSyntax)
     {
         return typeSyntax.Parent switch
         {
@@ -445,12 +476,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         };
     }
 
-    public void AddClassifications(
-        AkburaSemanticModel semanticModel,
-        AkburaSyntax root,
-        TextSpan requestedSpan,
-        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
-        CancellationToken cancellationToken)
+    public void AddClassifications(AkburaSemanticModel semanticModel, AkburaSyntax root, TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder, CancellationToken cancellationToken)
     {
         foreach (var node in root.DescendantNodes())
         {
@@ -521,10 +547,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         }
     }
 
-    private static void AddReferences(
-        ImmutableArray<CSharpSymbolReference> references,
-        TextSpan requestedSpan,
-        ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
+    private static void AddReferences(ImmutableArray<CSharpSymbolReference> references, TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
         foreach (var reference in references)
         {
@@ -680,9 +703,7 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         };
     }
 
-    private static AkburaClassificationKind
-        GetNamedTypeClassification(
-            INamedTypeSymbol type)
+    private static AkburaClassificationKind GetNamedTypeClassification(INamedTypeSymbol type)
     {
         return type.TypeKind switch
         {

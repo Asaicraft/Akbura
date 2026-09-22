@@ -77,6 +77,76 @@ public sealed class LifecycleTests
                 LspMethods.Initialized,
                 new InitializedParams());
 
+            var resourceUri = new Uri(
+                Path.Combine(root.FullName, "App.axaml"));
+            const string resourceSource =
+                "<ResourceDictionary " +
+                "xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">" +
+                "<SolidColorBrush x:Key=\"Accent\"/>" +
+                "</ResourceDictionary>";
+            await rpc.NotifyWithParameterObjectAsync(
+                LspMethods.ResourceDocumentDidOpen,
+                new DidOpenTextDocumentParams
+                {
+                    TextDocument = new TextDocumentItem
+                    {
+                        Uri = resourceUri.AbsoluteUri,
+                        LanguageId = "xml",
+                        Version = 1,
+                        Text = resourceSource,
+                    },
+                });
+            var keyStart = resourceSource.IndexOf(
+                "Accent",
+                StringComparison.Ordinal);
+            await rpc.NotifyWithParameterObjectAsync(
+                LspMethods.ResourceDocumentDidChange,
+                new DidChangeTextDocumentParams
+                {
+                    TextDocument = new VersionedTextDocumentIdentifier
+                    {
+                        Uri = resourceUri.AbsoluteUri,
+                        Version = 2,
+                    },
+                    ContentChanges =
+                    [
+                        new TextDocumentContentChangeEvent
+                        {
+                            Range = new Protocol.Range
+                            {
+                                Start = new Position
+                                {
+                                    Character = keyStart,
+                                },
+                                End = new Position
+                                {
+                                    Character = keyStart + "Accent".Length,
+                                },
+                            },
+                            RangeLength = "Accent".Length,
+                            Text = "AccentLive",
+                        },
+                    ],
+                });
+            await rpc.NotifyWithParameterObjectAsync(
+                LspMethods.ResourceDocumentDidSave,
+                new DidSaveTextDocumentParams
+                {
+                    TextDocument = new TextDocumentIdentifier
+                    {
+                        Uri = resourceUri.AbsoluteUri,
+                    },
+                });
+            await rpc.NotifyWithParameterObjectAsync(
+                LspMethods.ResourceDocumentDidClose,
+                new DidCloseTextDocumentParams
+                {
+                    TextDocument = new TextDocumentIdentifier
+                    {
+                        Uri = resourceUri.AbsoluteUri,
+                    },
+                });
+
             var documentUri = new Uri(
                 Path.Combine(root.FullName, "Component.akbura"));
             const string source =

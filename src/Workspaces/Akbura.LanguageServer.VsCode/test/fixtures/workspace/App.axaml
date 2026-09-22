@@ -1,0 +1,10 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Application.Resources>
+    <ResourceDictionary>
+      <x:String x:Key="DiskResource">disk</x:String>
+      <x:String x:Key="Icon.Home">home</x:String>
+      <x:String x:Key="--color-slate-300">slate</x:String>
+    </ResourceDictionary>
+  </Application.Resources>
+</Application>

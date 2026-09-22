@@ -15,11 +15,10 @@ public sealed class AkburaProjectSynchronizer
     private readonly AkburaWorkspace _workspace;
     private readonly RoslynProjectContextFactory _contextFactory;
     private readonly RoslynProjectDocumentLoader _documentLoader;
+    private readonly RoslynResourceDocumentLoader _resourceDocumentLoader =
+        new();
 
-    public AkburaProjectSynchronizer(
-        AkburaWorkspace workspace,
-        RoslynProjectContextFactory? contextFactory = null,
-        RoslynProjectDocumentLoader? documentLoader = null)
+    public AkburaProjectSynchronizer(AkburaWorkspace workspace, RoslynProjectContextFactory? contextFactory = null, RoslynProjectDocumentLoader? documentLoader = null)
     {
         _workspace = workspace ??
             throw new ArgumentNullException(nameof(workspace));
@@ -29,11 +28,7 @@ public sealed class AkburaProjectSynchronizer
             new RoslynProjectDocumentLoader();
     }
 
-    public Task<ImmutableArray<AkburaLoadedProject>>
-        SynchronizeSolutionAsync(
-            Solution solution,
-            Func<Uri, SourceText?>? openTextProvider,
-            CancellationToken cancellationToken)
+    public Task<ImmutableArray<AkburaLoadedProject>> SynchronizeSolutionAsync(Solution solution, Func<Uri, SourceText?>? openTextProvider, CancellationToken cancellationToken)
     {
         if (solution == null)
         {
@@ -47,12 +42,7 @@ public sealed class AkburaProjectSynchronizer
             cancellationToken);
     }
 
-    public async Task<AkburaLoadedProject> SynchronizeProjectAsync(
-        Project project,
-        Func<Uri, SourceText?>? openTextProvider,
-        Uri? excludedDocument,
-        bool includeProjectReferences,
-        CancellationToken cancellationToken)
+    public async Task<AkburaLoadedProject> SynchronizeProjectAsync(Project project, Func<Uri, SourceText?>? openTextProvider, Uri? excludedDocument, bool includeProjectReferences, CancellationToken cancellationToken)
     {
         if (project == null)
         {
@@ -95,12 +85,7 @@ public sealed class AkburaProjectSynchronizer
             .ConfigureAwait(false);
     }
 
-    public async Task<AkburaLoadedProject> SynchronizeProjectAsync(
-        Project project,
-        CSharpCompilation compilation,
-        Func<Uri, SourceText?>? openTextProvider,
-        Uri? excludedDocument,
-        CancellationToken cancellationToken)
+    public async Task<AkburaLoadedProject> SynchronizeProjectAsync(Project project, CSharpCompilation compilation, Func<Uri, SourceText?>? openTextProvider, Uri? excludedDocument, CancellationToken cancellationToken)
     {
         if (project == null)
         {
@@ -123,24 +108,32 @@ public sealed class AkburaProjectSynchronizer
                 excludedDocument,
                 cancellationToken)
             .ConfigureAwait(false);
+        var resourceDocuments = await _resourceDocumentLoader
+            .LoadAsync(
+                project,
+                compilation,
+                openTextProvider,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         var projectSnapshot = _workspace.AddOrUpdateProject(context);
         _workspace.SynchronizeProjectDocuments(
             projectSnapshot.Id,
             documents,
             cancellationToken);
+        _workspace.SynchronizeProjectResourceDocuments(
+            projectSnapshot.Id,
+            resourceDocuments,
+            cancellationToken);
 
         return new AkburaLoadedProject(
             context,
             documents,
+            resourceDocuments,
             ImmutableArray<AkburaProjectLoadDiagnostic>.Empty);
     }
 
-    private async Task<ImmutableArray<AkburaLoadedProject>>
-        SynchronizeProjectsAsync(
-            IEnumerable<Project> projects,
-            Func<Uri, SourceText?>? openTextProvider,
-            CancellationToken cancellationToken)
+    private async Task<ImmutableArray<AkburaLoadedProject>> SynchronizeProjectsAsync(IEnumerable<Project> projects, Func<Uri, SourceText?>? openTextProvider, CancellationToken cancellationToken)
     {
         var ordered = OrderProjects(projects);
         var loaded = new AkburaLoadedProject[ordered.Length];
@@ -164,8 +157,7 @@ public sealed class AkburaProjectSynchronizer
         return results.ToImmutable();
     }
 
-    private static ImmutableArray<Project> OrderProjects(
-        IEnumerable<Project> projects)
+    private static ImmutableArray<Project> OrderProjects(IEnumerable<Project> projects)
     {
         var source = projects
             .Where(static project =>

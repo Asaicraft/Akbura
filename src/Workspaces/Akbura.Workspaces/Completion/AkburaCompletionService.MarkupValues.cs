@@ -9,9 +9,221 @@ namespace Akbura.Workspaces.Completion;
 
 internal sealed partial class AkburaCompletionService
 {
-    private static MarkupElementSyntax? FindCompletionElement(
-        AkburaSemanticModel semanticModel,
-        int position)
+    private static ImmutableArray<AkburaCompletionItem> GetBindingPathItems(AkburaSemanticModel semanticModel, AkburaSyntacticCompletionContext context, CancellationToken cancellationToken)
+    {
+        if (!TryGetMarkupCompletionSyntax(
+                semanticModel,
+                context,
+                out var attribute,
+                out var extension))
+        {
+            return [];
+        }
+
+        var items = new Dictionary<string, AkburaCompletionItem>(
+            StringComparer.Ordinal);
+        var completedPath = context.CompletedPath ?? string.Empty;
+        if (completedPath.Length == 0)
+        {
+            foreach (var root in semanticModel.LookupMarkupBindingPathRootsForCompletion(attribute, cancellationToken))
+            {
+                if (!MatchesPrefix(root.Name, context.Prefix))
+                {
+                    continue;
+                }
+
+                items[root.Name] = new AkburaCompletionItem(
+                    root.Name,
+                    root.Name,
+                    AkburaCompletionKind.Keyword,
+                    root.Type?.ToDisplayString(
+                        SymbolDisplayFormat.FullyQualifiedFormat) ??
+                    "Binding path root.",
+                    descriptionFactory: null,
+                    priority: 0);
+            }
+        }
+
+        foreach (var candidate in semanticModel.LookupMarkupBindingPathMembersForCompletion(attribute, extension, completedPath, cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!MatchesPrefix(
+                    candidate.Name,
+                    context.Prefix))
+            {
+                continue;
+            }
+
+            const int priority = 10;
+            items[candidate.Name] = new AkburaCompletionItem(
+                candidate.Name,
+                candidate.Name,
+                AkburaCompletionKind.Property,
+                candidate.Symbol.ToDisplayString(),
+                descriptionFactory: null,
+                sortText: $"{priority:D2}_{candidate.Name}",
+                suffix: candidate.Type.ToDisplayString(
+                    SymbolDisplayFormat.MinimallyQualifiedFormat),
+                priority: priority);
+        }
+
+        return OrderCompletionItems(
+            items.Values,
+            context.Prefix);
+    }
+
+    private static ImmutableArray<AkburaCompletionItem> GetMarkupExtensionArgumentNameItems(AkburaSemanticModel semanticModel, AkburaSyntacticCompletionContext context, CancellationToken cancellationToken)
+    {
+        if (!TryGetMarkupCompletionSyntax(
+                semanticModel,
+                context,
+                out _,
+                out var extension))
+        {
+            return [];
+        }
+
+        using var items =
+            Akbura.Pools.ImmutableArrayBuilder<AkburaCompletionItem>
+                .Rent();
+        foreach (var candidate in semanticModel.LookupMarkupExtensionArgumentsForCompletion(extension, cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!MatchesPrefix(
+                    candidate.Name,
+                    context.Prefix))
+            {
+                continue;
+            }
+
+            items.Add(new AkburaCompletionItem(
+                candidate.Name,
+                candidate.Name + "=",
+                AkburaCompletionKind.Property,
+                candidate.Symbol?.ToDisplayString() ??
+                    candidate.Name,
+                descriptionFactory: null,
+                suffix: candidate.Type.ToDisplayString(
+                    SymbolDisplayFormat.MinimallyQualifiedFormat),
+                triggerCompletionAfterInsert: true));
+        }
+
+        return OrderCompletionItems(
+            items.ToImmutable(),
+            context.Prefix);
+    }
+
+    private static ImmutableArray<AkburaCompletionItem> GetMarkupExtensionArgumentValueItems(AkburaSemanticModel semanticModel, AkburaSyntacticCompletionContext context, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(
+                context.MarkupExtensionArgumentName) ||
+            !TryGetMarkupCompletionSyntax(
+                semanticModel,
+                context,
+                out _,
+                out var extension) ||
+            semanticModel
+                .GetMarkupExtensionArgumentValueTypeForCompletion(
+                    extension,
+                    context.MarkupExtensionArgumentName!,
+                    cancellationToken) is not { } valueType)
+        {
+            return [];
+        }
+
+        using var items =
+            Akbura.Pools.ImmutableArrayBuilder<AkburaCompletionItem>
+                .Rent();
+        if (valueType.TypeKind == TypeKind.Enum)
+        {
+            foreach (var field in valueType.GetMembers().OfType<IFieldSymbol>())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!field.HasConstantValue ||
+                    !MatchesPrefix(field.Name, context.Prefix))
+                {
+                    continue;
+                }
+
+                items.Add(new AkburaCompletionItem(
+                    field.Name,
+                    field.Name,
+                    AkburaCompletionKind.AkcssValue,
+                    field.ToDisplayString(),
+                    descriptionFactory: null));
+            }
+        }
+        else if (valueType.SpecialType ==
+                 SpecialType.System_Boolean)
+        {
+            foreach (var value in new[] { "false", "true" })
+            {
+                if (MatchesPrefix(value, context.Prefix))
+                {
+                    items.Add(new AkburaCompletionItem(
+                        value,
+                        value,
+                        AkburaCompletionKind.AkcssValue,
+                        "bool literal",
+                        descriptionFactory: null));
+                }
+            }
+        }
+
+        return OrderCompletionItems(
+            items.ToImmutable(),
+            context.Prefix);
+    }
+
+    private static bool TryGetMarkupCompletionSyntax(AkburaSemanticModel semanticModel, AkburaSyntacticCompletionContext context, out MarkupAttributeSyntax attribute, out MarkupExtensionSyntax extension)
+    {
+        extension = FindMarkupExtensionSyntax(
+            semanticModel,
+            context.MarkupExtensionSpan)!;
+        if (extension == null)
+        {
+            attribute = null!;
+            return false;
+        }
+
+        for (var current = extension.Parent; current != null; current = current.Parent)
+        {
+            if (current is MarkupAttributeSyntax candidate)
+            {
+                attribute = candidate;
+                return true;
+            }
+        }
+
+        attribute = null!;
+        extension = null!;
+        return false;
+    }
+
+    private static MarkupExtensionSyntax? FindMarkupExtensionSyntax(AkburaSemanticModel semanticModel, Microsoft.CodeAnalysis.Text.TextSpan span)
+    {
+        var root = semanticModel.SyntaxTree.GetRootSyntax();
+        if (root.FullSpan.Length == 0)
+        {
+            return null;
+        }
+
+        var tokenPosition = Math.Min(
+            Math.Max(span.Start, root.FullSpan.Start),
+            root.FullSpan.End - 1);
+        for (var node = root.FindToken(tokenPosition).Parent; node != null; node = node.Parent)
+        {
+            if (node is MarkupExtensionSyntax candidate &&
+                candidate.Span == span)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private static MarkupElementSyntax? FindCompletionElement(AkburaSemanticModel semanticModel, int position)
     {
         return semanticModel.SyntaxTree.GetRootSyntax().DescendantNodes()
             .OfType<MarkupElementSyntax>()
@@ -22,10 +234,7 @@ internal sealed partial class AkburaCompletionService
             .FirstOrDefault();
     }
 
-    private static IEnumerable<AkburaCompletionItem> GetDictionaryKeyItems(
-        AkburaSemanticModel semanticModel,
-        AkburaSyntacticCompletionContext context,
-        int position)
+    private static IEnumerable<AkburaCompletionItem> GetDictionaryKeyItems(AkburaSemanticModel semanticModel, AkburaSyntacticCompletionContext context, int position)
     {
         if (!MatchesPrefix("x.key", context.Prefix) ||
             FindCompletionElement(semanticModel, position) is not { } element ||
@@ -46,11 +255,7 @@ internal sealed partial class AkburaCompletionService
             descriptionFactory: null, caretOffsetFromEnd: 1)];
     }
 
-    private static ImmutableArray<AkburaCompletionItem> GetAttributeValueItems(
-        AkburaSemanticModel semanticModel,
-        AkburaSyntacticCompletionContext context,
-        int position,
-        CancellationToken cancellationToken)
+    private static ImmutableArray<AkburaCompletionItem> GetAttributeValueItems(AkburaSemanticModel semanticModel, AkburaSyntacticCompletionContext context, int position, CancellationToken cancellationToken)
     {
         var element = FindCompletionElement(semanticModel, position);
         var attribute = element?.StartTag?.Attributes.FirstOrDefault(candidate =>
@@ -116,11 +321,7 @@ internal sealed partial class AkburaCompletionService
         return OrderCompletionItems(items.Values, context.Prefix);
     }
 
-    private static void AddLiteralValueItem(
-        Dictionary<string, AkburaCompletionItem> items,
-        string name,
-        Microsoft.CodeAnalysis.ISymbol symbol,
-        string prefix)
+    private static void AddLiteralValueItem(Dictionary<string, AkburaCompletionItem> items, string name, Microsoft.CodeAnalysis.ISymbol symbol, string prefix)
     {
         if (MatchesPrefix(name, prefix))
         {
@@ -130,12 +331,7 @@ internal sealed partial class AkburaCompletionService
         }
     }
 
-    private static ImmutableArray<AkburaCompletionItem> GetPropertyReferenceItems(
-        AkburaSemanticModel semanticModel,
-        MarkupElementSyntax element,
-        ITypeSymbol declaredType,
-        string prefix,
-        CancellationToken cancellationToken)
+    private static ImmutableArray<AkburaCompletionItem> GetPropertyReferenceItems(AkburaSemanticModel semanticModel, MarkupElementSyntax element, ITypeSymbol declaredType, string prefix, CancellationToken cancellationToken)
     {
         var items = new Dictionary<string, AkburaCompletionItem>(StringComparer.Ordinal);
         var separator = prefix.LastIndexOf('.');
@@ -200,9 +396,7 @@ internal sealed partial class AkburaCompletionService
         return OrderCompletionItems(items.Values, prefix);
     }
 
-    private static IEnumerable<IFieldSymbol> GetPropertyReferenceFields(
-        AkburaSemanticModel semanticModel,
-        INamedTypeSymbol owner)
+    private static IEnumerable<IFieldSymbol> GetPropertyReferenceFields(AkburaSemanticModel semanticModel, INamedTypeSymbol owner)
     {
         for (var type = owner; type != null; type = type.BaseType)
         {

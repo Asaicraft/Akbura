@@ -1,5 +1,6 @@
 using Akbura.Language;
 using Akbura.Pools;
+using Akbura.Workspaces.Resources;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 
@@ -16,8 +17,7 @@ public sealed class AkburaWorkspace : IDisposable
     private AkburaSolutionSnapshot _currentSolution;
     private int _disposeState;
 
-    public AkburaWorkspace()
-        : this(ProjectContext.CreateSyntaxOnly())
+    public AkburaWorkspace() : this(ProjectContext.CreateSyntaxOnly())
     {
     }
 
@@ -48,8 +48,7 @@ public sealed class AkburaWorkspace : IDisposable
     public event EventHandler<AkburaWorkspaceChangedEventArgs>?
         Changed;
 
-    public AkburaProjectSnapshot AddOrUpdateProject(
-        ProjectContext context)
+    public AkburaProjectSnapshot AddOrUpdateProject(ProjectContext context)
     {
         if (context == null)
         {
@@ -130,11 +129,7 @@ public sealed class AkburaWorkspace : IDisposable
 
         Changed?.Invoke(this, eventArgs);
     }
-    public AkburaDocumentSnapshot OpenOrChangeDocument(
-        Uri uri,
-        SourceText text,
-        IReadOnlyList<TextChangeRange>? changes = null,
-        CancellationToken cancellationToken = default)
+    public AkburaDocumentSnapshot OpenOrChangeDocument(Uri uri, SourceText text, IReadOnlyList<TextChangeRange>? changes = null, CancellationToken cancellationToken = default)
     {
         return OpenOrChangeDocumentContext(
             uri,
@@ -143,11 +138,7 @@ public sealed class AkburaWorkspace : IDisposable
             cancellationToken).Document;
     }
 
-    public AkburaDocumentContext OpenOrChangeDocumentContext(
-        Uri uri,
-        SourceText text,
-        IReadOnlyList<TextChangeRange>? changes = null,
-        CancellationToken cancellationToken = default)
+    public AkburaDocumentContext OpenOrChangeDocumentContext(Uri uri, SourceText text, IReadOnlyList<TextChangeRange>? changes = null, CancellationToken cancellationToken = default)
     {
         return OpenOrChangeDocumentContext(
             DefaultProjectId,
@@ -157,12 +148,7 @@ public sealed class AkburaWorkspace : IDisposable
             cancellationToken);
     }
 
-    public AkburaDocumentContext OpenOrChangeDocumentContext(
-        AkburaProjectId projectId,
-        Uri uri,
-        SourceText text,
-        IReadOnlyList<TextChangeRange>? changes = null,
-        CancellationToken cancellationToken = default)
+    public AkburaDocumentContext OpenOrChangeDocumentContext(AkburaProjectId projectId, Uri uri, SourceText text, IReadOnlyList<TextChangeRange>? changes = null, CancellationToken cancellationToken = default)
     {
         if (uri == null)
         {
@@ -301,11 +287,7 @@ public sealed class AkburaWorkspace : IDisposable
         return result;
     }
 
-    public AkburaDocumentSnapshot OpenDocument(
-        AkburaProjectId projectId,
-        Uri uri,
-        SourceText text,
-        CancellationToken cancellationToken = default)
+    public AkburaDocumentSnapshot OpenDocument(AkburaProjectId projectId, Uri uri, SourceText text, CancellationToken cancellationToken = default)
     {
         if (uri == null)
         {
@@ -378,10 +360,7 @@ public sealed class AkburaWorkspace : IDisposable
     /// project transition. Syntax trees and project references are rebuilt
     /// once after every document has been parsed.
     /// </summary>
-    public AkburaProjectSnapshot SynchronizeProjectDocuments(
-        AkburaProjectId projectId,
-        ImmutableArray<AkburaDocumentInput> inputs,
-        CancellationToken cancellationToken = default)
+    public AkburaProjectSnapshot SynchronizeProjectDocuments(AkburaProjectId projectId, ImmutableArray<AkburaDocumentInput> inputs, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
 
@@ -467,11 +446,344 @@ public sealed class AkburaWorkspace : IDisposable
         return result;
     }
 
-    public AkburaDocumentSnapshot ChangeDocument(
-        AkburaDocumentId documentId,
-        SourceText newText,
-        IReadOnlyList<TextChangeRange>? changes = null,
-        CancellationToken cancellationToken = default)
+    internal AkburaProjectSnapshot SynchronizeProjectResourceDocuments(AkburaProjectId projectId, ImmutableArray<ResourceDocumentInput> inputs, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+
+        AkburaWorkspaceChangedEventArgs? eventArgs = null;
+        AkburaProjectSnapshot result;
+
+        lock (_mutationGate)
+        {
+            ThrowIfDisposed();
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var oldSolution = _currentSolution;
+            var oldProject = oldSolution.GetRequiredProject(projectId);
+            var builder = ImmutableDictionary.CreateBuilder<
+                ResourceDictionaryIdentity,
+                ResourceDocumentSnapshot>();
+
+            foreach (var input in inputs)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var identity = input.DictionaryIdentity;
+                ResourceDocumentSnapshot snapshot;
+                if (oldProject.ResourceDocuments.TryGetValue(
+                        identity,
+                        out var oldDocument) &&
+                    DocumentUri.Equals(oldDocument.Uri, input.Uri) &&
+                    string.Equals(
+                        oldDocument.Input.ProjectKey,
+                        input.ProjectKey,
+                        StringComparison.Ordinal) &&
+                    string.Equals(
+                        oldDocument.Input.TargetFramework,
+                        input.TargetFramework,
+                        StringComparison.Ordinal))
+                {
+                    snapshot = oldDocument.Version == input.Version &&
+                        oldDocument.Text.ContentEquals(input.Text)
+                            ? oldDocument
+                            : oldDocument.WithText(
+                                input.Text,
+                                input.Version,
+                                changes: null,
+                                cancellationToken);
+                }
+                else
+                {
+                    snapshot = ResourceDocumentSnapshot.Create(
+                        input,
+                        cancellationToken);
+                }
+
+                builder[identity] = snapshot;
+            }
+
+            var resourceDocuments = builder.ToImmutable();
+            if (HaveSameResourceDocuments(
+                    oldProject.ResourceDocuments,
+                    resourceDocuments))
+            {
+                return oldProject;
+            }
+
+            result = oldProject.WithResourceDocuments(resourceDocuments);
+            var newSolution = oldSolution.WithProject(result);
+            PublishSolution(newSolution);
+            eventArgs = new AkburaWorkspaceChangedEventArgs(
+                AkburaWorkspaceChangeKind.ProjectChanged,
+                oldSolution,
+                newSolution,
+                projectId);
+        }
+
+        Changed?.Invoke(this, eventArgs);
+        return result;
+    }
+
+    internal ResourceDocumentSnapshot OpenOrChangeResourceDocument(AkburaProjectId projectId, ResourceDocumentInput input, IReadOnlyList<TextChangeRange>? changes = null, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        AkburaWorkspaceChangedEventArgs eventArgs;
+        ResourceDocumentSnapshot result;
+
+        lock (_mutationGate)
+        {
+            ThrowIfDisposed();
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var oldSolution = _currentSolution;
+            var project = WithResourceDocument(
+                oldSolution.GetRequiredProject(projectId),
+                input,
+                changes,
+                cancellationToken,
+                out result);
+            var newSolution = oldSolution.WithProject(project);
+            PublishSolution(newSolution);
+            eventArgs = new AkburaWorkspaceChangedEventArgs(
+                AkburaWorkspaceChangeKind.ProjectChanged,
+                oldSolution,
+                newSolution,
+                projectId);
+        }
+
+        Changed?.Invoke(this, eventArgs);
+        return result;
+    }
+
+    internal void OpenOrChangeResourceDocuments(ImmutableArray<(AkburaProjectId ProjectId, ResourceDocumentInput Input)> updates, IReadOnlyList<TextChangeRange>? changes = null, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        if (updates.IsDefault)
+        {
+            throw new ArgumentException(
+                "Resource document updates must be initialized.",
+                nameof(updates));
+        }
+
+        if (updates.IsEmpty)
+        {
+            return;
+        }
+
+        ImmutableArray<AkburaProjectId> changedProjects;
+        AkburaSolutionSnapshot oldSolution;
+        AkburaSolutionSnapshot newSolution;
+        lock (_mutationGate)
+        {
+            ThrowIfDisposed();
+            cancellationToken.ThrowIfCancellationRequested();
+
+            oldSolution = _currentSolution;
+            newSolution = oldSolution;
+            var changed = ImmutableArray.CreateBuilder<AkburaProjectId>(
+                updates.Length);
+            foreach (var update in updates)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!newSolution.TryGetProject(
+                        update.ProjectId,
+                        out var project))
+                {
+                    continue;
+                }
+
+                project = WithResourceDocument(
+                    project,
+                    update.Input,
+                    changes,
+                    cancellationToken,
+                    out _);
+                newSolution = newSolution.WithProject(project);
+                changed.Add(update.ProjectId);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            if (changed.Count == 0)
+            {
+                return;
+            }
+
+            changedProjects = changed.ToImmutable();
+            PublishSolution(newSolution);
+        }
+
+        foreach (var projectId in changedProjects)
+        {
+            Changed?.Invoke(
+                this,
+                new AkburaWorkspaceChangedEventArgs(
+                    AkburaWorkspaceChangeKind.ProjectChanged,
+                    oldSolution,
+                    newSolution,
+                    projectId));
+        }
+    }
+
+    internal void RemoveResourceDocument(AkburaProjectId projectId, Uri uri)
+    {
+        if (uri == null)
+        {
+            throw new ArgumentNullException(nameof(uri));
+        }
+
+        ThrowIfDisposed();
+        AkburaWorkspaceChangedEventArgs? eventArgs = null;
+        lock (_mutationGate)
+        {
+            var oldSolution = _currentSolution;
+            var project = oldSolution.GetRequiredProject(projectId);
+            var documents = project.ResourceDocuments;
+            ResourceDictionaryIdentity? identity = null;
+            foreach (var pair in documents)
+            {
+                if (DocumentUri.Equals(pair.Value.Uri, uri))
+                {
+                    identity = pair.Key;
+                    break;
+                }
+            }
+
+            if (identity == null)
+            {
+                return;
+            }
+
+            project = project.WithResourceDocuments(
+                documents.Remove(identity.Value));
+            var newSolution = oldSolution.WithProject(project);
+            PublishSolution(newSolution);
+            eventArgs = new AkburaWorkspaceChangedEventArgs(
+                AkburaWorkspaceChangeKind.ProjectChanged,
+                oldSolution,
+                newSolution,
+                projectId);
+        }
+
+        Changed?.Invoke(this, eventArgs);
+    }
+
+    private static AkburaProjectSnapshot WithResourceDocument(AkburaProjectSnapshot project, ResourceDocumentInput input, IReadOnlyList<TextChangeRange>? changes, CancellationToken cancellationToken, out ResourceDocumentSnapshot result)
+    {
+        var documents = project.ResourceDocuments;
+        foreach (var pair in documents)
+        {
+            if (DocumentUri.Equals(pair.Value.Uri, input.Uri) &&
+                pair.Key != input.DictionaryIdentity)
+            {
+                documents = documents.Remove(pair.Key);
+                break;
+            }
+        }
+
+        if (documents.TryGetValue(
+                input.DictionaryIdentity,
+                out var oldDocument))
+        {
+            result = oldDocument.WithText(
+                input.Text,
+                input.Version,
+                changes,
+                cancellationToken);
+        }
+        else
+        {
+            result = ResourceDocumentSnapshot.Create(
+                input,
+                cancellationToken);
+        }
+
+        return project.WithResourceDocuments(
+            documents.SetItem(
+                input.DictionaryIdentity,
+                result));
+    }
+
+    internal bool TryRestoreResourceDocument(AkburaProjectId projectId, Uri uri, SourceText expectedText, ResourceDocumentInput? persistedInput, CancellationToken cancellationToken = default)
+    {
+        if (uri == null)
+        {
+            throw new ArgumentNullException(nameof(uri));
+        }
+
+        if (expectedText == null)
+        {
+            throw new ArgumentNullException(nameof(expectedText));
+        }
+
+        if (persistedInput is { } input &&
+            !DocumentUri.Equals(input.Uri, uri))
+        {
+            throw new ArgumentException(
+                "The persisted resource input belongs to another URI.",
+                nameof(persistedInput));
+        }
+
+        ThrowIfDisposed();
+        AkburaWorkspaceChangedEventArgs eventArgs;
+        lock (_mutationGate)
+        {
+            ThrowIfDisposed();
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var oldSolution = _currentSolution;
+            var project = oldSolution.GetRequiredProject(projectId);
+            var documents = project.ResourceDocuments;
+            ResourceDictionaryIdentity? identity = null;
+            ResourceDocumentSnapshot? current = null;
+            foreach (var pair in documents)
+            {
+                if (DocumentUri.Equals(pair.Value.Uri, uri))
+                {
+                    identity = pair.Key;
+                    current = pair.Value;
+                    break;
+                }
+            }
+
+            if (identity == null ||
+                current == null ||
+                !current.Text.ContentEquals(expectedText))
+            {
+                return false;
+            }
+
+            documents = documents.Remove(identity.Value);
+            if (persistedInput is { } persisted)
+            {
+                var restored = identity.Value ==
+                        persisted.DictionaryIdentity
+                    ? current.WithText(
+                        persisted.Text,
+                        persisted.Version,
+                        changes: null,
+                        cancellationToken)
+                    : ResourceDocumentSnapshot.Create(
+                        persisted,
+                        cancellationToken);
+                documents = documents.SetItem(
+                    persisted.DictionaryIdentity,
+                    restored);
+            }
+
+            project = project.WithResourceDocuments(documents);
+            var newSolution = oldSolution.WithProject(project);
+            PublishSolution(newSolution);
+            eventArgs = new AkburaWorkspaceChangedEventArgs(
+                AkburaWorkspaceChangeKind.ProjectChanged,
+                oldSolution,
+                newSolution,
+                projectId);
+        }
+
+        Changed?.Invoke(this, eventArgs);
+        return true;
+    }
+
+    public AkburaDocumentSnapshot ChangeDocument(AkburaDocumentId documentId, SourceText newText, IReadOnlyList<TextChangeRange>? changes = null, CancellationToken cancellationToken = default)
     {
         if (newText == null)
         {
@@ -524,8 +836,7 @@ public sealed class AkburaWorkspace : IDisposable
         return result;
     }
 
-    public void CloseDocument(
-        AkburaDocumentId documentId)
+    public void CloseDocument(AkburaDocumentId documentId)
     {
         ThrowIfDisposed();
 
@@ -574,8 +885,7 @@ public sealed class AkburaWorkspace : IDisposable
         Changed?.Invoke(this, eventArgs);
     }
 
-    public void RemoveDocument(
-        AkburaDocumentId documentId)
+    public void RemoveDocument(AkburaDocumentId documentId)
     {
         ThrowIfDisposed();
 
@@ -617,9 +927,7 @@ public sealed class AkburaWorkspace : IDisposable
         Changed?.Invoke(this, eventArgs);
     }
 
-    public bool TryGetDocument(
-        AkburaDocumentId documentId,
-        out AkburaDocumentSnapshot document)
+    public bool TryGetDocument(AkburaDocumentId documentId, out AkburaDocumentSnapshot document)
     {
         ThrowIfDisposed();
 
@@ -631,9 +939,7 @@ public sealed class AkburaWorkspace : IDisposable
             out document);
     }
 
-    public bool TryGetDocument(
-        Uri uri,
-        out AkburaDocumentSnapshot document)
+    public bool TryGetDocument(Uri uri, out AkburaDocumentSnapshot document)
     {
         if (uri == null)
         {
@@ -659,17 +965,14 @@ public sealed class AkburaWorkspace : IDisposable
         }
     }
 
-    private void PublishSolution(
-        AkburaSolutionSnapshot solution)
+    private void PublishSolution(AkburaSolutionSnapshot solution)
     {
         Volatile.Write(
             ref _currentSolution,
             solution);
     }
 
-    private static AkburaSolutionSnapshot
-        RebuildProjectReferences(
-            AkburaSolutionSnapshot solution)
+    private static AkburaSolutionSnapshot RebuildProjectReferences(AkburaSolutionSnapshot solution)
     {
         var rebuiltProjects =
             new Dictionary<
@@ -678,8 +981,7 @@ public sealed class AkburaWorkspace : IDisposable
         var visiting =
             new HashSet<AkburaProjectId>();
 
-        AkburaProjectSnapshot Rebuild(
-            AkburaProjectId projectId)
+        AkburaProjectSnapshot Rebuild(AkburaProjectId projectId)
         {
             if (rebuiltProjects.TryGetValue(
                     projectId,
@@ -708,8 +1010,7 @@ public sealed class AkburaWorkspace : IDisposable
                 project.Compilation
                     .CompilationReferences;
 
-            foreach (var projectReference in
-                     project.Context.ProjectReferences)
+            foreach (var projectReference in project.Context.ProjectReferences)
             {
                 var referencedProjectId =
                     AkburaProjectId.FromRoslyn(
@@ -745,14 +1046,12 @@ public sealed class AkburaWorkspace : IDisposable
             return rebuiltProject;
         }
 
-        foreach (var projectId in
-                 solution.Projects.Keys)
+        foreach (var projectId in solution.Projects.Keys)
         {
             _ = Rebuild(projectId);
         }
 
-        foreach (var project in
-                 rebuiltProjects.Values)
+        foreach (var project in rebuiltProjects.Values)
         {
             solution = solution.WithProject(project);
         }
@@ -760,10 +1059,7 @@ public sealed class AkburaWorkspace : IDisposable
         return solution;
     }
 
-    private static bool TryGetDocument(
-        ImmutableDictionary<AkburaDocumentId, AkburaDocumentSnapshot> documents,
-        Uri uri,
-        out AkburaDocumentSnapshot document)
+    private static bool TryGetDocument(ImmutableDictionary<AkburaDocumentId, AkburaDocumentSnapshot> documents, Uri uri, out AkburaDocumentSnapshot document)
     {
         foreach (var candidate in documents.Values)
         {
@@ -776,6 +1072,25 @@ public sealed class AkburaWorkspace : IDisposable
 
         document = null!;
         return false;
+    }
+
+    private static bool HaveSameResourceDocuments(ImmutableDictionary<ResourceDictionaryIdentity, ResourceDocumentSnapshot> left, ImmutableDictionary<ResourceDictionaryIdentity, ResourceDocumentSnapshot> right)
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        foreach (var pair in left)
+        {
+            if (!right.TryGetValue(pair.Key, out var document) ||
+                !ReferenceEquals(pair.Value, document))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void ThrowIfDisposed()

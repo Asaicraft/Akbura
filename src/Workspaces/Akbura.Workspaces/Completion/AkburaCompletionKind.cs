@@ -20,4 +20,5 @@ public enum AkburaCompletionKind
     TailwindUtility,
     Keyword,
     Hook,
+    Resource,
 }

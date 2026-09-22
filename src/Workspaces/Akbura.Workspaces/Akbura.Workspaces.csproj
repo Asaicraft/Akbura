@@ -21,6 +21,7 @@
 		</PackageReference>
 		<PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
 		<PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" />
+		<PackageReference Include="GuiLabs.Language.Xml" />
 		<PackageReference Include="System.Text.Json" />
 	</ItemGroup>
 

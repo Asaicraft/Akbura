@@ -15,6 +15,7 @@
 		<PackageVersion Include="Avalonia.Browser" Version="$(AvaloniaVersion)" />
 		<PackageVersion Include="Avalonia.Android" Version="$(AvaloniaVersion)" />
 		<PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+		<PackageVersion Include="GuiLabs.Language.Xml" Version="1.2.120" />
 		<PackageVersion Include="Microsoft.Build" Version="17.10.46" />
 		<PackageVersion Include="Microsoft.Build.Framework" Version="17.10.46" />
 		<PackageVersion Include="Microsoft.Build.Tasks.Core" Version="17.10.46" />

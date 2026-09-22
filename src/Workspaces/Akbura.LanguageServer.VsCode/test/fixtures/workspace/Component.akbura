@@ -1,1 +1,4 @@
-// Syntax-only VS Code integration-test workspace.
+using Avalonia.Controls;
+using Avalonia.Markup.Xaml.MarkupExtensions;
+
+<Border Tag=${StaticResource } />

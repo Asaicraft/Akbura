@@ -11,9 +11,7 @@ public sealed partial class AkburaSyntacticDocument
     /// <summary>
     /// Determines the completion construct at <paramref name="position"/>.
     /// </summary>
-    public AkburaSyntacticCompletionContext GetCompletionContext(
-        int position,
-        CancellationToken cancellationToken = default)
+    public AkburaSyntacticCompletionContext GetCompletionContext(int position, CancellationToken cancellationToken = default)
     {
         ValidatePosition(position);
         if (SyntaxTree.Kind == SyntaxTreeKind.Akcss)
@@ -43,6 +41,14 @@ public sealed partial class AkburaSyntacticDocument
                 out var markupExtensionContext))
         {
             return markupExtensionContext;
+        }
+
+        if (TryGetMarkupExtensionArgumentContext(
+                root,
+                position,
+                out var markupValueContext))
+        {
+            return markupValueContext;
         }
 
         if (TryGetIncompleteClosingTagContext(
@@ -164,9 +170,7 @@ public sealed partial class AkburaSyntacticDocument
     /// Returns a closing tag that should be inserted after a newly typed
     /// <c>&gt;</c>, or <see langword="null"/> when no insertion is needed.
     /// </summary>
-    public string? GetAutoClosingTagText(
-        int position,
-        CancellationToken cancellationToken = default)
+    public string? GetAutoClosingTagText(int position, CancellationToken cancellationToken = default)
     {
         ValidatePosition(position);
         if (SyntaxTree.Kind == SyntaxTreeKind.Akcss ||
@@ -225,9 +229,7 @@ public sealed partial class AkburaSyntacticDocument
     /// Returns text that should be inserted after a newly typed
     /// <c>/</c>, or <see langword="null"/> when no insertion is needed.
     /// </summary>
-    public string? GetSlashCompletionText(
-        int position,
-        CancellationToken cancellationToken = default)
+    public string? GetSlashCompletionText(int position, CancellationToken cancellationToken = default)
     {
         return TryGetSlashCompletionEdit(
                 position,
@@ -238,10 +240,7 @@ public sealed partial class AkburaSyntacticDocument
                 : null;
     }
 
-    internal bool TryGetSlashCompletionEdit(
-        int position,
-        out AkburaSlashCompletionEdit edit,
-        CancellationToken cancellationToken = default)
+    internal bool TryGetSlashCompletionEdit(int position, out AkburaSlashCompletionEdit edit, CancellationToken cancellationToken = default)
     {
         ValidatePosition(position);
         edit = default;
@@ -317,9 +316,7 @@ public sealed partial class AkburaSyntacticDocument
     /// Returns the structural indentation level for a closing tag completed
     /// after <c>&lt;/</c>, or <see langword="null"/> for other slash uses.
     /// </summary>
-    public int? GetSlashCompletionIndentationLevel(
-        int position,
-        CancellationToken cancellationToken = default)
+    public int? GetSlashCompletionIndentationLevel(int position, CancellationToken cancellationToken = default)
     {
         if (!TryGetSlashCompletionEdit(
                 position,
@@ -349,9 +346,7 @@ public sealed partial class AkburaSyntacticDocument
         }
     }
 
-    private TextSpan GetApplicableNameSpan(
-        int position,
-        int minimumStart)
+    private TextSpan GetApplicableNameSpan(int position, int minimumStart)
     {
         var start = position;
         while (start > minimumStart &&
@@ -364,9 +359,7 @@ public sealed partial class AkburaSyntacticDocument
         return TextSpan.FromBounds(start, position);
     }
 
-    private TextSpan GetApplicableAttributeNameSpan(
-        int position,
-        int minimumStart)
+    private TextSpan GetApplicableAttributeNameSpan(int position, int minimumStart)
     {
         var span = GetApplicableNameSpan(
             position,
@@ -384,10 +377,7 @@ public sealed partial class AkburaSyntacticDocument
         return span;
     }
 
-    private bool TryGetMarkupExtensionTypeContext(
-        AkburaSyntax root,
-        int position,
-        out AkburaSyntacticCompletionContext context)
+    private bool TryGetMarkupExtensionTypeContext(AkburaSyntax root, int position, out AkburaSyntacticCompletionContext context)
     {
         var nameStart = position;
         while (nameStart > 0 &&
@@ -441,10 +431,7 @@ public sealed partial class AkburaSyntacticDocument
         return GetMarkupStartTagStart(position) >= 0;
     }
 
-    private MarkupStartTagSyntax? GetStartTagAtPosition(
-        AkburaSyntax root,
-        AkburaSyntax? node,
-        int position)
+    private MarkupStartTagSyntax? GetStartTagAtPosition(AkburaSyntax root, AkburaSyntax? node, int position)
     {
         var startTag = FindAncestor<MarkupStartTagSyntax>(node);
         if (startTag != null)
@@ -508,10 +495,7 @@ public sealed partial class AkburaSyntacticDocument
         return quote == '\0' ? start : -1;
     }
 
-    private bool TryGetIncompleteClosingTagContext(
-        AkburaSyntax root,
-        int position,
-        out AkburaSyntacticCompletionContext context)
+    private bool TryGetIncompleteClosingTagContext(AkburaSyntax root, int position, out AkburaSyntacticCompletionContext context)
     {
         var nameStart = position;
         while (nameStart > 0 &&
@@ -549,10 +533,7 @@ public sealed partial class AkburaSyntacticDocument
         return true;
     }
 
-    private bool TryGetDeclarationModifierContext(
-        AkburaSyntax root,
-        int position,
-        out AkburaSyntacticCompletionContext context)
+    private bool TryGetDeclarationModifierContext(AkburaSyntax root, int position, out AkburaSyntacticCompletionContext context)
     {
         context = default;
         if (root is not AkburaDocumentSyntax document ||
@@ -562,8 +543,7 @@ public sealed partial class AkburaSyntacticDocument
         }
 
         var applicableSpan = GetTopLevelKeywordSpan(position);
-        foreach (var declaration in document.Members
-                     .OfType<ParamDeclarationSyntax>())
+        foreach (var declaration in document.Members.OfType<ParamDeclarationSyntax>())
         {
             if (position < declaration.ParamKeyword.Span.End ||
                 position > declaration.FullSpan.End ||
@@ -605,10 +585,7 @@ public sealed partial class AkburaSyntacticDocument
         return false;
     }
 
-    private bool TryGetTopLevelKeywordContext(
-        AkburaSyntax root,
-        int position,
-        out AkburaSyntacticCompletionContext context)
+    private bool TryGetTopLevelKeywordContext(AkburaSyntax root, int position, out AkburaSyntacticCompletionContext context)
     {
         context = default;
         if (root is not AkburaDocumentSyntax document ||
@@ -673,9 +650,7 @@ public sealed partial class AkburaSyntacticDocument
         return TextSpan.FromBounds(start, position);
     }
 
-    private static bool IsInsideComment(
-        AkburaSyntax root,
-        int position)
+    private static bool IsInsideComment(AkburaSyntax root, int position)
     {
         if (position == 0 || root.FullSpan.Length == 0)
         {
@@ -689,10 +664,7 @@ public sealed partial class AkburaSyntacticDocument
             SyntaxKind.MultiLineCommentTrivia;
     }
 
-    private static bool ContainsOnlyWhitespace(
-        SourceText text,
-        int start,
-        int end)
+    private static bool ContainsOnlyWhitespace(SourceText text, int start, int end)
     {
         for (var position = start; position < end; position++)
         {
@@ -711,9 +683,7 @@ public sealed partial class AkburaSyntacticDocument
             value is '_' or '-' or '.' or ':';
     }
 
-    private bool TryGetStartTagNameEndingAt(
-        int position,
-        out string name)
+    private bool TryGetStartTagNameEndingAt(int position, out string name)
     {
         name = string.Empty;
         var lessPosition = position - 2;
@@ -773,15 +743,10 @@ public sealed partial class AkburaSyntacticDocument
         return true;
     }
 
-    private static bool HasMatchingClosingTagAfter(
-        AkburaSyntax root,
-        int position,
-        string name)
+    private static bool HasMatchingClosingTagAfter(AkburaSyntax root, int position, string name)
     {
         var depth = 0;
-        foreach (var node in root.DescendantNodes()
-                     .Where(node => node.Span.Start >= position)
-                     .OrderBy(node => node.Span.Start))
+        foreach (var node in root.DescendantNodes().Where(node => node.Span.Start >= position).OrderBy(node => node.Span.Start))
         {
             if (node is MarkupStartTagSyntax startTag &&
                 startTag.CloseToken.Kind !=
@@ -811,17 +776,13 @@ public sealed partial class AkburaSyntacticDocument
         return false;
     }
 
-    private static bool IsBeforeTagClose(
-        int position,
-        SyntaxToken closeToken)
+    private static bool IsBeforeTagClose(int position, SyntaxToken closeToken)
     {
         return closeToken.IsMissing ||
             position < closeToken.Span.End;
     }
 
-    private static bool IsBeforeStartTagClose(
-        int position,
-        MarkupStartTagSyntax startTag)
+    private static bool IsBeforeStartTagClose(int position, MarkupStartTagSyntax startTag)
     {
         // The start-tag span is the authoritative boundary after a list of
         // attributes, including incomplete attributes recovered as utilities.
@@ -829,9 +790,7 @@ public sealed partial class AkburaSyntacticDocument
             position < startTag.Span.End;
     }
 
-    private bool IsInsideAttributeValue(
-        MarkupStartTagSyntax startTag,
-        int position)
+    private bool IsInsideAttributeValue(MarkupStartTagSyntax startTag, int position)
     {
         foreach (var attribute in startTag.Attributes)
         {
@@ -870,9 +829,7 @@ public sealed partial class AkburaSyntacticDocument
         return false;
     }
 
-    private AkburaSyntacticCompletionContext GetLiteralAttributeValueContext(
-        MarkupStartTagSyntax startTag,
-        int position)
+    private AkburaSyntacticCompletionContext GetLiteralAttributeValueContext(MarkupStartTagSyntax startTag, int position)
     {
         foreach (var attribute in startTag.Attributes)
         {
@@ -929,11 +886,7 @@ public sealed partial class AkburaSyntacticDocument
         return default;
     }
 
-    private bool IsInsideAssignedAttributeValue(
-        SyntaxToken equalsToken,
-        MarkupAttributeValueSyntax? value,
-        TextSpan attributeSpan,
-        int position)
+    private bool IsInsideAssignedAttributeValue(SyntaxToken equalsToken, MarkupAttributeValueSyntax? value, TextSpan attributeSpan, int position)
     {
         if (equalsToken.IsMissing ||
             position < equalsToken.Span.End)
@@ -952,8 +905,7 @@ public sealed partial class AkburaSyntacticDocument
         return position < attributeSpan.End;
     }
 
-    private bool IsCompleteAttributeValue(
-        MarkupAttributeValueSyntax value)
+    private bool IsCompleteAttributeValue(MarkupAttributeValueSyntax value)
     {
         return value switch
         {
@@ -967,8 +919,7 @@ public sealed partial class AkburaSyntacticDocument
         };
     }
 
-    private bool IsCompleteQuotedAttributeValue(
-        MarkupLiteralAttributeValueSyntax value)
+    private bool IsCompleteQuotedAttributeValue(MarkupLiteralAttributeValueSyntax value)
     {
         if (value.Span.Length < 2)
         {
@@ -987,8 +938,7 @@ public sealed partial class AkburaSyntacticDocument
             Text[end] == quote;
     }
 
-    private static ImmutableArray<string> GetExistingAttributeNames(
-        MarkupStartTagSyntax startTag)
+    private static ImmutableArray<string> GetExistingAttributeNames(MarkupStartTagSyntax startTag)
     {
         using var builder = ImmutableArrayBuilder<string>.Rent();
         foreach (var attribute in startTag.Attributes)
@@ -1017,9 +967,7 @@ public sealed partial class AkburaSyntacticDocument
         return builder.ToImmutable();
     }
 
-    private static string? GetClosingTagParentName(
-        MarkupEndTagSyntax endTag,
-        int position)
+    private static string? GetClosingTagParentName(MarkupEndTagSyntax endTag, int position)
     {
         if (endTag.Parent is MarkupElementSyntax element &&
             element.StartTag is { } startTag &&
@@ -1036,17 +984,14 @@ public sealed partial class AkburaSyntacticDocument
         return GetOpenElementName(endTag.Root, position);
     }
 
-    private static string? GetParentElementName(
-        MarkupElementSyntax? element)
+    private static string? GetParentElementName(MarkupElementSyntax? element)
     {
         if (element == null)
         {
             return null;
         }
 
-        for (var current = element.Parent;
-             current != null;
-             current = current.Parent)
+        for (var current = element.Parent; current != null; current = current.Parent)
         {
             if (current is MarkupElementSyntax parent &&
                 parent.StartTag is { } startTag)
@@ -1059,23 +1004,17 @@ public sealed partial class AkburaSyntacticDocument
         return null;
     }
 
-    private static string? GetOpenElementName(
-        AkburaSyntax root,
-        int position)
+    private static string? GetOpenElementName(AkburaSyntax root, int position)
     {
         var best = GetOpenElementStartTag(root, position);
         var name = best?.Name.ToFullString().Trim();
         return string.IsNullOrEmpty(name) ? null : name;
     }
 
-    private static MarkupStartTagSyntax? GetOpenElementStartTag(
-        AkburaSyntax root,
-        int position)
+    private static MarkupStartTagSyntax? GetOpenElementStartTag(AkburaSyntax root, int position)
     {
         MarkupStartTagSyntax? best = null;
-        foreach (var element in root
-                     .DescendantNodes()
-                     .OfType<MarkupElementSyntax>())
+        foreach (var element in root.DescendantNodes().OfType<MarkupElementSyntax>())
         {
             var startTag = element.StartTag;
             if (startTag == null ||
@@ -1099,8 +1038,7 @@ public sealed partial class AkburaSyntacticDocument
         return best;
     }
 
-    private static bool HasCompleteEndTag(
-        MarkupEndTagSyntax? endTag)
+    private static bool HasCompleteEndTag(MarkupEndTagSyntax? endTag)
     {
         return endTag != null &&
             !endTag.IsMissing &&
@@ -1109,21 +1047,15 @@ public sealed partial class AkburaSyntacticDocument
             !endTag.Name.IsMissing;
     }
 
-    private static bool HasCompleteEndTagBefore(
-        MarkupEndTagSyntax? endTag,
-        int position)
+    private static bool HasCompleteEndTagBefore(MarkupEndTagSyntax? endTag, int position)
     {
         return HasCompleteEndTag(endTag) &&
             endTag!.Span.End <= position;
     }
 
-    private static TNode? FindAncestor<TNode>(
-        AkburaSyntax? node)
-        where TNode : AkburaSyntax
+    private static TNode? FindAncestor<TNode>(AkburaSyntax? node) where TNode : AkburaSyntax
     {
-        for (var current = node;
-             current != null;
-             current = current.Parent)
+        for (var current = node; current != null; current = current.Parent)
         {
             if (current is TNode result)
             {

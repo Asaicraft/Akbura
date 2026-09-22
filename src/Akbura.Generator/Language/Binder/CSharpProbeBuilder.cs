@@ -23,10 +23,7 @@ internal sealed partial class CSharpProbeBuilder
         _binder = binder ?? throw new ArgumentNullException(nameof(binder));
     }
 
-    public CSharp.CompilationUnitSyntax CreateReturnExpressionProbe(
-        AkburaSyntax scope,
-        CSharp.ExpressionSyntax expression,
-        ITypeSymbol? targetType)
+    public CSharp.CompilationUnitSyntax CreateReturnExpressionProbe(AkburaSyntax scope, CSharp.ExpressionSyntax expression, ITypeSymbol? targetType)
     {
         return CreateReturnExpressionProbe(
             scope,
@@ -35,9 +32,7 @@ internal sealed partial class CSharpProbeBuilder
             includeAllVisibleSymbols: false);
     }
 
-    public CSharp.CompilationUnitSyntax CreateStatementProbe(
-        AkburaSyntax scope,
-        CSharp.StatementSyntax statement)
+    public CSharp.CompilationUnitSyntax CreateStatementProbe(AkburaSyntax scope, CSharp.StatementSyntax statement)
     {
         return CreateStatementProbe(
             scope,
@@ -45,10 +40,7 @@ internal sealed partial class CSharpProbeBuilder
             includeAllVisibleSymbols: false);
     }
 
-    private CSharp.CompilationUnitSyntax CreateStatementProbe(
-        AkburaSyntax scope,
-        CSharp.StatementSyntax statement,
-        bool includeAllVisibleSymbols)
+    private CSharp.CompilationUnitSyntax CreateStatementProbe(AkburaSyntax scope, CSharp.StatementSyntax statement, bool includeAllVisibleSymbols)
     {
         statement = statement.WithAdditionalAnnotations(
             new SyntaxAnnotation(StatementProbeAnnotationKind));
@@ -85,11 +77,7 @@ internal sealed partial class CSharpProbeBuilder
             "__AkburaStatementProbe");
     }
 
-    public CSharpProbeProjection CreateExpressionProjection(
-        AkburaSyntax scope,
-        CSharp.ExpressionSyntax expression,
-        int relativePosition,
-        ITypeSymbol? targetType = null)
+    public CSharpProbeProjection CreateExpressionProjection(AkburaSyntax scope, CSharp.ExpressionSyntax expression, int relativePosition, ITypeSymbol? targetType = null)
     {
         var annotation = new SyntaxAnnotation(
             CompletionAnnotationKind);
@@ -110,10 +98,7 @@ internal sealed partial class CSharpProbeBuilder
             relativePosition);
     }
 
-    public CSharpProbeProjection CreateStatementProjection(
-        AkburaSyntax scope,
-        CSharp.StatementSyntax statement,
-        int relativePosition)
+    public CSharpProbeProjection CreateStatementProjection(AkburaSyntax scope, CSharp.StatementSyntax statement, int relativePosition)
     {
         var annotation = new SyntaxAnnotation(
             CompletionAnnotationKind);
@@ -130,9 +115,7 @@ internal sealed partial class CSharpProbeBuilder
             relativePosition);
     }
 
-    public CSharpProbeProjection CreateTypeProjection(
-        CSharp.TypeSyntax type,
-        int relativePosition)
+    public CSharpProbeProjection CreateTypeProjection(CSharp.TypeSyntax type, int relativePosition)
     {
         var annotation = new SyntaxAnnotation(
             CompletionAnnotationKind);
@@ -157,9 +140,7 @@ internal sealed partial class CSharpProbeBuilder
             relativePosition);
     }
 
-    public CSharpProbeProjection CreateReturnTypeProjection(
-        CSharp.TypeSyntax type,
-        int relativePosition)
+    public CSharpProbeProjection CreateReturnTypeProjection(CSharp.TypeSyntax type, int relativePosition)
     {
         var annotation = new SyntaxAnnotation(
             CompletionAnnotationKind);
@@ -185,9 +166,7 @@ internal sealed partial class CSharpProbeBuilder
             relativePosition);
     }
 
-    public CSharpProbeProjection CreateUsingDirectiveProjection(
-        UsingDirectiveSyntax usingSyntax,
-        int relativePosition)
+    public CSharpProbeProjection CreateUsingDirectiveProjection(UsingDirectiveSyntax usingSyntax, int relativePosition)
     {
         var annotation = new SyntaxAnnotation(
             CompletionAnnotationKind);
@@ -217,10 +196,7 @@ internal sealed partial class CSharpProbeBuilder
             relativePosition);
     }
 
-    public CSharpProbeProjection CreateCommandParameterProjection(
-        CommandDeclarationSyntax command,
-        CSharp.ParameterListSyntax parameters,
-        int relativePosition)
+    public CSharpProbeProjection CreateCommandParameterProjection(CommandDeclarationSyntax command, CSharp.ParameterListSyntax parameters, int relativePosition)
     {
         var annotation = new SyntaxAnnotation(
             CompletionAnnotationKind);
@@ -282,11 +258,7 @@ internal sealed partial class CSharpProbeBuilder
             relativePosition);
     }
 
-    private CSharp.CompilationUnitSyntax CreateReturnExpressionProbe(
-        AkburaSyntax scope,
-        CSharp.ExpressionSyntax expression,
-        ITypeSymbol? targetType,
-        bool includeAllVisibleSymbols)
+    private CSharp.CompilationUnitSyntax CreateReturnExpressionProbe(AkburaSyntax scope, CSharp.ExpressionSyntax expression, ITypeSymbol? targetType, bool includeAllVisibleSymbols)
     {
         return CreateReturnExpressionProbe(
             scope,
@@ -296,12 +268,7 @@ internal sealed partial class CSharpProbeBuilder
             includeAllVisibleSymbols);
     }
 
-    private CSharp.CompilationUnitSyntax CreateReturnExpressionProbe(
-        AkburaSyntax scope,
-        CSharp.ExpressionSyntax probeExpression,
-        SyntaxNode completionScopeNode,
-        ITypeSymbol? targetType,
-        bool includeAllVisibleSymbols)
+    private CSharp.CompilationUnitSyntax CreateReturnExpressionProbe(AkburaSyntax scope, CSharp.ExpressionSyntax probeExpression, SyntaxNode completionScopeNode, ITypeSymbol? targetType, bool includeAllVisibleSymbols)
     {
         var precedingLocals = GetPrecedingLocalDeclarations(scope);
         var containingMethod = GetContainingComponentMethodProbe(scope);
@@ -340,9 +307,7 @@ internal sealed partial class CSharpProbeBuilder
             "__AkburaProbe");
     }
 
-    private static CSharp.MethodDeclarationSyntax ApplyContainingMethodContext(
-        CSharp.MethodDeclarationSyntax probeMethod,
-        CSharp.MethodDeclarationSyntax? containingMethod)
+    private static CSharp.MethodDeclarationSyntax ApplyContainingMethodContext(CSharp.MethodDeclarationSyntax probeMethod, CSharp.MethodDeclarationSyntax? containingMethod)
     {
         if (containingMethod == null)
         {
@@ -358,9 +323,7 @@ internal sealed partial class CSharpProbeBuilder
             .WithConstraintClauses(containingMethod.ConstraintClauses);
     }
 
-    private static Microsoft.CodeAnalysis.SyntaxTokenList
-        FilterProbeMethodModifiers(
-            Microsoft.CodeAnalysis.SyntaxTokenList modifiers)
+    private static Microsoft.CodeAnalysis.SyntaxTokenList FilterProbeMethodModifiers(Microsoft.CodeAnalysis.SyntaxTokenList modifiers)
     {
         return CSharpSyntaxFactory.TokenList(
             modifiers.Where(static modifier =>
@@ -369,8 +332,7 @@ internal sealed partial class CSharpProbeBuilder
                 modifier.IsKind(CSharpSyntaxKind.UnsafeKeyword)));
     }
 
-    private static ImmutableArray<string> GetParameterNames(
-        CSharp.MethodDeclarationSyntax? method)
+    private static ImmutableArray<string> GetParameterNames(CSharp.MethodDeclarationSyntax? method)
     {
         if (method == null ||
             method.ParameterList.Parameters.Count == 0)
@@ -386,12 +348,7 @@ internal sealed partial class CSharpProbeBuilder
             .ToImmutableArray();
     }
 
-    internal static CSharpProbeProjection CreateProjection<TNode>(
-        CSharp.CompilationUnitSyntax root,
-        TNode sourceNode,
-        SyntaxAnnotation annotation,
-        int relativePosition)
-        where TNode : SyntaxNode
+    internal static CSharpProbeProjection CreateProjection<TNode>(CSharp.CompilationUnitSyntax root, TNode sourceNode, SyntaxAnnotation annotation, int relativePosition) where TNode : SyntaxNode
     {
         if (relativePosition < 0 ||
             relativePosition > sourceNode.FullSpan.Length)
@@ -413,6 +370,60 @@ internal sealed partial class CSharpProbeBuilder
             .GetAnnotatedNodes(annotation)
             .OfType<TNode>()
             .Single();
+        if (projectedNode is CSharp.TypeSyntax &&
+            projectedNode.Parent is
+                CSharp.VariableDeclarationSyntax or
+                CSharp.MethodDeclarationSyntax)
+        {
+            var firstToken = projectedNode.GetFirstToken(
+                includeZeroWidth: true);
+            var previousToken = firstToken.GetPreviousToken(
+                includeZeroWidth: true);
+            if (previousToken.RawKind != 0 &&
+                previousToken.TrailingTrivia.Count == 0 &&
+                firstToken.LeadingTrivia.Count == 0)
+            {
+                var separatorTrivia = normalizedLeadingTrivia.Count != 0
+                    ? normalizedLeadingTrivia
+                    : CSharpSyntaxFactory.TriviaList(
+                        CSharpSyntaxFactory.Whitespace(" "));
+                root = root.ReplaceToken(
+                    previousToken,
+                    previousToken.WithTrailingTrivia(
+                        separatorTrivia));
+                projectedNode = root
+                    .GetAnnotatedNodes(annotation)
+                    .OfType<TNode>()
+                    .Single();
+            }
+
+            var lastToken = projectedNode.GetLastToken(
+                includeZeroWidth: true);
+            var nextToken = lastToken.GetNextToken(
+                includeZeroWidth: true);
+            if (nextToken.RawKind != 0 &&
+                lastToken.TrailingTrivia.Count == 0 &&
+                nextToken.LeadingTrivia.Count == 0)
+            {
+                var separatorTrivia = normalizedNode
+                    .GetTrailingTrivia();
+                if (separatorTrivia.Count == 0)
+                {
+                    separatorTrivia = CSharpSyntaxFactory.TriviaList(
+                        CSharpSyntaxFactory.Whitespace(" "));
+                }
+
+                root = root.ReplaceToken(
+                    nextToken,
+                    nextToken.WithLeadingTrivia(
+                        separatorTrivia));
+                projectedNode = root
+                    .GetAnnotatedNodes(annotation)
+                    .OfType<TNode>()
+                    .Single();
+            }
+        }
+
         if (sourceNode.FullSpan.Length == 0 &&
             normalizedNode.Parent is CSharp.UsingDirectiveSyntax)
         {
@@ -444,11 +455,7 @@ internal sealed partial class CSharpProbeBuilder
             relativePosition);
     }
 
-    private static CSharpProbeProjection CreateExpressionProjectionCore(
-        CSharp.CompilationUnitSyntax root,
-        CSharp.ExpressionSyntax sourceExpression,
-        SyntaxAnnotation annotation,
-        int relativePosition)
+    private static CSharpProbeProjection CreateExpressionProjectionCore(CSharp.CompilationUnitSyntax root, CSharp.ExpressionSyntax sourceExpression, SyntaxAnnotation annotation, int relativePosition)
     {
         if (relativePosition < 0 ||
             relativePosition > sourceExpression.FullSpan.Length)
@@ -480,11 +487,7 @@ internal sealed partial class CSharpProbeBuilder
             relativePosition);
     }
 
-    private static CSharpProbeProjection CreateProjectionResult(
-        CSharp.CompilationUnitSyntax root,
-        SyntaxNode projectedNode,
-        SyntaxAnnotation annotation,
-        int relativePosition)
+    private static CSharpProbeProjection CreateProjectionResult(CSharp.CompilationUnitSyntax root, SyntaxNode projectedNode, SyntaxAnnotation annotation, int relativePosition)
     {
         var stateNames = root
             .GetAnnotatedNodes(
@@ -498,11 +501,9 @@ internal sealed partial class CSharpProbeBuilder
             .ToImmutableArray();
         using var symbolOrigins =
             ImmutableArrayBuilder<CSharpProbeSymbolOrigin>.Rent();
-        foreach (var node in root.GetAnnotatedNodes(
-                     CSharpProbeBinder.ProjectedSymbolAnnotationKind))
+        foreach (var node in root.GetAnnotatedNodes(CSharpProbeBinder.ProjectedSymbolAnnotationKind))
         {
-            foreach (var symbolAnnotation in node.GetAnnotations(
-                         CSharpProbeBinder.ProjectedSymbolAnnotationKind))
+            foreach (var symbolAnnotation in node.GetAnnotations(CSharpProbeBinder.ProjectedSymbolAnnotationKind))
             {
                 if (CSharpProbeSymbolOrigin.TryParse(
                         symbolAnnotation.Data,
@@ -522,13 +523,9 @@ internal sealed partial class CSharpProbeBuilder
             symbolOrigins.ToImmutable());
     }
 
-    private static CSharp.MethodDeclarationSyntax?
-        GetContainingComponentMethodProbe(
-            AkburaSyntax scope)
+    private static CSharp.MethodDeclarationSyntax? GetContainingComponentMethodProbe(AkburaSyntax scope)
     {
-        for (var current = scope.Parent;
-             current != null;
-             current = current.Parent)
+        for (var current = scope.Parent; current != null; current = current.Parent)
         {
             if (current is CSharpStatementSyntax statement &&
                 statement.Parent is AkburaDocumentSyntax &&
@@ -543,9 +540,7 @@ internal sealed partial class CSharpProbeBuilder
         return null;
     }
 
-    private static ImmutableArray<CSharp.StatementSyntax>
-        GetPrecedingLocalDeclarations(
-            AkburaSyntax scope)
+    private static ImmutableArray<CSharp.StatementSyntax> GetPrecedingLocalDeclarations(AkburaSyntax scope)
     {
         using var builder =
             ImmutableArrayBuilder<CSharp.StatementSyntax>.Rent();
@@ -555,9 +550,7 @@ internal sealed partial class CSharpProbeBuilder
         return builder.ToImmutable();
     }
 
-    private static void AddPrecedingLocalDeclarations(
-        AkburaSyntax scope,
-        ImmutableArrayBuilder<CSharp.StatementSyntax> builder)
+    private static void AddPrecedingLocalDeclarations(AkburaSyntax scope, ImmutableArrayBuilder<CSharp.StatementSyntax> builder)
     {
         var parent = scope.Parent;
         if (parent == null)
@@ -579,11 +572,7 @@ internal sealed partial class CSharpProbeBuilder
         // inside their original header, not hoisted above its out/pattern locals.
     }
 
-    private static void AddPrecedingLocalDeclarationsFromList<TSyntax>(
-        Akbura.Language.Syntax.SyntaxList<TSyntax> members,
-        AkburaSyntax scope,
-        ImmutableArrayBuilder<CSharp.StatementSyntax> builder)
-        where TSyntax : AkburaSyntax
+    private static void AddPrecedingLocalDeclarationsFromList<TSyntax>(Akbura.Language.Syntax.SyntaxList<TSyntax> members, AkburaSyntax scope, ImmutableArrayBuilder<CSharp.StatementSyntax> builder) where TSyntax : AkburaSyntax
     {
         foreach (var member in members)
         {
@@ -642,13 +631,7 @@ internal sealed partial class CSharpProbeBuilder
 
 internal readonly struct CSharpProbeProjection
 {
-    public CSharpProbeProjection(
-        CSharp.CompilationUnitSyntax root,
-        TextSpan projectedSpan,
-        int projectedPosition,
-        ImmutableArray<string> stateNames,
-        SyntaxAnnotation activeAnnotation,
-        ImmutableArray<CSharpProbeSymbolOrigin> symbolOrigins)
+    public CSharpProbeProjection(CSharp.CompilationUnitSyntax root, TextSpan projectedSpan, int projectedPosition, ImmutableArray<string> stateNames, SyntaxAnnotation activeAnnotation, ImmutableArray<CSharpProbeSymbolOrigin> symbolOrigins)
     {
         Root = root ?? throw new ArgumentNullException(nameof(root));
         ProjectedSpan = projectedSpan;

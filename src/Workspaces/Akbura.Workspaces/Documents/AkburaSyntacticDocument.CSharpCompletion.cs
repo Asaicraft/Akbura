@@ -10,10 +10,7 @@ public sealed partial class AkburaSyntacticDocument
     /// Determines whether <paramref name="position"/> is inside an embedded
     /// C# fragment that can be projected for Roslyn completion.
     /// </summary>
-    public bool TryGetCSharpCompletionContext(
-        int position,
-        out AkburaCSharpCompletionContext context,
-        CancellationToken cancellationToken = default)
+    public bool TryGetCSharpCompletionContext(int position, out AkburaCSharpCompletionContext context, CancellationToken cancellationToken = default)
     {
         if (!TryGetEmbeddedCSharpContext(
                 position,
@@ -28,10 +25,7 @@ public sealed partial class AkburaSyntacticDocument
         return true;
     }
 
-    internal bool TryGetEmbeddedCSharpContext(
-        int position,
-        out AkburaEmbeddedCSharpContext context,
-        CancellationToken cancellationToken = default)
+    internal bool TryGetEmbeddedCSharpContext(int position, out AkburaEmbeddedCSharpContext context, CancellationToken cancellationToken = default)
     {
         ValidatePosition(position);
         if (Text.Length == 0)
@@ -95,6 +89,30 @@ public sealed partial class AkburaSyntacticDocument
             }
         }
 
+        foreach (var attribute in root.DescendantNodes().OfType<MarkupAttributeSyntax>())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!AkburaSemanticModel.IsMarkupDataTypeDirective(
+                    attribute) ||
+                AkburaSemanticModel.GetMarkupAttributeValue(
+                    attribute) is not
+                    MarkupLiteralAttributeValueSyntax literal ||
+                !AkburaMarkupSyntaxFacts
+                    .TryGetAttributeLiteralContentSpan(
+                        Text,
+                        literal,
+                        out var hostSpan))
+            {
+                continue;
+            }
+
+            AddCandidate(
+                AkburaCSharpCompletionContextKind.Type,
+                attribute,
+                hostSpan,
+                priority: -2);
+        }
+
         if (best == null)
         {
             context = default;
@@ -106,9 +124,7 @@ public sealed partial class AkburaSyntacticDocument
 
         void CollectCandidates(AkburaSyntax? syntax)
         {
-            for (var current = syntax;
-                 current != null;
-                 current = current.Parent)
+            for (var current = syntax; current != null; current = current.Parent)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 TryAddCandidate(current);
@@ -211,10 +227,7 @@ public sealed partial class AkburaSyntacticDocument
             return !IsInAkcssRegion(expression);
         }
 
-        bool TryGetCSharpTypeContext(
-            CSharpTypeSyntax type,
-            out AkburaCSharpCompletionContextKind kind,
-            out AkburaSyntax owner)
+        bool TryGetCSharpTypeContext(CSharpTypeSyntax type, out AkburaCSharpCompletionContextKind kind, out AkburaSyntax owner)
         {
             if (type.Parent is AkcssUsingDirectiveSyntax akcssUsingDirective &&
                 ReferenceEquals(akcssUsingDirective.Name, type) &&
@@ -277,9 +290,7 @@ public sealed partial class AkburaSyntacticDocument
                 return true;
             }
 
-            for (var current = syntax.Parent;
-                 current != null;
-                 current = current.Parent)
+            for (var current = syntax.Parent; current != null; current = current.Parent)
             {
                 if (current is InlineAkcssBlockSyntax)
                 {
@@ -290,11 +301,7 @@ public sealed partial class AkburaSyntacticDocument
             return false;
         }
 
-        void AddCandidate(
-            AkburaCSharpCompletionContextKind kind,
-            AkburaSyntax owner,
-            TextSpan hostSpan,
-            int priority)
+        void AddCandidate(AkburaCSharpCompletionContextKind kind, AkburaSyntax owner, TextSpan hostSpan, int priority)
         {
             if (!ContainsPosition(hostSpan, position))
             {
@@ -320,10 +327,7 @@ public sealed partial class AkburaSyntacticDocument
         }
     }
 
-    private bool TryGetDeclarationTypeSpan(
-        AkTopLevelMemberSyntax member,
-        int position,
-        out TextSpan hostSpan)
+    private bool TryGetDeclarationTypeSpan(AkTopLevelMemberSyntax member, int position, out TextSpan hostSpan)
     {
         SimpleNameSyntax name;
         int typeStart;
@@ -389,9 +393,7 @@ public sealed partial class AkburaSyntacticDocument
         return true;
     }
 
-    private static bool ContainsPosition(
-        TextSpan span,
-        int position)
+    private static bool ContainsPosition(TextSpan span, int position)
     {
         return position >= span.Start &&
             position <= span.End;
@@ -399,9 +401,7 @@ public sealed partial class AkburaSyntacticDocument
 
     private readonly struct EmbeddedCSharpCandidate
     {
-        public EmbeddedCSharpCandidate(
-            AkburaEmbeddedCSharpContext context,
-            int priority)
+        public EmbeddedCSharpCandidate(AkburaEmbeddedCSharpContext context, int priority)
         {
             Context = context;
             Priority = priority;

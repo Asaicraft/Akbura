@@ -58,11 +58,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         AkburaSemanticModel,
         SemanticModelCompletionCache> CompletionCaches = new();
 
-    public AkburaCompletionResult GetCompletions(
-        AkburaSyntacticDocument document,
-        AkburaDocumentContext? semanticContext,
-        int position,
-        CancellationToken cancellationToken = default)
+    public AkburaCompletionResult GetCompletions(AkburaSyntacticDocument document, AkburaDocumentContext? semanticContext, int position, CancellationToken cancellationToken = default)
     {
         if (document == null)
         {
@@ -96,6 +92,21 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                 document,
                 semanticContext,
                 csharpContext,
+                cancellationToken);
+        }
+
+        if (AkburaResourceKeyCompletionFacts.TryGetContext(
+                document,
+                position,
+                out var resourceKeyContext,
+                cancellationToken) &&
+            IsAvaloniaResourceKeyContext(
+                semanticContext,
+                resourceKeyContext))
+        {
+            return CreateResourceKeyResult(
+                semanticContext,
+                resourceKeyContext,
                 cancellationToken);
         }
 
@@ -189,6 +200,26 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                     syntaxContext.Prefix,
                     cancellationToken),
 
+            AkburaCompletionContextKind.BindingPath =>
+                GetBindingPathItems(
+                    semanticModel,
+                    syntaxContext,
+                    cancellationToken),
+
+            AkburaCompletionContextKind
+                .MarkupExtensionArgumentName =>
+                GetMarkupExtensionArgumentNameItems(
+                    semanticModel,
+                    syntaxContext,
+                    cancellationToken),
+
+            AkburaCompletionContextKind
+                .MarkupExtensionArgumentValue =>
+                GetMarkupExtensionArgumentValueItems(
+                    semanticModel,
+                    syntaxContext,
+                    cancellationToken),
+
             _ => ImmutableArray<AkburaCompletionItem>.Empty,
         };
 
@@ -199,12 +230,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                 syntaxContext.Kind));
     }
 
-    public AkburaCompletionChange GetCompletionChange(
-        AkburaSyntacticDocument document,
-        AkburaDocumentContext? semanticContext,
-        int position,
-        AkburaCompletionItem item,
-        CancellationToken cancellationToken = default)
+    public AkburaCompletionChange GetCompletionChange(AkburaSyntacticDocument document, AkburaDocumentContext? semanticContext, int position, AkburaCompletionItem item, CancellationToken cancellationToken = default)
     {
         if (document == null)
         {
@@ -298,8 +324,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             Math.Max(0, newPosition),
             item.TriggerCompletionAfterInsert);
     }
-    private static AkburaCompletionResult CreateClosingTagResult(
-        AkburaSyntacticCompletionContext context)
+    private static AkburaCompletionResult CreateClosingTagResult(AkburaSyntacticCompletionContext context)
     {
         if (string.IsNullOrWhiteSpace(
                 context.ParentComponentName))
@@ -327,12 +352,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                     $"Close '{name}'.")));
     }
 
-    private static AkburaCompletionResult CreateTopLevelResult(
-        AkburaSyntacticDocument document,
-        AkburaDocumentContext? semanticContext,
-        AkburaSyntacticCompletionContext context,
-        int position,
-        CancellationToken cancellationToken)
+    private static AkburaCompletionResult CreateTopLevelResult(AkburaSyntacticDocument document, AkburaDocumentContext? semanticContext, AkburaSyntacticCompletionContext context, int position, CancellationToken cancellationToken)
     {
         using var items =
             ImmutableArrayBuilder<AkburaCompletionItem>.Rent(
@@ -354,9 +374,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             items.ToImmutable());
     }
 
-    private static AkburaCompletionResult CreateDescriptorResult(
-        AkburaSyntacticCompletionContext context,
-        ImmutableArray<TopLevelCompletionDescriptor> descriptors)
+    private static AkburaCompletionResult CreateDescriptorResult(AkburaSyntacticCompletionContext context, ImmutableArray<TopLevelCompletionDescriptor> descriptors)
     {
         using var items =
             ImmutableArrayBuilder<AkburaCompletionItem>.Rent(
@@ -370,10 +388,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             items.ToImmutable());
     }
 
-    private static void AddDescriptorItems(
-        ImmutableArrayBuilder<AkburaCompletionItem> items,
-        string prefix,
-        ImmutableArray<TopLevelCompletionDescriptor> descriptors)
+    private static void AddDescriptorItems(ImmutableArrayBuilder<AkburaCompletionItem> items, string prefix, ImmutableArray<TopLevelCompletionDescriptor> descriptors)
     {
         foreach (var descriptor in descriptors)
         {
@@ -393,13 +408,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         }
     }
 
-    private static void AddUseEffectItems(
-        ImmutableArrayBuilder<AkburaCompletionItem> items,
-        AkburaSyntacticDocument document,
-        AkburaDocumentContext? semanticContext,
-        AkburaSyntacticCompletionContext context,
-        int position,
-        CancellationToken cancellationToken)
+    private static void AddUseEffectItems(ImmutableArrayBuilder<AkburaCompletionItem> items, AkburaSyntacticDocument document, AkburaDocumentContext? semanticContext, AkburaSyntacticCompletionContext context, int position, CancellationToken cancellationToken)
     {
         const string filterText = "useEffect";
         if (!MatchesPrefix(filterText, context.Prefix))
@@ -476,15 +485,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             namespaceImport);
     }
 
-    private static void AddHookItem(
-        ImmutableArrayBuilder<AkburaCompletionItem> items,
-        string displayText,
-        string suffix,
-        string beforeCaret,
-        string afterCaret,
-        string description,
-        string sortText,
-        string? namespaceImport)
+    private static void AddHookItem(ImmutableArrayBuilder<AkburaCompletionItem> items, string displayText, string suffix, string beforeCaret, string afterCaret, string description, string sortText, string? namespaceImport)
     {
         items.Add(new AkburaCompletionItem(
             displayText,
@@ -500,16 +501,11 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             namespaceImport: namespaceImport));
     }
 
-    private static bool IsUseEffectVisible(
-        AkburaSyntacticDocument document,
-        AkburaDocumentContext? semanticContext,
-        CancellationToken cancellationToken)
+    private static bool IsUseEffectVisible(AkburaSyntacticDocument document, AkburaDocumentContext? semanticContext, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        foreach (var node in document.SyntaxTree
-                     .GetRootSyntax()
-                     .DescendantNodesAndSelf())
+        foreach (var node in document.SyntaxTree.GetRootSyntax().DescendantNodesAndSelf())
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (node is NamespaceDeclarationSyntax namespaceDeclaration &&
@@ -532,9 +528,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             return false;
         }
 
-        foreach (var usingDirective in semanticContext.Project
-                     .Compilation
-                     .GlobalAkburaUsingDirectives)
+        foreach (var usingDirective in semanticContext.Project.Compilation.GlobalAkburaUsingDirectives)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!AkburaUsingEditService.IsAkcssUsingDirective(
@@ -545,9 +539,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             }
         }
 
-        foreach (var usingDirective in semanticContext.Project
-                     .Compilation
-                     .GlobalCSharpUsingDirectives)
+        foreach (var usingDirective in semanticContext.Project.Compilation.GlobalCSharpUsingDirectives)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (IsUseEffectUsing(usingDirective))
@@ -559,8 +551,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         return false;
     }
 
-    private static bool IsHooksNamespace(
-        NamespaceDeclarationSyntax namespaceDeclaration)
+    private static bool IsHooksNamespace(NamespaceDeclarationSyntax namespaceDeclaration)
     {
         try
         {
@@ -576,8 +567,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         }
     }
 
-    private static bool IsUseEffectUsing(
-        UsingDirectiveSyntax usingDirective)
+    private static bool IsUseEffectUsing(UsingDirectiveSyntax usingDirective)
     {
         try
         {
@@ -591,9 +581,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         }
     }
 
-    private static bool IsUseEffectUsing(
-        Microsoft.CodeAnalysis.CSharp.Syntax.UsingDirectiveSyntax
-            usingDirective)
+    private static bool IsUseEffectUsing(Microsoft.CodeAnalysis.CSharp.Syntax.UsingDirectiveSyntax usingDirective)
     {
         if (usingDirective.Alias != null ||
             usingDirective.Name == null)
@@ -608,9 +596,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                 : HooksNamespace);
     }
 
-    private static bool IsQualifiedName(
-        string name,
-        string expectedName)
+    private static bool IsQualifiedName(string name, string expectedName)
     {
         const string globalAlias = "global::";
         var normalizedName = name.Trim();
@@ -644,9 +630,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         return Environment.NewLine;
     }
 
-    private static string GetIndentation(
-        SourceText text,
-        int position)
+    private static string GetIndentation(SourceText text, int position)
     {
         var line = text.Lines.GetLineFromPosition(
             Math.Min(position, text.Length));
@@ -662,10 +646,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         return text.ToString(new TextSpan(line.Start, length));
     }
 
-    private static string GetIndentationUnit(
-        SourceText text,
-        int position,
-        string currentIndentation)
+    private static string GetIndentationUnit(SourceText text, int position, string currentIndentation)
     {
         if (currentIndentation.IndexOf('	') >= 0)
         {
@@ -674,9 +655,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
 
         var currentLine = text.Lines.GetLinePosition(
             Math.Min(position, text.Length)).Line;
-        for (var distance = 1;
-             distance < text.Lines.Count;
-             distance++)
+        for (var distance = 1; distance < text.Lines.Count; distance++)
         {
             var previous = currentLine - distance;
             if (previous >= 0 &&
@@ -704,11 +683,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         return "    ";
     }
 
-    private static bool TryGetIndentationDelta(
-        SourceText text,
-        TextLine line,
-        string currentIndentation,
-        out string delta)
+    private static bool TryGetIndentationDelta(SourceText text, TextLine line, string currentIndentation, out string delta)
     {
         var position = line.Start;
         while (position < line.End &&
@@ -739,11 +714,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         return false;
     }
 
-    private static AkburaCompletionResult CreateAkcssModuleImportResult(
-        AkburaSyntacticDocument document,
-        AkburaDocumentContext? semanticContext,
-        AkburaCSharpCompletionContext context,
-        CancellationToken cancellationToken)
+    private static AkburaCompletionResult CreateAkcssModuleImportResult(AkburaSyntacticDocument document, AkburaDocumentContext? semanticContext, AkburaCSharpCompletionContext context, CancellationToken cancellationToken)
     {
         var applicableSpan = TextSpan.FromBounds(
             context.HostSpan.Start,
@@ -769,11 +740,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         var prefix = document.Text.ToString(applicableSpan);
         using var items =
             ImmutableArrayBuilder<AkburaCompletionItem>.Rent();
-        foreach (var name in semanticContext.Project.Compilation
-                     .GetAvailableAkcssModuleNames(cancellationToken)
-                     .OrderBy(
-                         static name => name,
-                         StringComparer.Ordinal))
+        foreach (var name in semanticContext.Project.Compilation.GetAvailableAkcssModuleNames(cancellationToken).OrderBy(static name => name, StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!MatchesPrefix(name, prefix))
@@ -804,18 +771,13 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             isIncomplete: true);
     }
 
-    private static ImmutableArray<AkburaCompletionItem>
-        GetComponentItems(
-            AkburaSemanticModel semanticModel,
-            string prefix,
-            CancellationToken cancellationToken)
+    private static ImmutableArray<AkburaCompletionItem> GetComponentItems(AkburaSemanticModel semanticModel, string prefix, CancellationToken cancellationToken)
     {
         // Display names are not unique across imported namespaces.
         var items = new Dictionary<string, AkburaCompletionItem>(
             StringComparer.Ordinal);
 
-        foreach (var candidate in
-                 semanticModel.LookupMarkupComponents(cancellationToken))
+        foreach (var candidate in semanticModel.LookupMarkupComponents(cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!MatchesPrefix(candidate.DisplayName, prefix))
@@ -847,9 +809,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                     triggerCompletionAfterInsert: true));
         }
 
-        foreach (var candidate in semanticModel
-                     .LookupMarkupComponentCompletionImports(
-                         cancellationToken))
+        foreach (var candidate in semanticModel.LookupMarkupComponentCompletionImports(cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var displayName = candidate.Type?.Name ??
@@ -904,17 +864,12 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         return OrderCompletionItems(items.Values, prefix);
     }
 
-    private static ImmutableArray<AkburaCompletionItem>
-        GetMarkupExtensionItems(
-            AkburaSemanticModel semanticModel,
-            string prefix,
-            CancellationToken cancellationToken)
+    private static ImmutableArray<AkburaCompletionItem> GetMarkupExtensionItems(AkburaSemanticModel semanticModel, string prefix, CancellationToken cancellationToken)
     {
         var items = new Dictionary<string, AkburaCompletionItem>(
             StringComparer.Ordinal);
 
-        foreach (var candidate in
-                 semanticModel.LookupMarkupExtensions(cancellationToken))
+        foreach (var candidate in semanticModel.LookupMarkupExtensions(cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!MatchesPrefix(candidate.DisplayName, prefix) ||
@@ -947,12 +902,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         return OrderCompletionItems(items.Values, prefix);
     }
 
-    private static ImmutableArray<AkburaCompletionItem>
-        GetAttributeItems(
-            AkburaSemanticModel semanticModel,
-            AkburaSyntacticCompletionContext context,
-            int position,
-            CancellationToken cancellationToken)
+    private static ImmutableArray<AkburaCompletionItem> GetAttributeItems(AkburaSemanticModel semanticModel, AkburaSyntacticCompletionContext context, int position, CancellationToken cancellationToken)
     {
         var members = GetMemberItems(
             semanticModel,
@@ -976,11 +926,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             context.Prefix);
     }
 
-    private static ImmutableArray<AkburaCompletionItem>
-        GetAttachedPropertyItems(
-            AkburaSemanticModel semanticModel,
-            AkburaSyntacticCompletionContext context,
-            CancellationToken cancellationToken)
+    private static ImmutableArray<AkburaCompletionItem> GetAttachedPropertyItems(AkburaSemanticModel semanticModel, AkburaSyntacticCompletionContext context, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(context.ComponentName))
         {
@@ -993,10 +939,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         using var items =
             ImmutableArrayBuilder<AkburaCompletionItem>.Rent();
 
-        foreach (var candidate in semanticModel
-                     .LookupMarkupAttachedPropertiesForCompletion(
-                         context.ComponentName!,
-                         cancellationToken))
+        foreach (var candidate in semanticModel.LookupMarkupAttachedPropertiesForCompletion(context.ComponentName!, cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (existing.Contains(candidate.DisplayName) ||
@@ -1034,11 +977,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         return items.ToImmutable();
     }
 
-    private static ImmutableArray<AkburaCompletionItem>
-        GetTailwindUtilityItems(
-            AkburaSemanticModel semanticModel,
-            AkburaSyntacticCompletionContext context,
-            CancellationToken cancellationToken)
+    private static ImmutableArray<AkburaCompletionItem> GetTailwindUtilityItems(AkburaSemanticModel semanticModel, AkburaSyntacticCompletionContext context, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(context.ComponentName))
         {
@@ -1047,10 +986,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
 
         using var items =
             ImmutableArrayBuilder<AkburaCompletionItem>.Rent();
-        foreach (var candidate in
-                 semanticModel.LookupTailwindUtilities(
-                     context.ComponentName!,
-                     cancellationToken))
+        foreach (var candidate in semanticModel.LookupTailwindUtilities(context.ComponentName!, cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var insertion = candidate.Name +
@@ -1095,8 +1031,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             .ToImmutableArray();
     }
 
-    private static string GetTailwindUtilityDisplay(
-        TailwindUtilityLookupCandidate candidate)
+    private static string GetTailwindUtilityDisplay(TailwindUtilityLookupCandidate candidate)
     {
         var builder = new System.Text.StringBuilder(
             candidate.Name);
@@ -1121,8 +1056,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         return builder.ToString();
     }
 
-    private static string GetTailwindUtilityDescription(
-        TailwindUtilityLookupCandidate candidate)
+    private static string GetTailwindUtilityDescription(TailwindUtilityLookupCandidate candidate)
     {
         var display = GetTailwindUtilityDisplay(candidate);
         return string.IsNullOrWhiteSpace(candidate.TargetTypeDisplay)
@@ -1131,9 +1065,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                 $"Target: {candidate.TargetTypeDisplay}";
     }
 
-    private static bool MatchesTailwindUtilityPrefix(
-        string insertion,
-        string prefix)
+    private static bool MatchesTailwindUtilityPrefix(string insertion, string prefix)
     {
         return MatchesPrefix(insertion, prefix) ||
             prefix.StartsWith(
@@ -1141,12 +1073,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                 StringComparison.OrdinalIgnoreCase);
     }
 
-    private static ImmutableArray<AkburaCompletionItem>
-        GetMemberItems(
-            AkburaSemanticModel semanticModel,
-            AkburaSyntacticCompletionContext context,
-            bool propertyElements,
-            CancellationToken cancellationToken)
+    private static ImmutableArray<AkburaCompletionItem> GetMemberItems(AkburaSemanticModel semanticModel, AkburaSyntacticCompletionContext context, bool propertyElements, CancellationToken cancellationToken)
     {
         var componentName = propertyElements
             ? context.ParentComponentName
@@ -1184,10 +1111,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             .ToImmutableArray();
     }
 
-    private static ImmutableArray<AkburaCompletionItem>
-        OrderCompletionItems(
-            IEnumerable<AkburaCompletionItem> items,
-            string prefix)
+    private static ImmutableArray<AkburaCompletionItem> OrderCompletionItems(IEnumerable<AkburaCompletionItem> items, string prefix)
     {
         var ordered = items.OrderBy(
             static item => item.SortText,
@@ -1201,11 +1125,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                 .ToImmutableArray();
     }
 
-    private static ImmutableArray<CompletionMemberCandidate> CreateMemberCatalog(
-        AkburaSemanticModel semanticModel,
-        string componentName,
-        bool propertyElements,
-        CancellationToken cancellationToken)
+    private static ImmutableArray<CompletionMemberCandidate> CreateMemberCatalog(AkburaSemanticModel semanticModel, string componentName, bool propertyElements, CancellationToken cancellationToken)
     {
         if (!semanticModel.TryResolveMarkupComponentForCompletion(
                 componentName,
@@ -1233,8 +1153,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
 
         if (target.AkburaComponent != null)
         {
-            foreach (var parameter in
-                     target.AkburaComponent.Parameters)
+            foreach (var parameter in target.AkburaComponent.Parameters)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!parameter.ReceivesValueFromParent)
@@ -1254,8 +1173,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
 
             if (!propertyElements)
             {
-                foreach (var command in
-                         target.AkburaComponent.Commands)
+                foreach (var command in target.AkburaComponent.Commands)
                 {
                     AddMemberItem(
                         items,
@@ -1291,19 +1209,11 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
     private static readonly HashSet<string> EmptyMemberNames =
         new(StringComparer.Ordinal);
 
-    private static void AddClrMembers(
-        Dictionary<string, AkburaCompletionItem> items,
-        string ownerName,
-        INamedTypeSymbol componentType,
-        HashSet<string> existing,
-        bool propertyElements,
-        CancellationToken cancellationToken)
+    private static void AddClrMembers(Dictionary<string, AkburaCompletionItem> items, string ownerName, INamedTypeSymbol componentType, HashSet<string> existing, bool propertyElements, CancellationToken cancellationToken)
     {
         var visitedTypes = new HashSet<INamedTypeSymbol>(
             SymbolEqualityComparer.Default);
-        for (var current = componentType;
-             current != null;
-             current = current.BaseType)
+        for (var current = componentType; current != null; current = current.BaseType)
         {
             AddClrMembersFromType(
                 items,
@@ -1330,13 +1240,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         }
     }
 
-    private static void AddClrMembersFromType(
-        Dictionary<string, AkburaCompletionItem> items,
-        string ownerName,
-        INamedTypeSymbol type,
-        HashSet<string> existing,
-        bool propertyElements,
-        CancellationToken cancellationToken)
+    private static void AddClrMembersFromType(Dictionary<string, AkburaCompletionItem> items, string ownerName, INamedTypeSymbol type, HashSet<string> existing, bool propertyElements, CancellationToken cancellationToken)
     {
         foreach (var member in type.GetMembers())
         {
@@ -1400,13 +1304,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         }
     }
 
-    private static void AddMemberItem(
-        Dictionary<string, AkburaCompletionItem> items,
-        string ownerName,
-        string memberName,
-        AkburaCompletionKind kind,
-        string typeDisplay,
-        bool propertyElements)
+    private static void AddMemberItem(Dictionary<string, AkburaCompletionItem> items, string ownerName, string memberName, AkburaCompletionKind kind, string typeDisplay, bool propertyElements)
     {
         var displayName = propertyElements
             ? ownerName + "." + memberName
@@ -1457,20 +1355,22 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                     triggerCompletionAfterInsert));
     }
 
-    private static bool IsSemanticCompletionContext(
-        AkburaCompletionContextKind kind)
+    private static bool IsSemanticCompletionContext(AkburaCompletionContextKind kind)
     {
         return kind is
             AkburaCompletionContextKind.ComponentName or
             AkburaCompletionContextKind.AttributeName or
             AkburaCompletionContextKind.PropertyElementName or
             AkburaCompletionContextKind.AttributeValue or
-            AkburaCompletionContextKind.MarkupExtensionType;
+            AkburaCompletionContextKind.MarkupExtensionType or
+            AkburaCompletionContextKind.BindingPath or
+            AkburaCompletionContextKind
+                .MarkupExtensionArgumentName or
+            AkburaCompletionContextKind
+                .MarkupExtensionArgumentValue;
     }
 
-    private static bool MatchesPrefix(
-        string value,
-        string prefix)
+    private static bool MatchesPrefix(string value, string prefix)
     {
         return prefix.Length == 0 ||
             value.StartsWith(
@@ -1478,8 +1378,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                 StringComparison.OrdinalIgnoreCase);
     }
 
-    private static int GetComponentPriority(
-        MarkupComponentLookupCandidate candidate)
+    private static int GetComponentPriority(MarkupComponentLookupCandidate candidate)
     {
         if (candidate.IsAkburaComponent)
         {
@@ -1503,8 +1402,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                 : 90;
     }
 
-    private static string GetComponentSuffix(
-        MarkupComponentLookupCandidate candidate)
+    private static string GetComponentSuffix(MarkupComponentLookupCandidate candidate)
     {
         if (candidate.IsAkburaComponent)
         {
@@ -1517,8 +1415,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             string.Empty;
     }
 
-    private static int GetMarkupExtensionPriority(
-        MarkupExtensionLookupCandidate candidate)
+    private static int GetMarkupExtensionPriority(MarkupExtensionLookupCandidate candidate)
     {
         if (candidate.IsAvaloniaBinding ||
             candidate.DisplayName is
@@ -1531,8 +1428,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         return candidate.IsUtilityVariant ? 5 : 20;
     }
 
-    private static string GetMarkupExtensionInsertion(
-        MarkupExtensionLookupCandidate candidate)
+    private static string GetMarkupExtensionInsertion(MarkupExtensionLookupCandidate candidate)
     {
         var arity = candidate.ExtensionType.Arity;
         return arity == 0
@@ -1541,8 +1437,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                 new string(',', arity - 1) + ">";
     }
 
-    private static string GetMarkupExtensionSuffix(
-        MarkupExtensionLookupCandidate candidate)
+    private static string GetMarkupExtensionSuffix(MarkupExtensionLookupCandidate candidate)
     {
         if (candidate.IsAvaloniaBinding)
         {
@@ -1560,8 +1455,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             candidate.ExtensionType.ContainingNamespace.ToDisplayString();
     }
 
-    private static string GetMarkupExtensionDescription(
-        MarkupExtensionLookupCandidate candidate)
+    private static string GetMarkupExtensionDescription(MarkupExtensionLookupCandidate candidate)
     {
         var typeName = candidate.ExtensionType.ToDisplayString(
             SymbolDisplayFormat.FullyQualifiedFormat);
@@ -1594,9 +1488,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             : name[(namespaceSeparator + 1)..];
     }
 
-    private static string GetMemberName(
-        string displayName,
-        bool propertyElements)
+    private static string GetMemberName(string displayName, bool propertyElements)
     {
         if (!propertyElements)
         {
@@ -1616,9 +1508,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
 
     private readonly struct CompletionMemberCandidate
     {
-        public CompletionMemberCandidate(
-            string memberName,
-            AkburaCompletionItem item)
+        public CompletionMemberCandidate(string memberName, AkburaCompletionItem item)
         {
             MemberName = memberName;
             Item = item;
@@ -1634,11 +1524,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         private ImmutableDictionary<CompletionMemberCatalogKey, ImmutableArray<CompletionMemberCandidate>> _catalogs =
             ImmutableDictionary<CompletionMemberCatalogKey, ImmutableArray<CompletionMemberCandidate>>.Empty;
 
-        public ImmutableArray<CompletionMemberCandidate> GetOrCreate(
-            string componentName,
-            bool propertyElements,
-            Func<ImmutableArray<CompletionMemberCandidate>> factory,
-            CancellationToken cancellationToken)
+        public ImmutableArray<CompletionMemberCandidate> GetOrCreate(string componentName, bool propertyElements, Func<ImmutableArray<CompletionMemberCandidate>> factory, CancellationToken cancellationToken)
         {
             var key = new CompletionMemberCatalogKey(
                 componentName,

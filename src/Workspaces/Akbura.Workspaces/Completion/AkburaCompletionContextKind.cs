@@ -16,4 +16,7 @@ public enum AkburaCompletionContextKind
     AttributeValue = 8,
     MarkupStatement = 9,
     MarkupConditionalContinuation = 10,
+    MarkupExtensionArgumentName = 11,
+    MarkupExtensionArgumentValue = 12,
+    BindingPath = 13,
 }

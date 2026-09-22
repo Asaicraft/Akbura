@@ -24,12 +24,7 @@ namespace Akbura.Language.CodeGeneration;
 /// </summary>
 internal static partial class ComponentPlanner
 {
-    public static ComponentPlan Create(
-        IAkburaComponentSymbol component,
-        AkburaSemanticModel semanticModel,
-        IReadOnlyDictionary<AkburaSyntax, string> akcssModuleTypeNames,
-        ComponentGenerationMode generationMode =
-            ComponentGenerationMode.ReleaseDirect)
+    public static ComponentPlan Create(IAkburaComponentSymbol component, AkburaSemanticModel semanticModel, IReadOnlyDictionary<AkburaSyntax, string> akcssModuleTypeNames, ComponentGenerationMode generationMode = ComponentGenerationMode.ReleaseDirect)
     {
         if (semanticModel == null)
         {
@@ -45,13 +40,7 @@ internal static partial class ComponentPlanner
             generationMode);
     }
 
-    internal static ComponentPlan Create(
-        IAkburaComponentSymbol component,
-        AkburaSemanticModel semanticModel,
-        IReadOnlyDictionary<AkburaSyntax, string> akcssModuleTypeNames,
-        in MarkupExtensionResultEnvironment resultEnvironment,
-        ComponentGenerationMode generationMode =
-            ComponentGenerationMode.ReleaseDirect)
+    internal static ComponentPlan Create(IAkburaComponentSymbol component, AkburaSemanticModel semanticModel, IReadOnlyDictionary<AkburaSyntax, string> akcssModuleTypeNames, in MarkupExtensionResultEnvironment resultEnvironment, ComponentGenerationMode generationMode = ComponentGenerationMode.ReleaseDirect)
     {
         if (component == null)
         {
@@ -144,12 +133,7 @@ internal static partial class ComponentPlanner
         private int _nextRuntimeStorageId;
         private readonly Dictionary<int, int> _localRuntimeStorageCounts;
 
-        public Planner(
-            IAkburaComponentSymbol component,
-            AkburaSemanticModel semanticModel,
-            IReadOnlyDictionary<AkburaSyntax, string> akcssModuleTypeNames,
-            in MarkupExtensionResultEnvironment resultEnvironment,
-            ComponentGenerationMode generationMode)
+        public Planner(IAkburaComponentSymbol component, AkburaSemanticModel semanticModel, IReadOnlyDictionary<AkburaSyntax, string> akcssModuleTypeNames, in MarkupExtensionResultEnvironment resultEnvironment, ComponentGenerationMode generationMode)
         {
             _component = component;
             _semanticModel = semanticModel;
@@ -496,8 +480,7 @@ internal static partial class ComponentPlanner
             return new ComponentLifecyclePlan(rootElementId, flags);
         }
 
-        private bool HasExplicitDataContextSetter(
-            in PendingElementPlan element)
+        private bool HasExplicitDataContextSetter(in PendingElementPlan element)
         {
             var attributes = element.Symbol.AttributeOperations;
 
@@ -536,9 +519,7 @@ internal static partial class ComponentPlanner
                     _dataContextProperty);
         }
 
-        private static IFieldSymbol? GetStaticField(
-            INamedTypeSymbol? type,
-            string name)
+        private static IFieldSymbol? GetStaticField(INamedTypeSymbol? type, string name)
         {
             if (type == null)
             {
@@ -594,8 +575,7 @@ internal static partial class ComponentPlanner
             return false;
         }
 
-        private static bool RequiresMarkupServiceProvider(
-            MarkupExtensionValue extension)
+        private static bool RequiresMarkupServiceProvider(MarkupExtensionValue extension)
         {
             if (extension.Binding == null &&
                 extension.ProvideValueMethod.Symbol is
@@ -607,8 +587,7 @@ internal static partial class ComponentPlanner
             return NestedValuesRequireMarkupServiceProvider(extension);
         }
 
-        private static bool NestedValuesRequireMarkupServiceProvider(
-            MarkupExtensionValue extension)
+        private static bool NestedValuesRequireMarkupServiceProvider(MarkupExtensionValue extension)
         {
             var arguments = extension.Arguments;
             for (var i = 0; i < arguments.Length; i++)
@@ -713,12 +692,7 @@ internal static partial class ComponentPlanner
             return false;
         }
 
-        private bool TryBuildElement(
-            MarkupElementSyntax syntax,
-            int parentId,
-            TraversalContext context,
-            bool isRoot,
-            out int elementId)
+        private bool TryBuildElement(MarkupElementSyntax syntax, int parentId, TraversalContext context, bool isRoot, out int elementId)
         {
             if (_semanticModel.GetSymbolInfo(syntax).Symbol is not IMarkupComponentSymbol symbol)
             {
@@ -750,7 +724,7 @@ internal static partial class ComponentPlanner
             _syntaxElementIds.Add(syntax, elementId);
 
             var pendingFirstUpdateActionStart = _pendingFirstUpdateActions.Count;
-            AddPendingTemplateDataType(elementId, syntax, type);
+            AddPendingDataType(elementId, syntax, type);
             AddPendingFirstUpdateActions(elementId, scope.ScopeId, type, symbol);
             var pendingFirstUpdateActions = new ComponentPlanRange(
                 pendingFirstUpdateActionStart,
@@ -910,12 +884,7 @@ internal static partial class ComponentPlanner
             return true;
         }
 
-        private PendingPropertyElementPlan BuildPropertyElement(
-            int ownerElementId,
-            MarkupElementSyntax syntax,
-            AkburaPropertySymbol property,
-            IMarkupContentOperation operation,
-            TraversalContext inheritedContext)
+        private PendingPropertyElementPlan BuildPropertyElement(int ownerElementId, MarkupElementSyntax syntax, AkburaPropertySymbol property, IMarkupContentOperation operation, TraversalContext inheritedContext)
         {
             var boundary = CreatePropertyBoundary(
                 ownerElementId,
@@ -990,11 +959,7 @@ internal static partial class ComponentPlanner
                 boundaryValue);
         }
 
-        private ContentBoundary CreateImplicitBoundary(
-            int ownerElementId,
-            MarkupElementSyntax syntax,
-            IMarkupContentOperation? operation,
-            int parentScopeId)
+        private ContentBoundary CreateImplicitBoundary(int ownerElementId, MarkupElementSyntax syntax, IMarkupContentOperation? operation, int parentScopeId)
         {
             if (operation?.Property is not { } property || !IsDeferredContentProperty(property))
             {
@@ -1015,12 +980,7 @@ internal static partial class ComponentPlanner
                 isTemplate: false);
         }
 
-        private ContentBoundary CreatePropertyBoundary(
-            int ownerElementId,
-            MarkupElementSyntax syntax,
-            AkburaPropertySymbol property,
-            IMarkupContentOperation operation,
-            int parentScopeId)
+        private ContentBoundary CreatePropertyBoundary(int ownerElementId, MarkupElementSyntax syntax, AkburaPropertySymbol property, IMarkupContentOperation operation, int parentScopeId)
         {
             var isDeferred = IsDeferredContentProperty(property);
             var isTemplate = IsDataTemplateProperty(property);
@@ -1045,10 +1005,7 @@ internal static partial class ComponentPlanner
                 isTemplate);
         }
 
-        private ComponentContentValueReference CompleteBoundary(
-            in ContentBoundary boundary,
-            scoped ReadOnlySpan<int> deferredRoots,
-            scoped ReadOnlySpan<int> templateRoots)
+        private ComponentContentValueReference CompleteBoundary(in ContentBoundary boundary, scoped ReadOnlySpan<int> deferredRoots, scoped ReadOnlySpan<int> templateRoots)
         {
             if (!boundary.IsValid || boundary.Operation.HasErrors)
             {
@@ -1095,9 +1052,7 @@ internal static partial class ComponentPlanner
             return default;
         }
 
-        private ComponentContentValueReference CompleteTemplateBoundary(
-            in ContentBoundary boundary,
-            scoped ReadOnlySpan<int> roots)
+        private ComponentContentValueReference CompleteTemplateBoundary(in ContentBoundary boundary, scoped ReadOnlySpan<int> roots)
         {
             Debug.Assert(boundary.IsTemplate);
 
@@ -1145,11 +1100,7 @@ internal static partial class ComponentPlanner
                 id);
         }
 
-        private int AddPendingScope(
-            int parentScopeId,
-            int ownerElementId,
-            ComponentElementScopeKind kind,
-            bool hasConditionalContent = false)
+        private int AddPendingScope(int parentScopeId, int ownerElementId, ComponentElementScopeKind kind, bool hasConditionalContent = false)
         {
             Debug.Assert((uint)parentScopeId < (uint)_pendingScopes.Count);
             Debug.Assert(ownerElementId >= 0);
@@ -1365,11 +1316,7 @@ internal static partial class ComponentPlanner
             }
         }
 
-        private TraversalContext ResolveChildContext(
-            MarkupElementSyntax syntax,
-            MarkupChildContent? child,
-            in TraversalContext inherited,
-            in ContentBoundary boundary)
+        private TraversalContext ResolveChildContext(MarkupElementSyntax syntax, MarkupChildContent? child, in TraversalContext inherited, in ContentBoundary boundary)
         {
             var template = boundary.IsTemplate && !IsDataTemplateElement(syntax)
                 ? boundary.CreateTemplateScope()
@@ -1392,9 +1339,7 @@ internal static partial class ComponentPlanner
             return new TraversalContext(template, deferred, inherited.Conditional);
         }
 
-        private ITypeSymbol GetElementType(
-            MarkupElementSyntax syntax,
-            IMarkupComponentSymbol symbol)
+        private ITypeSymbol GetElementType(MarkupElementSyntax syntax, IMarkupComponentSymbol symbol)
         {
             if (_semanticModel.GetMarkupComponentReferenceType(symbol) is { } componentType)
             {
@@ -1417,11 +1362,7 @@ internal static partial class ComponentPlanner
                 IsDataTemplateType(GetElementType(syntax, symbol));
         }
 
-        private void TrackBoundaryRoot(
-            in ContentBoundary boundary,
-            int childId,
-            scoped ImmutableArrayBuilder<int> deferredRoots,
-            scoped ImmutableArrayBuilder<int> templateRoots)
+        private void TrackBoundaryRoot(in ContentBoundary boundary, int childId, scoped ImmutableArrayBuilder<int> deferredRoots, scoped ImmutableArrayBuilder<int> templateRoots)
         {
             var child = _elements[childId];
             if (boundary.IsDeferred &&
@@ -1446,37 +1387,34 @@ internal static partial class ComponentPlanner
             return new ComponentPlanRange(start, elementIds.Length);
         }
 
-        private void AddPendingTemplateDataType(
-            int elementId,
-            MarkupElementSyntax syntax,
-            ITypeSymbol elementType)
+        private void AddPendingDataType(int elementId, MarkupElementSyntax syntax, ITypeSymbol elementType)
         {
             if (elementType is not INamedTypeSymbol namedType)
             {
                 return;
             }
 
-            var templates =
+            var markupMetadata =
                 _semanticModel.BindingSession.MarkupTemplateContent;
-            if (!templates.IsDataTemplateType(namedType) ||
-                templates.FindDataTypeProperty(namedType) is not { } property ||
-                !TryGetTemplateDataType(syntax, out var dataType))
+            if (markupMetadata.FindDataTypeProperty(namedType) is not { } property ||
+                !TryGetRuntimeDataType(
+                    syntax,
+                    markupMetadata.IsDataTemplateType(namedType),
+                    out var dataType))
             {
                 return;
             }
 
             _pendingFirstUpdateActions.Add(
-                PendingFirstUpdateActionPlan.CreateTemplateDataType(
-                    new PendingTemplateDataTypePlan(
+                PendingFirstUpdateActionPlan.CreateDataType(
+                    new PendingDataTypePlan(
                         elementId,
                         property,
                         dataType,
                         syntax)));
         }
 
-        private bool TryGetTemplateDataType(
-            MarkupElementSyntax syntax,
-            out INamedTypeSymbol dataType)
+        private bool TryGetRuntimeDataType(MarkupElementSyntax syntax, bool searchTemplatePropertyAncestors, out INamedTypeSymbol dataType)
         {
             var dataTypes =
                 _semanticModel.BindingSession.MarkupDataTypes;
@@ -1485,9 +1423,13 @@ internal static partial class ComponentPlanner
                 return true;
             }
 
-            for (var ancestor = syntax.Parent;
-                 ancestor != null;
-                 ancestor = ancestor.Parent)
+            if (!searchTemplatePropertyAncestors)
+            {
+                dataType = null!;
+                return false;
+            }
+
+            for (var ancestor = syntax.Parent; ancestor != null; ancestor = ancestor.Parent)
             {
                 if (ancestor is not MarkupElementSyntax propertyElement ||
                     _semanticModel.GetSymbolInfo(propertyElement).Symbol
@@ -1506,11 +1448,7 @@ internal static partial class ComponentPlanner
             return false;
         }
 
-        private void AddPendingFirstUpdateActions(
-            int elementId,
-            int scopeId,
-            ITypeSymbol targetType,
-            IMarkupComponentSymbol symbol)
+        private void AddPendingFirstUpdateActions(int elementId, int scopeId, ITypeSymbol targetType, IMarkupComponentSymbol symbol)
         {
             var operations = symbol.AttributeOperations;
             for (var i = 0; i < operations.Length; i++)
@@ -1572,17 +1510,15 @@ internal static partial class ComponentPlanner
             }
         }
 
-        private void LowerFirstUpdateAction(
-            in PendingFirstUpdateActionPlan pending,
-            ITypeSymbol targetType)
+        private void LowerFirstUpdateAction(in PendingFirstUpdateActionPlan pending, ITypeSymbol targetType)
         {
             switch (pending.Kind)
             {
                 case PendingFirstUpdateActionKind.PropertyWrite:
                     LowerPropertyWrite(_pendingPropertyWrites[pending.PropertyWriteIndex]);
                     return;
-                case PendingFirstUpdateActionKind.TemplateDataType:
-                    LowerTemplateDataType(pending.TemplateDataType);
+                case PendingFirstUpdateActionKind.DataType:
+                    LowerDataType(pending.DataType);
                     return;
                 case PendingFirstUpdateActionKind.NameAssignment:
                     LowerNameAssignment((IMarkupNameAssignmentOperation)pending.Operation!);
@@ -1599,8 +1535,7 @@ internal static partial class ComponentPlanner
             }
         }
 
-        private void LowerTemplateDataType(
-            in PendingTemplateDataTypePlan pending)
+        private void LowerDataType(in PendingDataTypePlan pending)
         {
             Debug.Assert(
                 (uint)pending.ElementId < (uint)_elements.Count);
@@ -1671,9 +1606,7 @@ internal static partial class ComponentPlanner
             _firstUpdateActions.Add(ComponentFirstUpdateActionPlan.CreateRoutedEvent(index));
         }
 
-        private void LowerCommandBinding(
-            IMarkupCommandBindingOperation operation,
-            ITypeSymbol targetType)
+        private void LowerCommandBinding(IMarkupCommandBindingOperation operation, ITypeSymbol targetType)
         {
             var handler = operation.ValueSyntax is MarkupDynamicAttributeValueSyntax value
                 ? CSharpProbeBuilder.RewriteMarkupLoopIdentifiers(value, value.Expression.Expression.GetRawCSharpExpression()!)
@@ -1806,9 +1739,7 @@ internal static partial class ComponentPlanner
                 : LowerPropertyContent(pending, boundaryValue: default);
         }
 
-        private ComponentContentTargetReference LowerPropertyContent(
-            in PendingContentPlan pending,
-            ComponentContentValueReference boundaryValue)
+        private ComponentContentTargetReference LowerPropertyContent(in PendingContentPlan pending, ComponentContentValueReference boundaryValue)
         {
             var operation = pending.Operation;
             var destination = PropertyWritePlan.Create(
@@ -1890,8 +1821,7 @@ internal static partial class ComponentPlanner
                 _semanticModel.IsAvaloniaPropertyType(field.Type);
         }
 
-        private ComponentContentTargetReference LowerCollectionContent(
-            in PendingContentPlan pending)
+        private ComponentContentTargetReference LowerCollectionContent(in PendingContentPlan pending)
         {
             var operation = pending.Operation;
             var destination = CreateCollectionWritePlan(operation);
@@ -1999,9 +1929,7 @@ internal static partial class ComponentPlanner
                 index);
         }
 
-        private ComponentContentValueReference AddWholeContentValue(
-            IMarkupContentOperation operation,
-            ComponentContentValueKind kind)
+        private ComponentContentValueReference AddWholeContentValue(IMarkupContentOperation operation, ComponentContentValueKind kind)
         {
             var targetType = operation.ContentModel.AllowedChildType.Symbol as ITypeSymbol ??
                 operation.Property?.Type.Symbol as ITypeSymbol;
@@ -2047,9 +1975,7 @@ internal static partial class ComponentPlanner
             return new ComponentContentValueReference(kind, index);
         }
 
-        private ComponentContentValueReference AddTextContentValue(
-            in MarkupChildContent child,
-            in MarkupContentModel contentModel)
+        private ComponentContentValueReference AddTextContentValue(in MarkupChildContent child, in MarkupContentModel contentModel)
         {
             var index = _csharpValues.Count;
             _csharpValues.Add(new ComponentCSharpValuePlan(
@@ -2062,9 +1988,7 @@ internal static partial class ComponentPlanner
                 index);
         }
 
-        private ComponentContentValueReference AddExpressionContentValue(
-            in MarkupChildContent child,
-            in MarkupContentModel contentModel)
+        private ComponentContentValueReference AddExpressionContentValue(in MarkupChildContent child, in MarkupContentModel contentModel)
         {
             if (child.Syntax is not MarkupInlineExpressionSyntax inlineExpression)
             {
@@ -2136,9 +2060,7 @@ internal static partial class ComponentPlanner
                     elementType);
         }
 
-        private static ITypeSymbol? GetCollectionType(
-            AkburaPropertySymbol property,
-            in MarkupContentModel contentModel)
+        private static ITypeSymbol? GetCollectionType(AkburaPropertySymbol property, in MarkupContentModel contentModel)
         {
             return (property.ClrPropertyDefinition.Symbol as RoslynPropertySymbol)?.Type ??
                 (property.ReadDefinition.Symbol as RoslynPropertySymbol)?.Type ??
@@ -2216,10 +2138,7 @@ internal static partial class ComponentPlanner
             return new ComponentPropertyValueReference(kind, index);
         }
 
-        private ComponentPropertyValueReference LowerMarkupExtension(
-            MarkupExtensionValue extension,
-            int scopeId,
-            in PropertyWritePlan destination)
+        private ComponentPropertyValueReference LowerMarkupExtension(MarkupExtensionValue extension, int scopeId, in PropertyWritePlan destination)
         {
             if (destination.AssignBinding)
             {
@@ -2259,10 +2178,7 @@ internal static partial class ComponentPlanner
             return new ComponentPropertyValueReference(kind, index);
         }
 
-        private ComponentPropertyValueReference LowerMarkupBinding(
-            MarkupExtensionValue extension,
-            int scopeId,
-            in PropertyWritePlan destination)
+        private ComponentPropertyValueReference LowerMarkupBinding(MarkupExtensionValue extension, int scopeId, in PropertyWritePlan destination)
         {
             if (!destination.HasAvaloniaPropertyTarget)
             {
@@ -2358,11 +2274,7 @@ internal static partial class ComponentPlanner
             return scopeId == 0 ? null : "__nameScope";
         }
 
-        private ComponentElementFlags GetElementFlags(
-            ITypeSymbol type,
-            bool isRoot,
-            bool hasName,
-            in EffectiveScope scope)
+        private ComponentElementFlags GetElementFlags(ITypeSymbol type, bool isRoot, bool hasName, in EffectiveScope scope)
         {
             var flags = ComponentElementFlags.None;
             if (isRoot)
@@ -2435,10 +2347,7 @@ internal static partial class ComponentPlanner
             return false;
         }
 
-        private static string CreateRuntimeStorageExpression(
-            ITypeSymbol type,
-            int localId,
-            bool isForeachLocal)
+        private static string CreateRuntimeStorageExpression(ITypeSymbol type, int localId, bool isForeachLocal)
         {
             return (isForeachLocal ? "__akburaForeachRenderState" : "__akburaRenderState") +
                 ".GetRequired<" +
@@ -2497,9 +2406,7 @@ internal static partial class ComponentPlanner
                 .FirstOrDefault(static operation => !operation.HasErrors && operation.NameSymbol != null);
         }
 
-        private static MarkupChildContent? FindMarkupChild(
-            IMarkupContentOperation? operation,
-            MarkupElementContentSyntax syntax)
+        private static MarkupChildContent? FindMarkupChild(IMarkupContentOperation? operation, MarkupElementContentSyntax syntax)
         {
             if (operation == null)
             {
@@ -2517,8 +2424,7 @@ internal static partial class ComponentPlanner
             return null;
         }
 
-        private static ComponentPropertyWritePhase GetWritePhase(
-            IMarkupPropertySetterOperation operation)
+        private static ComponentPropertyWritePhase GetWritePhase(IMarkupPropertySetterOperation operation)
         {
             var isParameter = operation.Property?.Parameter != null;
             var isInitialValue = operation.ValueKind is
@@ -2612,12 +2518,7 @@ internal static partial class ComponentPlanner
 
     private readonly struct PendingScopePlan
     {
-        public PendingScopePlan(
-            int id,
-            int parentScopeId,
-            int ownerElementId,
-            ComponentElementScopeKind kind,
-            ComponentPlanRange elements = default)
+        public PendingScopePlan(int id, int parentScopeId, int ownerElementId, ComponentElementScopeKind kind, ComponentPlanRange elements = default)
         {
             Id = id;
             ParentScopeId = parentScopeId;
@@ -2649,26 +2550,7 @@ internal static partial class ComponentPlanner
 
     private readonly struct PendingElementPlan
     {
-        public PendingElementPlan(
-            int id,
-            MarkupElementSyntax syntax,
-            IMarkupComponentSymbol symbol,
-            ITypeSymbol type,
-            string identifier,
-            int parentId,
-            int scopeId,
-            ComponentElementScopeKind scopeKind,
-            ComponentElementFlags flags,
-            ComponentPlanRange children,
-            ComponentPlanRange pendingFirstUpdateActions,
-            ComponentPlanRange propertyElements,
-            ComponentPlanRange propertyWrites = default,
-            ComponentPlanRange propertySubscriptions = default,
-            ComponentPlanRange firstUpdateActions = default,
-            ComponentContentTargetReference content = default,
-            string? explicitKey = null,
-            int runtimeStorageId = -1,
-            int runtimeStorageRootScopeId = 0)
+        public PendingElementPlan(int id, MarkupElementSyntax syntax, IMarkupComponentSymbol symbol, ITypeSymbol type, string identifier, int parentId, int scopeId, ComponentElementScopeKind scopeKind, ComponentElementFlags flags, ComponentPlanRange children, ComponentPlanRange pendingFirstUpdateActions, ComponentPlanRange propertyElements, ComponentPlanRange propertyWrites = default, ComponentPlanRange propertySubscriptions = default, ComponentPlanRange firstUpdateActions = default, ComponentContentTargetReference content = default, string? explicitKey = null, int runtimeStorageId = -1, int runtimeStorageRootScopeId = 0)
         {
             Id = id;
             Syntax = syntax;
@@ -2713,10 +2595,7 @@ internal static partial class ComponentPlanner
         public bool RequiresLocalMarkupContext =>
             (Flags & ComponentElementFlags.RequiresLocalMarkupContext) != 0;
 
-        public PendingElementPlan WithPropertyPlans(
-            ComponentPlanRange propertyWrites,
-            ComponentPlanRange propertySubscriptions,
-            ComponentPlanRange firstUpdateActions)
+        public PendingElementPlan WithPropertyPlans(ComponentPlanRange propertyWrites, ComponentPlanRange propertySubscriptions, ComponentPlanRange firstUpdateActions)
         {
             return new PendingElementPlan(
                 Id,
@@ -2769,19 +2648,15 @@ internal static partial class ComponentPlanner
     {
         None,
         PropertyWrite,
-        TemplateDataType,
+        DataType,
         NameAssignment,
         RoutedEvent,
         CommandBinding,
     }
 
-    private readonly struct PendingTemplateDataTypePlan
+    private readonly struct PendingDataTypePlan
     {
-        public PendingTemplateDataTypePlan(
-            int elementId,
-            RoslynPropertySymbol property,
-            ITypeSymbol dataType,
-            AkburaSyntax syntax)
+        public PendingDataTypePlan(int elementId, RoslynPropertySymbol property, ITypeSymbol dataType, AkburaSyntax syntax)
         {
             ElementId = elementId;
             Property = property;
@@ -2797,22 +2672,18 @@ internal static partial class ComponentPlanner
 
     private readonly struct PendingFirstUpdateActionPlan
     {
-        private PendingFirstUpdateActionPlan(
-            PendingFirstUpdateActionKind kind,
-            int propertyWriteIndex,
-            IMarkupAttributeOperation? operation,
-            PendingTemplateDataTypePlan templateDataType)
+        private PendingFirstUpdateActionPlan(PendingFirstUpdateActionKind kind, int propertyWriteIndex, IMarkupAttributeOperation? operation, PendingDataTypePlan dataType)
         {
             Kind = kind;
             PropertyWriteIndex = propertyWriteIndex;
             Operation = operation;
-            TemplateDataType = templateDataType;
+            DataType = dataType;
         }
 
         public PendingFirstUpdateActionKind Kind { get; }
         public int PropertyWriteIndex { get; }
         public IMarkupAttributeOperation? Operation { get; }
-        public PendingTemplateDataTypePlan TemplateDataType { get; }
+        public PendingDataTypePlan DataType { get; }
 
         public static PendingFirstUpdateActionPlan CreateProperty(int propertyWriteIndex)
         {
@@ -2820,17 +2691,16 @@ internal static partial class ComponentPlanner
                 PendingFirstUpdateActionKind.PropertyWrite,
                 propertyWriteIndex,
                 operation: null,
-                templateDataType: default);
+                dataType: default);
         }
 
-        public static PendingFirstUpdateActionPlan CreateTemplateDataType(
-            in PendingTemplateDataTypePlan templateDataType)
+        public static PendingFirstUpdateActionPlan CreateDataType(in PendingDataTypePlan dataType)
         {
             return new PendingFirstUpdateActionPlan(
-                PendingFirstUpdateActionKind.TemplateDataType,
+                PendingFirstUpdateActionKind.DataType,
                 propertyWriteIndex: -1,
                 operation: null,
-                templateDataType);
+                dataType);
         }
 
         public static PendingFirstUpdateActionPlan CreateNameAssignment(IMarkupNameAssignmentOperation operation)
@@ -2839,7 +2709,7 @@ internal static partial class ComponentPlanner
                 PendingFirstUpdateActionKind.NameAssignment,
                 propertyWriteIndex: -1,
                 operation,
-                templateDataType: default);
+                dataType: default);
         }
 
         public static PendingFirstUpdateActionPlan CreateRoutedEvent(IMarkupRoutedEventBindingOperation operation)
@@ -2848,7 +2718,7 @@ internal static partial class ComponentPlanner
                 PendingFirstUpdateActionKind.RoutedEvent,
                 propertyWriteIndex: -1,
                 operation,
-                templateDataType: default);
+                dataType: default);
         }
 
         public static PendingFirstUpdateActionPlan CreateCommandBinding(IMarkupCommandBindingOperation operation)
@@ -2857,18 +2727,13 @@ internal static partial class ComponentPlanner
                 PendingFirstUpdateActionKind.CommandBinding,
                 propertyWriteIndex: -1,
                 operation,
-                templateDataType: default);
+                dataType: default);
         }
     }
 
     private readonly struct PendingPropertyWritePlan
     {
-        public PendingPropertyWritePlan(
-            int elementId,
-            int scopeId,
-            int sourceOrder,
-            PropertyWritePlan destination,
-            IMarkupPropertySetterOperation operation)
+        public PendingPropertyWritePlan(int elementId, int scopeId, int sourceOrder, PropertyWritePlan destination, IMarkupPropertySetterOperation operation)
         {
             ElementId = elementId;
             ScopeId = scopeId;
@@ -2886,13 +2751,7 @@ internal static partial class ComponentPlanner
 
     private readonly struct PendingPropertyElementPlan
     {
-        public PendingPropertyElementPlan(
-            int ownerElementId,
-            MarkupElementSyntax syntax,
-            AkburaPropertySymbol property,
-            IMarkupContentOperation operation,
-            ComponentPlanRange children,
-            ComponentContentValueReference boundaryValue)
+        public PendingPropertyElementPlan(int ownerElementId, MarkupElementSyntax syntax, AkburaPropertySymbol property, IMarkupContentOperation operation, ComponentPlanRange children, ComponentContentValueReference boundaryValue)
         {
             OwnerElementId = ownerElementId;
             Syntax = syntax;
@@ -2912,14 +2771,7 @@ internal static partial class ComponentPlanner
 
     private readonly struct PendingContentPlan
     {
-        public PendingContentPlan(
-            int ownerElementId,
-            IMarkupContentOperation operation,
-            ComponentPlanRange childElements,
-            int propertyElementId,
-            ComponentContentValueReference boundaryValue,
-            PropertyWritePlan destinationOverride = default,
-            MarkupContentModel? contentModelOverride = null)
+        public PendingContentPlan(int ownerElementId, IMarkupContentOperation operation, ComponentPlanRange childElements, int propertyElementId, ComponentContentValueReference boundaryValue, PropertyWritePlan destinationOverride = default, MarkupContentModel? contentModelOverride = null)
         {
             OwnerElementId = ownerElementId;
             Operation = operation;
@@ -2941,14 +2793,7 @@ internal static partial class ComponentPlanner
 
     private readonly struct ContentBoundary
     {
-        public ContentBoundary(
-            int scopeId,
-            int ownerElementId,
-            MarkupElementSyntax syntax,
-            AkburaPropertySymbol property,
-            IMarkupContentOperation operation,
-            bool isDeferred,
-            bool isTemplate)
+        public ContentBoundary(int scopeId, int ownerElementId, MarkupElementSyntax syntax, AkburaPropertySymbol property, IMarkupContentOperation operation, bool isDeferred, bool isTemplate)
         {
             ScopeId = scopeId;
             OwnerElementId = ownerElementId;
@@ -2989,11 +2834,7 @@ internal static partial class ComponentPlanner
 
     private readonly struct ScopeReference
     {
-        public ScopeReference(
-            int scopeId,
-            int ownerElementId,
-            ComponentElementScopeKind kind,
-            bool isDeferred)
+        public ScopeReference(int scopeId, int ownerElementId, ComponentElementScopeKind kind, bool isDeferred)
         {
             ScopeId = scopeId;
             OwnerElementId = ownerElementId;
@@ -3046,11 +2887,7 @@ internal static partial class ComponentPlanner
 
     private readonly struct EffectiveScope
     {
-        public EffectiveScope(
-            int scopeId,
-            int ownerElementId,
-            ComponentElementScopeKind kind,
-            bool isDeferred)
+        public EffectiveScope(int scopeId, int ownerElementId, ComponentElementScopeKind kind, bool isDeferred)
         {
             ScopeId = scopeId;
             OwnerElementId = ownerElementId;

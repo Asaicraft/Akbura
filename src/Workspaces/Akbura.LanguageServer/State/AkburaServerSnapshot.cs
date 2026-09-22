@@ -4,6 +4,8 @@ internal sealed record AkburaServerSnapshot(
     long Sequence,
     AkburaSolutionSnapshot Solution,
     ImmutableDictionary<Uri, AkburaOpenDocument> OpenDocuments,
+    ImmutableDictionary<Uri, AkburaOpenResourceDocument>
+        OpenResourceDocuments,
     ImmutableDictionary<Uri, AkburaWorkspaceFolderState> WorkspaceFolders,
     AkburaClientCapabilities ClientCapabilities,
     AkburaPositionEncoding PositionEncoding,
@@ -12,14 +14,15 @@ internal sealed record AkburaServerSnapshot(
     bool IsInitialized,
     bool IsShuttingDown)
 {
-    public static AkburaServerSnapshot Create(
-        AkburaWorkspace workspace)
+    public static AkburaServerSnapshot Create(AkburaWorkspace workspace)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         return new AkburaServerSnapshot(
             Sequence: 0,
             workspace.CurrentSolution,
             ImmutableDictionary.Create<Uri, AkburaOpenDocument>(
+                AkburaUriComparer.Instance),
+            ImmutableDictionary.Create<Uri, AkburaOpenResourceDocument>(
                 AkburaUriComparer.Instance),
             ImmutableDictionary.Create<Uri, AkburaWorkspaceFolderState>(
                 AkburaUriComparer.Instance),
@@ -31,8 +34,7 @@ internal sealed record AkburaServerSnapshot(
             IsShuttingDown: false);
     }
 
-    public AkburaServerSnapshot Next(
-        AkburaSolutionSnapshot solution)
+    public AkburaServerSnapshot Next(AkburaSolutionSnapshot solution)
     {
         return this with
         {

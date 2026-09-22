@@ -10,10 +10,7 @@ internal sealed class InitializeHandler :
 
     public override bool MutatesServerState => true;
 
-    public override Task<AkburaLspHandlerResult<InitializeResult>> HandleAsync(
-        InitializeParams parameters,
-        AkburaRequestContext context,
-        CancellationToken cancellationToken)
+    public override Task<AkburaLspHandlerResult<InitializeResult>> HandleAsync(InitializeParams parameters, AkburaRequestContext context, CancellationToken cancellationToken)
     {
         if (context.ServerSnapshot.IsInitializeReceived)
         {
@@ -58,8 +55,7 @@ internal sealed class InitializeHandler :
                 }));
     }
 
-    private static AkburaClientCapabilities ReadCapabilities(
-        InitializeClientCapabilities capabilities)
+    private static AkburaClientCapabilities ReadCapabilities(InitializeClientCapabilities capabilities)
     {
         var completion = capabilities.TextDocument?
             .Completion?.CompletionItem;
@@ -87,10 +83,7 @@ internal sealed class InitializeHandler :
                     .RefreshSupport == true);
     }
 
-    private static ImmutableDictionary<Uri, AkburaWorkspaceFolderState>
-        CreateWorkspaceFolders(
-            InitializeParams parameters,
-            AkburaLanguageServerServices services)
+    private static ImmutableDictionary<Uri, AkburaWorkspaceFolderState> CreateWorkspaceFolders(InitializeParams parameters, AkburaLanguageServerServices services)
     {
         var folders = ImmutableDictionary.CreateBuilder<
             Uri,
@@ -153,8 +146,7 @@ internal sealed class InitializeHandler :
                 Path.AltDirectorySeparatorChar));
     }
 
-    private static ServerCapabilities CreateServerCapabilities(
-        AkburaClientCapabilities capabilities)
+    private static ServerCapabilities CreateServerCapabilities(AkburaClientCapabilities capabilities)
     {
         return new ServerCapabilities
         {
@@ -204,10 +196,7 @@ internal sealed class InitializedHandler :
 
     public override bool MutatesServerState => true;
 
-    public override Task<AkburaLspHandlerResult<object?>> HandleAsync(
-        InitializedParams parameters,
-        AkburaRequestContext context,
-        CancellationToken cancellationToken)
+    public override Task<AkburaLspHandlerResult<object?>> HandleAsync(InitializedParams parameters, AkburaRequestContext context, CancellationToken cancellationToken)
     {
         if (!context.ServerSnapshot.IsInitializeReceived)
         {
@@ -259,9 +248,7 @@ internal sealed class InitializedHandler :
                 }));
     }
 
-    private static async Task RegisterFileWatchersAsync(
-        AkburaLanguageServerServices services,
-        CancellationToken cancellationToken)
+    private static async Task RegisterFileWatchersAsync(AkburaLanguageServerServices services, CancellationToken cancellationToken)
     {
         var options = JsonSerializer.SerializeToElement(
             new
@@ -270,6 +257,7 @@ internal sealed class InitializedHandler :
                 {
                     new { globPattern = "**/*.akbura" },
                     new { globPattern = "**/*.akcss" },
+                    new { globPattern = "**/*.axaml" },
                     new { globPattern = "**/*.csproj" },
                     new { globPattern = "**/*.sln" },
                     new { globPattern = "**/*.slnx" },
@@ -306,10 +294,7 @@ internal sealed class ShutdownHandler :
 
     public override bool MutatesServerState => true;
 
-    public override Task<AkburaLspHandlerResult<object?>> HandleAsync(
-        object? parameters,
-        AkburaRequestContext context,
-        CancellationToken cancellationToken)
+    public override Task<AkburaLspHandlerResult<object?>> HandleAsync(object? parameters, AkburaRequestContext context, CancellationToken cancellationToken)
     {
         context.Services.Lifetime.RequestShutdown();
         var next = context.ServerSnapshot
@@ -331,10 +316,7 @@ internal sealed class ExitHandler :
 
     public override bool MutatesServerState => true;
 
-    public override Task<AkburaLspHandlerResult<object?>> HandleAsync(
-        object? parameters,
-        AkburaRequestContext context,
-        CancellationToken cancellationToken)
+    public override Task<AkburaLspHandlerResult<object?>> HandleAsync(object? parameters, AkburaRequestContext context, CancellationToken cancellationToken)
     {
         context.Services.Lifetime.RequestExit();
         var next = context.ServerSnapshot.Next(context.Solution);

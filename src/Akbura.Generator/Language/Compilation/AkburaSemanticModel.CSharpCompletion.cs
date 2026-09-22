@@ -6,9 +6,7 @@ namespace Akbura.Language;
 
 internal abstract partial class AkburaSemanticModel
 {
-    internal CSharpProbeProjection CreateCSharpCompletionProjection(
-        CSharpExpressionSyntax expressionSyntax,
-        int relativePosition)
+    internal CSharpProbeProjection CreateCSharpCompletionProjection(CSharpExpressionSyntax expressionSyntax, int relativePosition)
     {
         if (expressionSyntax == null)
         {
@@ -80,9 +78,7 @@ internal abstract partial class AkburaSemanticModel
                 expectedType);
     }
 
-    internal CSharpProbeProjection CreateCSharpCompletionProjection(
-        CSharpStatementSyntax statementSyntax,
-        int relativePosition)
+    internal CSharpProbeProjection CreateCSharpCompletionProjection(CSharpStatementSyntax statementSyntax, int relativePosition)
     {
         if (statementSyntax == null)
         {
@@ -109,9 +105,7 @@ internal abstract partial class AkburaSemanticModel
                 relativePosition);
     }
 
-    internal CSharpProbeProjection CreateCSharpCompletionProjection(
-        CSharpTypeSyntax typeSyntax,
-        int relativePosition)
+    internal CSharpProbeProjection CreateCSharpCompletionProjection(CSharpTypeSyntax typeSyntax, int relativePosition)
     {
         if (typeSyntax == null)
         {
@@ -153,10 +147,7 @@ internal abstract partial class AkburaSemanticModel
                 relativePosition);
     }
 
-    internal CSharpProbeProjection CreateCSharpCompletionProjection(
-        AkburaSyntax declarationSyntax,
-        CSharp.TypeSyntax type,
-        int relativePosition)
+    internal CSharpProbeProjection CreateCSharpCompletionProjection(AkburaSyntax declarationSyntax, CSharp.TypeSyntax type, int relativePosition)
     {
         if (declarationSyntax == null)
         {
@@ -188,9 +179,34 @@ internal abstract partial class AkburaSemanticModel
                 relativePosition);
     }
 
-    internal CSharpProbeProjection CreateCSharpCompletionProjection(
-        UsingDirectiveSyntax usingSyntax,
-        int relativePosition)
+    internal CSharpProbeProjection CreateMarkupDataTypeCompletionProjection(MarkupAttributeSyntax attribute, CSharp.TypeSyntax type, int relativePosition)
+    {
+        if (attribute == null)
+        {
+            throw new ArgumentNullException(nameof(attribute));
+        }
+
+        if (type == null)
+        {
+            throw new ArgumentNullException(nameof(type));
+        }
+
+        ValidateSyntaxTreeOwnership(attribute);
+        if (!IsMarkupDataTypeDirective(attribute))
+        {
+            throw new ArgumentException(
+                "Only x.DataType supports a synthetic markup type projection.",
+                nameof(attribute));
+        }
+
+        var binder = BindingSession.GetCSharpProbeBinder(
+            attribute,
+            BinderUsage.Markup);
+        return new CSharpProbeBuilder(binder)
+            .CreateTypeProjection(type, relativePosition);
+    }
+
+    internal CSharpProbeProjection CreateCSharpCompletionProjection(UsingDirectiveSyntax usingSyntax, int relativePosition)
     {
         if (usingSyntax == null)
         {
@@ -207,9 +223,7 @@ internal abstract partial class AkburaSemanticModel
                 relativePosition);
     }
 
-    internal CSharpProbeProjection CreateCSharpCompletionProjection(
-        AkcssUsingDirectiveSyntax usingSyntax,
-        int relativePosition)
+    internal CSharpProbeProjection CreateCSharpCompletionProjection(AkcssUsingDirectiveSyntax usingSyntax, int relativePosition)
     {
         if (usingSyntax == null)
         {
@@ -222,9 +236,7 @@ internal abstract partial class AkburaSemanticModel
             relativePosition);
     }
 
-    internal CSharpProbeProjection CreateCSharpCompletionProjection(
-        CSharpParameterListSyntax parameterListSyntax,
-        int relativePosition)
+    internal CSharpProbeProjection CreateCSharpCompletionProjection(CSharpParameterListSyntax parameterListSyntax, int relativePosition)
     {
         if (parameterListSyntax == null)
         {
@@ -256,9 +268,7 @@ internal abstract partial class AkburaSemanticModel
 
     private static bool IsInsideMarkup(AkburaSyntax syntax)
     {
-        for (var current = syntax.Parent;
-             current != null;
-             current = current.Parent)
+        for (var current = syntax.Parent; current != null; current = current.Parent)
         {
             if (current is MarkupElementSyntax or MarkupRootSyntax)
             {

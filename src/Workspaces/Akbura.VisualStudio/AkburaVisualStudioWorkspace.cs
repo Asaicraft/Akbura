@@ -1,7 +1,9 @@
 using Akbura.Workspaces;
 using Akbura.Pools;
+using Akbura.Workspaces.Resources;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.LanguageServices;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
@@ -44,8 +46,10 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
 
     internal event EventHandler? ProjectContextChanged;
 
-    internal Project? FindRoslynProjectForDocument(
-        string filePath)
+    internal event EventHandler<WorkspaceChangeEventArgs>?
+        ResourceProjectContextChanged;
+
+    internal Project? FindRoslynProjectForDocument(string filePath)
     {
         if (string.IsNullOrWhiteSpace(filePath))
         {
@@ -56,13 +60,238 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             Path.GetFullPath(filePath));
     }
 
+    internal async Task<ImmutableArray< AkburaResourceDocumentRegistration>> OpenOrChangeResourceDocumentAsync(string filePath, SourceText text, IReadOnlyList<TextChangeRange>? changes, CancellationToken cancellationToken)
+    {
+        if (Volatile.Read(ref _disposeState) != 0)
+        {
+            return ImmutableArray<
+                AkburaResourceDocumentRegistration>.Empty;
+        }
+
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            throw new ArgumentException(
+                "A resource document path is required.",
+                nameof(filePath));
+        }
+
+        if (text == null)
+        {
+            throw new ArgumentNullException(nameof(text));
+        }
+
+        var fullPath = Path.GetFullPath(filePath);
+        var projects = FindResourceDocumentProjects(fullPath);
+        if (projects.IsDefaultOrEmpty)
+        {
+            return ImmutableArray<
+                AkburaResourceDocumentRegistration>.Empty;
+        }
+
+        var registrations = new List<
+            AkburaResourceDocumentRegistration>(projects.Length);
+        var updates = ImmutableArray.CreateBuilder<(
+            AkburaProjectId ProjectId,
+            ResourceDocumentInput Input)>(projects.Length);
+        var version = VersionStamp.Create();
+        foreach (var project in projects)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!await GetOrCreateProjectSynchronizationTaskAsync(
+                    project,
+                    activeFilePath: null)
+                .ConfigureAwait(false))
+            {
+                continue;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            var projectId = new AkburaProjectId(project.Id.Id);
+            if (!Workspace.CurrentSolution.TryGetProject(
+                    projectId,
+                    out var projectSnapshot) ||
+                !TryFindResourceDocumentInput(
+                    projectSnapshot,
+                    fullPath,
+                    out var input))
+            {
+                continue;
+            }
+
+            var liveInput = input.WithText(text, version);
+            updates.Add((projectId, liveInput));
+            registrations.Add(
+                new AkburaResourceDocumentRegistration(
+                    projectId,
+                    liveInput));
+        }
+
+        Workspace.OpenOrChangeResourceDocuments(
+            updates.ToImmutable(),
+            changes,
+            cancellationToken);
+        return registrations.ToImmutableArray();
+    }
+
+    internal void ChangeResourceDocument(ImmutableArray<AkburaResourceDocumentRegistration> registrations, SourceText text, IReadOnlyList<TextChangeRange>? changes, CancellationToken cancellationToken)
+    {
+        if (Volatile.Read(ref _disposeState) != 0)
+        {
+            return;
+        }
+
+        if (text == null)
+        {
+            throw new ArgumentNullException(nameof(text));
+        }
+
+        var version = VersionStamp.Create();
+        var updates = ImmutableArray.CreateBuilder<(
+            AkburaProjectId ProjectId,
+            ResourceDocumentInput Input)>(registrations.Length);
+        foreach (var registration in registrations)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            updates.Add(
+                (registration.ProjectId,
+                registration.Input.WithText(
+                    text,
+                    version)));
+        }
+
+        Workspace.OpenOrChangeResourceDocuments(
+            updates.ToImmutable(),
+            changes,
+            cancellationToken);
+    }
+
+    internal void RemoveResourceDocuments(ImmutableArray<AkburaResourceDocumentRegistration> registrations)
+    {
+        if (Volatile.Read(ref _disposeState) != 0)
+        {
+            return;
+        }
+
+        foreach (var registration in registrations)
+        {
+            if (!Workspace.CurrentSolution.TryGetProject(
+                    registration.ProjectId,
+                    out _))
+            {
+                continue;
+            }
+
+            Workspace.RemoveResourceDocument(
+                registration.ProjectId,
+                registration.Input.Uri);
+        }
+    }
+
+    internal void RestorePersistedResourceDocuments(string filePath, ImmutableArray<AkburaResourceDocumentRegistration> registrations, SourceText expectedText)
+    {
+        if (Volatile.Read(ref _disposeState) != 0)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return;
+        }
+
+        if (expectedText == null)
+        {
+            throw new ArgumentNullException(nameof(expectedText));
+        }
+
+        var fullPath = Path.GetFullPath(filePath);
+        SourceText? persistedText = null;
+        try
+        {
+            if (File.Exists(fullPath))
+            {
+                using var stream = File.OpenRead(fullPath);
+                persistedText = SourceText.From(stream);
+            }
+        }
+        catch (IOException exception)
+        {
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Workspace,
+                $"Could not restore Avalonia resource document " +
+                $"'{fullPath}' from disk: {exception.Message}");
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Workspace,
+                $"Could not restore Avalonia resource document " +
+                $"'{fullPath}' from disk: {exception.Message}");
+        }
+
+        var currentOwners = FindResourceDocumentProjects(fullPath)
+            .Select(static project =>
+                new AkburaProjectId(project.Id.Id))
+            .ToImmutableHashSet();
+
+        foreach (var registration in registrations)
+        {
+            if (!Workspace.CurrentSolution.TryGetProject(
+                    registration.ProjectId,
+                    out _))
+            {
+                continue;
+            }
+
+            var persistedInput = persistedText != null &&
+                    currentOwners.Contains(registration.ProjectId)
+                ? registration.Input.WithText(
+                    persistedText,
+                    VersionStamp.Create())
+                : (ResourceDocumentInput?)null;
+            Workspace.TryRestoreResourceDocument(
+                registration.ProjectId,
+                registration.Input.Uri,
+                expectedText,
+                persistedInput);
+        }
+    }
+
+    private ImmutableArray<Project> FindResourceDocumentProjects(string fullPath)
+    {
+        return _visualStudioWorkspace
+            .CurrentSolution
+            .Projects
+            .Where(static project =>
+                project.Language == LanguageNames.CSharp)
+            .Where(project =>
+                project.AdditionalDocuments.Any(document =>
+                    RoslynResourceDocumentLoader
+                        .IsAvaloniaResourceDocument(document.FilePath) &&
+                    PathsEqual(document.FilePath, fullPath)))
+            .ToImmutableArray();
+    }
+
+    private static bool TryFindResourceDocumentInput(AkburaProjectSnapshot project, string fullPath, out ResourceDocumentInput input)
+    {
+        foreach (var document in project.ResourceDocuments.Values)
+        {
+            if (PathsEqual(document.PhysicalPath, fullPath))
+            {
+                input = document.Input;
+                return true;
+            }
+        }
+
+        input = default;
+        return false;
+    }
+
     /// <summary>
     /// Finds the C# project that owns the specified Akbura document
     /// and synchronizes it with the Akbura workspace.
     /// </summary>
-    public async Task<AkburaProjectId?> SynchronizeProjectAsync(
-        string filePath,
-        CancellationToken cancellationToken)
+    public async Task<AkburaProjectId?> SynchronizeProjectAsync(string filePath, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(filePath))
         {
@@ -106,9 +335,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             : null;
     }
 
-    private async Task<bool> GetOrCreateProjectSynchronizationTaskAsync(
-        Project project,
-        string? activeFilePath)
+    private async Task<bool> GetOrCreateProjectSynchronizationTaskAsync(Project project, string? activeFilePath)
     {
         var cancellationToken = _disposeCancellation.Token;
         var version = await project
@@ -137,11 +364,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
         return await state.Task.ConfigureAwait(false);
     }
 
-    private async Task CompleteProjectSynchronizationAsync(
-        Project project,
-        string? activeFilePath,
-        ProjectSynchronizationEntry entry,
-        ProjectSynchronizationState state)
+    private async Task CompleteProjectSynchronizationAsync(Project project, string? activeFilePath, ProjectSynchronizationEntry entry, ProjectSynchronizationState state)
     {
         var cancellationToken = _disposeCancellation.Token;
         try
@@ -189,11 +412,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
         }
     }
 
-    private async Task<bool>
-        SynchronizeProjectAndReferencesAsync(
-            Project project,
-            string? activeFilePath,
-            CancellationToken cancellationToken)
+    private async Task<bool> SynchronizeProjectAndReferencesAsync(Project project, string? activeFilePath, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -212,8 +431,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
         var totalTimer = Stopwatch.StartNew();
         var stageTimer = Stopwatch.StartNew();
 
-        foreach (var projectReference in
-                 project.ProjectReferences)
+        foreach (var projectReference in project.ProjectReferences)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -299,8 +517,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
         return true;
     }
 
-    private Project? FindContainingProject(
-        string filePath)
+    private Project? FindContainingProject(string filePath)
     {
         var solution =
             _visualStudioWorkspace
@@ -408,9 +625,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
         return score;
     }
 
-    private static bool ContainsFile(
-        IEnumerable<TextDocument> documents,
-        string filePath)
+    private static bool ContainsFile(IEnumerable<TextDocument> documents, string filePath)
     {
         foreach (var document in documents)
         {
@@ -425,9 +640,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
         return false;
     }
 
-    private static bool IsContainedByDirectory(
-        string filePath,
-        string directoryPath)
+    private static bool IsContainedByDirectory(string filePath, string directoryPath)
     {
         var normalizedFilePath =
             Path.GetFullPath(filePath);
@@ -444,9 +657,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool PathsEqual(
-        string? left,
-        string? right)
+    private static bool PathsEqual(string? left, string? right)
     {
         if (string.IsNullOrWhiteSpace(left) ||
             string.IsNullOrWhiteSpace(right))
@@ -460,11 +671,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             StringComparison.OrdinalIgnoreCase);
     }
 
-    private static ProjectContext
-        CreateProjectContext(
-            Project project,
-            CSharpCompilation compilation,
-            string documentFilePath)
+    private static ProjectContext CreateProjectContext(Project project, CSharpCompilation compilation, string documentFilePath)
     {
         var projectFilePath =
             project.FilePath ??
@@ -491,9 +698,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             [.. project.ProjectReferences]);
     }
 
-    private static string GetRootNamespace(
-        Project project,
-        CSharpCompilation compilation)
+    private static string GetRootNamespace(Project project, CSharpCompilation compilation)
     {
         if (project.AnalyzerOptions
                 .AnalyzerConfigOptionsProvider
@@ -522,11 +727,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
         return project.Name;
     }
 
-    private async Task SynchronizeAkburaDocumentsAsync(
-        Project project,
-        AkburaProjectId projectId,
-        string? activeFilePath,
-        CancellationToken cancellationToken)
+    private async Task SynchronizeAkburaDocumentsAsync(Project project, AkburaProjectId projectId, string? activeFilePath, CancellationToken cancellationToken)
     {
         var documents =
             GetAkburaDocuments(project)
@@ -574,8 +775,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             $"Akbura documents for " +
             $"project '{project.Name}'.");
 
-        async Task<AkburaDocumentInput?> LoadDocumentAsync(
-            TextDocument document)
+        async Task<AkburaDocumentInput?> LoadDocumentAsync(TextDocument document)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -603,8 +803,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
         }
     }
 
-    private static ImmutableArray<TextDocument>
-        GetAkburaDocuments(Project project)
+    private static ImmutableArray<TextDocument> GetAkburaDocuments(Project project)
     {
         using var builder =
             ImmutableArrayBuilder<TextDocument>.Rent();
@@ -617,10 +816,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
         return builder.ToImmutable();
     }
 
-    private static void AddDocuments(
-        IEnumerable<TextDocument> documents,
-        HashSet<string> paths,
-        ImmutableArrayBuilder<TextDocument> builder)
+    private static void AddDocuments(IEnumerable<TextDocument> documents, HashSet<string> paths, ImmutableArrayBuilder<TextDocument> builder)
     {
         foreach (var document in documents)
         {
@@ -675,9 +871,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
                    StringComparison.OrdinalIgnoreCase);
     }
 
-    internal bool TryResolveProjectSource(
-        AkburaDefinition definition,
-        out string filePath)
+    internal bool TryResolveProjectSource(AkburaDefinition definition, out string filePath)
     {
         if (definition == null)
         {
@@ -696,10 +890,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             return false;
         }
 
-        foreach (var project in
-                 _visualStudioWorkspace
-                     .CurrentSolution
-                     .Projects)
+        foreach (var project in _visualStudioWorkspace.CurrentSolution.Projects)
         {
             if (project.Language != LanguageNames.CSharp ||
                 !string.Equals(
@@ -728,10 +919,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
         return false;
     }
 
-    private static bool TryResolveProjectSource(
-        Project project,
-        string sourcePath,
-        out string filePath)
+    private static bool TryResolveProjectSource(Project project, string sourcePath, out string filePath)
     {
         var projectDirectory =
             string.IsNullOrWhiteSpace(project.FilePath)
@@ -796,9 +984,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
         return false;
     }
 
-    private static bool DocumentLogicalPathMatches(
-        TextDocument document,
-        string sourcePath)
+    private static bool DocumentLogicalPathMatches(TextDocument document, string sourcePath)
     {
         var logicalPath = string.Join(
             "/",
@@ -811,9 +997,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool PhysicalPathEndsWithSourcePath(
-        string filePath,
-        string sourcePath)
+    private static bool PhysicalPathEndsWithSourcePath(string filePath, string sourcePath)
     {
         var normalizedFilePath =
             NormalizeLogicalPath(
@@ -830,8 +1014,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
                    StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string NormalizeFileSystemPath(
-        string path)
+    private static string NormalizeFileSystemPath(string path)
     {
         return path
             .Replace(
@@ -842,8 +1025,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
                 Path.DirectorySeparatorChar);
     }
 
-    private static string NormalizeLogicalPath(
-        string path)
+    private static string NormalizeLogicalPath(string path)
     {
         return path
             .Replace('\\', '/')
@@ -866,22 +1048,20 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
 
         Workspace.Dispose();
         ProjectContextChanged = null;
+        ResourceProjectContextChanged = null;
     }
 
-    private void OnVisualStudioWorkspaceChanged(
-        object? sender,
-        WorkspaceChangeEventArgs e)
+    private void OnVisualStudioWorkspaceChanged(object? sender, WorkspaceChangeEventArgs e)
     {
         if (Volatile.Read(ref _disposeState) == 0)
         {
             ProjectContextChanged?.Invoke(this, EventArgs.Empty);
+            ResourceProjectContextChanged?.Invoke(this, e);
         }
     }
 
 #pragma warning disable VSTHRD003 // The shared source task deliberately outlives the requesting editor snapshot.
-    private static async Task<T> AwaitWithoutCancelingSourceAsync<T>(
-        Task<T> task,
-        CancellationToken cancellationToken)
+    private static async Task<T> AwaitWithoutCancelingSourceAsync<T>(Task<T> task, CancellationToken cancellationToken)
     {
         if (task.IsCompleted || !cancellationToken.CanBeCanceled)
         {
@@ -915,9 +1095,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
                 initialCount: 1,
                 maxCount: 1);
 
-        public ProjectSynchronizationState GetOrCreateState(
-            VersionStamp version,
-            out bool created)
+        public ProjectSynchronizationState GetOrCreateState(VersionStamp version, out bool created)
         {
             while (true)
             {

@@ -12,6 +12,10 @@
         "link": "/akbura/axaml-integration"
       },
       {
+        "text": "Editor Completion",
+        "link": "/akbura/editor-completion"
+      },
+      {
         "text": "XML, XAML and AXAML differences",
         "link": "/akbura/xml-xaml-axaml"
       },

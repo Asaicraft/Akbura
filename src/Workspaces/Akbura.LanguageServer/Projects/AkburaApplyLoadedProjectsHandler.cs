@@ -1,3 +1,5 @@
+using Akbura.LanguageServer.Handlers.Documents;
+
 namespace Akbura.LanguageServer.Projects;
 
 internal static class AkburaInternalMethods
@@ -14,13 +16,12 @@ internal sealed class AkburaApplyLoadedProjectsHandler :
 
     public override bool MutatesServerState => true;
 
-    public override Task<AkburaLspHandlerResult<object?>> HandleAsync(
-        AkburaProjectLoadResult parameters,
-        AkburaRequestContext context,
-        CancellationToken cancellationToken)
+    public override Task<AkburaLspHandlerResult<object?>> HandleAsync(AkburaProjectLoadResult parameters, AkburaRequestContext context, CancellationToken cancellationToken)
     {
         var workspace = context.Services.Workspace;
         var openDocuments = context.ServerSnapshot.OpenDocuments;
+        var openResourceDocuments =
+            context.ServerSnapshot.OpenResourceDocuments;
         var diskTexts = new Dictionary<Uri, SourceText>(
             AkburaUriComparer.Instance);
         var existingFolder = context.ServerSnapshot.WorkspaceFolders
@@ -44,9 +45,7 @@ internal sealed class AkburaApplyLoadedProjectsHandler :
 
                 var inputs = new AkburaDocumentInput[
                     loadedProject.Documents.Length];
-                for (var index = 0;
-                     index < loadedProject.Documents.Length;
-                     index++)
+                for (var index = 0; index < loadedProject.Documents.Length; index++)
                 {
                     var input = loadedProject.Documents[index];
                     diskTexts[input.Uri] = input.Text;
@@ -63,11 +62,16 @@ internal sealed class AkburaApplyLoadedProjectsHandler :
                     project.Id,
                     inputs.ToImmutableArray(),
                     cancellationToken);
+                workspace.SynchronizeProjectResourceDocuments(
+                    project.Id,
+                    loadedProject.ResourceDocuments,
+                    cancellationToken);
                 context.Services.Logger.Log(
                     AkburaServerLogLevel.Information,
                     "Applied project " +
                     $"'{loadedProject.Context.CSharpCompilation.AssemblyName}', " +
                     $"documents={loadedProject.Documents.Length}, " +
+                    $"resources={loadedProject.ResourceDocuments.Length}, " +
                     $"projectId={project.Id}.");
             }
         }
@@ -92,6 +96,33 @@ internal sealed class AkburaApplyLoadedProjectsHandler :
         }
 
         var solution = workspace.CurrentSolution;
+        if (parameters.Succeeded)
+        {
+            var refreshedResourceProjects = projectIds.ToHashSet();
+            foreach (var pair in openResourceDocuments)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var document = pair.Value with
+                {
+                    Projects = AkburaResourceDocumentSynchronization
+                        .RebindProjects(
+                            solution,
+                            pair.Value,
+                            refreshedResourceProjects),
+                };
+                AkburaResourceDocumentSynchronization.ApplyOpenText(
+                    workspace,
+                    document,
+                    changes: null,
+                    cancellationToken);
+                openResourceDocuments = openResourceDocuments.SetItem(
+                    pair.Key,
+                    document);
+            }
+
+            solution = workspace.CurrentSolution;
+        }
+
         foreach (var pair in openDocuments)
         {
             if (!solution.TryGetDocument(
@@ -135,6 +166,7 @@ internal sealed class AkburaApplyLoadedProjectsHandler :
             .Next(solution) with
             {
                 OpenDocuments = openDocuments,
+                OpenResourceDocuments = openResourceDocuments,
                 WorkspaceFolders = folders,
             };
 

@@ -2193,10 +2193,7 @@ public sealed class AkburaCsGeneratorTests
         "System.Collections.Generic.List<Avalonia.Controls.Control>",
         "List<global::Avalonia.Controls.Control>",
         false)]
-    public void Generator_EmitsRequestedContentCollectionShape(
-        string parameterType,
-        string backingType,
-        bool observesChanges)
+    public void Generator_EmitsRequestedContentCollectionShape(string parameterType, string backingType, bool observesChanges)
     {
         var component =
             "param " + parameterType + " Content;\n" +
@@ -2507,6 +2504,181 @@ public sealed class AkburaCsGeneratorTests
             updatedCompilation.GetDiagnostics(),
             static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Generator_AssignsExplicitDataTypeToAttributedClrProperty(bool inheritedAttribute)
+    {
+        const string component =
+            """
+            using Demo;
+
+            namespace Demo;
+
+            <DataTypeProbe x.DataType="Person" />
+            """;
+        const string directCSharp =
+            """
+            using Akbura.Engine;
+            using Avalonia.Controls;
+            using Avalonia.Metadata;
+            using System;
+
+            namespace Demo;
+
+            public sealed class Person
+            {
+            }
+
+            public sealed class DataTypeProbe : Border
+            {
+                [DataType]
+                public Type? CompiledBindingType { get; set; }
+            }
+
+            public partial class CustomDataTypeHost
+            {
+                public CustomDataTypeHost()
+                    : base(AkburaEngine.Empty)
+                {
+                }
+            }
+            """;
+        const string inheritedCSharp =
+            """
+            using Akbura.Engine;
+            using Avalonia.Controls;
+            using Avalonia.Metadata;
+            using System;
+
+            namespace Demo;
+
+            public sealed class Person
+            {
+            }
+
+            public abstract class DataTypeProbeBase : Border
+            {
+                [DataType]
+                public virtual Type? CompiledBindingType { get; set; }
+            }
+
+            public sealed class DataTypeProbe : DataTypeProbeBase
+            {
+                public override Type? CompiledBindingType { get; set; }
+            }
+
+            public partial class CustomDataTypeHost
+            {
+                public CustomDataTypeHost()
+                    : base(AkburaEngine.Empty)
+                {
+                }
+            }
+            """;
+        var csharp = inheritedAttribute
+            ? inheritedCSharp
+            : directCSharp;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaCustomDataTypeTests_" + Guid.NewGuid().ToString("N"),
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(csharp, parseOptions),
+            ],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var sourcePath = Path.Combine(
+            Environment.CurrentDirectory,
+            "CustomDataTypeHost.akbura");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new Akbura.BlackSilence.AkburaBlackSilenceGenerator()
+                    .AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    sourcePath,
+                    SourceText.From(component)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var generated = Assert.Single(
+            Assert.Single(driver.GetRunResult().Results)
+                .GeneratedSources,
+            static source =>
+                source.HintName.StartsWith(
+                    "Akbura.Component.",
+                    StringComparison.Ordinal));
+        Assert.Contains(
+            ".CompiledBindingType = typeof(global::Demo.Person);",
+            generated.SourceText.ToString(),
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+
+        using var assemblyStream = new MemoryStream();
+        var emitResult = updatedCompilation.Emit(assemblyStream);
+        Assert.True(
+            emitResult.Success,
+            string.Join(
+                Environment.NewLine,
+                emitResult.Diagnostics));
+        var assembly = Assembly.Load(assemblyStream.ToArray());
+
+        var session = AvaloniaHeadlessTestSession.GetSession();
+        await session.Dispatch(
+            () =>
+            {
+                var componentType =
+                    assembly.GetType("Demo.CustomDataTypeHost");
+                var personType = assembly.GetType("Demo.Person");
+
+                Assert.NotNull(componentType);
+                Assert.NotNull(personType);
+
+                var component = Assert.IsAssignableFrom<AkburaControl>(
+                    Activator.CreateInstance(componentType));
+                var window = new Window
+                {
+                    Content = component,
+                };
+                window.Show();
+                try
+                {
+                    var probe = component.Child;
+                    Assert.NotNull(probe);
+                    Assert.Equal(
+                        assembly.GetType("Demo.DataTypeProbe"),
+                        probe.GetType());
+                    Assert.Equal(
+                        personType,
+                        probe.GetType().GetProperty("CompiledBindingType")!
+                            .GetValue(probe));
+                }
+                finally
+                {
+                    window.Close();
+                }
+            },
+            CancellationToken.None);
     }
 
     [Fact]
@@ -5539,10 +5711,7 @@ public sealed class AkburaCsGeneratorTests
         return generated.SourceText.ToString();
     }
 
-    private static int AssertEnhancedLineDirective(
-        string generatedSource,
-        string sourceSpan,
-        string sourcePath)
+    private static int AssertEnhancedLineDirective(string generatedSource, string sourceSpan, string sourcePath)
     {
         var prefix = $"#line {sourceSpan} ";
         var directiveIndex = generatedSource.IndexOf(prefix, StringComparison.Ordinal);
@@ -5566,11 +5735,7 @@ public sealed class AkburaCsGeneratorTests
         return directiveIndex;
     }
 
-    private static void AssertMappedLocation(
-        SyntaxToken token,
-        string sourcePath,
-        LinePosition expectedStart,
-        LinePosition expectedEnd)
+    private static void AssertMappedLocation(SyntaxToken token, string sourcePath, LinePosition expectedStart, LinePosition expectedEnd)
     {
         var mappedSpan = token.GetLocation().GetMappedLineSpan();
         Assert.Equal(sourcePath, mappedSpan.Path);

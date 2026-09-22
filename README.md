@@ -51,7 +51,8 @@ Install the editor extension for the IDE you use:
 
 The extensions provide language support for `.akbura` and `.akcss` files. The
 NuGet package remains responsible for compiling those files as part of the
-project build.
+project build. See [Editor completion](https://asaicraft.github.io/Akbura/akbura/editor-completion)
+for `x.DataType`, binding-path, resource-key, and library resource export support.
 
 ## First component
 

@@ -9,6 +9,10 @@ namespace Akbura.Workspaces.UnitTests;
 
 public sealed class WorkspaceDictionaryStyleTests
 {
+    private static readonly MetadataReference
+        ResourceMarkupExtensionsReference =
+            CreateResourceMarkupExtensionsReference();
+
     [Theory]
     [InlineData("x.")]
     [InlineData("x.k")]
@@ -55,6 +59,65 @@ public sealed class WorkspaceDictionaryStyleTests
 
         Assert.DoesNotContain(GetCompletions(fixture).Items,
             static item => item.DisplayText is "x.key" or "x.Key");
+    }
+
+    [Fact]
+    public void ResourceCompletion_UsesNearestAkburaResourcesDictionary()
+    {
+        var fixture = Create(
+            "<Border>" +
+            "<Border.Resources>" +
+            "<Value x.key=\"LocalValue\"/>" +
+            "</Border.Resources>" +
+            "<Border Background=${StaticResource Local|}/>" +
+            "</Border>");
+        using var workspace = fixture.Workspace;
+
+        var item = Assert.Single(
+            GetCompletions(fixture).Items,
+            static item => item.DisplayText == "LocalValue");
+
+        Assert.Contains(
+            "Local resource",
+            item.Description,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ResourceCompletion_DoesNotLeakFromSiblingResourceScope()
+    {
+        var fixture = Create(
+            "<Border>" +
+            "<Border>" +
+            "<Border.Resources>" +
+            "<Value x.key=\"SiblingValue\"/>" +
+            "</Border.Resources>" +
+            "</Border>" +
+            "<Border Background=${StaticResource Sibling|}/>" +
+            "</Border>");
+        using var workspace = fixture.Workspace;
+
+        Assert.DoesNotContain(
+            GetCompletions(fixture).Items,
+            static item => item.DisplayText == "SiblingValue");
+    }
+
+    [Fact]
+    public void ResourceCompletion_DoesNotIndexArbitraryDictionaryKeys()
+    {
+        var fixture = Create(
+            "<Border>" +
+            "<IntDictionary>" +
+            "<Value x.key=\"OrdinaryDictionaryValue\"/>" +
+            "</IntDictionary>" +
+            "<Border Background=${StaticResource Ordinary|}/>" +
+            "</Border>");
+        using var workspace = fixture.Workspace;
+
+        Assert.DoesNotContain(
+            GetCompletions(fixture).Items,
+            static item =>
+                item.DisplayText == "OrdinaryDictionaryValue");
     }
 
     [Theory]
@@ -420,7 +483,9 @@ public sealed class WorkspaceDictionaryStyleTests
         var compilation = CSharpCompilation.Create("WorkspaceDictionaryStyleTests",
             [CSharpSyntaxTree.ParseText(Definitions,
                 path: definitionsPath ?? Path.GetFullPath("DictionaryStyleDefinitions.cs"))],
-            platform.Select(static path => MetadataReference.CreateFromFile(path)),
+            platform
+                .Select(static path => MetadataReference.CreateFromFile(path))
+                .Append(ResourceMarkupExtensionsReference),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.DoesNotContain(compilation.GetDiagnostics(), static diagnostic =>
             diagnostic.Severity == DiagnosticSeverity.Error);
@@ -431,6 +496,35 @@ public sealed class WorkspaceDictionaryStyleTests
         var text = SourceText.From(source);
         var context = workspace.OpenOrChangeDocumentContext(new Uri(path), text);
         return new Fixture(workspace, context, AkburaSyntacticDocument.Parse(text, path), source, position);
+    }
+
+    private static MetadataReference CreateResourceMarkupExtensionsReference()
+    {
+        const string source = """
+            namespace Avalonia.Markup.Xaml.MarkupExtensions;
+
+            public sealed class StaticResourceExtension
+            {
+                public StaticResourceExtension(object key) { }
+                public object ProvideValue() => new();
+            }
+            """;
+        var platform = ((string?)AppContext.GetData(
+                "TRUSTED_PLATFORM_ASSEMBLIES"))?
+            .Split(Path.PathSeparator) ?? [];
+        var compilation = CSharpCompilation.Create(
+            "Avalonia.Markup.Xaml",
+            [CSharpSyntaxTree.ParseText(source)],
+            platform.Select(
+                static path => MetadataReference.CreateFromFile(path)),
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        Assert.True(
+            result.Success,
+            string.Join(Environment.NewLine, result.Diagnostics));
+        return MetadataReference.CreateFromImage(stream.ToArray());
     }
 
     private sealed record Fixture(AkburaWorkspace Workspace, AkburaDocumentContext Context,
@@ -493,6 +587,14 @@ public sealed class WorkspaceDictionaryStyleTests
         }
         namespace Avalonia.Controls
         {
+            public interface IResourceDictionary
+                : IDictionary<object, object>
+            {
+            }
+            public sealed class ResourceDictionary
+                : Dictionary<object, object>, IResourceDictionary
+            {
+            }
             public class Control
             {
                 public static readonly Avalonia.StyledProperty<object> BackgroundProperty = new();
@@ -509,7 +611,8 @@ public sealed class WorkspaceDictionaryStyleTests
             }
             public class Border : Control
             {
-                public Dictionary<object, object> Resources { get; } = new();
+                public IResourceDictionary Resources { get; } =
+                    new ResourceDictionary();
                 public static readonly Avalonia.StyledProperty<string> OnlyBorderProperty = new();
                 public string OnlyBorder { get; set; }
             }

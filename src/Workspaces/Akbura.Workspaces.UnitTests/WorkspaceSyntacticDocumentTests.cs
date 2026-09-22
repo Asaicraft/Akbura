@@ -70,10 +70,7 @@ public sealed class WorkspaceSyntacticDocumentTests
     [Theory]
     [InlineData("<StackPanel>\n", "Incomplete.akbura", 1)]
     [InlineData("@utilities {\n", "Incomplete.akcss", 1)]
-    public void SyntacticDocument_IncompleteBlockStillProvidesIndentation(
-        string source,
-        string filePath,
-        int expectedIndentation)
+    public void SyntacticDocument_IncompleteBlockStillProvidesIndentation(string source, string filePath, int expectedIndentation)
     {
         var document = AkburaSyntacticDocument.Parse(
             SourceText.From(source),
@@ -102,10 +99,7 @@ public sealed class WorkspaceSyntacticDocumentTests
     [InlineData("<Card ", AkburaCompletionContextKind.AttributeName, "")]
     [InlineData("<Card Tit", AkburaCompletionContextKind.AttributeName, "Tit")]
     [InlineData("</", AkburaCompletionContextKind.ClosingComponentName, "")]
-    public void SyntacticDocument_DetectsCompletionContext(
-        string source,
-        AkburaCompletionContextKind expectedKind,
-        string expectedPrefix)
+    public void SyntacticDocument_DetectsCompletionContext(string source, AkburaCompletionContextKind expectedKind, string expectedPrefix)
     {
         var document = AkburaSyntacticDocument.Parse(
             SourceText.From(source),
@@ -141,10 +135,7 @@ public sealed class WorkspaceSyntacticDocumentTests
         "<Button Wid/|",
         AkburaCompletionContextKind.AttributeName,
         "Wid")]
-    public void SyntacticDocument_DetectsSlashBoundaryContext(
-        string sourceWithCaret,
-        AkburaCompletionContextKind expectedKind,
-        string expectedPrefix)
+    public void SyntacticDocument_DetectsSlashBoundaryContext(string sourceWithCaret, AkburaCompletionContextKind expectedKind, string expectedPrefix)
     {
         var position = sourceWithCaret.IndexOf('|');
         var source = sourceWithCaret.Remove(position, 1);
@@ -169,9 +160,7 @@ public sealed class WorkspaceSyntacticDocumentTests
     [InlineData(
         "state int count = 0;\n\nstat|\n\n<StackPanel gap-3>\n<Button Click={count--}/>\n</StackPanel>",
         "stat")]
-    public void SyntacticDocument_DetectsTopLevelKeywordCompletion(
-        string sourceWithCaret,
-        string expectedPrefix)
+    public void SyntacticDocument_DetectsTopLevelKeywordCompletion(string sourceWithCaret, string expectedPrefix)
     {
         var position = sourceWithCaret.IndexOf('|');
         var source = sourceWithCaret.Remove(position, 1);
@@ -195,9 +184,7 @@ public sealed class WorkspaceSyntacticDocumentTests
     [InlineData("param b|", "b")]
     [InlineData("param ou|", "ou")]
     [InlineData("param bind|", "bind")]
-    public void SyntacticDocument_DetectsParamModifierCompletion(
-        string sourceWithCaret,
-        string expectedPrefix)
+    public void SyntacticDocument_DetectsParamModifierCompletion(string sourceWithCaret, string expectedPrefix)
     {
         var position = sourceWithCaret.IndexOf('|');
         var source = sourceWithCaret.Remove(position, 1);
@@ -223,8 +210,7 @@ public sealed class WorkspaceSyntacticDocumentTests
     [InlineData("param out |")]
     [InlineData("inject |")]
     [InlineData("command |")]
-    public void SyntacticDocument_DoesNotTreatDeclarationTypeAsTopLevel(
-        string sourceWithCaret)
+    public void SyntacticDocument_DoesNotTreatDeclarationTypeAsTopLevel(string sourceWithCaret)
     {
         var position = sourceWithCaret.IndexOf('|');
         var source = sourceWithCaret.Remove(position, 1);
@@ -253,8 +239,7 @@ public sealed class WorkspaceSyntacticDocumentTests
     [InlineData("using |")]
     [InlineData("using Akbura.|")]
     [InlineData("global using Akbura.|")]
-    public void SyntacticDocument_DoesNotCompleteStateOutsideTopLevelStart(
-        string sourceWithCaret)
+    public void SyntacticDocument_DoesNotCompleteStateOutsideTopLevelStart(string sourceWithCaret)
     {
         var position = sourceWithCaret.IndexOf('|');
         var source = sourceWithCaret.Remove(position, 1);
@@ -272,8 +257,7 @@ public sealed class WorkspaceSyntacticDocumentTests
     [InlineData("<Card Con|</Card>")]
     [InlineData("<Card Title=\"Hello\" Con|></Card>")]
     [InlineData("<Card\n    Con|></Card>")]
-    public void SyntacticDocument_DetectsAttributeCompletionBeforeFollowingSyntax(
-        string sourceWithCaret)
+    public void SyntacticDocument_DetectsAttributeCompletionBeforeFollowingSyntax(string sourceWithCaret)
     {
         var position = sourceWithCaret.IndexOf('|');
         var source = sourceWithCaret.Remove(position, 1);
@@ -297,9 +281,7 @@ public sealed class WorkspaceSyntacticDocumentTests
     [InlineData(
         "<Button Content=${Outer Value=${Bin|}}/>",
         "Bin")]
-    public void SyntacticDocument_DetectsMarkupExtensionTypeCompletion(
-        string sourceWithCaret,
-        string expectedPrefix)
+    public void SyntacticDocument_DetectsMarkupExtensionTypeCompletion(string sourceWithCaret, string expectedPrefix)
     {
         var position = sourceWithCaret.IndexOf('|');
         var source = sourceWithCaret.Remove(position, 1);
@@ -334,6 +316,39 @@ public sealed class WorkspaceSyntacticDocumentTests
             document.GetCompletionContext(position).Kind);
     }
 
+    [Theory]
+    [InlineData(
+        "<Border x.DataType=\"|\"/>",
+        "")]
+    [InlineData(
+        "<Border x.DataType='Main|ViewModel'/>",
+        "MainViewModel")]
+    [InlineData(
+        "<Border x.DataType=\"Main|ViewModel/>",
+        "MainViewModel")]
+    [InlineData(
+        "<Border x.DataType=\"System.Collections.Generic.List<Main|ViewModel>>",
+        "System.Collections.Generic.List<MainViewModel>")]
+    public void SyntacticDocument_TreatsDataTypeLiteralAsCSharpType(string sourceWithCaret, string expectedHostText)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        Assert.True(document.TryGetCSharpCompletionContext(
+            position,
+            out var context));
+        Assert.Equal(
+            AkburaCSharpCompletionContextKind.Type,
+            context.Kind);
+        Assert.Equal(
+            expectedHostText,
+            document.Text.ToString(context.HostSpan));
+        Assert.Equal(position, context.HostPosition);
+    }
+
     [Fact]
     public void SyntacticDocument_DoesNotTreatQuotedTextAsMarkupExtension()
     {
@@ -366,9 +381,7 @@ public sealed class WorkspaceSyntacticDocumentTests
     [InlineData(
         "<Button IsVisible={true|}/>",
         "true")]
-    public void SyntacticDocument_DetectsCSharpExpressionCompletion(
-        string sourceWithCaret,
-        string expectedExpression)
+    public void SyntacticDocument_DetectsCSharpExpressionCompletion(string sourceWithCaret, string expectedExpression)
     {
         var position = sourceWithCaret.IndexOf('|');
         var source = sourceWithCaret.Remove(position, 1);
@@ -494,10 +507,7 @@ public sealed class WorkspaceSyntacticDocumentTests
         "command void Save(UserMo| model);",
         AkburaCSharpCompletionContextKind.CommandParameterList,
         "(UserMo model)")]
-    public void SyntacticDocument_DetectsEmbeddedCSharpCompletionContexts(
-        string sourceWithCaret,
-        AkburaCSharpCompletionContextKind expectedKind,
-        string expectedHost)
+    public void SyntacticDocument_DetectsEmbeddedCSharpCompletionContexts(string sourceWithCaret, AkburaCSharpCompletionContextKind expectedKind, string expectedHost)
     {
         var position = sourceWithCaret.IndexOf('|');
         var source = sourceWithCaret.Remove(position, 1);
@@ -528,8 +538,7 @@ public sealed class WorkspaceSyntacticDocumentTests
     [InlineData("<Button Content=${Binding Path=Us|}/>")]
     [InlineData("<But|")]
     [InlineData("using Al| = System.Collections.Generic;")]
-    public void SyntacticDocument_DoesNotProjectNonCSharpPositions(
-        string sourceWithCaret)
+    public void SyntacticDocument_DoesNotProjectNonCSharpPositions(string sourceWithCaret)
     {
         var position = sourceWithCaret.IndexOf('|');
         var source = sourceWithCaret.Remove(position, 1);
@@ -546,8 +555,7 @@ public sealed class WorkspaceSyntacticDocumentTests
     [InlineData("<Button Content=|{ViewModel.User}/>")]
     [InlineData("<Button Content={ViewModel.User}|/>")]
     [InlineData("<Button Content=\"ViewModel.Us|er\"/>")]
-    public void SyntacticDocument_DoesNotProjectOutsideCSharpExpressions(
-        string sourceWithCaret)
+    public void SyntacticDocument_DoesNotProjectOutsideCSharpExpressions(string sourceWithCaret)
     {
         var position = sourceWithCaret.IndexOf('|');
         var source = sourceWithCaret.Remove(position, 1);
@@ -609,10 +617,7 @@ public sealed class WorkspaceSyntacticDocumentTests
         "@using |;",
         AkburaCSharpCompletionContextKind.UsingDirectiveName,
         "")]
-    public void SyntacticDocument_DetectsAkcssEmbeddedCSharp(
-        string sourceWithCaret,
-        AkburaCSharpCompletionContextKind expectedKind,
-        string expectedHost)
+    public void SyntacticDocument_DetectsAkcssEmbeddedCSharp(string sourceWithCaret, AkburaCSharpCompletionContextKind expectedKind, string expectedHost)
     {
         var position = sourceWithCaret.IndexOf('|');
         var source = sourceWithCaret.Remove(position, 1);
@@ -632,8 +637,7 @@ public sealed class WorkspaceSyntacticDocumentTests
     [InlineData(".card { Grid.Ro| }")]
     [InlineData(".card { @apply gap-| }")]
     [InlineData("@using Shared.akcss|;")]
-    public void SyntacticDocument_DoesNotProjectAkcssNativeSyntax(
-        string sourceWithCaret)
+    public void SyntacticDocument_DoesNotProjectAkcssNativeSyntax(string sourceWithCaret)
     {
         var position = sourceWithCaret.IndexOf('|');
         var source = sourceWithCaret.Remove(position, 1);
@@ -651,8 +655,7 @@ public sealed class WorkspaceSyntacticDocumentTests
     [InlineData("@akcss { .card { Grid.Ro| } }")]
     [InlineData("@akcss { .card { @apply gap-| } }")]
     [InlineData("@akcss { @using Shared.akcss|; }")]
-    public void SyntacticDocument_DoesNotProjectInlineAkcssNativeSyntax(
-        string sourceWithCaret)
+    public void SyntacticDocument_DoesNotProjectInlineAkcssNativeSyntax(string sourceWithCaret)
     {
         var position = sourceWithCaret.IndexOf('|');
         var source = sourceWithCaret.Remove(position, 1);
@@ -691,9 +694,7 @@ public sealed class WorkspaceSyntacticDocumentTests
     [InlineData("<Card></Card>", null)]
     [InlineData("<Card Text=\"a>b\">", null)]
     [InlineData("<Card>\n<Border>", "</Border>")]
-    public void SyntacticDocument_DeterminesAutoClosingTag(
-        string source,
-        string? expected)
+    public void SyntacticDocument_DeterminesAutoClosingTag(string source, string? expected)
     {
         var position = source.IndexOf(">", StringComparison.Ordinal) + 1;
         if (source.EndsWith(">", StringComparison.Ordinal) &&
@@ -762,10 +763,7 @@ public sealed class WorkspaceSyntacticDocumentTests
     [InlineData(
         "<Button Text=\"a /|\">",
         null)]
-    public void
-        SyntacticDocument_DeterminesSlashCompletion(
-            string sourceWithCaret,
-            string? expected)
+    public void SyntacticDocument_DeterminesSlashCompletion(string sourceWithCaret, string? expected)
     {
         var position =
             sourceWithCaret.IndexOf(
@@ -796,10 +794,7 @@ public sealed class WorkspaceSyntacticDocumentTests
     [InlineData(
         "<Grid><Button>\n        </|",
         1)]
-    public void
-        SyntacticDocument_DeterminesClosingTagIndentation(
-            string sourceWithCaret,
-            int expected)
+    public void SyntacticDocument_DeterminesClosingTagIndentation(string sourceWithCaret, int expected)
     {
         var position = sourceWithCaret.IndexOf('|');
         var source = sourceWithCaret.Remove(position, 1);
@@ -833,8 +828,7 @@ public sealed class WorkspaceSyntacticDocumentTests
         "state Dictionary<string, List<int>> value = Create<Dictionary<string, List<int>>>|();")]
     [InlineData(
         "<Button Tag={GetValue<double>|()}/>")]
-    public void SyntacticDocument_DoesNotAutoCloseCSharpGeneric(
-        string sourceWithCaret)
+    public void SyntacticDocument_DoesNotAutoCloseCSharpGeneric(string sourceWithCaret)
     {
         var position = sourceWithCaret.IndexOf(
             '|',
@@ -955,11 +949,7 @@ public sealed class WorkspaceSyntacticDocumentTests
         AkcssCompletionContextKind.PropertyName,
         "Wid",
         "")]
-    public void SyntacticDocument_DetectsAkcssCompletionContext(
-        string sourceWithCaret,
-        AkcssCompletionContextKind expectedKind,
-        string expectedPrefix,
-        string expectedQualifier)
+    public void SyntacticDocument_DetectsAkcssCompletionContext(string sourceWithCaret, AkcssCompletionContextKind expectedKind, string expectedPrefix, string expectedQualifier)
     {
         var position = sourceWithCaret.IndexOf('|');
         var source = sourceWithCaret.Remove(position, 1);

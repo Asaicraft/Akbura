@@ -229,6 +229,44 @@ public sealed class TemplateWriterTests
     }
 
     [Fact]
+    public void AnnotatedDataTypeProperty_WritesRuntimeTypeForNonTemplateElement()
+    {
+        const string component =
+            """
+            using Demo;
+
+            <DataTypeHost x.DataType="Person" />
+            """;
+        const string csharp =
+            """
+            using System;
+            using Avalonia.Controls;
+            using Avalonia.Metadata;
+
+            namespace Demo;
+
+            public sealed class Person
+            {
+            }
+
+            public sealed class DataTypeHost : Control
+            {
+                [DataType]
+                public Type? CompiledBindingType { get; set; }
+            }
+            """;
+        using var fixture = CreateFixture(component, csharp);
+
+        WriteComponentScope(fixture);
+
+        var output = fixture.CodeWriter.GetText().ToString();
+        Assert.Contains(
+            ".CompiledBindingType = typeof(global::Demo.Person);",
+            output,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TemplateElementNameBinding_UsesTheTemplateNameScopeAndCompiles()
     {
         const string component =
@@ -362,10 +400,7 @@ public sealed class TemplateWriterTests
         }
         """;
 
-    private static WriterFixture CreateFixture(
-        string component,
-        string? additionalCSharp = null,
-        int currentIndent = 0)
+    private static WriterFixture CreateFixture(string component, string? additionalCSharp = null, int currentIndent = 0)
     {
         var semanticFixture = AkcssActivatorPlannerTests.CreateFixture(
             component,
@@ -387,8 +422,7 @@ public sealed class TemplateWriterTests
         return new WriterFixture(semanticFixture, codeWriter, writer);
     }
 
-    private static MarkupExtensionWriteContext CreateMarkupContext(
-        in ComponentElementPlan owner)
+    private static MarkupExtensionWriteContext CreateMarkupContext(in ComponentElementPlan owner)
     {
         var identifier = GetIdentifier(owner);
         return new MarkupExtensionWriteContext(
@@ -430,11 +464,7 @@ public sealed class TemplateWriterTests
         writer.WriteComponentInitialState(plan, scope, context);
     }
 
-    private static void AssertGeneratedTemplateCompiles(
-        WriterFixture fixture,
-        in ComponentElementPlan owner,
-        string output,
-        string? staticMembers = null)
+    private static void AssertGeneratedTemplateCompiles(WriterFixture fixture, in ComponentElementPlan owner, string output, string? staticMembers = null)
     {
         var generatedSource =
             """
@@ -477,28 +507,21 @@ public sealed class TemplateWriterTests
             generatedSource);
     }
 
-    private static ComponentElementPlan GetScopeRoot(
-        in ComponentPlan plan,
-        int scopeId)
+    private static ComponentElementPlan GetScopeRoot(in ComponentPlan plan, int scopeId)
     {
         ref readonly var scope = ref plan.Scopes.ItemRef(scopeId);
         var rootId = plan.ScopeRootElementIds[scope.Roots.Start];
         return plan.Elements[rootId];
     }
 
-    private static int[] GetScopeElementIds(
-        in ComponentPlan plan,
-        in ComponentScopePlan scope)
+    private static int[] GetScopeElementIds(in ComponentPlan plan, in ComponentScopePlan scope)
     {
         var result = new int[scope.Elements.Length];
         plan.ScopeElementIds.AsSpan(scope.Elements.Start, scope.Elements.Length).CopyTo(result);
         return result;
     }
 
-    private static int IndexOfLifecycleCall(
-        string output,
-        in ComponentElementPlan element,
-        string method)
+    private static int IndexOfLifecycleCall(string output, in ComponentElementPlan element, string method)
     {
         var pattern =
             "((global::System.ComponentModel.ISupportInitialize)" +

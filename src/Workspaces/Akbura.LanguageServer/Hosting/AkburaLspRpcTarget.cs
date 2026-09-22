@@ -14,9 +14,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.Initialize,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<InitializeResult?> InitializeAsync(
-        InitializeParams parameters,
-        CancellationToken cancellationToken)
+    public Task<InitializeResult?> InitializeAsync(InitializeParams parameters, CancellationToken cancellationToken)
     {
         return ExecuteAsync<InitializeResult>(
             LspMethods.Initialize,
@@ -27,9 +25,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.Initialized,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<object?> InitializedAsync(
-        InitializedParams parameters,
-        CancellationToken cancellationToken)
+    public Task<object?> InitializedAsync(InitializedParams parameters, CancellationToken cancellationToken)
     {
         return ExecuteAsync<object?>(
             LspMethods.Initialized,
@@ -38,8 +34,7 @@ internal sealed class AkburaLspRpcTarget
     }
 
     [JsonRpcMethod(LspMethods.Shutdown)]
-    public Task<object?> ShutdownAsync(
-        CancellationToken cancellationToken)
+    public Task<object?> ShutdownAsync(CancellationToken cancellationToken)
     {
         return ExecuteAsync<object?>(
             LspMethods.Shutdown,
@@ -48,8 +43,7 @@ internal sealed class AkburaLspRpcTarget
     }
 
     [JsonRpcMethod(LspMethods.Exit)]
-    public Task<object?> ExitAsync(
-        CancellationToken cancellationToken)
+    public Task<object?> ExitAsync(CancellationToken cancellationToken)
     {
         return ExecuteAsync<object?>(
             LspMethods.Exit,
@@ -60,9 +54,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.DidOpen,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<object?> DidOpenAsync(
-        DidOpenTextDocumentParams parameters,
-        CancellationToken cancellationToken)
+    public Task<object?> DidOpenAsync(DidOpenTextDocumentParams parameters, CancellationToken cancellationToken)
     {
         return ExecuteAsync<object?>(
             LspMethods.DidOpen,
@@ -73,9 +65,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.DidChange,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<object?> DidChangeAsync(
-        DidChangeTextDocumentParams parameters,
-        CancellationToken cancellationToken)
+    public Task<object?> DidChangeAsync(DidChangeTextDocumentParams parameters, CancellationToken cancellationToken)
     {
         return ExecuteAsync<object?>(
             LspMethods.DidChange,
@@ -86,9 +76,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.DidClose,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<object?> DidCloseAsync(
-        DidCloseTextDocumentParams parameters,
-        CancellationToken cancellationToken)
+    public Task<object?> DidCloseAsync(DidCloseTextDocumentParams parameters, CancellationToken cancellationToken)
     {
         return ExecuteAsync<object?>(
             LspMethods.DidClose,
@@ -99,9 +87,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.DidSave,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<object?> DidSaveAsync(
-        DidSaveTextDocumentParams parameters,
-        CancellationToken cancellationToken)
+    public Task<object?> DidSaveAsync(DidSaveTextDocumentParams parameters, CancellationToken cancellationToken)
     {
         return ExecuteAsync<object?>(
             LspMethods.DidSave,
@@ -110,11 +96,53 @@ internal sealed class AkburaLspRpcTarget
     }
 
     [JsonRpcMethod(
+        LspMethods.ResourceDocumentDidOpen,
+        UseSingleObjectParameterDeserialization = true)]
+    public Task<object?> ResourceDocumentDidOpenAsync(DidOpenTextDocumentParams parameters, CancellationToken cancellationToken)
+    {
+        return ExecuteAsync<object?>(
+            LspMethods.ResourceDocumentDidOpen,
+            parameters,
+            cancellationToken);
+    }
+
+    [JsonRpcMethod(
+        LspMethods.ResourceDocumentDidChange,
+        UseSingleObjectParameterDeserialization = true)]
+    public Task<object?> ResourceDocumentDidChangeAsync(DidChangeTextDocumentParams parameters, CancellationToken cancellationToken)
+    {
+        return ExecuteAsync<object?>(
+            LspMethods.ResourceDocumentDidChange,
+            parameters,
+            cancellationToken);
+    }
+
+    [JsonRpcMethod(
+        LspMethods.ResourceDocumentDidClose,
+        UseSingleObjectParameterDeserialization = true)]
+    public Task<object?> ResourceDocumentDidCloseAsync(DidCloseTextDocumentParams parameters, CancellationToken cancellationToken)
+    {
+        return ExecuteAsync<object?>(
+            LspMethods.ResourceDocumentDidClose,
+            parameters,
+            cancellationToken);
+    }
+
+    [JsonRpcMethod(
+        LspMethods.ResourceDocumentDidSave,
+        UseSingleObjectParameterDeserialization = true)]
+    public Task<object?> ResourceDocumentDidSaveAsync(DidSaveTextDocumentParams parameters, CancellationToken cancellationToken)
+    {
+        return ExecuteAsync<object?>(
+            LspMethods.ResourceDocumentDidSave,
+            parameters,
+            cancellationToken);
+    }
+
+    [JsonRpcMethod(
         LspMethods.DidChangeWatchedFiles,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<object?> DidChangeWatchedFilesAsync(
-        DidChangeWatchedFilesParams parameters,
-        CancellationToken cancellationToken)
+    public Task<object?> DidChangeWatchedFilesAsync(DidChangeWatchedFilesParams parameters, CancellationToken cancellationToken)
     {
         return ExecuteAsync<object?>(
             LspMethods.DidChangeWatchedFiles,
@@ -125,9 +153,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.DidChangeWorkspaceFolders,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<object?> DidChangeWorkspaceFoldersAsync(
-        DidChangeWorkspaceFoldersParams parameters,
-        CancellationToken cancellationToken)
+    public Task<object?> DidChangeWorkspaceFoldersAsync(DidChangeWorkspaceFoldersParams parameters, CancellationToken cancellationToken)
     {
         return ExecuteAsync<object?>(
             LspMethods.DidChangeWorkspaceFolders,
@@ -137,9 +163,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.Completion,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<CompletionList?> CompletionAsync(
-        CompletionParams parameters,
-        CancellationToken cancellationToken)
+    public Task<CompletionList?> CompletionAsync(CompletionParams parameters, CancellationToken cancellationToken)
     {
         return ExecuteAsync<CompletionList>(
             LspMethods.Completion,
@@ -150,9 +174,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.CompletionResolve,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<Protocol.CompletionItem?> ResolveCompletionAsync(
-        Protocol.CompletionItem parameters,
-        CancellationToken cancellationToken)
+    public Task<Protocol.CompletionItem?> ResolveCompletionAsync(Protocol.CompletionItem parameters, CancellationToken cancellationToken)
     {
         return ExecuteAsync<Protocol.CompletionItem>(
             LspMethods.CompletionResolve,
@@ -163,9 +185,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.Hover,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<Hover?> HoverAsync(
-        TextDocumentPositionParams parameters,
-        CancellationToken cancellationToken)
+    public Task<Hover?> HoverAsync(TextDocumentPositionParams parameters, CancellationToken cancellationToken)
     {
         return ExecuteAsync<Hover?>(
             LspMethods.Hover,
@@ -176,9 +196,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.Definition,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<LocationLink[]?> DefinitionAsync(
-        DefinitionParams parameters,
-        CancellationToken cancellationToken)
+    public Task<LocationLink[]?> DefinitionAsync(DefinitionParams parameters, CancellationToken cancellationToken)
     {
         return ExecuteAsync<LocationLink[]?>(
             LspMethods.Definition,
@@ -189,9 +207,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.CodeAction,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<Protocol.CodeAction[]?> CodeActionAsync(
-        CodeActionParams parameters,
-        CancellationToken cancellationToken)
+    public Task<Protocol.CodeAction[]?> CodeActionAsync(CodeActionParams parameters, CancellationToken cancellationToken)
     {
         return ExecuteAsync<Protocol.CodeAction[]>(
             LspMethods.CodeAction,
@@ -202,9 +218,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.CodeActionResolve,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<Protocol.CodeAction?> ResolveCodeActionAsync(
-        Protocol.CodeAction parameters,
-        CancellationToken cancellationToken)
+    public Task<Protocol.CodeAction?> ResolveCodeActionAsync(Protocol.CodeAction parameters, CancellationToken cancellationToken)
     {
         return ExecuteAsync<Protocol.CodeAction>(
             LspMethods.CodeActionResolve,
@@ -215,9 +229,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.SemanticTokensFull,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<Protocol.SemanticTokens?> SemanticTokensFullAsync(
-        SemanticTokensParams parameters,
-        CancellationToken cancellationToken)
+    public Task<Protocol.SemanticTokens?> SemanticTokensFullAsync(SemanticTokensParams parameters, CancellationToken cancellationToken)
     {
         return ExecuteAsync<Protocol.SemanticTokens>(
             LspMethods.SemanticTokensFull,
@@ -228,9 +240,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.SemanticTokensRange,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<Protocol.SemanticTokens?> SemanticTokensRangeAsync(
-        SemanticTokensRangeParams parameters,
-        CancellationToken cancellationToken)
+    public Task<Protocol.SemanticTokens?> SemanticTokensRangeAsync(SemanticTokensRangeParams parameters, CancellationToken cancellationToken)
     {
         return ExecuteAsync<Protocol.SemanticTokens>(
             LspMethods.SemanticTokensRange,
@@ -241,9 +251,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.SemanticTokensFullDelta,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<object?> SemanticTokensFullDeltaAsync(
-        SemanticTokensDeltaParams parameters,
-        CancellationToken cancellationToken)
+    public Task<object?> SemanticTokensFullDeltaAsync(SemanticTokensDeltaParams parameters, CancellationToken cancellationToken)
     {
         return ExecuteAsync<object>(
             LspMethods.SemanticTokensFullDelta,
@@ -253,9 +261,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.DocumentDiagnostic,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<object?> DocumentDiagnosticAsync(
-        DocumentDiagnosticParams parameters,
-        CancellationToken cancellationToken)
+    public Task<object?> DocumentDiagnosticAsync(DocumentDiagnosticParams parameters, CancellationToken cancellationToken)
     {
         return ExecuteAsync<object>(
             LspMethods.DocumentDiagnostic,
@@ -266,9 +272,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.WorkspaceDiagnostic,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<WorkspaceDiagnosticReport?> WorkspaceDiagnosticAsync(
-        WorkspaceDiagnosticParams parameters,
-        CancellationToken cancellationToken)
+    public Task<WorkspaceDiagnosticReport?> WorkspaceDiagnosticAsync(WorkspaceDiagnosticParams parameters, CancellationToken cancellationToken)
     {
         return ExecuteAsync<WorkspaceDiagnosticReport>(
             LspMethods.WorkspaceDiagnostic,
@@ -279,9 +283,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.DocumentSymbol,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<DocumentSymbol[]?> DocumentSymbolAsync(
-        DocumentSymbolParams parameters,
-        CancellationToken cancellationToken) =>
+    public Task<DocumentSymbol[]?> DocumentSymbolAsync(DocumentSymbolParams parameters, CancellationToken cancellationToken) =>
         ExecuteAsync<DocumentSymbol[]>(
             LspMethods.DocumentSymbol,
             parameters,
@@ -290,9 +292,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.WorkspaceSymbol,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<SymbolInformation[]?> WorkspaceSymbolAsync(
-        WorkspaceSymbolParams parameters,
-        CancellationToken cancellationToken) =>
+    public Task<SymbolInformation[]?> WorkspaceSymbolAsync(WorkspaceSymbolParams parameters, CancellationToken cancellationToken) =>
         ExecuteAsync<SymbolInformation[]>(
             LspMethods.WorkspaceSymbol,
             parameters,
@@ -301,9 +301,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.FoldingRange,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<FoldingRange[]?> FoldingRangeAsync(
-        FoldingRangeParams parameters,
-        CancellationToken cancellationToken) =>
+    public Task<FoldingRange[]?> FoldingRangeAsync(FoldingRangeParams parameters, CancellationToken cancellationToken) =>
         ExecuteAsync<FoldingRange[]>(
             LspMethods.FoldingRange,
             parameters,
@@ -312,9 +310,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.DocumentHighlight,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<DocumentHighlight[]?> DocumentHighlightAsync(
-        DocumentHighlightParams parameters,
-        CancellationToken cancellationToken) =>
+    public Task<DocumentHighlight[]?> DocumentHighlightAsync(DocumentHighlightParams parameters, CancellationToken cancellationToken) =>
         ExecuteAsync<DocumentHighlight[]>(
             LspMethods.DocumentHighlight,
             parameters,
@@ -323,9 +319,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.References,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<Location[]?> ReferencesAsync(
-        ReferenceParams parameters,
-        CancellationToken cancellationToken) =>
+    public Task<Location[]?> ReferencesAsync(ReferenceParams parameters, CancellationToken cancellationToken) =>
         ExecuteAsync<Location[]>(
             LspMethods.References,
             parameters,
@@ -334,9 +328,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.PrepareRename,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<PrepareRenameResult?> PrepareRenameAsync(
-        PrepareRenameParams parameters,
-        CancellationToken cancellationToken) =>
+    public Task<PrepareRenameResult?> PrepareRenameAsync(PrepareRenameParams parameters, CancellationToken cancellationToken) =>
         ExecuteAsync<PrepareRenameResult?>(
             LspMethods.PrepareRename,
             parameters,
@@ -345,9 +337,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.Rename,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<WorkspaceEdit?> RenameAsync(
-        RenameParams parameters,
-        CancellationToken cancellationToken) =>
+    public Task<WorkspaceEdit?> RenameAsync(RenameParams parameters, CancellationToken cancellationToken) =>
         ExecuteAsync<WorkspaceEdit>(
             LspMethods.Rename,
             parameters,
@@ -356,9 +346,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.SignatureHelp,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<SignatureHelp?> SignatureHelpAsync(
-        SignatureHelpParams parameters,
-        CancellationToken cancellationToken) =>
+    public Task<SignatureHelp?> SignatureHelpAsync(SignatureHelpParams parameters, CancellationToken cancellationToken) =>
         ExecuteAsync<SignatureHelp?>(
             LspMethods.SignatureHelp,
             parameters,
@@ -367,9 +355,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.Formatting,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<TextEdit[]?> FormattingAsync(
-        DocumentFormattingParams parameters,
-        CancellationToken cancellationToken) =>
+    public Task<TextEdit[]?> FormattingAsync(DocumentFormattingParams parameters, CancellationToken cancellationToken) =>
         ExecuteAsync<TextEdit[]>(
             LspMethods.Formatting,
             parameters,
@@ -378,9 +364,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.RangeFormatting,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<TextEdit[]?> RangeFormattingAsync(
-        DocumentRangeFormattingParams parameters,
-        CancellationToken cancellationToken) =>
+    public Task<TextEdit[]?> RangeFormattingAsync(DocumentRangeFormattingParams parameters, CancellationToken cancellationToken) =>
         ExecuteAsync<TextEdit[]>(
             LspMethods.RangeFormatting,
             parameters,
@@ -389,9 +373,7 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.OnTypeFormatting,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<TextEdit[]?> OnTypeFormattingAsync(
-        DocumentOnTypeFormattingParams parameters,
-        CancellationToken cancellationToken) =>
+    public Task<TextEdit[]?> OnTypeFormattingAsync(DocumentOnTypeFormattingParams parameters, CancellationToken cancellationToken) =>
         ExecuteAsync<TextEdit[]>(
             LspMethods.OnTypeFormatting,
             parameters,
@@ -400,18 +382,13 @@ internal sealed class AkburaLspRpcTarget
     [JsonRpcMethod(
         LspMethods.Typing,
         UseSingleObjectParameterDeserialization = true)]
-    public Task<AkburaTypingResponse?> TypingAsync(
-        AkburaTypingParams parameters,
-        CancellationToken cancellationToken) =>
+    public Task<AkburaTypingResponse?> TypingAsync(AkburaTypingParams parameters, CancellationToken cancellationToken) =>
         ExecuteAsync<AkburaTypingResponse>(
             LspMethods.Typing,
             parameters,
             cancellationToken);
 
-    private async Task<TResult?> ExecuteAsync<TResult>(
-        string method,
-        object? parameters,
-        CancellationToken cancellationToken)
+    private async Task<TResult?> ExecuteAsync<TResult>(string method, object? parameters, CancellationToken cancellationToken)
     {
         try
         {

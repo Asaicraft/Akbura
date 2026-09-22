@@ -12,12 +12,7 @@ namespace Akbura.LanguageServer.Hosting;
 
 internal static class AkburaLanguageServerHost
 {
-    public static async Task<int> RunAsync(
-        Stream input,
-        Stream output,
-        AkburaServerOptions options,
-        TextWriter error,
-        CancellationToken cancellationToken = default)
+    public static async Task<int> RunAsync(Stream input, Stream output, AkburaServerOptions options, TextWriter error, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(output);
@@ -55,6 +50,10 @@ internal static class AkburaLanguageServerHost
             new DidChangeHandler(),
             new DidCloseHandler(),
             new DidSaveHandler(),
+            new ResourceDocumentDidOpenHandler(),
+            new ResourceDocumentDidChangeHandler(),
+            new ResourceDocumentDidCloseHandler(),
+            new ResourceDocumentDidSaveHandler(),
             new DidChangeWatchedFilesHandler(),
             new DidChangeWorkspaceFoldersHandler(),
             new DocumentDiagnosticHandler(),
@@ -155,8 +154,7 @@ internal static class AkburaLanguageServerHost
         return lifetime.IsShutdownRequested ? 0 : 1;
     }
 
-    private static Task WaitForCancellationAsync(
-        CancellationToken cancellationToken)
+    private static Task WaitForCancellationAsync(CancellationToken cancellationToken)
     {
         if (!cancellationToken.CanBeCanceled)
         {

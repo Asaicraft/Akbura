@@ -1,4 +1,5 @@
 using Akbura.Language;
+using Akbura.Workspaces.Resources;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Collections.Immutable;
@@ -10,12 +11,7 @@ namespace Akbura.Workspaces.Projects;
 /// </summary>
 public sealed class AkburaProjectSnapshot
 {
-    internal AkburaProjectSnapshot(
-        AkburaProjectId id,
-        VersionStamp version,
-        ProjectContext context,
-        AkburaCompilation compilation,
-        ImmutableDictionary<AkburaDocumentId, AkburaDocumentSnapshot> documents)
+    internal AkburaProjectSnapshot(AkburaProjectId id, VersionStamp version, ProjectContext context, AkburaCompilation compilation, ImmutableDictionary<AkburaDocumentId, AkburaDocumentSnapshot> documents, ImmutableDictionary<ResourceDictionaryIdentity, ResourceDocumentSnapshot> resourceDocuments, object? resourceInputsIdentity = null)
     {
         Id = id;
         Version = version;
@@ -25,6 +21,11 @@ public sealed class AkburaProjectSnapshot
 
         Documents = documents ??
             throw new ArgumentNullException(nameof(documents));
+
+        ResourceDocuments = resourceDocuments ??
+            throw new ArgumentNullException(nameof(resourceDocuments));
+
+        ResourceInputsIdentity = resourceInputsIdentity ?? new object();
     }
 
     public AkburaProjectId Id { get; }
@@ -36,6 +37,12 @@ public sealed class AkburaProjectSnapshot
     public CSharpCompilation CSharpCompilation => Context.CSharpCompilation;
 
     public ImmutableDictionary<AkburaDocumentId, AkburaDocumentSnapshot> Documents { get; }
+
+    internal ImmutableDictionary<
+        ResourceDictionaryIdentity,
+        ResourceDocumentSnapshot> ResourceDocuments { get; }
+
+    internal object ResourceInputsIdentity { get; }
 
     internal AkburaCompilation Compilation { get; }
 
@@ -59,19 +66,18 @@ public sealed class AkburaProjectSnapshot
             compilation,
             ImmutableDictionary<
                 AkburaDocumentId,
-                AkburaDocumentSnapshot>.Empty);
+                AkburaDocumentSnapshot>.Empty,
+            ImmutableDictionary<
+                ResourceDictionaryIdentity,
+                ResourceDocumentSnapshot>.Empty);
     }
 
-    public bool TryGetDocument(
-        AkburaDocumentId documentId,
-        out AkburaDocumentSnapshot document)
+    public bool TryGetDocument(AkburaDocumentId documentId, out AkburaDocumentSnapshot document)
     {
         return Documents.TryGetValue(documentId, out document!);
     }
 
-    public bool TryGetDocument(
-        Uri uri,
-        out AkburaDocumentSnapshot document)
+    public bool TryGetDocument(Uri uri, out AkburaDocumentSnapshot document)
     {
         if (uri == null)
         {
@@ -121,7 +127,9 @@ public sealed class AkburaProjectSnapshot
             VersionStamp.Create(),
             Context,
             compilation,
-            Documents.Add(document.Id, document));
+            Documents.Add(document.Id, document),
+            ResourceDocuments,
+            ResourceInputsIdentity);
     }
 
     internal AkburaProjectSnapshot ReplaceDocument(AkburaDocumentSnapshot document)
@@ -174,7 +182,9 @@ public sealed class AkburaProjectSnapshot
             VersionStamp.Create(),
             Context,
             compilation,
-            documents);
+            documents,
+            ResourceDocuments,
+            ResourceInputsIdentity);
     }
 
     internal AkburaProjectSnapshot RemoveDocument(AkburaDocumentId documentId)
@@ -196,11 +206,12 @@ public sealed class AkburaProjectSnapshot
             VersionStamp.Create(),
             Context,
             compilation,
-            Documents.Remove(documentId));
+            Documents.Remove(documentId),
+            ResourceDocuments,
+            ResourceInputsIdentity);
     }
 
-    internal AkburaProjectSnapshot WithContext(
-        ProjectContext context)
+    internal AkburaProjectSnapshot WithContext(ProjectContext context)
     {
         if (context == null)
         {
@@ -262,11 +273,11 @@ public sealed class AkburaProjectSnapshot
             VersionStamp.Create(),
             context,
             compilation,
-            Documents);
+            Documents,
+            ResourceDocuments);
     }
 
-    internal AkburaProjectSnapshot WithDocuments(
-        ImmutableDictionary<AkburaDocumentId, AkburaDocumentSnapshot> documents)
+    internal AkburaProjectSnapshot WithDocuments(ImmutableDictionary<AkburaDocumentId, AkburaDocumentSnapshot> documents)
     {
         if (documents == null)
         {
@@ -299,11 +310,33 @@ public sealed class AkburaProjectSnapshot
             VersionStamp.Create(),
             Context,
             compilation,
-            documents);
+            documents,
+            ResourceDocuments,
+            ResourceInputsIdentity);
     }
 
-    internal AkburaProjectSnapshot WithCompilationReferences(
-        ImmutableArray<AkburaCompilationReference> references)
+    internal AkburaProjectSnapshot WithResourceDocuments(ImmutableDictionary<ResourceDictionaryIdentity, ResourceDocumentSnapshot> resourceDocuments)
+    {
+        if (resourceDocuments == null)
+        {
+            throw new ArgumentNullException(nameof(resourceDocuments));
+        }
+
+        if (ReferenceEquals(resourceDocuments, ResourceDocuments))
+        {
+            return this;
+        }
+
+        return new AkburaProjectSnapshot(
+            Id,
+            VersionStamp.Create(),
+            Context,
+            Compilation,
+            Documents,
+            resourceDocuments);
+    }
+
+    internal AkburaProjectSnapshot WithCompilationReferences(ImmutableArray<AkburaCompilationReference> references)
     {
         var compilation =
             Compilation.WithCompilationReferences(references);
@@ -315,12 +348,12 @@ public sealed class AkburaProjectSnapshot
                 VersionStamp.Create(),
                 Context,
                 compilation,
-                Documents);
+                Documents,
+                ResourceDocuments,
+                ResourceInputsIdentity);
     }
 
-    private static AkburaCompilation AddSyntaxTree(
-    AkburaCompilation compilation,
-    AkburaSyntaxTree syntaxTree)
+    private static AkburaCompilation AddSyntaxTree(AkburaCompilation compilation, AkburaSyntaxTree syntaxTree)
     {
         return syntaxTree switch
         {
@@ -338,10 +371,7 @@ public sealed class AkburaProjectSnapshot
         };
     }
 
-    private static AkburaCompilation ReplaceSyntaxTree(
-        AkburaCompilation compilation,
-        AkburaSyntaxTree oldTree,
-        AkburaSyntaxTree newTree)
+    private static AkburaCompilation ReplaceSyntaxTree(AkburaCompilation compilation, AkburaSyntaxTree oldTree, AkburaSyntaxTree newTree)
     {
         if (oldTree is AkcssSyntaxTree oldAkcssTree)
         {
@@ -368,9 +398,7 @@ public sealed class AkburaProjectSnapshot
             newTree);
     }
 
-    private static AkburaCompilation RemoveSyntaxTree(
-        AkburaCompilation compilation,
-        AkburaSyntaxTree syntaxTree)
+    private static AkburaCompilation RemoveSyntaxTree(AkburaCompilation compilation, AkburaSyntaxTree syntaxTree)
     {
         return syntaxTree switch
         {

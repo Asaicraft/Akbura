@@ -34,8 +34,7 @@ public sealed class WorkspaceCompletionTests
     [Theory]
     [InlineData(".")]
     [InlineData(".cl")]
-    public void Completion_SelectorSnippetReplacesLeadingDot(
-        string source)
+    public void Completion_SelectorSnippetReplacesLeadingDot(string source)
     {
         var text = SourceText.From(source);
         var document = AkburaSyntacticDocument.Parse(
@@ -85,13 +84,7 @@ public sealed class WorkspaceCompletionTests
                 semanticContext: null,
                 source.Length);
 
-        foreach (var keyword in new[]
-                 {
-                     "state",
-                     "param",
-                     "inject",
-                     "command",
-                 })
+        foreach (var keyword in new[] { "state", "param", "inject", "command", })
         {
             var item = Assert.Single(
                 result.Items,
@@ -115,9 +108,7 @@ public sealed class WorkspaceCompletionTests
     [InlineData("par", "param")]
     [InlineData("inj", "inject")]
     [InlineData("comm", "command")]
-    public void Completion_TopLevelFiltersCatalogByPrefix(
-        string source,
-        string expectedItem)
+    public void Completion_TopLevelFiltersCatalogByPrefix(string source, string expectedItem)
     {
         var document = AkburaSyntacticDocument.Parse(
             SourceText.From(source),
@@ -185,8 +176,7 @@ public sealed class WorkspaceCompletionTests
     [InlineData(
         "using static Akbura.Hooks.EffectHooks;\n\nuseE")]
     [InlineData("namespace Akbura.Hooks;\n\nuseE")]
-    public void Completion_UseEffectDoesNotOfferRedundantImport(
-        string source)
+    public void Completion_UseEffectDoesNotOfferRedundantImport(string source)
     {
         var document = AkburaSyntacticDocument.Parse(
             SourceText.From(source),
@@ -403,10 +393,7 @@ public sealed class WorkspaceCompletionTests
         "Control.card {\n    Width: 10;\n    Wid|\n}",
         "Width",
         "Width: ")]
-    public void Completion_AkcssOffersSemanticProperties(
-        string sourceWithCaret,
-        string expectedDisplayText,
-        string expectedInsertText)
+    public void Completion_AkcssOffersSemanticProperties(string sourceWithCaret, string expectedDisplayText, string expectedInsertText)
     {
         WithAkcssWorkspace(
             sourceWithCaret,
@@ -623,10 +610,7 @@ public sealed class WorkspaceCompletionTests
     [InlineData("param |", "", 2)]
     [InlineData("param b|", "b", 1)]
     [InlineData("param ou|", "ou", 1)]
-    public void Completion_ParamOffersBindingModifiers(
-        string sourceWithCaret,
-        string expectedPrefix,
-        int expectedCount)
+    public void Completion_ParamOffersBindingModifiers(string sourceWithCaret, string expectedPrefix, int expectedCount)
     {
         var position = sourceWithCaret.IndexOf('|');
         var source = sourceWithCaret.Remove(position, 1);
@@ -812,9 +796,7 @@ public sealed class WorkspaceCompletionTests
     [Theory]
     [InlineData("<|", "")]
     [InlineData("<Bord|", "Bord")]
-    public void Completion_ComponentNameOffersAutoImportableBorder(
-        string sourceWithCaret,
-        string expectedPrefix)
+    public void Completion_ComponentNameOffersAutoImportableBorder(string sourceWithCaret, string expectedPrefix)
     {
         var position = sourceWithCaret.IndexOf('|');
         var source = sourceWithCaret.Remove(position, count: 1);
@@ -951,8 +933,7 @@ public sealed class WorkspaceCompletionTests
     [InlineData("Grid")]
     [InlineData("Grid.")]
     [InlineData("Grid.Ro")]
-    public void Completion_AttributeOffersVisibleAttachedProperty(
-        string prefix)
+    public void Completion_AttributeOffersVisibleAttachedProperty(string prefix)
     {
         var sourceWithCaret =
             "namespace Gallery;\n\n" +
@@ -2058,6 +2039,973 @@ public sealed class WorkspaceCompletionTests
     }
 
     [Fact]
+    public void ProjectedCSharpService_CompletesDataTypeInsideQuotedValue()
+    {
+        const string sourceWithCaret = """
+            namespace Consumer;
+
+            using Avalonia.Controls;
+            using Gallery;
+
+            <Border x.DataType="Opt|ions"/>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var context));
+                Assert.Equal(
+                    AkburaCSharpCompletionContextKind.Type,
+                    context.Kind);
+                Assert.Equal(
+                    "Options",
+                    syntacticDocument.Text.ToString(context.HostSpan));
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    context,
+                    out var projection));
+                var roslynCompletion = RoslynCompletionTestHost
+                    .GetCompletionsAsync(
+                        semanticContext.Project.CSharpCompilation,
+                        projection.Root,
+                        projection.ProjectedPosition,
+                        CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult();
+                Assert.NotNull(roslynCompletion);
+                var rawItem = Assert.Single(
+                    roslynCompletion.ItemsList,
+                    static item => item.DisplayText == "Options");
+                Assert.True(
+                    projection.TryMapToHost(
+                        rawItem.Span,
+                        out _),
+                    $"Completion span {rawItem.Span} is outside " +
+                    $"projection span {projection.ProjectedSpan}.");
+
+                var result = workspace.LanguageServices.ProjectedCSharp
+                    .GetCompletionsAsync(
+                        syntacticDocument,
+                        semanticContext,
+                        position,
+                        new AkburaProjectedCompletionTrigger(
+                            IsExplicit: true,
+                            IsIncomplete: false,
+                            Character: '\0'))
+                    .GetAwaiter()
+                    .GetResult();
+
+                Assert.NotNull(result);
+                var item = Assert.Single(
+                    result.Value.Items,
+                    static item => item.DisplayText == "Options");
+                var resolution = workspace.LanguageServices.ProjectedCSharp
+                    .ResolveCompletionAsync(
+                        syntacticDocument,
+                        semanticContext,
+                        position,
+                        item.ResolveKey)
+                    .GetAwaiter()
+                    .GetResult();
+
+                Assert.NotNull(resolution);
+                var changed = SourceText.From(source)
+                    .WithChanges(resolution!.Change.Changes)
+                    .ToString();
+                Assert.Contains(
+                    "x.DataType=\"Options\"",
+                    changed,
+                    StringComparison.Ordinal);
+                Assert.DoesNotContain(
+                    "Optionsions",
+                    changed,
+                    StringComparison.Ordinal);
+            });
+    }
+
+    [Fact]
+    public void ProjectedCSharpService_DataTypeAutoImportPreservesCrLfAndUnicode()
+    {
+        const string sourceWithCaret =
+            "namespace Consumer;\r\n" +
+            "\r\n" +
+            "using Avalonia.Controls;\r\n" +
+            "\r\n" +
+            "// 😀\r\n" +
+            "<Border x.DataType=\"Option|\"/>\r\n";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (_workspace, semanticContext, syntacticDocument) =>
+            {
+                Assert.True(
+                    syntacticDocument.TryGetCSharpCompletionContext(
+                        position,
+                        out var context));
+                Assert.True(AkburaCSharpProjectionFactory.TryCreate(
+                    syntacticDocument,
+                    semanticContext,
+                    context,
+                    out var projection));
+
+                var completion = RoslynCompletionTestHost
+                    .GetAutomaticImportCompletionAsync(
+                        semanticContext.Project.CSharpCompilation,
+                        projection.Root,
+                        projection.ProjectedPosition,
+                        'n',
+                        displayText: "Options",
+                        isIncompleteSession: true,
+                        CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult();
+
+                Assert.NotNull(completion);
+                Assert.True(
+                    AkburaCSharpCompletionChangeMapper
+                        .TryMapCompletionChange(
+                            SourceText.From(source),
+                            completion.Value.ProjectedText,
+                            projection,
+                            completion.Value.Change,
+                            out var mapped));
+                var changed = SourceText.From(source)
+                    .WithChanges(mapped.Changes)
+                    .ToString();
+
+                Assert.Contains(
+                    "using Gallery;\r\n",
+                    changed,
+                    StringComparison.Ordinal);
+                Assert.Contains(
+                    "x.DataType=\"Options\"",
+                    changed,
+                    StringComparison.Ordinal);
+                Assert.Contains("// 😀\r\n", changed);
+                Assert.DoesNotContain("\n", changed.Replace("\r\n", ""));
+            });
+    }
+
+    [Theory]
+    [InlineData(
+        "<Border x.DataType='Opt|ions'/>",
+        "x.DataType='Options'")]
+    [InlineData(
+        "<Border x.DataType=\"Opt|ions/>",
+        "x.DataType=\"Options/>")]
+    [InlineData(
+        "<Border x.DataType=\"global::Gallery.Opt|ions\"/>",
+        "x.DataType=\"global::Gallery.Options\"")]
+    [InlineData(
+        "<Border x.DataType=\"System.Collections.Generic.List<Gallery.Opt|ions>\"/>",
+        "x.DataType=\"System.Collections.Generic.List<Gallery.Options>\"")]
+    public void ProjectedCSharpService_DataTypeEditPreservesSupportedLiteralForm(string markupWithCaret, string expectedText)
+    {
+        var sourceWithCaret =
+            "namespace Consumer;\r\n\r\n" +
+            "using Avalonia.Controls;\r\n" +
+            "using Gallery;\r\n\r\n" +
+            markupWithCaret;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.ProjectedCSharp
+                    .GetCompletionsAsync(
+                        syntacticDocument,
+                        semanticContext,
+                        position,
+                        new AkburaProjectedCompletionTrigger(
+                            IsExplicit: true,
+                            IsIncomplete: false,
+                            Character: '\0'))
+                    .GetAwaiter()
+                    .GetResult();
+
+                Assert.NotNull(result);
+                var item = Assert.Single(
+                    result.Value.Items,
+                    static item =>
+                        item.DisplayText == "Options");
+                var resolution = workspace.LanguageServices.ProjectedCSharp
+                    .ResolveCompletionAsync(
+                        syntacticDocument,
+                        semanticContext,
+                        position,
+                        item.ResolveKey)
+                    .GetAwaiter()
+                    .GetResult();
+
+                Assert.NotNull(resolution);
+                var changed = SourceText.From(source)
+                    .WithChanges(resolution!.Change.Changes)
+                    .ToString();
+                Assert.Contains(
+                    expectedText,
+                    changed,
+                    StringComparison.Ordinal);
+                Assert.DoesNotContain(
+                    "Optionsions",
+                    changed,
+                    StringComparison.Ordinal);
+            });
+    }
+
+    [Fact]
+    public void ProjectedCSharpService_EmptyDataTypeOffersTypeItems()
+    {
+        const string sourceWithCaret = """
+            namespace Consumer;
+
+            using Avalonia.Controls;
+            using Gallery;
+
+            <Border x.DataType="|"/>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.ProjectedCSharp
+                    .GetCompletionsAsync(
+                        syntacticDocument,
+                        semanticContext,
+                        position,
+                        new AkburaProjectedCompletionTrigger(
+                            IsExplicit: true,
+                            IsIncomplete: false,
+                            Character: '\0'))
+                    .GetAwaiter()
+                    .GetResult();
+
+                Assert.NotNull(result);
+                var items = result.Value.Items
+                    .Where(static item =>
+                        item.DisplayText == "Options")
+                    .ToArray();
+                Assert.NotEmpty(items);
+                Assert.All(
+                    items,
+                    static item => Assert.Equal(
+                        AkburaProjectedCompletionKind.Class,
+                        item.Kind));
+            });
+    }
+
+    [Fact]
+    public void DataTypeResolver_UsesDocumentUsingsAliasesAndSupportedTypeForms()
+    {
+        const string source = """
+            namespace Consumer;
+
+            using Avalonia.Controls;
+            using Gallery;
+            using VM = Gallery.Options;
+            using Generic = System.Collections.Generic;
+
+            <Border x.DataType="Options"/>
+            """;
+
+        WithWorkspace(
+            source,
+            (_workspace, semanticContext, _syntacticDocument) =>
+            {
+                var semanticModel = semanticContext.Project.Compilation
+                    .GetSemanticModel(
+                        semanticContext.Document.SyntaxTree);
+
+                AssertDataType(
+                    semanticModel,
+                    "Options",
+                    "global::Gallery.Options");
+                AssertDataType(
+                    semanticModel,
+                    "Gallery.Options",
+                    "global::Gallery.Options");
+                AssertDataType(
+                    semanticModel,
+                    "global::Gallery.Options",
+                    "global::Gallery.Options");
+                AssertDataType(
+                    semanticModel,
+                    "VM",
+                    "global::Gallery.Options");
+                AssertDataType(
+                    semanticModel,
+                    "Outer.Nested",
+                    "global::Gallery.Outer.Nested");
+                AssertDataType(
+                    semanticModel,
+                    "Generic.List<Options>",
+                    "global::System.Collections.Generic.List<global::Gallery.Options>");
+            });
+    }
+
+    [Fact]
+    public void DataTypeResolver_UsesGlobalUsingFromCurrentProjectSnapshot()
+    {
+        const string source = """
+            namespace Consumer;
+
+            using Avalonia.Controls;
+
+            <Border x.DataType="Options"/>
+            """;
+
+        WithWorkspace(
+            source,
+            stylesSource: null,
+            (_workspace, semanticContext, _syntacticDocument) =>
+            {
+                var semanticModel = semanticContext.Project.Compilation
+                    .GetSemanticModel(
+                        semanticContext.Document.SyntaxTree);
+                AssertDataType(
+                    semanticModel,
+                    "Options",
+                    "global::Gallery.Options");
+            },
+            globalUsingsSource: "global using Gallery;");
+    }
+
+    [Fact]
+    public void DataTypeResolver_DoesNotChooseRandomAmbiguousShortName()
+    {
+        const string source = """
+            namespace Consumer;
+
+            using Avalonia.Controls;
+            using Gallery;
+            using Other;
+
+            <Border x.DataType="Options"/>
+            """;
+
+        var compilation = CreateCompilation().AddSyntaxTrees(
+            CSharpSyntaxTree.ParseText(
+                "namespace Other { public sealed class Options { } }"));
+        using var workspace = new AkburaWorkspace(
+            new ProjectContext(
+                ProjectId.CreateNewId("AmbiguousDataType"),
+                projectFilePath: string.Empty,
+                projectDirectory: Environment.CurrentDirectory,
+                rootNamespace: "Consumer",
+                compilation,
+                ImmutableArray<ProjectReference>.Empty));
+        var path = Path.GetFullPath(
+            "AmbiguousDataType.akbura");
+        var text = SourceText.From(source);
+        var semanticContext = workspace.OpenOrChangeDocumentContext(
+            new Uri(path),
+            text);
+        var semanticModel = semanticContext.Project.Compilation
+            .GetSemanticModel(
+                semanticContext.Document.SyntaxTree);
+
+        Assert.False(
+            semanticModel.TryBindMarkupDataTypeDirective(
+                "Options",
+                out _));
+        AssertDataType(
+            semanticModel,
+            "Gallery.Options",
+            "global::Gallery.Options");
+        AssertDataType(
+            semanticModel,
+            "Other.Options",
+            "global::Other.Options");
+    }
+
+    [Theory]
+    [InlineData(
+        "<Border Tag=${Binding Customer.Add|ress} x.DataType=\"MainViewModel\"/>",
+        "Address",
+        "Customer.Address")]
+    [InlineData(
+        "<Border Tag=${Binding Path=Customer.Add|ress} x.DataType=\"MainViewModel\"/>",
+        "Address",
+        "Path=Customer.Address")]
+    [InlineData(
+        "<Border Tag=${Binding Customer.Address.Ci|ty} x.DataType=\"MainViewModel\"/>",
+        "City",
+        "Customer.Address.City")]
+    [InlineData(
+        "<Border Tag=${Binding Customers[0].Na|me} x.DataType=\"MainViewModel\"/>",
+        "Name",
+        "Customers[0].Name")]
+    [InlineData(
+        "<Border Tag=${Binding CustomerList[0].Na|me} x.DataType=\"MainViewModel\"/>",
+        "Name",
+        "CustomerList[0].Name")]
+    [InlineData(
+        "<Border Tag=${Binding Customer?.Na|me} x.DataType=\"MainViewModel\"/>",
+        "Name",
+        "Customer?.Name")]
+    [InlineData(
+        "<Border Tag=${Binding ((Customer)Customer).Na|me} x.DataType=\"MainViewModel\"/>",
+        "Name",
+        "((Customer)Customer).Name")]
+    [InlineData(
+        "<Border Tag=${Binding Pending^.Na|me} x.DataType=\"MainViewModel\"/>",
+        "Name",
+        "Pending^.Name")]
+    [InlineData(
+        "<Border Tag=${Binding !IsA|ctive} x.DataType=\"MainViewModel\"/>",
+        "IsActive",
+        "!IsActive")]
+    [InlineData(
+        "<Border Tag=${Binding $self.Wi|dth} x.DataType=\"MainViewModel\"/>",
+        "Width",
+        "$self.Width")]
+    [InlineData(
+        "<StackPanel><Border Tag=${Binding $parent[StackPanel].Spa|cing} x.DataType=\"MainViewModel\"/></StackPanel>",
+        "Spacing",
+        "$parent[StackPanel].Spacing")]
+    [InlineData(
+        "<StackPanel><Border Tag=${Binding $parent.Spa|cing} x.DataType=\"MainViewModel\"/></StackPanel>",
+        "Spacing",
+        "$parent.Spacing")]
+    [InlineData(
+        "<StackPanel x.Name=\"named\"><Border Tag=${Binding #named.Spa|cing} x.DataType=\"MainViewModel\"/></StackPanel>",
+        "Spacing",
+        "#named.Spacing")]
+    [InlineData(
+        "<StackPanel x.Name=\"named\"><Border Tag=${CompiledBinding Spa|cing, ElementName=named} x.DataType=\"MainViewModel\"/></StackPanel>",
+        "Spacing",
+        "CompiledBinding Spacing")]
+    [InlineData(
+        "<StackPanel x.Name=\"named\"><Border Tag=${ReflectionBinding Spa|cing, ElementName=named} x.DataType=\"MainViewModel\"/></StackPanel>",
+        "Spacing",
+        "ReflectionBinding Spacing")]
+    [InlineData(
+        "<Border Tag=${Binding Spa|cing, RelativeSource=${RelativeSource FindAncestor, AncestorType=StackPanel}} x.DataType=\"MainViewModel\"/>",
+        "Spacing",
+        "Binding Spacing")]
+    public void Completion_BindingPathUsesSemanticReceiverAndReplacesSuffix(string markupWithCaret, string expectedItem, string expectedPath)
+    {
+        var sourceWithCaret =
+            "namespace Gallery;\n\n" +
+            "using Avalonia.Controls;\n\n" +
+            markupWithCaret;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var syntaxContext = syntacticDocument
+                    .GetCompletionContext(position);
+                Assert.Equal(
+                    AkburaCompletionContextKind.BindingPath,
+                    syntaxContext.Kind);
+                var semanticModel = semanticContext.Project.Compilation
+                    .GetSemanticModel(
+                        semanticContext.Document.SyntaxTree);
+                Assert.True(
+                    semanticModel.TryBindMarkupDataTypeDirective(
+                        "MainViewModel",
+                        out _));
+
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+                var item = Assert.Single(
+                    result.Items,
+                    item => item.DisplayText == expectedItem);
+                var changed = syntacticDocument.Text.WithChanges(
+                    new TextChange(
+                        result.ApplicableSpan,
+                        item.InsertText));
+
+                Assert.Contains(
+                    expectedPath,
+                    changed.ToString(),
+                    StringComparison.Ordinal);
+                Assert.DoesNotContain(
+                    expectedItem + expectedItem,
+                    changed.ToString(),
+                    StringComparison.Ordinal);
+            });
+    }
+
+    [Fact]
+    public void Completion_BindingSourceExpressionOverridesDataType()
+    {
+        const string sourceWithCaret = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            <Border Tag=${Binding Na|me, Source={Customer}} x.DataType="MainViewModel"/>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+                var names = result.Items
+                    .Select(static item => item.DisplayText)
+                    .ToHashSet(StringComparer.Ordinal);
+
+                Assert.Contains("Name", names);
+                Assert.DoesNotContain("Inherited", names);
+            });
+    }
+
+    [Fact]
+    public void Completion_RelativeSourceSelfUsesElementType()
+    {
+        const string sourceWithCaret = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            <Border Tag=${Binding Wi|dth, RelativeSource=Self} x.DataType="MainViewModel"/>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+                var names = result.Items
+                    .Select(static item => item.DisplayText)
+                    .ToHashSet(StringComparer.Ordinal);
+
+                Assert.Contains("Width", names);
+                Assert.DoesNotContain("Inherited", names);
+            });
+    }
+
+    [Fact]
+    public void Completion_BindingInsideItemTemplateUsesInferredItemType()
+    {
+        const string sourceWithCaret = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            <ItemsControl x.DataType="MainViewModel" ItemsSource=${Binding Customers}>
+                <ItemsControl.ItemTemplate>
+                    <Border Tag=${Binding Na|me}/>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+                var names = result.Items
+                    .Select(static item => item.DisplayText)
+                    .ToHashSet(StringComparer.Ordinal);
+
+                Assert.Contains("Name", names);
+                Assert.DoesNotContain("Inherited", names);
+            });
+    }
+
+    [Fact]
+    public void Completion_UnknownRelativeSourceDoesNotUseDataType()
+    {
+        const string sourceWithCaret = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            <Border Tag=${Binding Inh|, RelativeSource=Unknown} x.DataType="MainViewModel"/>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.DoesNotContain(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "Inherited");
+            });
+    }
+
+    [Fact]
+    public void Completion_BindingInsideItemTemplateUsesExplicitItemType()
+    {
+        const string sourceWithCaret = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            <ItemsControl x.DataType="MainViewModel" ItemsSource=${Binding Customers}>
+                <ItemsControl.ItemTemplate x.DataType="Customer">
+                    <Border Tag=${Binding Na|me}/>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+                var names = result.Items
+                    .Select(static item => item.DisplayText)
+                    .ToHashSet(StringComparer.Ordinal);
+
+                Assert.Contains("Name", names);
+                Assert.DoesNotContain("Inherited", names);
+            });
+    }
+
+    [Fact]
+    public void Completion_BindingTemplateBoundaryDoesNotUseOuterDataType()
+    {
+        const string sourceWithCaret = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            <ItemsControl x.DataType="MainViewModel">
+                <ItemsControl.ItemTemplate>
+                    <Border Tag=${Binding Inh|}/>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.DoesNotContain(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "Inherited");
+            });
+    }
+
+    [Fact]
+    public void Completion_BindingUsesUpdatedRoslynCompilationWithoutBuild()
+    {
+        const string sourceWithCaret = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            <Border Tag=${Binding Fre|} x.DataType="MainViewModel"/>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var text = SourceText.From(source);
+        var projectId = ProjectId.CreateNewId("Application");
+        var compilation = CreateCompilation();
+        var projectDirectory = Path.GetFullPath(
+            Path.Combine(
+                Path.GetTempPath(),
+                nameof(WorkspaceCompletionTests),
+                Guid.NewGuid().ToString("N")));
+        var projectPath = Path.Combine(
+            projectDirectory,
+            "Application.csproj");
+        var documentPath = Path.Combine(
+            projectDirectory,
+            "View.akbura");
+        var initialProjectContext = new ProjectContext(
+            projectId,
+            projectPath,
+            projectDirectory,
+            "Gallery",
+            compilation,
+            ImmutableArray<ProjectReference>.Empty);
+
+        using var workspace = new AkburaWorkspace(
+            initialProjectContext);
+        var initialContext = workspace.OpenOrChangeDocumentContext(
+            new Uri(documentPath),
+            text);
+        var syntacticDocument = AkburaSyntacticDocument.Parse(
+            text,
+            documentPath);
+        var initial = workspace.LanguageServices.Completion
+            .GetCompletions(
+                syntacticDocument,
+                initialContext,
+                position);
+
+        Assert.DoesNotContain(
+            initial.Items,
+            static item =>
+                item.DisplayText == "FreshFromUnsavedEdit");
+
+        var oldTree = Assert.Single(compilation.SyntaxTrees);
+        var oldSource = oldTree.GetText().ToString();
+        var changedSource = oldSource.Replace(
+            "public bool IsActive { get; }",
+            "public bool IsActive { get; }\r\n\r\n" +
+            "                    public string FreshFromUnsavedEdit " +
+            "{ get; } = \"\";",
+            StringComparison.Ordinal);
+        Assert.NotEqual(oldSource, changedSource);
+        var changedTree = CSharpSyntaxTree.ParseText(
+            changedSource,
+            (CSharpParseOptions)oldTree.Options,
+            oldTree.FilePath);
+        var changedCompilation = compilation.ReplaceSyntaxTree(
+            oldTree,
+            changedTree);
+
+        workspace.AddOrUpdateProject(new ProjectContext(
+            projectId,
+            projectPath,
+            projectDirectory,
+            "Gallery",
+            changedCompilation,
+            ImmutableArray<ProjectReference>.Empty));
+        var changedContext = workspace.OpenOrChangeDocumentContext(
+            new Uri(documentPath),
+            text);
+        var changed = workspace.LanguageServices.Completion
+            .GetCompletions(
+                syntacticDocument,
+                changedContext,
+                position);
+
+        Assert.Contains(
+            changed.Items,
+            static item =>
+                item.DisplayText == "FreshFromUnsavedEdit");
+        Assert.DoesNotContain(
+            initial.Items,
+            static item =>
+                item.DisplayText == "FreshFromUnsavedEdit");
+    }
+
+    [Fact]
+    public void Completion_BindingRootIncludesReadableInheritedMembersOnly()
+    {
+        const string sourceWithCaret = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            <Border Tag=${Binding |} x.DataType="MainViewModel"/>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var syntaxContext = syntacticDocument
+                    .GetCompletionContext(position);
+                Assert.Equal(
+                    AkburaCompletionContextKind.BindingPath,
+                    syntaxContext.Kind);
+                var semanticModel = semanticContext.Project.Compilation
+                    .GetSemanticModel(
+                        semanticContext.Document.SyntaxTree);
+                Assert.True(
+                    semanticModel.TryBindMarkupDataTypeDirective(
+                        "MainViewModel",
+                        out _));
+
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+                var names = result.Items
+                    .Select(static item => item.DisplayText)
+                    .ToHashSet(StringComparer.Ordinal);
+
+                Assert.Contains("Customer", names);
+                Assert.Contains("Inherited", names);
+                Assert.Contains("PublicField", names);
+                Assert.Contains("$self", names);
+                Assert.Contains("$parent", names);
+                Assert.Contains("$templatedParent", names);
+                Assert.DoesNotContain("WriteOnly", names);
+                Assert.DoesNotContain("StaticMember", names);
+                Assert.DoesNotContain("Hidden", names);
+            });
+    }
+
+    [Fact]
+    public void Completion_UnknownBindingReceiverFailsWithoutUnrelatedMembers()
+    {
+        const string sourceWithCaret = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            <Border Tag=${Binding Missing.|} x.DataType="MainViewModel"/>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.Empty(result.Items);
+            });
+    }
+
+    [Theory]
+    [InlineData(
+        "<Border Tag=${Binding Customer.Name, Mo|} x.DataType=\"MainViewModel\"/>",
+        "Mode",
+        "Mode=")]
+    [InlineData(
+        "<Border Tag=${Binding Mode=Tw|oWay} x.DataType=\"MainViewModel\"/>",
+        "TwoWay",
+        "Mode=TwoWay")]
+    [InlineData(
+        "<Border Tag=${CompiledBinding Customer.Name, Ele|} x.DataType=\"MainViewModel\"/>",
+        "ElementName",
+        "ElementName=")]
+    public void Completion_BindingArgumentsUseExtensionMetadata(string markupWithCaret, string expectedItem, string expectedText)
+    {
+        var sourceWithCaret =
+            "namespace Gallery;\n\n" +
+            "using Avalonia.Controls;\n\n" +
+            markupWithCaret;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+                var item = Assert.Single(
+                    result.Items,
+                    item => item.DisplayText == expectedItem);
+                var changed = syntacticDocument.Text.WithChanges(
+                    new TextChange(
+                        result.ApplicableSpan,
+                        item.InsertText));
+
+                Assert.Contains(
+                    expectedText,
+                    changed.ToString(),
+                    StringComparison.Ordinal);
+            });
+    }
+
+    [Theory]
+    [InlineData(
+        "<Border Tag=${Custom 0, Mo|}/>",
+        "Mode",
+        "Mode=")]
+    [InlineData(
+        "<Border Tag=${Custom 0, Mode=Pr|imary}/>",
+        "Primary",
+        "Mode=Primary")]
+    public void Completion_CommonMarkupExtensionArgumentsUsePropertyMetadata(string markupWithCaret, string expectedItem, string expectedText)
+    {
+        var sourceWithCaret =
+            "namespace Gallery;\n\n" +
+            "using Avalonia.Controls;\n" +
+            "using Gallery.Extensions;\n\n" +
+            markupWithCaret;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+                var item = Assert.Single(
+                    result.Items,
+                    item => item.DisplayText == expectedItem);
+                var changed = syntacticDocument.Text.WithChanges(
+                    new TextChange(
+                        result.ApplicableSpan,
+                        item.InsertText));
+
+                Assert.Contains(
+                    expectedText,
+                    changed.ToString(),
+                    StringComparison.Ordinal);
+            });
+    }
+
+    [Fact]
     public async Task ProjectedCSharpService_UsesCompilationProjectReferences()
     {
         const string sourceWithCaret = """
@@ -2177,12 +3125,7 @@ public sealed class WorkspaceCompletionTests
                 Assert.Contains("int", info.Signature);
             });
     }
-    private static void WithWorkspace(
-        string source,
-        Action<
-            AkburaWorkspace,
-            AkburaDocumentContext,
-            AkburaSyntacticDocument> assertion)
+    private static void WithWorkspace(string source, Action<AkburaWorkspace, AkburaDocumentContext, AkburaSyntacticDocument> assertion)
     {
         WithWorkspace(
             source,
@@ -2190,14 +3133,7 @@ public sealed class WorkspaceCompletionTests
             assertion);
     }
 
-    private static void WithAkcssWorkspace(
-        string sourceWithCaret,
-        string? importedStylesSource,
-        Action<
-            AkburaWorkspace,
-            AkburaDocumentContext,
-            AkburaSyntacticDocument,
-            int> assertion)
+    private static void WithAkcssWorkspace(string sourceWithCaret, string? importedStylesSource, Action<AkburaWorkspace, AkburaDocumentContext, AkburaSyntacticDocument, int> assertion)
     {
         var position = sourceWithCaret.IndexOf('|');
         var source = position >= 0
@@ -2255,14 +3191,7 @@ public sealed class WorkspaceCompletionTests
         }
     }
 
-    private static void WithWorkspace(
-        string source,
-        string? stylesSource,
-        Action<
-            AkburaWorkspace,
-            AkburaDocumentContext,
-            AkburaSyntacticDocument> assertion,
-        string? globalUsingsSource = null)
+    private static void WithWorkspace(string source, string? stylesSource, Action<AkburaWorkspace, AkburaDocumentContext, AkburaSyntacticDocument> assertion, string? globalUsingsSource = null)
     {
         var directory = Path.Combine(
             Path.GetTempPath(),
@@ -2412,9 +3341,7 @@ public sealed class WorkspaceCompletionTests
         "? new Border() { } " +
         ": new Button() { Hei| }",
         "Height")]
-    public void CSharpProjection_ObjectInitializersSupportCompletion(
-        string expressionWithCaret,
-        string expectedItem)
+    public void CSharpProjection_ObjectInitializersSupportCompletion(string expressionWithCaret, string expectedItem)
     {
         var source =
             "namespace Gallery;\n\n" +
@@ -2450,9 +3377,7 @@ public sealed class WorkspaceCompletionTests
     [InlineData(
         "? new Button() { Wid| }",
         "Width")]
-    public void CSharpProjection_MultilineConditionalWithIndentedClosingBrace(
-        string branchWithCaret,
-        string expectedItem)
+    public void CSharpProjection_MultilineConditionalWithIndentedClosingBrace(string branchWithCaret, string expectedItem)
     {
         var source =
             "namespace Gallery;\r\n" +
@@ -3216,10 +4141,7 @@ public sealed class WorkspaceCompletionTests
         "Control.card { Variant: Pri|; }",
         "Primary",
         AkburaCompletionKind.AkcssValue)]
-    public void Completion_AkcssOffersExpectedTypeValues(
-        string sourceWithCaret,
-        string expectedDisplayText,
-        AkburaCompletionKind expectedKind)
+    public void Completion_AkcssOffersExpectedTypeValues(string sourceWithCaret, string expectedDisplayText, AkburaCompletionKind expectedKind)
     {
         WithAkcssWorkspace(
             sourceWithCaret,
@@ -3672,10 +4594,7 @@ public sealed class WorkspaceCompletionTests
         "@using |;\n.card { }",
         AkburaCSharpCompletionContextKind.UsingDirectiveName,
         "System")]
-    public void CSharpProjection_AkcssContextsUseRoslynCompletion(
-        string sourceWithCaret,
-        AkburaCSharpCompletionContextKind expectedKind,
-        string expectedItem)
+    public void CSharpProjection_AkcssContextsUseRoslynCompletion(string sourceWithCaret, AkburaCSharpCompletionContextKind expectedKind, string expectedItem)
     {
         WithAkcssWorkspace(
             sourceWithCaret,
@@ -3854,10 +4773,7 @@ public sealed class WorkspaceCompletionTests
         "@akcss { StackP|.card { } }",
         AkburaCSharpCompletionContextKind.Type,
         "StackPanel")]
-    public void CSharpProjection_InlineAkcssUsesRoslynCompletion(
-        string inlineAkcssWithCaret,
-        AkburaCSharpCompletionContextKind expectedKind,
-        string expectedItem)
+    public void CSharpProjection_InlineAkcssUsesRoslynCompletion(string inlineAkcssWithCaret, AkburaCSharpCompletionContextKind expectedKind, string expectedItem)
     {
         var sourceWithCaret =
             "using Avalonia.Controls;\n\n" +
@@ -3901,9 +4817,7 @@ public sealed class WorkspaceCompletionTests
         "@utilities { StackPanel.gap-(double value) { " +
         "Spacing: val|ue; } }",
         "value")]
-    public void CSharpProjection_AkcssMapsRoslynQuickInfoToHost(
-        string sourceWithCaret,
-        string expectedToken)
+    public void CSharpProjection_AkcssMapsRoslynQuickInfoToHost(string sourceWithCaret, string expectedToken)
     {
         WithAkcssWorkspace(
             sourceWithCaret,
@@ -4552,10 +5466,7 @@ public sealed class WorkspaceCompletionTests
     [Theory]
     [InlineData("B", 'B', false)]
     [InlineData("Brus", 's', true)]
-    public void CSharpCompletion_AutomaticallyImportsBrushes(
-        string prefix,
-        char triggerCharacter,
-        bool isIncompleteSession)
+    public void CSharpCompletion_AutomaticallyImportsBrushes(string prefix, char triggerCharacter, bool isIncompleteSession)
     {
         const string sourceTemplate = """
             using Avalonia.Controls;
@@ -4741,11 +5652,7 @@ public sealed class WorkspaceCompletionTests
         "SomeExtension",
         "Gallery.Extensions",
         "name.SomeExtension")]
-    public void CSharpCompletionChangeMapper_MapsRoslynAutoImports(
-        string fragmentWithCaret,
-        string displayText,
-        string expectedNamespace,
-        string expectedFragment)
+    public void CSharpCompletionChangeMapper_MapsRoslynAutoImports(string fragmentWithCaret, string displayText, string expectedNamespace, string expectedFragment)
     {
         var sourceWithCaret =
             "using Avalonia.Controls;\n\n" +
@@ -4867,9 +5774,7 @@ public sealed class WorkspaceCompletionTests
     [InlineData(
         "command void Save(System.Threading.CancellationTok|en token);",
         "CancellationToken")]
-    public void CSharpProjection_MapsRoslynQuickInfoAcrossContexts(
-        string fragmentWithCaret,
-        string expectedToken)
+    public void CSharpProjection_MapsRoslynQuickInfoAcrossContexts(string fragmentWithCaret, string expectedToken)
     {
         var sourceWithCaret =
             "using Avalonia.Controls;\n\n" +
@@ -4912,13 +5817,7 @@ public sealed class WorkspaceCompletionTests
             });
     }
 
-    private static void WithCSharpProjection(
-        string sourceWithCaret,
-        Action<
-            AkburaDocumentContext,
-            AkburaCSharpCompletionContext,
-            AkburaCSharpProjection,
-            int> assertion)
+    private static void WithCSharpProjection(string sourceWithCaret, Action<AkburaDocumentContext, AkburaCSharpCompletionContext, AkburaCSharpProjection, int> assertion)
     {
         var position = sourceWithCaret.IndexOf('|');
         Assert.True(position >= 0);
@@ -4956,9 +5855,7 @@ public sealed class WorkspaceCompletionTests
             });
     }
 
-    private static int CountOccurrences(
-        string value,
-        string search)
+    private static int CountOccurrences(string value, string search)
     {
         var count = 0;
         var position = 0;
@@ -4974,10 +5871,7 @@ public sealed class WorkspaceCompletionTests
         return count;
     }
 
-    private static void AssertCompletionContains(
-        AkburaDocumentContext semanticContext,
-        AkburaCSharpProjection projection,
-        string displayText)
+    private static void AssertCompletionContains(AkburaDocumentContext semanticContext, AkburaCSharpProjection projection, string displayText)
     {
         var completionList = RoslynCompletionTestHost
             .GetCompletionsAsync(
@@ -4993,11 +5887,20 @@ public sealed class WorkspaceCompletionTests
             item => item.DisplayText == displayText);
     }
 
-    private static AkburaCompletionResult GetCompletionResult(
-        AkburaWorkspace workspace,
-        AkburaProjectId projectId,
-        string path,
-        string source)
+    private static void AssertDataType(AkburaSemanticModel semanticModel, string typeText, string expectedType)
+    {
+        Assert.True(
+            semanticModel.TryBindMarkupDataTypeDirective(
+                typeText,
+                out var dataType),
+            $"Expected '{typeText}' to resolve.");
+        Assert.Equal(
+            expectedType,
+            dataType.ToDisplayString(
+                SymbolDisplayFormat.FullyQualifiedFormat));
+    }
+
+    private static AkburaCompletionResult GetCompletionResult(AkburaWorkspace workspace, AkburaProjectId projectId, string path, string source)
     {
         var text = SourceText.From(source);
         var semanticContext = workspace.OpenOrChangeDocumentContext(
@@ -5051,6 +5954,15 @@ public sealed class WorkspaceCompletionTests
 
                 public sealed class Button : Control
                 {
+                }
+
+                public sealed class ItemsControl : Control
+                {
+                    public object? ItemsSource { get; set; }
+
+                    [Avalonia.Metadata.InheritDataTypeFromItems(
+                        "ItemsSource")]
+                    public object? ItemTemplate { get; set; }
                 }
 
                 public abstract class AbstractView : Control
@@ -5166,6 +6078,22 @@ public sealed class WorkspaceCompletionTests
                 }
             }
 
+            namespace Avalonia.Metadata
+            {
+                [System.AttributeUsage(
+                    System.AttributeTargets.Property)]
+                public sealed class InheritDataTypeFromItemsAttribute :
+                    System.Attribute
+                {
+                    public InheritDataTypeFromItemsAttribute(
+                        string propertyName)
+                    {
+                    }
+
+                    public System.Type? AncestorType { get; set; }
+                }
+            }
+
             namespace Avalonia
             {
                 public readonly struct Thickness
@@ -5242,15 +6170,32 @@ public sealed class WorkspaceCompletionTests
 
             namespace Avalonia.Data
             {
+                public enum BindingMode
+                {
+                    OneWay,
+                    TwoWay,
+                }
+
                 public class Binding
                 {
+                    public string? Path { get; set; }
+
+                    public BindingMode Mode { get; set; }
+
+                    public bool IsAsync { get; set; }
+
+                    public string? ElementName { get; set; }
+
+                    public object? Source { get; set; }
+
+                    public object? RelativeSource { get; set; }
                 }
 
-                public class ReflectionBinding
+                public class ReflectionBinding : Binding
                 {
                 }
 
-                public class CompiledBinding
+                public class CompiledBinding : Binding
                 {
                 }
             }
@@ -5348,6 +6293,12 @@ public sealed class WorkspaceCompletionTests
 
                 public sealed class CustomExtension
                 {
+                    public CustomExtension(int seed)
+                    {
+                    }
+
+                    public Gallery.Variant Mode { get; set; }
+
                     public object ProvideValue() => new();
                 }
 
@@ -5378,9 +6329,60 @@ public sealed class WorkspaceCompletionTests
 
             namespace Gallery
             {
+                public class ViewModelBase
+                {
+                    public string Inherited { get; } = "";
+
+                    protected string Hidden { get; } = "";
+
+                    public static string StaticMember { get; } = "";
+                }
+
+                public sealed class MainViewModel : ViewModelBase
+                {
+                    public Customer Customer { get; } = new();
+
+                    public Customer[] Customers { get; } = [];
+
+                    public System.Collections.Generic.List<Customer>
+                        CustomerList { get; } = [];
+
+                    public System.Threading.Tasks.Task<Customer> Pending
+                        { get; } = System.Threading.Tasks.Task.FromResult(
+                            new Customer());
+
+                    public bool IsActive { get; }
+
+                    public string PublicField = "";
+
+                    public string WriteOnly
+                    {
+                        set { }
+                    }
+                }
+
+                public sealed class Customer
+                {
+                    public string Name { get; } = "";
+
+                    public Address Address { get; } = new();
+                }
+
+                public sealed class Address
+                {
+                    public string City { get; } = "";
+                }
+
                 public sealed class Options
                 {
                     public string Name { get; set; } = "";
+                }
+
+                public sealed class Outer
+                {
+                    public sealed class Nested
+                    {
+                    }
                 }
 
                 public partial class Card : Akbura.AkburaControl
@@ -5391,6 +6393,7 @@ public sealed class WorkspaceCompletionTests
                 {
                 }
             }
+
             """;
 
         return CSharpCompilation.Create(
@@ -5401,8 +6404,7 @@ public sealed class WorkspaceCompletionTests
                 OutputKind.DynamicallyLinkedLibrary));
     }
 
-    private static PortableExecutableReference
-        CreateEmbeddedComponentReference(string directory)
+    private static PortableExecutableReference CreateEmbeddedComponentReference(string directory)
     {
         const string componentSource = """
             namespace Library;
@@ -5475,9 +6477,7 @@ public sealed class WorkspaceCompletionTests
         return MetadataReference.CreateFromFile(assemblyPath);
     }
 
-    private static ResourceDescription CreateEmbeddedSourceResource(
-        string name,
-        string content)
+    private static ResourceDescription CreateEmbeddedSourceResource(string name, string content)
     {
         var preamble = System.Text.Encoding.Unicode.GetPreamble();
         var text = System.Text.Encoding.Unicode.GetBytes(content);
@@ -5487,9 +6487,7 @@ public sealed class WorkspaceCompletionTests
         return CreateResource(name, bytes);
     }
 
-    private static ResourceDescription CreateResource(
-        string name,
-        byte[] content)
+    private static ResourceDescription CreateResource(string name, byte[] content)
     {
         return new ResourceDescription(
             name,

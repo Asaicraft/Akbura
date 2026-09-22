@@ -25,11 +25,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             throw new ArgumentNullException(nameof(referenceResolver)));
     }
 
-    public ImmutableArray<AkburaClassifiedSpan> GetSyntacticClassifications(
-        SourceText text,
-        string filePath,
-        TextSpan requestedSpan,
-        CancellationToken cancellationToken = default)
+    public ImmutableArray<AkburaClassifiedSpan> GetSyntacticClassifications(SourceText text, string filePath, TextSpan requestedSpan, CancellationToken cancellationToken = default)
     {
         if (text == null)
         {
@@ -51,10 +47,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             cancellationToken);
     }
 
-    public ImmutableArray<AkburaClassifiedSpan> GetSyntacticClassifications(
-        AkburaSyntacticDocument document,
-        TextSpan requestedSpan,
-        CancellationToken cancellationToken = default)
+    public ImmutableArray<AkburaClassifiedSpan> GetSyntacticClassifications(AkburaSyntacticDocument document, TextSpan requestedSpan, CancellationToken cancellationToken = default)
     {
         if (document == null)
         {
@@ -69,10 +62,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             cancellationToken);
     }
 
-    public ImmutableArray<AkburaClassifiedSpan> GetClassifications(
-        AkburaDocumentContext context,
-        TextSpan requestedSpan,
-        CancellationToken cancellationToken = default)
+    public ImmutableArray<AkburaClassifiedSpan> GetClassifications(AkburaDocumentContext context, TextSpan requestedSpan, CancellationToken cancellationToken = default)
     {
         if (context == null)
         {
@@ -149,6 +139,14 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
 #endif
         _semanticCSharp.AddClassifications(
             semanticModel,
+            root,
+            span,
+            semanticBuilder,
+            cancellationToken);
+
+        AddMarkupDataTypeClassifications(
+            semanticModel,
+            document.Text,
             root,
             span,
             semanticBuilder,
@@ -253,12 +251,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
     }
 #endif
 
-    private ImmutableArray<AkburaClassifiedSpan>
-        GetSyntacticClassifications(
-            AkburaSyntax root,
-            int textLength,
-            TextSpan requestedSpan,
-            CancellationToken cancellationToken)
+    private ImmutableArray<AkburaClassifiedSpan> GetSyntacticClassifications(AkburaSyntax root, int textLength, TextSpan requestedSpan, CancellationToken cancellationToken)
     {
         var span = ClampSpan(
             requestedSpan,
@@ -313,10 +306,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
         return ImmutableArray.Create(items);
     }
 
-    private static ImmutableArray<AkburaClassifiedSpan>
-        MergeClassifications(
-            ImmutableArray<AkburaClassifiedSpan> syntacticSpans,
-            ImmutableArray<AkburaClassifiedSpan> semanticSpans)
+    private static ImmutableArray<AkburaClassifiedSpan> MergeClassifications(ImmutableArray<AkburaClassifiedSpan> syntacticSpans, ImmutableArray<AkburaClassifiedSpan> semanticSpans)
     {
 
         var orderedSemantic = semanticSpans.ToArray();
@@ -360,12 +350,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
         return [.. items];
     }
 
-    private static void AddMarkupPropertyReferenceClassifications(
-        Akbura.Language.AkburaSemanticModel semanticModel,
-        AkburaSyntax root,
-        TextSpan span,
-        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
-        CancellationToken cancellationToken)
+    private static void AddMarkupPropertyReferenceClassifications(Akbura.Language.AkburaSemanticModel semanticModel, AkburaSyntax root, TextSpan span, ImmutableArrayBuilder<AkburaClassifiedSpan> builder, CancellationToken cancellationToken)
     {
         foreach (var literal in root.DescendantNodes().OfType<MarkupLiteralAttributeValueSyntax>())
         {
@@ -406,11 +391,47 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
         }
     }
 
-    private static void AddUncoveredStringParts(
-        AkburaClassifiedSpan syntactic,
-        AkburaClassifiedSpan[] semantic,
-        int[] prefixMaximumEnd,
-        List<AkburaClassifiedSpan> items)
+    private static void AddMarkupDataTypeClassifications(Akbura.Language.AkburaSemanticModel semanticModel, SourceText text, AkburaSyntax root, TextSpan span, ImmutableArrayBuilder<AkburaClassifiedSpan> builder, CancellationToken cancellationToken)
+    {
+        foreach (var attribute in root.DescendantNodes().OfType<MarkupAttributeSyntax>())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!Akbura.Language.AkburaSemanticModel
+                    .IsMarkupDataTypeDirective(attribute) ||
+                Akbura.Language.AkburaSemanticModel
+                    .GetMarkupAttributeValue(attribute) is not
+                    MarkupLiteralAttributeValueSyntax literal ||
+                !AkburaMarkupSyntaxFacts
+                    .TryGetAttributeLiteralContentSpan(
+                        text,
+                        literal,
+                        out var contentSpan) ||
+                !contentSpan.OverlapsWith(span))
+            {
+                continue;
+            }
+
+            var typeText = text.ToString(contentSpan);
+            if (!semanticModel.TryBindMarkupDataTypeDirective(
+                    typeText,
+                    out var typeSymbol))
+            {
+                continue;
+            }
+
+            var typeSyntax = Microsoft.CodeAnalysis.CSharp
+                .SyntaxFactory.ParseTypeName(typeText);
+            EmbeddedCSharpSemanticClassificationService
+                .AddTypeClassifications(
+                    typeSyntax,
+                    typeSymbol,
+                    contentSpan.Start,
+                    span,
+                    builder);
+        }
+    }
+
+    private static void AddUncoveredStringParts(AkburaClassifiedSpan syntactic, AkburaClassifiedSpan[] semantic, int[] prefixMaximumEnd, List<AkburaClassifiedSpan> items)
     {
         var start = syntactic.Span.Start;
         var low = 0;
@@ -461,10 +482,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
         }
     }
 
-    private static bool IsCoveredBySemanticSpan(
-        TextSpan syntacticSpan,
-        AkburaClassifiedSpan[] semanticSpans,
-        int[] prefixMaximumEnd)
+    private static bool IsCoveredBySemanticSpan(TextSpan syntacticSpan, AkburaClassifiedSpan[] semanticSpans, int[] prefixMaximumEnd)
     {
         var low = 0;
         var high = semanticSpans.Length - 1;
@@ -487,9 +505,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             prefixMaximumEnd[candidate] >= syntacticSpan.End;
     }
 
-    private static int CompareClassifications(
-        AkburaClassifiedSpan left,
-        AkburaClassifiedSpan right)
+    private static int CompareClassifications(AkburaClassifiedSpan left, AkburaClassifiedSpan right)
     {
         var start =
             left.Span.Start.CompareTo(
@@ -503,9 +519,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
 
     private static bool IsClassifiedAsEmbeddedCSharpNode(SyntaxToken token)
     {
-        for (var node = token.Parent;
-             node != null;
-             node = node.Parent)
+        for (var node = token.Parent; node != null; node = node.Parent)
         {
             switch (node)
             {
@@ -522,11 +536,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
         return false;
     }
 
-    private void AddEmbeddedCSharpNodes(
-        AkburaSyntax root,
-        TextSpan requestedSpan,
-        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
-        CancellationToken cancellationToken)
+    private void AddEmbeddedCSharpNodes(AkburaSyntax root, TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder, CancellationToken cancellationToken)
     {
         foreach (var node in root.DescendantNodes())
         {
@@ -568,11 +578,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
         }
     }
 
-    private void AddToken(
-        SyntaxToken token,
-        TextSpan requestedSpan,
-        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
-        CancellationToken cancellationToken)
+    private void AddToken(SyntaxToken token, TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder, CancellationToken cancellationToken)
     {
         if (token.Kind == SyntaxKind.CSharpRawToken &&
             _embeddedCSharp.TryAddClassifications(
@@ -604,11 +610,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             classification.Value));
     }
 
-    private void AddTrivia(
-        SyntaxTriviaList triviaList,
-        TextSpan requestedSpan,
-        ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
-        CancellationToken cancellationToken)
+    private void AddTrivia(SyntaxTriviaList triviaList, TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder, CancellationToken cancellationToken)
     {
         foreach (var trivia in triviaList)
         {
@@ -643,9 +645,7 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
         }
     }
 
-    private static TextSpan ClampSpan(
-        TextSpan span,
-        int textLength)
+    private static TextSpan ClampSpan(TextSpan span, int textLength)
     {
         var start = Math.Max(
             0,

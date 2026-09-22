@@ -259,10 +259,7 @@ public sealed class WorkspaceClassificationTests
             context,
             sourceWithoutUsing);
 
-        static void AssertSelectorTargetNotFound(
-            AkburaWorkspace workspace,
-            AkburaDocumentContext context,
-            string source)
+        static void AssertSelectorTargetNotFound(AkburaWorkspace workspace, AkburaDocumentContext context, string source)
         {
             var diagnostics = workspace.LanguageServices.Diagnostics
                 .GetDiagnostics(
@@ -423,9 +420,7 @@ public sealed class WorkspaceClassificationTests
     [Theory]
     [InlineData("\n", "    ")]
     [InlineData("\r\n", "\t")]
-    public void SemanticClassification_AkcssShortEnumMembersUseSourceCoordinates(
-        string newLine,
-        string indent)
+    public void SemanticClassification_AkcssShortEnumMembersUseSourceCoordinates(string newLine, string indent)
     {
         var source = string.Join(
             newLine,
@@ -633,8 +628,7 @@ public sealed class WorkspaceClassificationTests
         AssertOnlyIdentifier(
             "vertical");
 
-        void AssertOnlyIdentifier(
-            string value)
+        void AssertOnlyIdentifier(string value)
         {
             var start =
                 source.IndexOf(
@@ -758,14 +752,7 @@ public sealed class WorkspaceClassificationTests
                 context,
                 new TextSpan(0, text.Length));
 
-        for (var start = newSource.IndexOf(
-                 "\tControl",
-                 StringComparison.Ordinal) + 1;
-             start >= 0;
-             start = newSource.IndexOf(
-                 "Control",
-                 start + "Control".Length,
-                 StringComparison.Ordinal))
+        for (var start = newSource.IndexOf("\tControl", StringComparison.Ordinal) + 1; start >= 0; start = newSource.IndexOf("Control", start + "Control".Length, StringComparison.Ordinal))
         {
             var targetSpan = new TextSpan(start, "Control".Length);
 
@@ -841,14 +828,7 @@ public sealed class WorkspaceClassificationTests
                 ErrorCodes.ERR_SyntaxError or
                 ErrorCodes.ERR_LbraceExpected);
 
-        for (var markerStart = source.IndexOf(
-                 "\tControl",
-                 StringComparison.Ordinal);
-             markerStart >= 0;
-             markerStart = source.IndexOf(
-                 "\tControl",
-                 markerStart + "\tControl".Length,
-                 StringComparison.Ordinal))
+        for (var markerStart = source.IndexOf("\tControl", StringComparison.Ordinal); markerStart >= 0; markerStart = source.IndexOf("\tControl", markerStart + "\tControl".Length, StringComparison.Ordinal))
         {
             var start = markerStart + 1;
             var targetSpan = new TextSpan(start, "Control".Length);
@@ -992,6 +972,77 @@ public sealed class WorkspaceClassificationTests
                 classification.Span == referenceSpan &&
                 classification.Kind ==
                     AkburaClassificationKind.Identifier);
+    }
+
+    [Fact]
+    public void SemanticClassification_DataTypeRefinesOnlyQuotedTypeContent()
+    {
+        const string source = """
+            namespace Consumer;
+
+            using Avalonia.Controls;
+
+            <Border x.DataType="System.Collections.Generic.List<Gallery.Options>" Background="Gallery.Options"/>
+            """;
+
+        using var workspace = CreateSemanticWorkspace();
+        var text = SourceText.From(source);
+        var filePath = Path.GetFullPath("Counter.akbura");
+        var context = workspace.OpenOrChangeDocumentContext(
+            new Uri(filePath),
+            text);
+        var classifications = workspace.LanguageServices.Classification
+            .GetClassifications(
+                context,
+                new TextSpan(0, text.Length));
+
+        foreach (var namespaceName in new[] { "System", "Collections", "Generic", "Gallery", })
+        {
+            var start = source.IndexOf(
+                namespaceName,
+                StringComparison.Ordinal);
+            AssertOnlyClassification(
+                classifications,
+                start,
+                namespaceName.Length,
+                AkburaClassificationKind.Namespace);
+        }
+
+        foreach (var typeName in new[] { "List", "Options" })
+        {
+            var start = source.IndexOf(
+                typeName,
+                StringComparison.Ordinal);
+            AssertOnlyClassification(
+                classifications,
+                start,
+                typeName.Length,
+                AkburaClassificationKind.ClassName);
+        }
+
+        var dataTypeQuote = source.IndexOf(
+            "\"System",
+            StringComparison.Ordinal);
+        Assert.Contains(
+            classifications,
+            classification =>
+                classification.Kind == AkburaClassificationKind.String &&
+                classification.Span.Contains(dataTypeQuote));
+
+        var ordinaryLiteralStart = source.LastIndexOf(
+            "Gallery.Options",
+            StringComparison.Ordinal);
+        var ordinaryLiteralSpan = new TextSpan(
+            ordinaryLiteralStart,
+            "Gallery.Options".Length);
+        Assert.DoesNotContain(
+            classifications,
+            classification =>
+                classification.Span.OverlapsWith(
+                    ordinaryLiteralSpan) &&
+                classification.Kind is
+                    AkburaClassificationKind.Namespace or
+                    AkburaClassificationKind.ClassName);
     }
 
     [Fact]
@@ -1279,11 +1330,7 @@ public sealed class WorkspaceClassificationTests
         }
     }
 
-    private static void AssertClassification(
-        SourceText text,
-        IEnumerable<AkburaClassifiedSpan> classifications,
-        string expectedText,
-        AkburaClassificationKind expectedKind)
+    private static void AssertClassification(SourceText text, IEnumerable<AkburaClassifiedSpan> classifications, string expectedText, AkburaClassificationKind expectedKind)
     {
         Assert.Contains(
             classifications,
@@ -1295,11 +1342,7 @@ public sealed class WorkspaceClassificationTests
                     StringComparison.Ordinal));
     }
 
-    private static void AssertOnlyClassification(
-        IEnumerable<AkburaClassifiedSpan> classifications,
-        int start,
-        int length,
-        AkburaClassificationKind expectedKind)
+    private static void AssertOnlyClassification(IEnumerable<AkburaClassifiedSpan> classifications, int start, int length, AkburaClassificationKind expectedKind)
     {
         var expectedSpan = new TextSpan(start, length);
 
@@ -1322,8 +1365,7 @@ public sealed class WorkspaceClassificationTests
             CreateSemanticProjectContext());
     }
 
-    private static ProjectContext CreateSemanticProjectContext(
-        CSharpCompilation? compilation = null)
+    private static ProjectContext CreateSemanticProjectContext(CSharpCompilation? compilation = null)
     {
         compilation ??= CreateCSharpCompilation();
 
@@ -1336,8 +1378,7 @@ public sealed class WorkspaceClassificationTests
             ImmutableArray<ProjectReference>.Empty);
     }
 
-    private static CSharpCompilation CreateCSharpCompilation(
-        IEnumerable<MetadataReference>? additionalReferences = null)
+    private static CSharpCompilation CreateCSharpCompilation(IEnumerable<MetadataReference>? additionalReferences = null)
     {
         const string csharpSource = """
             namespace Akbura
@@ -1405,6 +1446,13 @@ public sealed class WorkspaceClassificationTests
                 }
             }
 
+            namespace Gallery
+            {
+                public sealed class Options
+                {
+                }
+            }
+
             public partial class Counter : Akbura.AkburaControl
             {
             }
@@ -1426,9 +1474,7 @@ public sealed class WorkspaceClassificationTests
                 OutputKind.DynamicallyLinkedLibrary));
     }
 
-    private static PortableExecutableReference CreateEmbeddedAkcssReference(
-        string directory,
-        string stylesSource)
+    private static PortableExecutableReference CreateEmbeddedAkcssReference(string directory, string stylesSource)
     {
         var manifest = AkburaModuleManifestBuilder.Build(
             "Library",
@@ -1479,9 +1525,7 @@ public sealed class WorkspaceClassificationTests
             .ToArray();
     }
 
-    private static ResourceDescription CreateEmbeddedSourceResource(
-        string name,
-        string content)
+    private static ResourceDescription CreateEmbeddedSourceResource(string name, string content)
     {
         var preamble = Encoding.Unicode.GetPreamble();
         var text = Encoding.Unicode.GetBytes(content);
@@ -1491,9 +1535,7 @@ public sealed class WorkspaceClassificationTests
         return CreateResource(name, bytes);
     }
 
-    private static ResourceDescription CreateResource(
-        string name,
-        byte[] content)
+    private static ResourceDescription CreateResource(string name, byte[] content)
     {
         return new ResourceDescription(
             name,

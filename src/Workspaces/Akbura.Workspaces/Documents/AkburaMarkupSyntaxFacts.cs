@@ -26,4 +26,61 @@ internal static class AkburaMarkupSyntaxFacts
             ? new TextSpan(span.Start, end)
             : span;
     }
+
+    internal static bool TryGetAttributeLiteralContentSpan(SourceText text, MarkupLiteralAttributeValueSyntax literal, out TextSpan contentSpan)
+    {
+        var literalSpan = GetAttributeLiteralSpan(literal);
+        if (literalSpan.Length == 0 ||
+            literalSpan.Start >= text.Length ||
+            text[literalSpan.Start] is not ('\'' or '"'))
+        {
+            contentSpan = default;
+            return false;
+        }
+
+        var quote = text[literalSpan.Start];
+        var start = literalSpan.Start + 1;
+        var end = literalSpan.End;
+        if (end > start && text[end - 1] == quote)
+        {
+            end--;
+        }
+        else
+        {
+            var angleDepth = 0;
+            for (var index = start; index < end; index++)
+            {
+                if (text[index] == '<')
+                {
+                    angleDepth++;
+                    continue;
+                }
+
+                if (text[index] != '>')
+                {
+                    continue;
+                }
+
+                if (angleDepth > 0)
+                {
+                    angleDepth--;
+                    continue;
+                }
+
+                if (index > start && text[index - 1] == '/')
+                {
+                    end = index - 1;
+                }
+                else
+                {
+                    end = index;
+                }
+
+                break;
+            }
+        }
+
+        contentSpan = TextSpan.FromBounds(start, end);
+        return true;
+    }
 }

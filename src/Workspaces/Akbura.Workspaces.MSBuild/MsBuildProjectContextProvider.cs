@@ -14,6 +14,8 @@ public sealed class MsBuildProjectContextProvider :
     private readonly MSBuildWorkspace _workspace;
     private readonly RoslynProjectContextFactory _contextFactory = new();
     private readonly RoslynProjectDocumentLoader _documentLoader = new();
+    private readonly RoslynResourceDocumentLoader _resourceDocumentLoader =
+        new();
     private readonly ConcurrentDictionary<ProjectId, ProjectContext>
         _contexts = new();
     private readonly ConcurrentQueue<AkburaProjectLoadDiagnostic>
@@ -42,9 +44,7 @@ public sealed class MsBuildProjectContextProvider :
     public event EventHandler<ProjectContextChangedEventArgs>?
         Changed;
 
-    public async Task<ProjectContext> OpenProjectAsync(
-        string projectPath,
-        CancellationToken cancellationToken)
+    public async Task<ProjectContext> OpenProjectAsync(string projectPath, CancellationToken cancellationToken)
     {
         return (await LoadProjectAsync(
                 projectPath,
@@ -52,9 +52,7 @@ public sealed class MsBuildProjectContextProvider :
             .ConfigureAwait(false)).Context;
     }
 
-    public async Task<ImmutableArray<ProjectContext>> OpenSolutionAsync(
-        string solutionPath,
-        CancellationToken cancellationToken)
+    public async Task<ImmutableArray<ProjectContext>> OpenSolutionAsync(string solutionPath, CancellationToken cancellationToken)
     {
         var loaded = await LoadSolutionAsync(
                 solutionPath,
@@ -70,9 +68,7 @@ public sealed class MsBuildProjectContextProvider :
         return contexts.ToImmutable();
     }
 
-    public async Task<AkburaLoadedProject> LoadProjectAsync(
-        string projectPath,
-        CancellationToken cancellationToken)
+    public async Task<AkburaLoadedProject> LoadProjectAsync(string projectPath, CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
         ValidatePath(projectPath, nameof(projectPath));
@@ -93,10 +89,7 @@ public sealed class MsBuildProjectContextProvider :
             .ConfigureAwait(false);
     }
 
-    public async Task<ImmutableArray<AkburaLoadedProject>>
-        LoadSolutionAsync(
-            string solutionPath,
-            CancellationToken cancellationToken)
+    public async Task<ImmutableArray<AkburaLoadedProject>> LoadSolutionAsync(string solutionPath, CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
         ValidatePath(solutionPath, nameof(solutionPath));
@@ -131,9 +124,7 @@ public sealed class MsBuildProjectContextProvider :
         return loaded.ToImmutable();
     }
 
-    private async Task<Project> OpenProjectWithoutNotificationsAsync(
-        string projectPath,
-        CancellationToken cancellationToken)
+    private async Task<Project> OpenProjectWithoutNotificationsAsync(string projectPath, CancellationToken cancellationToken)
     {
         _workspace.WorkspaceChanged -= OnWorkspaceChanged;
         try
@@ -153,9 +144,7 @@ public sealed class MsBuildProjectContextProvider :
         }
     }
 
-    private async Task<Solution> OpenSolutionWithoutNotificationsAsync(
-        string solutionPath,
-        CancellationToken cancellationToken)
+    private async Task<Solution> OpenSolutionWithoutNotificationsAsync(string solutionPath, CancellationToken cancellationToken)
     {
         _workspace.WorkspaceChanged -= OnWorkspaceChanged;
         try
@@ -217,9 +206,7 @@ public sealed class MsBuildProjectContextProvider :
         _workspace.Dispose();
     }
 
-    private async Task<AkburaLoadedProject> CreateLoadedProjectAsync(
-        Project project,
-        CancellationToken cancellationToken)
+    private async Task<AkburaLoadedProject> CreateLoadedProjectAsync(Project project, CancellationToken cancellationToken)
     {
         var context = await _contextFactory
             .CreateAsync(
@@ -234,6 +221,13 @@ public sealed class MsBuildProjectContextProvider :
                 excludedDocument: null,
                 cancellationToken)
             .ConfigureAwait(false);
+        var resourceDocuments = await _resourceDocumentLoader
+            .LoadAsync(
+                project,
+                context.CSharpCompilation,
+                openTextProvider: null,
+                cancellationToken)
+            .ConfigureAwait(false);
         _contexts[project.Id] = context;
 
         using var diagnostics =
@@ -246,12 +240,11 @@ public sealed class MsBuildProjectContextProvider :
         return new AkburaLoadedProject(
             context,
             documents,
+            resourceDocuments,
             diagnostics.ToImmutable());
     }
 
-    private void OnWorkspaceChanged(
-        object? sender,
-        WorkspaceChangeEventArgs eventArgs)
+    private void OnWorkspaceChanged(object? sender, WorkspaceChangeEventArgs eventArgs)
     {
         if (Volatile.Read(ref _disposeState) != 0)
         {
@@ -263,9 +256,7 @@ public sealed class MsBuildProjectContextProvider :
             _disposeCancellation.Token);
     }
 
-    private async Task PublishWorkspaceChangeAsync(
-        WorkspaceChangeEventArgs eventArgs,
-        CancellationToken cancellationToken)
+    private async Task PublishWorkspaceChangeAsync(WorkspaceChangeEventArgs eventArgs, CancellationToken cancellationToken)
     {
         try
         {
@@ -294,8 +285,7 @@ public sealed class MsBuildProjectContextProvider :
                 return;
             }
 
-            foreach (var project in
-                     _workspace.CurrentSolution.Projects)
+            foreach (var project in _workspace.CurrentSolution.Projects)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (project.Language == LanguageNames.CSharp)
@@ -321,10 +311,7 @@ public sealed class MsBuildProjectContextProvider :
         }
     }
 
-    private async Task PublishProjectChangeAsync(
-        ProjectId projectId,
-        WorkspaceChangeKind workspaceChangeKind,
-        CancellationToken cancellationToken)
+    private async Task PublishProjectChangeAsync(ProjectId projectId, WorkspaceChangeKind workspaceChangeKind, CancellationToken cancellationToken)
     {
         var project = _workspace.CurrentSolution.GetProject(projectId);
         if (project == null ||
@@ -350,9 +337,7 @@ public sealed class MsBuildProjectContextProvider :
                 newContext));
     }
 
-    private void OnWorkspaceFailed(
-        object? sender,
-        WorkspaceDiagnosticEventArgs eventArgs)
+    private void OnWorkspaceFailed(object? sender, WorkspaceDiagnosticEventArgs eventArgs)
     {
         _loadDiagnostics.Enqueue(
             new AkburaProjectLoadDiagnostic(
@@ -362,8 +347,7 @@ public sealed class MsBuildProjectContextProvider :
                 eventArgs.Diagnostic.Message));
     }
 
-    private static ProjectContextChangeKind GetChangeKind(
-        WorkspaceChangeKind kind)
+    private static ProjectContextChangeKind GetChangeKind(WorkspaceChangeKind kind)
     {
         return kind is WorkspaceChangeKind.ProjectChanged or
             WorkspaceChangeKind.ProjectReloaded or
@@ -379,9 +363,7 @@ public sealed class MsBuildProjectContextProvider :
                         : ProjectContextChangeKind.ReferencesChanged;
     }
 
-    private static void ValidatePath(
-        string path,
-        string parameterName)
+    private static void ValidatePath(string path, string parameterName)
     {
         if (string.IsNullOrWhiteSpace(path))
         {

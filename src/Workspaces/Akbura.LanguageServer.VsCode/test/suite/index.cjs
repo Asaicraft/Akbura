@@ -151,6 +151,113 @@ async function run() {
     await vscode.commands.executeCommand(
         'workbench.action.closeActiveEditor'
     );
+
+    await verifyUnsavedResourceCompletion();
+}
+
+async function verifyUnsavedResourceCompletion() {
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    assert.ok(folder, 'The acceptance workspace was not opened.');
+    const componentUri = vscode.Uri.joinPath(
+        folder.uri,
+        'Component.akbura'
+    );
+    const appUri = vscode.Uri.joinPath(folder.uri, 'App.axaml');
+    const component = await vscode.workspace.openTextDocument(
+        componentUri
+    );
+    const marker = '${StaticResource ';
+    const offset = component.getText().indexOf(marker);
+    assert.ok(offset >= 0, 'Resource completion marker is missing.');
+    const position = component.positionAt(offset + marker.length);
+
+    const diskCompletion = await waitForCompletion(
+        componentUri,
+        position,
+        'DiskResource'
+    );
+    assert.equal(
+        diskCompletion.items.some(item => item.label === 'LiveResource'),
+        false
+    );
+
+    const app = await vscode.workspace.openTextDocument(appUri);
+    const appEditor = await vscode.window.showTextDocument(app);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const keyStart = app.getText().indexOf('DiskResource');
+    assert.ok(keyStart >= 0, 'Disk resource key is missing.');
+    const applied = await appEditor.edit(edit => edit.replace(
+        new vscode.Range(
+            app.positionAt(keyStart),
+            app.positionAt(keyStart + 'DiskResource'.length)
+        ),
+        'LiveResource'
+    ));
+    assert.equal(applied, true);
+    assert.equal(app.isDirty, true);
+
+    await vscode.window.showTextDocument(component);
+    const liveCompletion = await waitForCompletion(
+        componentUri,
+        position,
+        'LiveResource',
+        'DiskResource'
+    );
+    const liveItem = liveCompletion.items.find(
+        item => item.label === 'LiveResource'
+    );
+    assert.ok(liveItem);
+    assert.equal(
+        (liveItem.commitCharacters ?? []).includes('.'),
+        false
+    );
+    assert.equal(
+        (liveItem.commitCharacters ?? []).includes('-'),
+        false
+    );
+
+    await vscode.window.showTextDocument(app);
+    await vscode.commands.executeCommand(
+        'workbench.action.files.revert'
+    );
+    assert.equal(app.isDirty, false);
+    await vscode.commands.executeCommand(
+        'workbench.action.closeActiveEditor'
+    );
+    await vscode.window.showTextDocument(component);
+    await vscode.commands.executeCommand(
+        'workbench.action.closeActiveEditor'
+    );
+}
+
+async function waitForCompletion(
+    uri,
+    position,
+    expectedLabel,
+    rejectedLabel
+) {
+    const deadline = Date.now() + 60_000;
+    let lastLabels = [];
+    while (Date.now() < deadline) {
+        const result = await vscode.commands.executeCommand(
+            'vscode.executeCompletionItemProvider',
+            uri,
+            position
+        );
+        lastLabels = result?.items.map(item => item.label) ?? [];
+        if (lastLabels.includes(expectedLabel) &&
+            (rejectedLabel == null ||
+                !lastLabels.includes(rejectedLabel))) {
+            return result;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 250));
+    }
+
+    assert.fail(
+        `Completion '${expectedLabel}' was not returned. ` +
+            `Last labels: ${lastLabels.join(', ')}`
+    );
 }
 
 async function type(text) {

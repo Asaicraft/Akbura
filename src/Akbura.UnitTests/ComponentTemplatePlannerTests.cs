@@ -225,6 +225,135 @@ public sealed class ComponentTemplatePlannerTests
     }
 
     [Fact]
+    public void Create_NonTemplateElementWritesAttributeSelectedRuntimeDataType()
+    {
+        const string component =
+            """
+            using Demo;
+
+            <DataTypeHost x.DataType="Person" />
+            """;
+        const string csharp =
+            """
+            using System;
+            using Avalonia.Controls;
+            using Avalonia.Metadata;
+
+            namespace Demo;
+
+            public sealed class Person
+            {
+            }
+
+            public sealed class DataTypeHost : Control
+            {
+                [DataType]
+                public Type? CompiledBindingType { get; set; }
+            }
+            """;
+        var plan = CreatePlan(component, csharp);
+        var host = GetElement(plan, "DataTypeHost");
+        var action = Assert.Single(
+            GetActions(plan, host.FirstUpdateActions));
+        var write = plan.PropertyWrites[action.Index];
+        var value = plan.CSharpValues[write.PayloadIndex];
+
+        Assert.Equal(ComponentFirstUpdateActionKind.PropertyWrite, action.Kind);
+        Assert.Equal(
+            "CompiledBindingType",
+            write.Destination.ClrProperty?.Name);
+        Assert.Equal(ComponentPropertyValueKind.Constant, write.ValueKind);
+        Assert.Equal(
+            ComponentPropertyWritePhase.FirstUpdate,
+            write.Phase);
+        Assert.Equal(
+            "global::Demo.Person",
+            GetTypeName(Assert.IsAssignableFrom<ITypeSymbol>(value.ConvertedValue)));
+    }
+
+    [Fact]
+    public void Create_NonTemplateElementDoesNotInheritTemplateDataType()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+            using Demo;
+
+            inject PeopleViewModel ViewModel;
+
+            <ItemsControl ItemsSource={ViewModel.People}>
+                <ItemsControl.ItemTemplate>
+                    <DataTypeHost />
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            """;
+        const string csharp =
+            """
+            using System;
+            using System.Collections.Generic;
+            using Avalonia.Controls;
+            using Avalonia.Metadata;
+
+            namespace Demo;
+
+            public sealed class Person
+            {
+            }
+
+            public sealed class PeopleViewModel
+            {
+                public IReadOnlyList<Person> People { get; set; } = [];
+            }
+
+            public sealed class DataTypeHost : Control
+            {
+                [DataType]
+                public Type? CompiledBindingType { get; set; }
+            }
+            """;
+        var plan = CreatePlan(component, csharp);
+        var host = GetElement(plan, "DataTypeHost");
+
+        Assert.Empty(GetActions(plan, host.FirstUpdateActions));
+    }
+
+    [Theory]
+    [InlineData("public Type? CompiledBindingType { get; init; }")]
+    [InlineData("public string? CompiledBindingType { get; set; }")]
+    [InlineData("public Type? this[int index] { get => null; set { } }")]
+    public void Create_InvalidDataTypeTargetDoesNotCreateRuntimeWrite(string propertyDeclaration)
+    {
+        const string component =
+            """
+            using Demo;
+
+            <DataTypeHost x.DataType="Person" />
+            """;
+        var csharp =
+            $$"""
+            using System;
+            using Avalonia.Controls;
+            using Avalonia.Metadata;
+
+            namespace Demo;
+
+            public sealed class Person
+            {
+            }
+
+            public sealed class DataTypeHost : Control
+            {
+                [DataType]
+                {{propertyDeclaration}}
+            }
+            """;
+        var plan = CreatePlan(component, csharp);
+        var host = GetElement(plan, "DataTypeHost");
+
+        Assert.Empty(GetActions(plan, host.FirstUpdateActions));
+    }
+
+    [Fact]
     public void Create_MultipleDirectTemplateRootsCreateNoTemplatePlan()
     {
         const string component =
@@ -243,9 +372,7 @@ public sealed class ComponentTemplatePlannerTests
         Assert.Empty(plan.Templates);
     }
 
-    private static ComponentPlan CreatePlan(
-        string component,
-        string? additionalCSharp = null)
+    private static ComponentPlan CreatePlan(string component, string? additionalCSharp = null)
     {
         var fixture = AkcssActivatorPlannerTests.CreateFixture(
             component,
@@ -260,9 +387,7 @@ public sealed class ComponentTemplatePlannerTests
             new Dictionary<AkburaSyntax, string>());
     }
 
-    private static ComponentElementPlan GetElement(
-        in ComponentPlan plan,
-        string tagName)
+    private static ComponentElementPlan GetElement(in ComponentPlan plan, string tagName)
     {
         return Assert.Single(plan.Elements, element => string.Equals(
             element.Syntax.StartTag?.Name.ToFullString().Trim(),
@@ -270,18 +395,14 @@ public sealed class ComponentTemplatePlannerTests
             StringComparison.Ordinal));
     }
 
-    private static ComponentFirstUpdateActionPlan[] GetActions(
-        in ComponentPlan plan,
-        ComponentPlanRange range)
+    private static ComponentFirstUpdateActionPlan[] GetActions(in ComponentPlan plan, ComponentPlanRange range)
     {
         return plan.FirstUpdateActions
             .AsSpan(range.Start, range.Length)
             .ToArray();
     }
 
-    private static int[] GetScopeRootIds(
-        in ComponentPlan plan,
-        in ComponentScopePlan scope)
+    private static int[] GetScopeRootIds(in ComponentPlan plan, in ComponentScopePlan scope)
     {
         return plan.ScopeRootElementIds
             .AsSpan(scope.Roots.Start, scope.Roots.Length)

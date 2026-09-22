@@ -71,10 +71,7 @@ internal partial class AkburaSemanticModel
         return text;
     }
 
-    internal MarkupExtensionBindingResult BindMarkupExtensionAttributeValue(
-        MarkupAttributeSyntax markupAttribute,
-        MarkupExtensionSyntax extensionSyntax,
-        Symbols.IPropertySymbol? property)
+    internal MarkupExtensionBindingResult BindMarkupExtensionAttributeValue(MarkupAttributeSyntax markupAttribute, MarkupExtensionSyntax extensionSyntax, Symbols.IPropertySymbol? property)
     {
         using var diagnosticsBuilder =
             ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
@@ -113,9 +110,7 @@ internal partial class AkburaSemanticModel
             result.Conversion);
     }
 
-    internal MarkupExtensionBindingResult BindTailwindMarkupExtension(
-        MarkupAttributeSyntax markupAttribute,
-        MarkupExtensionSyntax extensionSyntax)
+    internal MarkupExtensionBindingResult BindTailwindMarkupExtension(MarkupAttributeSyntax markupAttribute, MarkupExtensionSyntax extensionSyntax)
     {
         using var diagnosticsBuilder =
             ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
@@ -141,12 +136,7 @@ internal partial class AkburaSemanticModel
                property.AttachedPropertyDefinition.Symbol is not null;
     }
 
-    private MarkupExtensionBindingResult BindMarkupExtensionSyntax(
-        MarkupAttributeSyntax markupAttribute,
-        MarkupExtensionSyntax extensionSyntax,
-        ITypeSymbol? targetType,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder,
-        bool allowAvaloniaSpecialResults = false)
+    private MarkupExtensionBindingResult BindMarkupExtensionSyntax(MarkupAttributeSyntax markupAttribute, MarkupExtensionSyntax extensionSyntax, ITypeSymbol? targetType, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder, bool allowAvaloniaSpecialResults = false)
     {
         var rawText = extensionSyntax.ToFullString();
         var extensionName = GetMarkupExtensionTypeName(extensionSyntax.Type);
@@ -332,10 +322,7 @@ internal partial class AkburaSemanticModel
             conversion);
     }
 
-    private bool TryResolveMarkupExtensionType(
-        string name,
-        out INamedTypeSymbol extensionType,
-        out ImmutableArray<INamedTypeSymbol> ambiguousTypes)
+    private bool TryResolveMarkupExtensionType(string name, out INamedTypeSymbol extensionType, out ImmutableArray<INamedTypeSymbol> ambiguousTypes)
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var candidate in GetMarkupExtensionTypeCandidates(name))
@@ -390,10 +377,7 @@ internal partial class AkburaSemanticModel
         }
     }
 
-    private bool TryBindMarkupExtensionTypeCandidate(
-        string candidate,
-        out INamedTypeSymbol extensionType,
-        out ImmutableArray<INamedTypeSymbol> ambiguousTypes)
+    private bool TryBindMarkupExtensionTypeCandidate(string candidate, out INamedTypeSymbol extensionType, out ImmutableArray<INamedTypeSymbol> ambiguousTypes)
     {
         ambiguousTypes = ImmutableArray<INamedTypeSymbol>.Empty;
         try
@@ -429,10 +413,7 @@ internal partial class AkburaSemanticModel
         return false;
     }
 
-    private OverloadResolutionResult ResolveMarkupExtensionConstructor(
-        MarkupAttributeSyntax markupAttribute,
-        INamedTypeSymbol extensionType,
-        MarkupExtensionSyntax extensionSyntax)
+    private OverloadResolutionResult ResolveMarkupExtensionConstructor(MarkupAttributeSyntax markupAttribute, INamedTypeSymbol extensionType, MarkupExtensionSyntax extensionSyntax)
     {
         using var candidates = ImmutableArrayBuilder<IMethodSymbol>.Rent();
         var positionalArgumentCount = 0;
@@ -484,9 +465,7 @@ internal partial class AkburaSemanticModel
             argumentTypes.ToImmutable());
     }
 
-    private ITypeSymbol? GetMarkupExtensionArgumentType(
-        MarkupAttributeSyntax markupAttribute,
-        MarkupExtensionValueSyntax valueSyntax)
+    private ITypeSymbol? GetMarkupExtensionArgumentType(MarkupAttributeSyntax markupAttribute, MarkupExtensionValueSyntax valueSyntax)
     {
         switch (valueSyntax.Kind)
         {
@@ -515,8 +494,7 @@ internal partial class AkburaSemanticModel
         }
     }
 
-    internal static bool IsMarkupWhitespaceDirective(
-    MarkupAttributeSyntax attribute)
+    internal static bool IsMarkupWhitespaceDirective(MarkupAttributeSyntax attribute)
     {
         if (attribute is not MarkupAttachedPropertyAttributeSyntax attached)
         {
@@ -533,10 +511,7 @@ internal partial class AkburaSemanticModel
                    StringComparison.Ordinal);
     }
 
-    internal static bool TryGetMarkupWhitespaceMode(
-        MarkupAttributeSyntax attribute,
-        out MarkupWhitespaceMode mode,
-        out string rawValue)
+    internal static bool TryGetMarkupWhitespaceMode(MarkupAttributeSyntax attribute, out MarkupWhitespaceMode mode, out string rawValue)
     {
         mode = MarkupWhitespaceMode.Default;
         rawValue = string.Empty;
@@ -565,10 +540,7 @@ internal partial class AkburaSemanticModel
         }
     }
 
-    private Microsoft.CodeAnalysis.IPropertySymbol? FindMarkupExtensionSettableProperty(
-        INamedTypeSymbol extensionType,
-        string name,
-        out bool inaccessible)
+    private Microsoft.CodeAnalysis.IPropertySymbol? FindMarkupExtensionSettableProperty(INamedTypeSymbol extensionType, string name, out bool inaccessible)
     {
         inaccessible = false;
 
@@ -611,9 +583,7 @@ internal partial class AkburaSemanticModel
 
 
 
-    private static bool IsMarkupExtensionProvideValueMethod(
-        IMethodSymbol method,
-        INamedTypeSymbol? serviceProviderType)
+    private static bool IsMarkupExtensionProvideValueMethod(IMethodSymbol method, INamedTypeSymbol? serviceProviderType)
     {
         if (method.IsStatic ||
             method.DeclaredAccessibility != Accessibility.Public ||
@@ -632,9 +602,7 @@ internal partial class AkburaSemanticModel
             IsMarkupExtensionServiceProviderParameter(method.Parameters[0], serviceProviderType);
     }
 
-    private static bool IsMarkupExtensionServiceProviderParameter(
-        IParameterSymbol parameter,
-        INamedTypeSymbol? serviceProviderType)
+    private static bool IsMarkupExtensionServiceProviderParameter(IParameterSymbol parameter, INamedTypeSymbol? serviceProviderType)
     {
         var parameterType = parameter.Type;
         return (serviceProviderType != null &&
@@ -643,10 +611,7 @@ internal partial class AkburaSemanticModel
             "global::System.IServiceProvider";
     }
 
-    private bool CanMarkupExtensionResultConvertToTarget(
-        ITypeSymbol sourceType,
-        ITypeSymbol targetType,
-        bool allowAvaloniaSpecialResults = false)
+    private bool CanMarkupExtensionResultConvertToTarget(ITypeSymbol sourceType, ITypeSymbol targetType, bool allowAvaloniaSpecialResults = false)
     {
         if (sourceType.TypeKind == TypeKind.Error ||
             targetType.TypeKind == TypeKind.Error ||
@@ -673,8 +638,7 @@ internal partial class AkburaSemanticModel
                    targetType);
     }
 
-    private bool IsAvaloniaSpecialMarkupExtensionResult(
-        ITypeSymbol sourceType)
+    private bool IsAvaloniaSpecialMarkupExtensionResult(ITypeSymbol sourceType)
     {
         var bindingBaseType =
             Compilation.CSharpCompilation
@@ -744,13 +708,7 @@ internal partial class AkburaSemanticModel
             "Avalonia.Data");
     }
 
-    private bool TryBindAvaloniaBindingExtension(
-        MarkupAttributeSyntax markupAttribute,
-        MarkupExtensionSyntax extensionSyntax,
-        string extensionName,
-        ITypeSymbol? targetType,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder,
-        out MarkupExtensionBindingResult result)
+    private bool TryBindAvaloniaBindingExtension(MarkupAttributeSyntax markupAttribute, MarkupExtensionSyntax extensionSyntax, string extensionName, ITypeSymbol? targetType, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder, out MarkupExtensionBindingResult result)
     {
         result = default;
         var bindingName = GetUnqualifiedMarkupExtensionName(extensionName);
@@ -993,9 +951,7 @@ internal partial class AkburaSemanticModel
             : normalizedName[(lastDot + 1)..];
     }
 
-    private static IMethodSymbol? SelectMarkupBindingConstructor(
-        INamedTypeSymbol bindingType,
-        MarkupBindingKind kind)
+    private static IMethodSymbol? SelectMarkupBindingConstructor(INamedTypeSymbol bindingType, MarkupBindingKind kind)
     {
         var expectedParameterTypeName = kind == MarkupBindingKind.Compiled
             ? "Avalonia.Data.CompiledBindingPath"
@@ -1074,13 +1030,7 @@ internal partial class AkburaSemanticModel
             null);
     }
 
-    private ImmutableArray<MarkupBindingPathElement> BindMarkupBindingPath(
-        MarkupAttributeSyntax markupAttribute,
-        string path,
-        MarkupBindingKind kind,
-        INamedTypeSymbol? dataType,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder,
-        out ITypeSymbol? resultType)
+    private ImmutableArray<MarkupBindingPathElement> BindMarkupBindingPath(MarkupAttributeSyntax markupAttribute, string path, MarkupBindingKind kind, INamedTypeSymbol? dataType, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder, out ITypeSymbol? resultType)
     {
         using var builder = ImmutableArrayBuilder<MarkupBindingPathElement>.Rent();
         resultType = dataType;
@@ -1305,13 +1255,7 @@ internal partial class AkburaSemanticModel
         return builder.ToImmutable();
     }
 
-    private bool TryReadBindingPathRoot(
-        MarkupAttributeSyntax markupAttribute,
-        string path,
-        ref int index,
-        ImmutableArrayBuilder<MarkupBindingPathElement> builder,
-        out ITypeSymbol? rootType,
-        out bool isRooted)
+    private bool TryReadBindingPathRoot(MarkupAttributeSyntax markupAttribute, string path, ref int index, ImmutableArrayBuilder<MarkupBindingPathElement> builder, out ITypeSymbol? rootType, out bool isRooted)
     {
         rootType = null;
         isRooted = false;
@@ -1446,14 +1390,9 @@ internal partial class AkburaSemanticModel
         return false;
     }
 
-    private bool TryGetMarkupBindingElementNameType(
-        MarkupAttributeSyntax markupAttribute,
-        string elementName,
-        out INamedTypeSymbol elementType)
+    private bool TryGetMarkupBindingElementNameType(MarkupAttributeSyntax markupAttribute, string elementName, out INamedTypeSymbol elementType)
     {
-        for (var current = markupAttribute.Parent;
-             current != null;
-             current = current.Parent)
+        for (var current = markupAttribute.Parent; current != null; current = current.Parent)
         {
             if (current.Kind != AkburaSyntaxKind.MarkupRootSyntax)
             {
@@ -1482,19 +1421,14 @@ internal partial class AkburaSemanticModel
             break;
         }
 
-        for (var binder = BindingSession.GetBinder(
-                 markupAttribute,
-                 BinderUsage.Expression);
-             binder != null;
-             binder = binder.Next)
+        for (var binder = BindingSession.GetBinder(markupAttribute, BinderUsage.Expression); binder != null; binder = binder.Next)
         {
             if (binder is not ComponentBinder componentBinder)
             {
                 continue;
             }
 
-            foreach (var symbol in componentBinder
-                         .GetDeclaredMarkupNameSymbols())
+            foreach (var symbol in componentBinder.GetDeclaredMarkupNameSymbols())
             {
                 if (symbol is not IMarkupNameSymbol nameSymbol ||
                     !string.Equals(
@@ -1522,17 +1456,7 @@ internal partial class AkburaSemanticModel
         return false;
     }
 
-    private bool TryBindMarkupBindingAttachedPropertyElement(
-        MarkupAttributeSyntax markupAttribute,
-        string attachedPropertyText,
-        MarkupBindingKind kind,
-        ITypeSymbol? currentType,
-        bool acceptsNull,
-        ImmutableArrayBuilder<MarkupBindingPathElement>
-            builder,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic>
-            diagnosticsBuilder,
-        out ITypeSymbol? resultType)
+    private bool TryBindMarkupBindingAttachedPropertyElement(MarkupAttributeSyntax markupAttribute, string attachedPropertyText, MarkupBindingKind kind, ITypeSymbol? currentType, bool acceptsNull, ImmutableArrayBuilder<MarkupBindingPathElement> builder, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder, out ITypeSymbol? resultType)
     {
         resultType = null;
 
@@ -1622,16 +1546,7 @@ internal partial class AkburaSemanticModel
         return true;
     }
 
-    private ITypeSymbol? BindMarkupBindingGroupedOperand(
-        MarkupAttributeSyntax markupAttribute,
-        string operandText,
-        MarkupBindingKind kind,
-        ITypeSymbol? sourceType,
-        bool isRooted,
-        ImmutableArrayBuilder<MarkupBindingPathElement>
-            builder,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic>
-            diagnosticsBuilder)
+    private ITypeSymbol? BindMarkupBindingGroupedOperand(MarkupAttributeSyntax markupAttribute, string operandText, MarkupBindingKind kind, ITypeSymbol? sourceType, bool isRooted, ImmutableArrayBuilder<MarkupBindingPathElement> builder, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         var currentType = sourceType;
         var index = 0;
@@ -1755,10 +1670,7 @@ internal partial class AkburaSemanticModel
         return currentType;
     }
 
-    private bool TryBindMarkupBindingStream(
-        ITypeSymbol? sourceType,
-        out MarkupBindingPathElementKind kind,
-        out ITypeSymbol resultType)
+    private bool TryBindMarkupBindingStream(ITypeSymbol? sourceType, out MarkupBindingPathElementKind kind, out ITypeSymbol resultType)
     {
         kind = MarkupBindingPathElementKind.Unknown;
         resultType = null!;
@@ -1775,9 +1687,7 @@ internal partial class AkburaSemanticModel
 
         if (taskDefinition != null)
         {
-            for (var current = namedType;
-                 current != null;
-                 current = current.BaseType)
+            for (var current = namedType; current != null; current = current.BaseType)
             {
                 if (SymbolEqualityComparer.Default.Equals(
                         current.OriginalDefinition,
@@ -1811,8 +1721,7 @@ internal partial class AkburaSemanticModel
             return true;
         }
 
-        foreach (var interfaceType
-                 in namedType.AllInterfaces)
+        foreach (var interfaceType in namedType.AllInterfaces)
         {
             if (!SymbolEqualityComparer.Default.Equals(
                     interfaceType.OriginalDefinition,
@@ -1830,16 +1739,7 @@ internal partial class AkburaSemanticModel
         return false;
     }
 
-    private ITypeSymbol? BindMarkupBindingPathMemberElement(
-        MarkupAttributeSyntax markupAttribute,
-        string memberName,
-        MarkupBindingKind kind,
-        ITypeSymbol? currentType,
-        bool isRooted,
-        bool acceptsNull,
-        ImmutableArrayBuilder<MarkupBindingPathElement> builder,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic>
-            diagnosticsBuilder)
+    private ITypeSymbol? BindMarkupBindingPathMemberElement(MarkupAttributeSyntax markupAttribute, string memberName, MarkupBindingKind kind, ITypeSymbol? currentType, bool isRooted, bool acceptsNull, ImmutableArrayBuilder<MarkupBindingPathElement> builder, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         if (TryBindMarkupBindingPathMember(
                 currentType,
@@ -1894,13 +1794,7 @@ internal partial class AkburaSemanticModel
         return null;
     }
 
-    private static bool TryBindMarkupBindingPathMember(
-        ITypeSymbol? currentType,
-        string memberName,
-        out Microsoft.CodeAnalysis.ISymbol member,
-        out ITypeSymbol? memberType,
-        out MarkupBindingPathElementKind elementKind,
-        out bool inaccessible)
+    private static bool TryBindMarkupBindingPathMember(ITypeSymbol? currentType, string memberName, out Microsoft.CodeAnalysis.ISymbol member, out ITypeSymbol? memberType, out MarkupBindingPathElementKind elementKind, out bool inaccessible)
     {
         member = null!;
         memberType = null;
@@ -1946,15 +1840,7 @@ internal partial class AkburaSemanticModel
         return false;
     }
 
-    private void BindMarkupBindingIndexer(
-        MarkupAttributeSyntax markupAttribute,
-        ITypeSymbol? currentType,
-        string indexerText,
-        ImmutableArray<string> argumentTexts,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder,
-        out Microsoft.CodeAnalysis.IPropertySymbol? indexer,
-        out ITypeSymbol? resultType,
-        out ImmutableArray<MarkupBindingPathArgument> boundArguments)
+    private void BindMarkupBindingIndexer(MarkupAttributeSyntax markupAttribute, ITypeSymbol? currentType, string indexerText, ImmutableArray<string> argumentTexts, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder, out Microsoft.CodeAnalysis.IPropertySymbol? indexer, out ITypeSymbol? resultType, out ImmutableArray<MarkupBindingPathArgument> boundArguments)
     {
         indexer = null;
         resultType = null;
@@ -1987,17 +1873,28 @@ internal partial class AkburaSemanticModel
         }
 
         using var candidates = ImmutableArrayBuilder<Microsoft.CodeAnalysis.IPropertySymbol>.Rent();
-        foreach (var type in EnumerateBindingMemberTypes(currentType))
+        if (currentType is INamedTypeSymbol namedType)
         {
-            foreach (var property in type.GetMembers().OfType<Microsoft.CodeAnalysis.IPropertySymbol>())
+            for (var type = namedType; type != null; type = type.BaseType)
             {
-                if (property.IsIndexer &&
-                    property.DeclaredAccessibility == Accessibility.Public &&
-                    property.GetMethod?.DeclaredAccessibility == Accessibility.Public &&
-                    property.Parameters.Length == argumentTexts.Length &&
-                    property.Parameters.All(static parameter => parameter.RefKind == RefKind.None))
+                AddMarkupBindingIndexerCandidates(
+                    type,
+                    argumentTexts.Length,
+                    candidates);
+            }
+
+            // A constructed class such as List<T> exposes its public
+            // indexer directly and also through multiple interfaces.
+            // Considering all of those equivalent contracts together
+            // makes an otherwise unambiguous indexer look ambiguous.
+            if (candidates.Count == 0)
+            {
+                foreach (var @interface in namedType.AllInterfaces)
                 {
-                    candidates.Add(property);
+                    AddMarkupBindingIndexerCandidates(
+                        @interface,
+                        argumentTexts.Length,
+                        candidates);
                 }
             }
         }
@@ -2023,11 +1920,26 @@ internal partial class AkburaSemanticModel
             diagnosticsBuilder);
     }
 
-    private Microsoft.CodeAnalysis.IPropertySymbol? SelectMarkupBindingIndexer(
-        MarkupAttributeSyntax markupAttribute,
-        ImmutableArray<Microsoft.CodeAnalysis.IPropertySymbol> candidates,
-        ImmutableArray<string> argumentTexts,
-        out bool ambiguous)
+    private static void AddMarkupBindingIndexerCandidates(INamedTypeSymbol type, int argumentCount, ImmutableArrayBuilder<Microsoft.CodeAnalysis.IPropertySymbol> candidates)
+    {
+        foreach (var property in type.GetMembers().OfType<Microsoft.CodeAnalysis.IPropertySymbol>())
+        {
+            if (property.IsIndexer &&
+                property.DeclaredAccessibility ==
+                    Accessibility.Public &&
+                property.GetMethod?.DeclaredAccessibility ==
+                    Accessibility.Public &&
+                property.Parameters.Length == argumentCount &&
+                property.Parameters.All(
+                    static parameter =>
+                        parameter.RefKind == RefKind.None))
+            {
+                candidates.Add(property);
+            }
+        }
+    }
+
+    private Microsoft.CodeAnalysis.IPropertySymbol? SelectMarkupBindingIndexer(MarkupAttributeSyntax markupAttribute, ImmutableArray<Microsoft.CodeAnalysis.IPropertySymbol> candidates, ImmutableArray<string> argumentTexts, out bool ambiguous)
     {
         ambiguous = false;
         if (candidates.Length <= 1)
@@ -2082,12 +1994,7 @@ internal partial class AkburaSemanticModel
         return ambiguous ? null : best;
     }
 
-    private ImmutableArray<MarkupBindingPathArgument> BindMarkupBindingPathArguments(
-        MarkupAttributeSyntax markupAttribute,
-        ImmutableArray<string> argumentTexts,
-        ImmutableArray<IParameterSymbol>? parameterSource,
-        ITypeSymbol? fallbackType,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    private ImmutableArray<MarkupBindingPathArgument> BindMarkupBindingPathArguments(MarkupAttributeSyntax markupAttribute, ImmutableArray<string> argumentTexts, ImmutableArray<IParameterSymbol>? parameterSource, ITypeSymbol? fallbackType, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         using var builder = ImmutableArrayBuilder<MarkupBindingPathArgument>.Rent(argumentTexts.Length);
         for (var index = 0; index < argumentTexts.Length; index++)
@@ -2141,11 +2048,7 @@ internal partial class AkburaSemanticModel
         }
     }
 
-    private static ImmutableArray<string> GetBindingPathArguments(
-        string text,
-        char open,
-        char close,
-        char separator = ',')
+    private static ImmutableArray<string> GetBindingPathArguments(string text, char open, char close, char separator = ',')
     {
         if (text.Length < 2 || text[0] != open || text[^1] != close)
         {
@@ -2205,9 +2108,7 @@ internal partial class AkburaSemanticModel
         return builder.ToImmutable();
     }
 
-    private static bool TryValidateMarkupBindingPath(
-        string path,
-        out string error)
+    private static bool TryValidateMarkupBindingPath(string path, out string error)
     {
         error = string.Empty;
         var bracketDepth = 0;
@@ -2291,10 +2192,7 @@ internal partial class AkburaSemanticModel
         return true;
     }
 
-    private static bool TryParseGroupedBindingTypeCast(
-        string text,
-        out string typeText,
-        out string operandText)
+    private static bool TryParseGroupedBindingTypeCast(string text, out string typeText, out string operandText)
     {
         typeText = string.Empty;
         operandText = string.Empty;
@@ -2323,10 +2221,7 @@ internal partial class AkburaSemanticModel
                operandText.Length > 0;
     }
 
-    private static bool StartsWithBindingRoot(
-        string path,
-        int index,
-        string root)
+    private static bool StartsWithBindingRoot(string path, int index, string root)
     {
         if (!path.AsSpan(index).StartsWith(
                 root.AsSpan(),
@@ -2363,11 +2258,7 @@ internal partial class AkburaSemanticModel
         return ReadDelimitedBindingText(text, ref index, '(', ')');
     }
 
-    private static string ReadDelimitedBindingText(
-        string text,
-        ref int index,
-        char open,
-        char close)
+    private static string ReadDelimitedBindingText(string text, ref int index, char open, char close)
     {
         var start = index;
         var depth = 0;
@@ -2417,9 +2308,7 @@ internal partial class AkburaSemanticModel
         return IsMarkupDirective(markupAttribute, "Name");
     }
 
-    private static bool IsMarkupDirective(
-        MarkupAttributeSyntax markupAttribute,
-        string name)
+    private static bool IsMarkupDirective(MarkupAttributeSyntax markupAttribute, string name)
     {
         if (markupAttribute.Kind != AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax)
         {
@@ -2431,9 +2320,7 @@ internal partial class AkburaSemanticModel
             attachedProperty.Name.Identifier.ValueText == name;
     }
 
-    internal static bool TryGetMarkupDataTypeText(
-        MarkupAttributeSyntax attribute,
-        out string typeText)
+    internal static bool TryGetMarkupDataTypeText(MarkupAttributeSyntax attribute, out string typeText)
     {
         typeText = string.Empty;
         var value = GetMarkupAttributeValue(attribute);
@@ -2461,9 +2348,7 @@ internal partial class AkburaSemanticModel
         }
     }
 
-    private bool TryBindMarkupDataType(
-        string typeText,
-        out INamedTypeSymbol dataType)
+    private bool TryBindMarkupDataType(string typeText, out INamedTypeSymbol dataType)
     {
         dataType = null!;
         if (string.IsNullOrWhiteSpace(typeText))
@@ -2496,18 +2381,12 @@ internal partial class AkburaSemanticModel
         return false;
     }
 
-    internal bool TryBindMarkupDataTypeDirective(
-        string typeText,
-        out INamedTypeSymbol dataType)
+    internal bool TryBindMarkupDataTypeDirective(string typeText, out INamedTypeSymbol dataType)
     {
         return TryBindMarkupDataType(typeText, out dataType);
     }
 
-    private MarkupExtensionBoundValue BindMarkupExtensionValue(
-        MarkupAttributeSyntax markupAttribute,
-        MarkupExtensionValueSyntax valueSyntax,
-        ITypeSymbol? expectedType,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    private MarkupExtensionBoundValue BindMarkupExtensionValue(MarkupAttributeSyntax markupAttribute, MarkupExtensionValueSyntax valueSyntax, ITypeSymbol? expectedType, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         switch (valueSyntax.Kind)
         {
@@ -2603,9 +2482,7 @@ internal partial class AkburaSemanticModel
         return GetMarkupLiteralText(literalValue.Value);
     }
 
-    private static CSharp.ExpressionSyntax CreateMarkupExtensionLiteralExpression(
-        string text,
-        ITypeSymbol? expectedType)
+    private static CSharp.ExpressionSyntax CreateMarkupExtensionLiteralExpression(string text, ITypeSymbol? expectedType)
     {
         if (expectedType?.SpecialType == SpecialType.System_String)
         {
@@ -2684,12 +2561,7 @@ internal partial class AkburaSemanticModel
                (text[0] is '+' or '-' && text.Length > 1 && char.IsDigit(text[1]));
     }
 
-    private void AddMarkupExtensionValueConversionDiagnostics(
-        AkburaSyntax syntax,
-        string valueText,
-        CSharpBindingResult binding,
-        ITypeSymbol? expectedType,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    private void AddMarkupExtensionValueConversionDiagnostics(AkburaSyntax syntax, string valueText, CSharpBindingResult binding, ITypeSymbol? expectedType, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         if (expectedType == null)
         {
@@ -2730,12 +2602,7 @@ internal partial class AkburaSemanticModel
             diagnosticsBuilder);
     }
 
-    private static void AddMarkupExtensionValueConversionDiagnostic(
-        AkburaSyntax syntax,
-        string valueText,
-        ITypeSymbol sourceType,
-        ITypeSymbol targetType,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    private static void AddMarkupExtensionValueConversionDiagnostic(AkburaSyntax syntax, string valueText, ITypeSymbol sourceType, ITypeSymbol targetType, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         diagnosticsBuilder.Add(CreateMarkupExtensionErrorDiagnostic(
             syntax,
@@ -2765,9 +2632,7 @@ internal partial class AkburaSemanticModel
         return builder.ToString();
     }
 
-    private static void AppendMarkupExtensionNameSegment(
-        StringBuilder builder,
-        MarkupNameSegmentSyntax segment)
+    private static void AppendMarkupExtensionNameSegment(StringBuilder builder, MarkupNameSegmentSyntax segment)
     {
         switch (segment.Kind)
         {
@@ -2796,13 +2661,7 @@ internal partial class AkburaSemanticModel
 
     private readonly struct MarkupExtensionBoundValue
     {
-        public MarkupExtensionBoundValue(
-            string text,
-            CSharpSymbolDefinition type,
-            CSharpOperationDefinition operation,
-            AkburaConversion conversion,
-            object? convertedValue,
-            MarkupExtensionValue? nestedValue)
+        public MarkupExtensionBoundValue(string text, CSharpSymbolDefinition type, CSharpOperationDefinition operation, AkburaConversion conversion, object? convertedValue, MarkupExtensionValue? nestedValue)
         {
             Text = text;
             Type = type;
@@ -2830,11 +2689,7 @@ internal partial class AkburaSemanticModel
         return inlineExpression.GetRawCSharpExpression();
     }
 
-    internal static void AddMarkupAttributeBindingDiagnostics(
-        MarkupAttributeSyntax markupAttribute,
-        Symbols.IPropertySymbol property,
-        MarkupAttributeBindingKind bindingKind,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    internal static void AddMarkupAttributeBindingDiagnostics(MarkupAttributeSyntax markupAttribute, Symbols.IPropertySymbol property, MarkupAttributeBindingKind bindingKind, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         if (property.Command != null)
         {
@@ -2901,10 +2756,7 @@ internal partial class AkburaSemanticModel
             bindingKind));
     }
 
-    private static AkburaSemanticDiagnostic CreateMarkupAttributeBindingNotAllowedDiagnostic(
-        MarkupAttributeSyntax markupAttribute,
-        Symbols.IPropertySymbol property,
-        MarkupAttributeBindingKind bindingKind)
+    private static AkburaSemanticDiagnostic CreateMarkupAttributeBindingNotAllowedDiagnostic(MarkupAttributeSyntax markupAttribute, Symbols.IPropertySymbol property, MarkupAttributeBindingKind bindingKind)
     {
         return new AkburaSemanticDiagnostic(
             markupAttribute,
@@ -2912,10 +2764,7 @@ internal partial class AkburaSemanticModel
             [GetMarkupAttributeBindingText(bindingKind), property.Name, GetParamBindingText(property.Parameter!.BindingKind)]);
     }
 
-    private static AkburaSemanticDiagnostic CreateMarkupCommandBindingNotAllowedDiagnostic(
-        MarkupAttributeSyntax markupAttribute,
-        ICommandSymbol command,
-        MarkupAttributeBindingKind bindingKind)
+    private static AkburaSemanticDiagnostic CreateMarkupCommandBindingNotAllowedDiagnostic(MarkupAttributeSyntax markupAttribute, ICommandSymbol command, MarkupAttributeBindingKind bindingKind)
     {
         return new AkburaSemanticDiagnostic(
             markupAttribute,
@@ -2943,11 +2792,7 @@ internal partial class AkburaSemanticModel
         };
     }
 
-    internal static void AddDuplicateMarkupPropertySetterDiagnostics(
-        MarkupAttributeSyntax markupAttribute,
-        Symbols.IPropertySymbol property,
-        MarkupAttributeBindingKind bindingKind,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    internal static void AddDuplicateMarkupPropertySetterDiagnostics(MarkupAttributeSyntax markupAttribute, Symbols.IPropertySymbol property, MarkupAttributeBindingKind bindingKind, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         if (!IsMarkupPropertySetter(bindingKind) ||
             GetContainingMarkupStartTag(markupAttribute) is not { } startTag)
@@ -2980,11 +2825,7 @@ internal partial class AkburaSemanticModel
         return bindingKind is MarkupAttributeBindingKind.None or MarkupAttributeBindingKind.Bind;
     }
 
-    internal static void AddMarkupEventBindingDiagnostics(
-        MarkupAttributeSyntax markupAttribute,
-        IRoutedEventSymbol routedEvent,
-        MarkupAttributeBindingKind bindingKind,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    internal static void AddMarkupEventBindingDiagnostics(MarkupAttributeSyntax markupAttribute, IRoutedEventSymbol routedEvent, MarkupAttributeBindingKind bindingKind, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         if (bindingKind == MarkupAttributeBindingKind.None)
         {
@@ -2997,11 +2838,7 @@ internal partial class AkburaSemanticModel
             [routedEvent.Name, GetMarkupAttributeBindingText(bindingKind)]));
     }
 
-    internal void AddMarkupEventHandlerSignatureDiagnostics(
-        MarkupAttributeSyntax markupAttribute,
-        IRoutedEventSymbol routedEvent,
-        CSharp.ExpressionSyntax? expression,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    internal void AddMarkupEventHandlerSignatureDiagnostics(MarkupAttributeSyntax markupAttribute, IRoutedEventSymbol routedEvent, CSharp.ExpressionSyntax? expression, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         if (expression == null ||
             !TryGetLambdaParameterTypes(expression, out var parameterTypes))
@@ -3027,9 +2864,7 @@ internal partial class AkburaSemanticModel
             ]));
     }
 
-    private static bool TryGetLambdaParameterTypes(
-        CSharp.ExpressionSyntax expression,
-        out ImmutableArray<CSharp.TypeSyntax?> parameterTypes)
+    private static bool TryGetLambdaParameterTypes(CSharp.ExpressionSyntax expression, out ImmutableArray<CSharp.TypeSyntax?> parameterTypes)
     {
         using var builder = ImmutableArrayBuilder<CSharp.TypeSyntax?>.Rent();
         switch (expression)
@@ -3062,8 +2897,7 @@ internal partial class AkburaSemanticModel
         return false;
     }
 
-    private static ImmutableArray<ITypeSymbol> GetEventHandlerParameterTypes(
-        IRoutedEventSymbol routedEvent)
+    private static ImmutableArray<ITypeSymbol> GetEventHandlerParameterTypes(IRoutedEventSymbol routedEvent)
     {
         if (routedEvent.HandlerType.Symbol is not INamedTypeSymbol { DelegateInvokeMethod: { } invokeMethod })
         {
@@ -3079,9 +2913,7 @@ internal partial class AkburaSemanticModel
         return builder.ToImmutable();
     }
 
-    private bool HasCompatibleEventHandlerParameters(
-        ImmutableArray<ITypeSymbol> expectedParameterTypes,
-        ImmutableArray<CSharp.TypeSyntax?> actualParameterTypes)
+    private bool HasCompatibleEventHandlerParameters(ImmutableArray<ITypeSymbol> expectedParameterTypes, ImmutableArray<CSharp.TypeSyntax?> actualParameterTypes)
     {
         if (expectedParameterTypes.Length != actualParameterTypes.Length)
         {
@@ -3107,8 +2939,7 @@ internal partial class AkburaSemanticModel
         return true;
     }
 
-    private static string FormatEventHandlerSignature(
-        ImmutableArray<ITypeSymbol> parameterTypes)
+    private static string FormatEventHandlerSignature(ImmutableArray<ITypeSymbol> parameterTypes)
     {
         return "(" +
             string.Join(
@@ -3117,8 +2948,7 @@ internal partial class AkburaSemanticModel
             ")";
     }
 
-    private static string FormatEventHandlerSignature(
-        ImmutableArray<CSharp.TypeSyntax?> parameterTypes)
+    private static string FormatEventHandlerSignature(ImmutableArray<CSharp.TypeSyntax?> parameterTypes)
     {
         return "(" +
             string.Join(
@@ -3152,11 +2982,7 @@ internal partial class AkburaSemanticModel
                originalDefinition.Name is "ColumnDefinitions" or "RowDefinitions";
     }
 
-    internal void AddMarkupDefinitionListLiteralDiagnostics(
-        MarkupAttributeSyntax markupAttribute,
-        Symbols.IPropertySymbol property,
-        string literalValue,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    internal void AddMarkupDefinitionListLiteralDiagnostics(MarkupAttributeSyntax markupAttribute, Symbols.IPropertySymbol property, string literalValue, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         if (property.Type.Symbol is not ITypeSymbol targetType ||
             !IsAvaloniaGridDefinitionListType(targetType) ||
@@ -3173,11 +2999,7 @@ internal partial class AkburaSemanticModel
             diagnosticsBuilder);
     }
 
-    internal void AddMarkupLiteralValueDiagnostics(
-        MarkupAttributeSyntax markupAttribute,
-        Symbols.IPropertySymbol property,
-        MarkupLiteralConversionStatus conversionStatus,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    internal void AddMarkupLiteralValueDiagnostics(MarkupAttributeSyntax markupAttribute, Symbols.IPropertySymbol property, MarkupLiteralConversionStatus conversionStatus, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         if (conversionStatus != MarkupLiteralConversionStatus.Invalid ||
             property.Type.Symbol is not ITypeSymbol targetType)
@@ -3193,11 +3015,7 @@ internal partial class AkburaSemanticModel
             diagnosticsBuilder);
     }
 
-    internal void AddMarkupAttributeValueDiagnostics(
-        MarkupAttributeSyntax markupAttribute,
-        Symbols.IPropertySymbol property,
-        CSharpBindingResult binding,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    internal void AddMarkupAttributeValueDiagnostics(MarkupAttributeSyntax markupAttribute, Symbols.IPropertySymbol property, CSharpBindingResult binding, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         if (property.Type.Symbol is not ITypeSymbol targetType)
         {
@@ -3246,12 +3064,7 @@ internal partial class AkburaSemanticModel
             diagnosticsBuilder);
     }
 
-    private static void AddMarkupAttributeCannotConvertDiagnostic(
-        MarkupAttributeSyntax markupAttribute,
-        Symbols.IPropertySymbol property,
-        ITypeSymbol sourceType,
-        ITypeSymbol targetType,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    private static void AddMarkupAttributeCannotConvertDiagnostic(MarkupAttributeSyntax markupAttribute, Symbols.IPropertySymbol property, ITypeSymbol sourceType, ITypeSymbol targetType, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         var sourceTypeText = sourceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         var targetTypeText = targetType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
@@ -3262,10 +3075,7 @@ internal partial class AkburaSemanticModel
             [property.Name, sourceTypeText, targetTypeText]));
     }
 
-    internal void AddMarkupExpressionDiagnostics(
-        MarkupAttributeSyntax markupAttribute,
-        CSharpBindingResult binding,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    internal void AddMarkupExpressionDiagnostics(MarkupAttributeSyntax markupAttribute, CSharpBindingResult binding, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         AddMarkupExpressionDiagnostics(
             markupAttribute,
@@ -3274,10 +3084,7 @@ internal partial class AkburaSemanticModel
             diagnosticsBuilder);
     }
 
-    internal void AddMarkupExpressionDiagnostics(
-        MarkupAttributeSyntax markupAttribute,
-        ImmutableArray<Diagnostic> diagnostics,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    internal void AddMarkupExpressionDiagnostics(MarkupAttributeSyntax markupAttribute, ImmutableArray<Diagnostic> diagnostics, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         AddMarkupExpressionDiagnostics(
             markupAttribute,
@@ -3286,11 +3093,7 @@ internal partial class AkburaSemanticModel
             diagnosticsBuilder);
     }
 
-    internal void AddMarkupExpressionDiagnostics(
-        AkburaSyntax syntax,
-        string expressionText,
-        CSharpBindingResult binding,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    internal void AddMarkupExpressionDiagnostics(AkburaSyntax syntax, string expressionText, CSharpBindingResult binding, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         AddMarkupExpressionDiagnostics(
             syntax,
@@ -3300,11 +3103,7 @@ internal partial class AkburaSemanticModel
         AddMarkupConditionalHookDiagnostics(syntax, binding.OperationDefinition, diagnosticsBuilder);
     }
 
-    internal void AddMarkupExpressionDiagnostics(
-        AkburaSyntax syntax,
-        string expressionText,
-        ImmutableArray<Diagnostic> diagnostics,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    internal void AddMarkupExpressionDiagnostics(AkburaSyntax syntax, string expressionText, ImmutableArray<Diagnostic> diagnostics, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         if (diagnostics.IsDefaultOrEmpty)
         {
@@ -3323,12 +3122,7 @@ internal partial class AkburaSemanticModel
         }
     }
 
-    internal void AddMarkupCommandHandlerSignatureDiagnostics(
-        MarkupAttributeSyntax markupAttribute,
-        ICommandSymbol command,
-        CSharp.ExpressionSyntax? expression,
-        MarkupCommandHandlerAnalysis handler,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    internal void AddMarkupCommandHandlerSignatureDiagnostics(MarkupAttributeSyntax markupAttribute, ICommandSymbol command, CSharp.ExpressionSyntax? expression, MarkupCommandHandlerAnalysis handler, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         if (handler.Kind != MarkupCommandHandlerKind.Lambda ||
             expression == null)
@@ -3389,9 +3183,7 @@ internal partial class AkburaSemanticModel
             sourceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
     }
 
-    private bool HasCompatibleCommandHandlerParameters(
-        ICommandSymbol command,
-        ImmutableArray<CSharp.TypeSyntax?> actualParameterTypes)
+    private bool HasCompatibleCommandHandlerParameters(ICommandSymbol command, ImmutableArray<CSharp.TypeSyntax?> actualParameterTypes)
     {
         if (actualParameterTypes.Length != command.Parameters.Length)
         {
@@ -3452,12 +3244,7 @@ internal partial class AkburaSemanticModel
             : resultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
     }
 
-    internal MarkupCommandHandlerAnalysis AnalyzeMarkupCommandHandler(
-        MarkupAttributeSyntax markupAttribute,
-        ICommandSymbol command,
-        CSharp.ExpressionSyntax? expression,
-        CSharpSymbolDefinition handlerType,
-        CSharpOperationDefinition handlerOperation)
+    internal MarkupCommandHandlerAnalysis AnalyzeMarkupCommandHandler(MarkupAttributeSyntax markupAttribute, ICommandSymbol command, CSharp.ExpressionSyntax? expression, CSharpSymbolDefinition handlerType, CSharpOperationDefinition handlerOperation)
     {
         if (expression == null)
         {
@@ -3498,10 +3285,7 @@ internal partial class AkburaSemanticModel
         };
     }
 
-    internal MarkupEventHandlerAnalysis AnalyzeMarkupEventHandler(
-        MarkupAttributeSyntax markupAttribute,
-        IRoutedEventSymbol routedEvent,
-        CSharp.ExpressionSyntax? expression)
+    internal MarkupEventHandlerAnalysis AnalyzeMarkupEventHandler(MarkupAttributeSyntax markupAttribute, IRoutedEventSymbol routedEvent, CSharp.ExpressionSyntax? expression)
     {
         if (expression == null)
         {
@@ -3535,9 +3319,7 @@ internal partial class AkburaSemanticModel
         };
     }
 
-    private MarkupEventHandlerAnalysis CreateDirectMarkupEventHandlerAnalysis(
-        MarkupAttributeSyntax markupAttribute,
-        CSharp.ExpressionSyntax expression)
+    private MarkupEventHandlerAnalysis CreateDirectMarkupEventHandlerAnalysis(MarkupAttributeSyntax markupAttribute, CSharp.ExpressionSyntax expression)
     {
         var binding = BindMarkupAttributeExpression(markupAttribute, expression);
         return new MarkupEventHandlerAnalysis(
@@ -3550,10 +3332,7 @@ internal partial class AkburaSemanticModel
             binding.Diagnostics);
     }
 
-    private MarkupEventHandlerAnalysis CreateExpressionMarkupEventHandlerAnalysis(
-        MarkupAttributeSyntax markupAttribute,
-        IRoutedEventSymbol routedEvent,
-        CSharp.ExpressionSyntax expression)
+    private MarkupEventHandlerAnalysis CreateExpressionMarkupEventHandlerAnalysis(MarkupAttributeSyntax markupAttribute, IRoutedEventSymbol routedEvent, CSharp.ExpressionSyntax expression)
     {
         var binding = BindMarkupEventHandlerStatementExpression(
             markupAttribute,
@@ -3572,12 +3351,7 @@ internal partial class AkburaSemanticModel
             binding.Diagnostics);
     }
 
-    private MarkupEventHandlerAnalysis AnalyzeMarkupEventLambda(
-        MarkupAttributeSyntax markupAttribute,
-        IRoutedEventSymbol routedEvent,
-        ImmutableArray<string> parameterNames,
-        bool isAsync,
-        SyntaxNode body)
+    private MarkupEventHandlerAnalysis AnalyzeMarkupEventLambda(MarkupAttributeSyntax markupAttribute, IRoutedEventSymbol routedEvent, ImmutableArray<string> parameterNames, bool isAsync, SyntaxNode body)
     {
         var containsAwait = ContainsAwaitExpression(body);
         var binding = body switch
@@ -3609,12 +3383,7 @@ internal partial class AkburaSemanticModel
             binding.Diagnostics);
     }
 
-    private MarkupCommandHandlerAnalysis AnalyzeMarkupCommandLambda(
-        MarkupAttributeSyntax markupAttribute,
-        ICommandSymbol command,
-        ImmutableArray<string> parameterNames,
-        bool isAsync,
-        SyntaxNode body)
+    private MarkupCommandHandlerAnalysis AnalyzeMarkupCommandLambda(MarkupAttributeSyntax markupAttribute, ICommandSymbol command, ImmutableArray<string> parameterNames, bool isAsync, SyntaxNode body)
     {
         var containsAwait = ContainsAwaitExpression(body);
         var argumentMode = parameterNames.Length == 0
@@ -3701,9 +3470,7 @@ internal partial class AkburaSemanticModel
             diagnostics);
     }
 
-    private bool TryGetAwaitedLocalCommandExecuteResultType(
-        CSharp.ExpressionSyntax expression,
-        out CSharpSymbolDefinition resultType)
+    private bool TryGetAwaitedLocalCommandExecuteResultType(CSharp.ExpressionSyntax expression, out CSharpSymbolDefinition resultType)
     {
         resultType = default;
 
@@ -3739,11 +3506,7 @@ internal partial class AkburaSemanticModel
         return false;
     }
 
-    private CSharpBindingResult BindCommandHandlerResultExpression(
-        MarkupAttributeSyntax markupAttribute,
-        ICommandSymbol command,
-        ImmutableArray<string> parameterNames,
-        CSharp.ExpressionSyntax expressionSyntax)
+    private CSharpBindingResult BindCommandHandlerResultExpression(MarkupAttributeSyntax markupAttribute, ICommandSymbol command, ImmutableArray<string> parameterNames, CSharp.ExpressionSyntax expressionSyntax)
     {
         var probeScope = CreateMarkupHandlerProbeScope(
             markupAttribute,
@@ -3778,11 +3541,7 @@ internal partial class AkburaSemanticModel
             .BindReturnExpression(compilationUnit, isBindingPath: false);
     }
 
-    private CSharpBindingResult BindCommandHandlerStatementExpression(
-        MarkupAttributeSyntax markupAttribute,
-        ICommandSymbol command,
-        ImmutableArray<string> parameterNames,
-        CSharp.ExpressionSyntax expressionSyntax)
+    private CSharpBindingResult BindCommandHandlerStatementExpression(MarkupAttributeSyntax markupAttribute, ICommandSymbol command, ImmutableArray<string> parameterNames, CSharp.ExpressionSyntax expressionSyntax)
     {
         var probeScope = CreateMarkupHandlerProbeScope(
             markupAttribute,
@@ -3809,12 +3568,7 @@ internal partial class AkburaSemanticModel
             .BindExpressionStatement(compilationUnit, isBindingPath: false);
     }
 
-    private CSharpBindingResult BindMarkupEventHandlerStatementExpression(
-        MarkupAttributeSyntax markupAttribute,
-        IRoutedEventSymbol routedEvent,
-        ImmutableArray<string> parameterNames,
-        CSharp.ExpressionSyntax expressionSyntax,
-        bool isAsync)
+    private CSharpBindingResult BindMarkupEventHandlerStatementExpression(MarkupAttributeSyntax markupAttribute, IRoutedEventSymbol routedEvent, ImmutableArray<string> parameterNames, CSharp.ExpressionSyntax expressionSyntax, bool isAsync)
     {
         var probeScope = CreateMarkupHandlerProbeScope(
             markupAttribute,
@@ -3847,12 +3601,7 @@ internal partial class AkburaSemanticModel
             .BindExpressionStatement(compilationUnit, isBindingPath: false);
     }
 
-    private CSharpBindingResult BindMarkupEventHandlerBlock(
-        MarkupAttributeSyntax markupAttribute,
-        IRoutedEventSymbol routedEvent,
-        ImmutableArray<string> parameterNames,
-        CSharp.BlockSyntax block,
-        bool isAsync)
+    private CSharpBindingResult BindMarkupEventHandlerBlock(MarkupAttributeSyntax markupAttribute, IRoutedEventSymbol routedEvent, ImmutableArray<string> parameterNames, CSharp.BlockSyntax block, bool isAsync)
     {
         var probeScope = CreateMarkupHandlerProbeScope(
             markupAttribute,
@@ -3884,10 +3633,7 @@ internal partial class AkburaSemanticModel
             .BindMethodBlock(compilationUnit, "__AkburaEventHandlerProbe");
     }
 
-    private CSharpProbeScope CreateMarkupHandlerProbeScope(
-        MarkupAttributeSyntax markupAttribute,
-        SyntaxNode csharpNode,
-        ImmutableArray<string> parameterNames)
+    private CSharpProbeScope CreateMarkupHandlerProbeScope(MarkupAttributeSyntax markupAttribute, SyntaxNode csharpNode, ImmutableArray<string> parameterNames)
     {
         var scope = GetMarkupBindingScope(markupAttribute);
         csharpNode = CSharpProbeBuilder.WrapMarkupConditionalScopes(markupAttribute,
@@ -3898,8 +3644,7 @@ internal partial class AkburaSemanticModel
             .CreateProbeScope(markupAttribute, csharpNode, parameterNames);
     }
 
-    private CSharp.ClassDeclarationSyntax CreateMarkupHandlerProbeType(
-        ImmutableArray<CSharp.MemberDeclarationSyntax> members)
+    private CSharp.ClassDeclarationSyntax CreateMarkupHandlerProbeType(ImmutableArray<CSharp.MemberDeclarationSyntax> members)
     {
         var componentName = SyntaxTree.ComponentName;
         var declaration = CSharpSyntaxFactory.ClassDeclaration(
@@ -3913,9 +3658,7 @@ internal partial class AkburaSemanticModel
                 CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.PartialKeyword)));
     }
 
-    private void AddMarkupAttributeProbeMembers(
-        ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax> membersBuilder,
-        CSharpProbeScope probeScope)
+    private void AddMarkupAttributeProbeMembers(ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax> membersBuilder, CSharpProbeScope probeScope)
     {
         var addedMemberKeys = new HashSet<string>(StringComparer.Ordinal);
         foreach (var field in CreateMarkupAttributeProbeFields())
@@ -3929,10 +3672,7 @@ internal partial class AkburaSemanticModel
         }
     }
 
-    private static void AddMarkupAttributeProbeMember(
-        ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax> membersBuilder,
-        HashSet<string> addedMemberKeys,
-        CSharp.MemberDeclarationSyntax member)
+    private static void AddMarkupAttributeProbeMember(ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax> membersBuilder, HashSet<string> addedMemberKeys, CSharp.MemberDeclarationSyntax member)
     {
         var key = GetMarkupAttributeProbeMemberKey(member);
         if (key == null ||
@@ -3961,9 +3701,7 @@ internal partial class AkburaSemanticModel
         };
     }
 
-    private static CSharp.BlockSyntax CreateMarkupHandlerProbeBlock(
-        ImmutableArray<CSharp.StatementSyntax> localStatements,
-        CSharp.StatementSyntax statement)
+    private static CSharp.BlockSyntax CreateMarkupHandlerProbeBlock(ImmutableArray<CSharp.StatementSyntax> localStatements, CSharp.StatementSyntax statement)
     {
         if (localStatements.IsDefaultOrEmpty)
         {
@@ -3976,9 +3714,7 @@ internal partial class AkburaSemanticModel
         return CSharpSyntaxFactory.Block(CSharpSyntaxFactory.List(statements.ToImmutable()));
     }
 
-    private static CSharp.BlockSyntax PrependMarkupHandlerProbeLocals(
-        CSharp.BlockSyntax block,
-        ImmutableArray<CSharp.StatementSyntax> localStatements)
+    private static CSharp.BlockSyntax PrependMarkupHandlerProbeLocals(CSharp.BlockSyntax block, ImmutableArray<CSharp.StatementSyntax> localStatements)
     {
         if (localStatements.IsDefaultOrEmpty)
         {
@@ -3996,9 +3732,7 @@ internal partial class AkburaSemanticModel
         return block.WithStatements(CSharpSyntaxFactory.List(statements.ToImmutable()));
     }
 
-    private static CSharp.ParameterListSyntax CreateCommandHandlerProbeParameterList(
-        ICommandSymbol command,
-        ImmutableArray<string> parameterNames)
+    private static CSharp.ParameterListSyntax CreateCommandHandlerProbeParameterList(ICommandSymbol command, ImmutableArray<string> parameterNames)
     {
         using var parameters = ImmutableArrayBuilder<CSharp.ParameterSyntax>.Rent();
         for (var index = 0; index < parameterNames.Length; index++)
@@ -4017,9 +3751,7 @@ internal partial class AkburaSemanticModel
             CSharpSyntaxFactory.SeparatedList(parameters.ToImmutable()));
     }
 
-    private static CSharp.ParameterListSyntax CreateEventHandlerProbeParameterList(
-        IRoutedEventSymbol routedEvent,
-        ImmutableArray<string> parameterNames)
+    private static CSharp.ParameterListSyntax CreateEventHandlerProbeParameterList(IRoutedEventSymbol routedEvent, ImmutableArray<string> parameterNames)
     {
         if (routedEvent.HandlerType.Symbol is not INamedTypeSymbol { DelegateInvokeMethod: { } invokeMethod })
         {
@@ -4075,10 +3807,7 @@ internal partial class AkburaSemanticModel
             .BindReturnExpression(compilationUnit, isBindingPath: true);
     }
 
-    internal CSharpBindingResult BindMarkupAttributeExpression(
-        AkburaSyntax scopeSyntax,
-        CSharp.ExpressionSyntax expressionSyntax,
-        ITypeSymbol? targetType = null)
+    internal CSharpBindingResult BindMarkupAttributeExpression(AkburaSyntax scopeSyntax, CSharp.ExpressionSyntax expressionSyntax, ITypeSymbol? targetType = null)
     {
         var scope = GetMarkupBindingScope(scopeSyntax);
         var bound = BindingSession
@@ -4177,9 +3906,7 @@ internal partial class AkburaSemanticModel
         return builder.ToImmutable();
     }
 
-    private bool TryCreateParamProbeField(
-        ParamDeclarationSyntax paramDeclaration,
-        out CSharp.FieldDeclarationSyntax field)
+    private bool TryCreateParamProbeField(ParamDeclarationSyntax paramDeclaration, out CSharp.FieldDeclarationSyntax field)
     {
         field = null!;
 
@@ -4217,9 +3944,7 @@ internal partial class AkburaSemanticModel
         return true;
     }
 
-    private static bool TryCreateInjectProbeField(
-        InjectDeclarationSyntax injectDeclaration,
-        out CSharp.FieldDeclarationSyntax field)
+    private static bool TryCreateInjectProbeField(InjectDeclarationSyntax injectDeclaration, out CSharp.FieldDeclarationSyntax field)
     {
         field = null!;
 
@@ -4240,8 +3965,7 @@ internal partial class AkburaSemanticModel
         }
     }
 
-    private ImmutableArray<CSharp.MemberDeclarationSyntax> CreateCommandProbeMembers(
-        CommandDeclarationSyntax commandDeclaration)
+    private ImmutableArray<CSharp.MemberDeclarationSyntax> CreateCommandProbeMembers(CommandDeclarationSyntax commandDeclaration)
     {
         if (GetSymbolInfo(commandDeclaration).Symbol is not ICommandSymbol command)
         {
@@ -4260,9 +3984,7 @@ internal partial class AkburaSemanticModel
         return ImmutableArray.Create<CSharp.MemberDeclarationSyntax>(commandClass, commandField);
     }
 
-    private ImmutableArray<CSharp.MemberDeclarationSyntax> CreateCommandProbeTypeMembers(
-        CommandDeclarationSyntax commandDeclaration,
-        ICommandSymbol command)
+    private ImmutableArray<CSharp.MemberDeclarationSyntax> CreateCommandProbeTypeMembers(CommandDeclarationSyntax commandDeclaration, ICommandSymbol command)
     {
         using var builder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
 
@@ -4334,9 +4056,7 @@ internal partial class AkburaSemanticModel
         return builder.ToString();
     }
 
-    private static CSharp.FieldDeclarationSyntax CreateProbeField(
-        CSharp.TypeSyntax type,
-        string name)
+    private static CSharp.FieldDeclarationSyntax CreateProbeField(CSharp.TypeSyntax type, string name)
     {
         return CSharpSyntaxFactory.FieldDeclaration(
                 CSharpSyntaxFactory.VariableDeclaration(type)
@@ -4357,10 +4077,7 @@ internal partial class AkburaSemanticModel
         };
     }
 
-    internal AkburaSemanticDiagnostic CreateTailwindUtilityNotFoundDiagnostic(
-        TailwindAttributeSyntax syntax,
-        string utilityName,
-        IMarkupComponentSymbol? componentSymbol)
+    internal AkburaSemanticDiagnostic CreateTailwindUtilityNotFoundDiagnostic(TailwindAttributeSyntax syntax, string utilityName, IMarkupComponentSymbol? componentSymbol)
     {
         return new AkburaSemanticDiagnostic(
             syntax,
@@ -4368,10 +4085,7 @@ internal partial class AkburaSemanticModel
             [utilityName, componentSymbol?.Name ?? "<unknown>"]);
     }
 
-    internal AkburaSemanticDiagnostic CreateTailwindUtilityAmbiguousDiagnostic(
-        TailwindAttributeSyntax syntax,
-        string utilityName,
-        IMarkupComponentSymbol? componentSymbol)
+    internal AkburaSemanticDiagnostic CreateTailwindUtilityAmbiguousDiagnostic(TailwindAttributeSyntax syntax, string utilityName, IMarkupComponentSymbol? componentSymbol)
     {
         return new AkburaSemanticDiagnostic(
             syntax,
@@ -4379,10 +4093,7 @@ internal partial class AkburaSemanticModel
             [utilityName, componentSymbol?.Name ?? "<unknown>"]);
     }
 
-    internal AkburaSemanticDiagnostic CreateTailwindUtilityArgumentMismatchDiagnostic(
-        TailwindAttributeSyntax syntax,
-        ITailwindUtilitySymbol utility,
-        int actualCount)
+    internal AkburaSemanticDiagnostic CreateTailwindUtilityArgumentMismatchDiagnostic(TailwindAttributeSyntax syntax, ITailwindUtilitySymbol utility, int actualCount)
     {
         return new AkburaSemanticDiagnostic(
             syntax,
@@ -4390,11 +4101,7 @@ internal partial class AkburaSemanticModel
             [utility.Name, utility.Parameters.Length, actualCount]);
     }
 
-    internal static AkburaSemanticDiagnostic
-        CreateTailwindMarkupExtensionResultMismatchDiagnostic(
-            AkburaSyntax syntax,
-            ITypeSymbol? resultType,
-            ITypeSymbol expectedType)
+    internal static AkburaSemanticDiagnostic CreateTailwindMarkupExtensionResultMismatchDiagnostic(AkburaSyntax syntax, ITypeSymbol? resultType, ITypeSymbol expectedType)
     {
         return new AkburaSemanticDiagnostic(
             syntax,
@@ -4408,10 +4115,7 @@ internal partial class AkburaSemanticModel
             ]);
     }
 
-    internal static AkburaSemanticDiagnostic
-        CreateTailwindVariantResultMismatchDiagnostic(
-            AkburaSyntax syntax,
-            ITypeSymbol? resultType)
+    internal static AkburaSemanticDiagnostic CreateTailwindVariantResultMismatchDiagnostic(AkburaSyntax syntax, ITypeSymbol? resultType)
     {
         return new AkburaSemanticDiagnostic(
             syntax,
@@ -4423,9 +4127,7 @@ internal partial class AkburaSemanticModel
             ]);
     }
 
-    internal static AkburaSemanticDiagnostic
-        CreateTailwindLegacyPrefixDiagnostic(
-            SimpleConditionalPrefixSyntax syntax)
+    internal static AkburaSemanticDiagnostic CreateTailwindLegacyPrefixDiagnostic(SimpleConditionalPrefixSyntax syntax)
     {
         return new AkburaSemanticDiagnostic(
             syntax,
@@ -4433,9 +4135,7 @@ internal partial class AkburaSemanticModel
             [syntax.Name.Identifier.ValueText]);
     }
 
-    internal static AkburaSemanticDiagnostic CreateUtilityBindingPrioritySourceMissingDiagnostic(
-        AkburaSyntax syntax,
-        INamedTypeSymbol extensionType)
+    internal static AkburaSemanticDiagnostic CreateUtilityBindingPrioritySourceMissingDiagnostic(AkburaSyntax syntax, INamedTypeSymbol extensionType)
     {
         return new AkburaSemanticDiagnostic(
             syntax,
@@ -4443,9 +4143,7 @@ internal partial class AkburaSemanticModel
             [extensionType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)]);
     }
 
-    internal static AkburaSemanticDiagnostic CreateUtilityBindingPrioritySourceConflictDiagnostic(
-        AkburaSyntax syntax,
-        INamedTypeSymbol extensionType)
+    internal static AkburaSemanticDiagnostic CreateUtilityBindingPrioritySourceConflictDiagnostic(AkburaSyntax syntax, INamedTypeSymbol extensionType)
     {
         return new AkburaSemanticDiagnostic(
             syntax,
@@ -4453,10 +4151,7 @@ internal partial class AkburaSemanticModel
             [extensionType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)]);
     }
 
-    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityMemberNotFoundDiagnostic(
-        AkburaSyntax syntax,
-        string memberName,
-        INamedTypeSymbol extensionType)
+    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityMemberNotFoundDiagnostic(AkburaSyntax syntax, string memberName, INamedTypeSymbol extensionType)
     {
         return new AkburaSemanticDiagnostic(
             syntax,
@@ -4464,9 +4159,7 @@ internal partial class AkburaSemanticModel
             [memberName, extensionType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)]);
     }
 
-    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityMemberStaticDiagnostic(
-        AkburaSyntax syntax,
-        Microsoft.CodeAnalysis.ISymbol member)
+    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityMemberStaticDiagnostic(AkburaSyntax syntax, Microsoft.CodeAnalysis.ISymbol member)
     {
         return new AkburaSemanticDiagnostic(
             syntax,
@@ -4474,9 +4167,7 @@ internal partial class AkburaSemanticModel
             [member.Name]);
     }
 
-    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityMemberInaccessibleDiagnostic(
-        AkburaSyntax syntax,
-        Microsoft.CodeAnalysis.ISymbol member)
+    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityMemberInaccessibleDiagnostic(AkburaSyntax syntax, Microsoft.CodeAnalysis.ISymbol member)
     {
         return new AkburaSemanticDiagnostic(
             syntax,
@@ -4484,9 +4175,7 @@ internal partial class AkburaSemanticModel
             [member.Name]);
     }
 
-    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityMemberUnreadableDiagnostic(
-        AkburaSyntax syntax,
-        Microsoft.CodeAnalysis.ISymbol member)
+    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityMemberUnreadableDiagnostic(AkburaSyntax syntax, Microsoft.CodeAnalysis.ISymbol member)
     {
         return new AkburaSemanticDiagnostic(
             syntax,
@@ -4494,10 +4183,7 @@ internal partial class AkburaSemanticModel
             [member.Name]);
     }
 
-    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityMemberTypeMismatchDiagnostic(
-        AkburaSyntax syntax,
-        Microsoft.CodeAnalysis.ISymbol member,
-        ITypeSymbol memberType)
+    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityMemberTypeMismatchDiagnostic(AkburaSyntax syntax, Microsoft.CodeAnalysis.ISymbol member, ITypeSymbol memberType)
     {
         return new AkburaSemanticDiagnostic(
             syntax,
@@ -4508,9 +4194,7 @@ internal partial class AkburaSemanticModel
             ]);
     }
 
-    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityNotSupportedDiagnostic(
-        AkburaSyntax syntax,
-        string priority)
+    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityNotSupportedDiagnostic(AkburaSyntax syntax, string priority)
     {
         return new AkburaSemanticDiagnostic(
             syntax,
@@ -4518,9 +4202,7 @@ internal partial class AkburaSemanticModel
             [priority]);
     }
 
-    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityTargetNotSupportedDiagnostic(
-        AkburaSyntax syntax,
-        Akbura.Language.Symbols.IPropertySymbol? property)
+    internal static AkburaSemanticDiagnostic CreateUtilityBindingPriorityTargetNotSupportedDiagnostic(AkburaSyntax syntax, Akbura.Language.Symbols.IPropertySymbol? property)
     {
         return new AkburaSemanticDiagnostic(
             syntax,
@@ -4528,9 +4210,7 @@ internal partial class AkburaSemanticModel
             [property?.Name ?? "<unknown>"]);
     }
 
-    private static AkburaSemanticDiagnostic CreateMarkupExpressionErrorDiagnostic(
-        MarkupAttributeSyntax syntax,
-        Diagnostic diagnostic)
+    private static AkburaSemanticDiagnostic CreateMarkupExpressionErrorDiagnostic(MarkupAttributeSyntax syntax, Diagnostic diagnostic)
     {
         return CreateMarkupExpressionErrorDiagnostic(
             syntax,
@@ -4546,10 +4226,7 @@ internal partial class AkburaSemanticModel
             : valueSyntax.ToFullString().Trim();
     }
 
-    private static AkburaSemanticDiagnostic CreateMarkupExpressionErrorDiagnostic(
-        AkburaSyntax syntax,
-        string expressionText,
-        Diagnostic diagnostic)
+    private static AkburaSemanticDiagnostic CreateMarkupExpressionErrorDiagnostic(AkburaSyntax syntax, string expressionText, Diagnostic diagnostic)
     {
         return new AkburaSemanticDiagnostic(
             syntax,
@@ -4557,10 +4234,7 @@ internal partial class AkburaSemanticModel
             [expressionText, diagnostic.GetMessage()]);
     }
 
-    private static AkburaSemanticDiagnostic CreateMarkupExtensionErrorDiagnostic(
-        AkburaSyntax syntax,
-        string expressionText,
-        string message)
+    private static AkburaSemanticDiagnostic CreateMarkupExtensionErrorDiagnostic(AkburaSyntax syntax, string expressionText, string message)
     {
         return new AkburaSemanticDiagnostic(
             syntax,
@@ -4568,10 +4242,7 @@ internal partial class AkburaSemanticModel
             ["${" + expressionText + "}", message]);
     }
 
-    internal static AkburaSemanticDiagnostic CreateTailwindMarkupExtensionDiagnostic(
-        AkburaSyntax syntax,
-        string expressionText,
-        string message)
+    internal static AkburaSemanticDiagnostic CreateTailwindMarkupExtensionDiagnostic(AkburaSyntax syntax, string expressionText, string message)
     {
         return CreateMarkupExtensionErrorDiagnostic(
             syntax,
@@ -4579,8 +4250,7 @@ internal partial class AkburaSemanticModel
             message);
     }
 
-    private static bool IsUpdateDependentMarkupExtension(
-        MarkupExtensionSyntax extensionSyntax)
+    private static bool IsUpdateDependentMarkupExtension(MarkupExtensionSyntax extensionSyntax)
     {
         foreach (var argument in extensionSyntax.Arguments)
         {
@@ -4611,9 +4281,7 @@ internal partial class AkburaSemanticModel
         return false;
     }
 
-    internal static AkburaSemanticDiagnostic CreateMarkupWhitespaceValueInvalidDiagnostic(
-        MarkupAttributeSyntax syntax,
-        string rawValue)
+    internal static AkburaSemanticDiagnostic CreateMarkupWhitespaceValueInvalidDiagnostic(MarkupAttributeSyntax syntax, string rawValue)
     {
         return new AkburaSemanticDiagnostic(
             syntax,
@@ -4621,11 +4289,7 @@ internal partial class AkburaSemanticModel
             [rawValue]);
     }
 
-    private static AkburaSemanticDiagnostic CreateMarkupCommandHandlerSignatureMismatchDiagnostic(
-        MarkupAttributeSyntax markupAttribute,
-        ICommandSymbol command,
-        string expected,
-        string actual)
+    private static AkburaSemanticDiagnostic CreateMarkupCommandHandlerSignatureMismatchDiagnostic(MarkupAttributeSyntax markupAttribute, ICommandSymbol command, string expected, string actual)
     {
         return new AkburaSemanticDiagnostic(
             markupAttribute,
@@ -4633,10 +4297,7 @@ internal partial class AkburaSemanticModel
             [command.Name, expected, actual]);
     }
 
-    private static AkburaSemanticDiagnostic
-        CreateAkcssSelfImportDiagnostic(
-            AkcssUsingDirectiveSyntax usingDirective,
-            string importName)
+    private static AkburaSemanticDiagnostic CreateAkcssSelfImportDiagnostic(AkcssUsingDirectiveSyntax usingDirective, string importName)
     {
         return new AkburaSemanticDiagnostic(
             usingDirective,
@@ -4668,17 +4329,7 @@ internal partial class AkburaSemanticModel
             operation: default,
             diagnostics: ImmutableArray<Diagnostic>.Empty);
 
-        public MarkupCommandHandlerAnalysis(
-            MarkupCommandHandlerKind kind,
-            MarkupCommandArgumentMode argumentMode,
-            MarkupCommandResultMode resultMode,
-            int parameterCount,
-            bool isAsync,
-            bool containsAwait,
-            CSharpSymbolDefinition type,
-            CSharpSymbolDefinition resultType,
-            CSharpOperationDefinition operation,
-            ImmutableArray<Diagnostic> diagnostics = default)
+        public MarkupCommandHandlerAnalysis(MarkupCommandHandlerKind kind, MarkupCommandArgumentMode argumentMode, MarkupCommandResultMode resultMode, int parameterCount, bool isAsync, bool containsAwait, CSharpSymbolDefinition type, CSharpSymbolDefinition resultType, CSharpOperationDefinition operation, ImmutableArray<Diagnostic> diagnostics = default)
         {
             Kind = kind;
             ArgumentMode = argumentMode;
@@ -4726,14 +4377,7 @@ internal partial class AkburaSemanticModel
             operation: default,
             diagnostics: ImmutableArray<Diagnostic>.Empty);
 
-        public MarkupEventHandlerAnalysis(
-            MarkupCommandHandlerKind kind,
-            MarkupCommandArgumentMode argumentMode,
-            int parameterCount,
-            bool isAsync,
-            bool containsAwait,
-            CSharpOperationDefinition operation,
-            ImmutableArray<Diagnostic> diagnostics)
+        public MarkupEventHandlerAnalysis(MarkupCommandHandlerKind kind, MarkupCommandArgumentMode argumentMode, int parameterCount, bool isAsync, bool containsAwait, CSharpOperationDefinition operation, ImmutableArray<Diagnostic> diagnostics)
         {
             Kind = kind;
             ArgumentMode = argumentMode;

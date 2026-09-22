@@ -84,6 +84,84 @@ public sealed class WorkspaceMarkupExtensionSessionTests
             document, position, opening, out _));
     }
 
+    [Theory]
+    [InlineData(
+        "<Border Tag=${Binding Customer.Na|me} />",
+        AkburaCompletionContextKind.BindingPath,
+        "Na",
+        "Name",
+        "Customer.")]
+    [InlineData(
+        "<Border Tag=${Binding Path=Customer.Add|ress} />",
+        AkburaCompletionContextKind.BindingPath,
+        "Add",
+        "Address",
+        "Customer.")]
+    [InlineData(
+        "<Border Tag=${Binding Customer.Name, Mo|} />",
+        AkburaCompletionContextKind.MarkupExtensionArgumentName,
+        "Mo",
+        "Mo",
+        null)]
+    [InlineData(
+        "<Border Tag=${Binding Mode=Tw|oWay} />",
+        AkburaCompletionContextKind.MarkupExtensionArgumentValue,
+        "Tw",
+        "TwoWay",
+        null)]
+    [InlineData(
+        "<Border Tag=${ReflectionBinding Customer.Na|me} />",
+        AkburaCompletionContextKind.BindingPath,
+        "Na",
+        "Name",
+        "Customer.")]
+    [InlineData(
+        "<Border Tag=${CompiledBinding Path=Customer.Na|me} />",
+        AkburaCompletionContextKind.BindingPath,
+        "Na",
+        "Name",
+        "Customer.")]
+    [InlineData(
+        "<Border Tag=${Custom 0, Mo|} />",
+        AkburaCompletionContextKind.MarkupExtensionArgumentName,
+        "Mo",
+        "Mo",
+        null)]
+    [InlineData(
+        "<Border Tag=${Custom 0, Mode=Pr|imary} />",
+        AkburaCompletionContextKind.MarkupExtensionArgumentValue,
+        "Pr",
+        "Primary",
+        null)]
+    [InlineData(
+        "<Border Tag=${Custom Text=\"C:\\\\\", Mo|} />",
+        AkburaCompletionContextKind.MarkupExtensionArgumentName,
+        "Mo",
+        "Mo",
+        null)]
+    public void ArgumentContext_DistinguishesBindingPathNamesAndValues(string marked, AkburaCompletionContextKind expectedKind, string expectedPrefix, string expectedApplicableText, string? expectedCompletedPath)
+    {
+        var (document, position, _) = Parse(marked);
+
+        var context = document.GetCompletionContext(position);
+
+        Assert.Equal(expectedKind, context.Kind);
+        Assert.Equal(expectedPrefix, context.Prefix);
+        Assert.Equal(
+            expectedApplicableText,
+            document.Text.ToString(context.ApplicableSpan));
+        Assert.Equal(expectedCompletedPath, context.CompletedPath);
+        var extensionNameStart = marked.IndexOf(
+            "${",
+            StringComparison.Ordinal) + 2;
+        var extensionNameEnd = marked.IndexOf(
+            ' ',
+            extensionNameStart);
+        Assert.Equal(
+            marked[extensionNameStart..extensionNameEnd],
+            context.MarkupExtensionName);
+    }
+
     [Fact]
     public void ARequestForAnOuterOpener_CannotSwitchANestedSession()
     {
@@ -108,8 +186,7 @@ public sealed class WorkspaceMarkupExtensionSessionTests
             document.Text.WithChanges(new TextChange(span, "StaticResource")).ToString());
     }
 
-    private static void AssertTransition(
-        AkburaSyntacticDocument incremental, int position, int opening, int previousStart)
+    private static void AssertTransition(AkburaSyntacticDocument incremental, int position, int opening, int previousStart)
     {
         var full = AkburaSyntacticDocument.Parse(incremental.Text, "MainView.akbura");
         Assert.True(AkburaMarkupExtensionCompletionFacts.TryGetTypeNameSpan(

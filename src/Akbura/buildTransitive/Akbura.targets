@@ -35,6 +35,18 @@
 		<!-- Keep source files as None items so Visual Studio can create and display them. -->
 		<AdditionalFiles Include="@(_AkburaModuleSource)"
 						 Exclude="@(AdditionalFiles)" />
+
+		<!--
+			Expose evaluated Avalonia XAML resources to Roslyn workspaces.
+			The Akbura generators filter their inputs by extension, while the
+			editor uses these AdditionalDocuments as source-only resource facts.
+		-->
+		<AdditionalFiles
+			Include="@(AvaloniaResource->WithMetadataValue('Extension', '.axaml'))"
+			Exclude="@(AdditionalFiles)" />
+		<AdditionalFiles
+			Include="@(AvaloniaXaml->WithMetadataValue('Extension', '.axaml'))"
+			Exclude="@(AdditionalFiles)" />
 	</ItemGroup>
 
 	<Target Name="GenerateAkburaModuleManifest"

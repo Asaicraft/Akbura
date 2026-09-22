@@ -131,6 +131,37 @@ public sealed class ComponentFirstUpdateActionTests
     }
 
     [Fact]
+    public void NamedDataTemplate_DoesNotAssignMissingClrNameProperty()
+    {
+        const string component =
+            """
+            using Avalonia.Markup.Xaml.Templates;
+
+            state int count = 0;
+
+            <DataTemplate
+                x.Name="settingsPageTemplate"
+                DataType={count.GetType()} />
+            """;
+        var fixture = AkcssActivatorPlannerTests.CreateFixture(component);
+        using var codeWriter = new CodeWriter("\n");
+        using var writer = CreateWriter(codeWriter, fixture);
+        var assignment = Assert.Single(writer.Plan.NameAssignments);
+
+        Assert.False(assignment.AssignsClrName);
+
+        var output = WriteFirstUpdateActionsAndAssertCompiles(
+            codeWriter,
+            writer,
+            fixture);
+
+        Assert.DoesNotContain(
+            "settingsPageTemplate.Name",
+            output,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void WriteFirstUpdateActions_EmitsAvaloniaRoutedEventRegistration()
     {
         const string component =
@@ -224,6 +255,8 @@ public sealed class ComponentFirstUpdateActionTests
         codeWriter.WriteLine("public void Build()");
         codeWriter.WriteLine("{");
         codeWriter.CurrentIndent = 8;
+        codeWriter.WriteLine("count = 0;");
+        codeWriter.WriteLine("_ = count;");
 
         for (var i = 0; i < writer.Plan.Elements.Length; i++)
         {

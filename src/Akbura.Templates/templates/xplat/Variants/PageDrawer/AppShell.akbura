@@ -1,0 +1,57 @@
+using AkburaTemplateNamespace.ViewModels;
+using Avalonia.Controls;
+
+namespace AkburaTemplateNamespace.Views;
+
+inject MainViewModel Vm;
+
+state int selectedPage = 0;
+
+<PageNavigationHost
+    DataContext={Vm}
+    x.DataType="MainViewModel">
+
+    <PageNavigationHost.Page>
+        <DrawerPage
+            x.Name="drawer"
+            Header="Akbura">
+
+            <DrawerPage.Drawer>
+                <ListBox
+                    x.Name="menu"
+                    ItemsSource={new[] { "Home", "Settings" }}
+                    SelectedIndex="0"
+                    SelectionChanged={() =>
+                    {
+                        var selectedIndex = menu.SelectedIndex;
+                        if (selectedIndex < 0)
+                        {
+                            return;
+                        }
+
+                        selectedPage = selectedIndex;
+                        drawer.IsOpen = false;
+                    }} />
+            </DrawerPage.Drawer>
+
+            <DrawerPage.Content>
+                $if (selectedPage == 0)
+                {
+                    <ContentPage Header="Home">
+                        <MainView DataContext={Vm} />
+                    </ContentPage>
+                }
+                $else
+                {
+                    <ContentPage Header="Settings">
+                        <TextBlock
+                            Text="Settings for your Akbura application"
+                            Margin="24" />
+                    </ContentPage>
+                }
+            </DrawerPage.Content>
+
+        </DrawerPage>
+    </PageNavigationHost.Page>
+
+</PageNavigationHost>

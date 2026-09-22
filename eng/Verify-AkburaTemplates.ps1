@@ -143,6 +143,11 @@ try {
         "content/templates/xplat/AkburaXplatTemplate.slnx",
         "content/templates/xplat/AkburaXplatTemplate/AkburaXplatTemplate.csproj",
         "content/templates/xplat/AkburaXplatTemplate/Views/MainView.akbura",
+        "content/templates/xplat/Variants/PageNone/AppShell.akbura",
+        "content/templates/xplat/Variants/PageContent/AppShell.akbura",
+        "content/templates/xplat/Variants/PageTabbed/AppShell.akbura",
+        "content/templates/xplat/Variants/PageDrawer/AppShell.akbura",
+        "content/templates/xplat/Variants/PageNavigation/AppShell.akbura",
         "content/templates/xplat/AkburaXplatTemplate.Desktop/AkburaXplatTemplate.Desktop.csproj",
         "content/templates/xplat/AkburaXplatTemplate.Browser/AkburaXplatTemplate.Browser.csproj",
         "content/templates/xplat/AkburaXplatTemplate.Android/AkburaXplatTemplate.Android.csproj",
@@ -152,6 +157,9 @@ try {
         "content/templates/partial-component/NewComponent.akbura",
         "content/templates/partial-component/NewComponent.akbura.cs"
     )
+
+    Assert-Condition (@($entries | Where-Object { $_ -like "*/MainViewHost.cs" }).Count -eq 0) (
+        "Template package contains the retired MainViewHost.cs factory.")
 
     foreach ($entry in $requiredEntries) {
         Assert-Condition ($entries -contains $entry) (

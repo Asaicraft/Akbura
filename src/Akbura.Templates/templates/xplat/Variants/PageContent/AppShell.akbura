@@ -1,0 +1,18 @@
+using AkburaTemplateNamespace.ViewModels;
+using Avalonia.Controls;
+
+namespace AkburaTemplateNamespace.Views;
+
+inject MainViewModel Vm;
+
+<PageNavigationHost
+    DataContext={Vm}
+    x.DataType="MainViewModel">
+
+    <PageNavigationHost.Page>
+        <ContentPage Header="Home">
+            <MainView DataContext={Vm} />
+        </ContentPage>
+    </PageNavigationHost.Page>
+
+</PageNavigationHost>

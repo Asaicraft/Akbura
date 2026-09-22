@@ -57,15 +57,18 @@ internal readonly struct ComponentFirstUpdateActionPlan
 
 internal readonly struct ComponentNameAssignmentPlan
 {
-    public ComponentNameAssignmentPlan(string name, AkburaSyntax syntax)
+    public ComponentNameAssignmentPlan(string name, AkburaSyntax syntax, bool assignsClrName)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
+        AssignsClrName = assignsClrName;
     }
 
     public string Name { get; }
 
     public AkburaSyntax Syntax { get; }
+
+    public bool AssignsClrName { get; }
 }
 
 internal enum ComponentRoutedEventKind : byte

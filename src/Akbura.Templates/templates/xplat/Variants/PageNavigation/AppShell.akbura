@@ -1,0 +1,90 @@
+using AkburaTemplateNamespace.ViewModels;
+using Avalonia.Controls;
+using Avalonia.Markup.Xaml.Templates;
+using System;
+
+namespace AkburaTemplateNamespace.Views;
+
+inject MainViewModel Vm;
+
+state bool navigationPending = false;
+
+<PageNavigationHost
+    DataContext={Vm}
+    x.DataType="MainViewModel">
+
+    <PageNavigationHost.Resources>
+        <DataTemplate
+            x.Key="SettingsPageTemplate"
+            x.Name="settingsPageTemplate">
+
+            <ContentPage
+                x.Name="settingsPage"
+                Header="Settings">
+
+                <StackPanel
+                    Margin="24"
+                    Spacing="12">
+
+                    <TextBlock Text="Settings for your Akbura application" />
+                    <Button
+                        Content="Back to Home"
+                        Click={async () =>
+                        {
+                            var navigation = settingsPage.Navigation;
+                            if (navigation?.CanGoBack == true)
+                            {
+                                await navigation.PopAsync();
+                            }
+                        }} />
+
+                </StackPanel>
+            </ContentPage>
+        </DataTemplate>
+    </PageNavigationHost.Resources>
+
+    <PageNavigationHost.Page>
+        <NavigationPage x.Name="navigation">
+            <NavigationPage.Content>
+                <ContentPage Header="Home">
+                    <StackPanel>
+                        <MainView DataContext={Vm} />
+                        <Button
+                            Content="Open Settings"
+                            Margin="16"
+                            Click={async () =>
+                            {
+                                if (navigationPending || navigation.IsNavigating)
+                                {
+                                    return;
+                                }
+
+                                navigationPending = true;
+                                try
+                                {
+                                    if (settingsPageTemplate.Build(Vm) is not Page settingsPage)
+                                    {
+                                        throw new InvalidOperationException(
+                                            "The settings template must create a native Page.");
+                                    }
+
+                                    if (settingsPage.Parent is not null)
+                                    {
+                                        throw new InvalidOperationException(
+                                            "The settings page is already attached to a parent.");
+                                    }
+
+                                    await navigation.PushAsync(settingsPage);
+                                }
+                                finally
+                                {
+                                    navigationPending = false;
+                                }
+                            }} />
+                    </StackPanel>
+                </ContentPage>
+            </NavigationPage.Content>
+        </NavigationPage>
+    </PageNavigationHost.Page>
+
+</PageNavigationHost>

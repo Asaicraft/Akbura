@@ -1,0 +1,32 @@
+using AkburaTemplateNamespace.ViewModels;
+using Avalonia.Controls;
+// Explicitly supplies a concrete AvaloniaList<Page> value to the IEnumerable<Page> property.
+using PageList = Avalonia.Collections.AvaloniaList<Avalonia.Controls.Page>;
+
+namespace AkburaTemplateNamespace.Views;
+
+inject MainViewModel Vm;
+
+<PageNavigationHost
+    DataContext={Vm}
+    x.DataType="MainViewModel">
+
+    <PageNavigationHost.Page>
+        <TabbedPage>
+            <TabbedPage.Pages>
+                <PageList>
+                    <ContentPage Header="Home">
+                        <MainView DataContext={Vm} />
+                    </ContentPage>
+
+                    <ContentPage Header="Settings">
+                        <TextBlock
+                            Text="Settings for your Akbura application"
+                            Margin="24" />
+                    </ContentPage>
+                </PageList>
+            </TabbedPage.Pages>
+        </TabbedPage>
+    </PageNavigationHost.Page>
+
+</PageNavigationHost>

@@ -1,0 +1,14 @@
+using AkburaTemplateNamespace.ViewModels;
+using Avalonia.Controls;
+
+namespace AkburaTemplateNamespace.Views;
+
+inject MainViewModel Vm;
+
+<UserControl
+    DataContext={Vm}
+    x.DataType="MainViewModel">
+
+    <MainView DataContext={Vm} />
+
+</UserControl>

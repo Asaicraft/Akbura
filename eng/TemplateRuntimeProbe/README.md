@@ -20,9 +20,13 @@ replacement, and view reattachment. It does not claim to exercise mobile host
 launch, animated navigation, or a real browser/device. For an xplat shared project,
 pass `-p:TemplateKind=xplat -p:TemplatePageType=None` (or the selected
 `ContentPage`, `TabbedPage`, `DrawerPage`, or `NavigationPage` value). This also
-tests the chosen page shell and that the shared `MainViewHost` factory returns
-distinct visual trees with the same ViewModel DataContext. It does not invoke
-the Android `IActivityApplicationLifetime.MainViewFactory` delegate.
+creates the generated `AppShell`, sets its required `Vm` property and outer
+`DataContext`, attaches it, and inspects its initialized native page tree. The
+probe checks independent shell trees, tab collection stability, drawer behavior,
+real PushAsync/PopAsync navigation, explicit-value precedence over DI, provider-
+only construction, and the normal missing-service error without DI. It does not
+invoke the Android `IActivityApplicationLifetime.MainViewFactory` delegate;
+startup source verification preserves that delegate's fresh-AppShell contract.
 The NavigationPage assertion disables visual animation under Headless while
 checking real PushAsync/PopAsync, page-stack, and Back behavior. Pass
 `-p:TemplateToolkit=ReactiveUI` for a ReactiveUI-generated project so the

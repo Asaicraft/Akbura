@@ -1521,7 +1521,9 @@ internal static partial class ComponentPlanner
                     LowerDataType(pending.DataType);
                     return;
                 case PendingFirstUpdateActionKind.NameAssignment:
-                    LowerNameAssignment((IMarkupNameAssignmentOperation)pending.Operation!);
+                    LowerNameAssignment(
+                        (IMarkupNameAssignmentOperation)pending.Operation!,
+                        targetType);
                     return;
                 case PendingFirstUpdateActionKind.RoutedEvent:
                     LowerRoutedEvent((IMarkupRoutedEventBindingOperation)pending.Operation!);
@@ -1564,7 +1566,7 @@ internal static partial class ComponentPlanner
                 ComponentFirstUpdateActionPlan.CreateWrite(writeIndex));
         }
 
-        private void LowerNameAssignment(IMarkupNameAssignmentOperation operation)
+        private void LowerNameAssignment(IMarkupNameAssignmentOperation operation, ITypeSymbol targetType)
         {
             if (!operation.IsAssignedDuringFirstUpdate || operation.NameSymbol is not { } name)
             {
@@ -1572,8 +1574,29 @@ internal static partial class ComponentPlanner
             }
 
             var index = _nameAssignments.Count;
-            _nameAssignments.Add(new ComponentNameAssignmentPlan(name.Name, operation.Syntax));
+            _nameAssignments.Add(new ComponentNameAssignmentPlan(
+                name.Name,
+                operation.Syntax,
+                CanAssignClrName(targetType)));
             _firstUpdateActions.Add(ComponentFirstUpdateActionPlan.CreateNameAssignment(index));
+        }
+
+        private static bool CanAssignClrName(ITypeSymbol targetType)
+        {
+            for (var current = targetType as INamedTypeSymbol; current != null; current = current.BaseType)
+            {
+                foreach (var property in current.GetMembers("Name").OfType<RoslynPropertySymbol>())
+                {
+                    if (!property.IsStatic &&
+                        property.Type.SpecialType == SpecialType.System_String &&
+                        property.SetMethod?.DeclaredAccessibility == Accessibility.Public)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         private void LowerRoutedEvent(IMarkupRoutedEventBindingOperation operation)

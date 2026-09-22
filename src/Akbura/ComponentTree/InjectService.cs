@@ -63,6 +63,9 @@ public abstract class InjectService
             setter);
 #pragma warning restore AVP1001 // The same AvaloniaProperty should not be registered twice
 
+        property.Changed.AddClassHandler<TOwner>(static (owner, _) =>
+            owner.OnServiceChanged());
+
         return new(property, isOptional);
     }
 

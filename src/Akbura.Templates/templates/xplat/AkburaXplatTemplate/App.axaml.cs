@@ -28,7 +28,11 @@ public partial class App : Application
             desktop.MainWindow = new MainWindow
             {
                 DataContext = viewModel,
-                Content = MainViewHost.CreateWithDataContext(viewModel)
+                Content = new AppShell
+                {
+                    Vm = viewModel,
+                    DataContext = viewModel
+                }
             };
 
             desktop.Exit += (_, _) => AppServices.DisposeOwnedServices();
@@ -48,12 +52,20 @@ public partial class App : Application
         {
             var viewModel = AppServices.Current.MainViewModel;
             // Android can recreate an Activity. Each invocation must receive a fresh visual tree.
-            activity.MainViewFactory = () => MainViewHost.CreateWithDataContext(viewModel);
+            activity.MainViewFactory = () => new AppShell
+            {
+                Vm = viewModel,
+                DataContext = viewModel
+            };
         }
         else if (ApplicationLifetime is ISingleViewApplicationLifetime singleView)
         {
             var viewModel = AppServices.Current.MainViewModel;
-            singleView.MainView = MainViewHost.CreateWithDataContext(viewModel);
+            singleView.MainView = new AppShell
+            {
+                Vm = viewModel,
+                DataContext = viewModel
+            };
         }
 
         base.OnFrameworkInitializationCompleted();

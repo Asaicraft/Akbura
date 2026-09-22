@@ -375,31 +375,118 @@ function Assert-GeneratedTemplate {
             $androidProperties.UseDefaultPublishRuntimeIdentifier -eq "false") (
             "$Name Android project does not disable the default publish " +
             "runtime identifier.")
-        $mainViewHosts = @(Get-ChildItem -LiteralPath $Directory -Recurse -Filter MainViewHost.cs)
-        Assert-Condition ($mainViewHosts.Count -eq 1) (
-            "$Name must have exactly one selected MainViewHost.cs.")
-        $hostContent = Get-Content -LiteralPath $mainViewHosts[0].FullName -Raw
+        $appShells = @(Get-ChildItem -LiteralPath $Directory -Recurse -Filter AppShell.akbura)
+        Assert-Condition ($appShells.Count -eq 1) (
+            "$Name must have exactly one selected AppShell.akbura.")
+        Assert-Condition (@(Get-ChildItem -LiteralPath $Directory -Recurse -Filter MainViewHost.cs).Count -eq 0) (
+            "$Name leaked the retired MainViewHost.cs factory.")
+        Assert-Condition (@(Get-ChildItem -LiteralPath $Directory -Recurse -Filter HomePage.cs).Count -eq 0) (
+            "$Name leaked an imperative HomePage.cs factory.")
+        Assert-Condition (@(Get-ChildItem -LiteralPath $Directory -Recurse -Filter SettingsPage.cs).Count -eq 0) (
+            "$Name leaked an imperative SettingsPage.cs factory.")
+        $shellMarkup = Get-Content -LiteralPath $appShells[0].FullName -Raw
+        Assert-Condition ($shellMarkup.Contains(
+            "inject MainViewModel Vm;", [StringComparison]::Ordinal)) (
+            "$Name AppShell does not inject MainViewModel as Vm.")
+        $mainNamespace = [regex]::Match(
+            $markup,
+            "(?m)^namespace\s+([^;]+);").Groups[1].Value
+        $shellNamespace = [regex]::Match(
+            $shellMarkup,
+            "(?m)^namespace\s+([^;]+);").Groups[1].Value
+        Assert-Condition (![string]::IsNullOrWhiteSpace($mainNamespace) -and
+            $shellNamespace -eq $mainNamespace) (
+            "$Name AppShell does not use the generated Views namespace.")
+        $csharpSources = (@(
+            Get-ChildItem -LiteralPath $Directory -Recurse -File -Filter *.cs |
+                Where-Object { $_.FullName -notmatch '[\\/](obj|bin)[\\/]' } |
+                ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }
+        ) -join "`n")
+        foreach ($factoryPattern in @(
+            "new ContentPage",
+            "new TabbedPage",
+            "new DrawerPage",
+            "new NavigationPage",
+            "new PageNavigationHost")) {
+            Assert-Condition (!$csharpSources.Contains(
+                $factoryPattern, [StringComparison]::Ordinal)) (
+                "$Name contains imperative native page construction '$factoryPattern'.")
+        }
         $appSource = Get-Content -LiteralPath (
             Join-Path $Directory "$Name/App.axaml.cs") -Raw
         Assert-Condition ($appSource.Contains(
-            "Content = MainViewHost.CreateWithDataContext(viewModel)",
+            "Content = new AppShell",
             [StringComparison]::Ordinal)) (
-            "$Name desktop startup does not pass MainViewModel to MainViewHost.")
+            "$Name desktop startup does not create AppShell.")
+        Assert-Condition ($appSource.Contains(
+            "Vm = viewModel", [StringComparison]::Ordinal) -and
+            $appSource.Contains(
+                "DataContext = viewModel", [StringComparison]::Ordinal)) (
+            "$Name startup does not pass MainViewModel explicitly to AppShell.")
+        Assert-Condition ($appSource.Contains(
+            "activity.MainViewFactory = () => new AppShell",
+            [StringComparison]::Ordinal)) (
+            "$Name activity startup does not create a fresh AppShell tree.")
+        Assert-Condition (([regex]::Matches(
+            $appSource,
+            "new AppShell",
+            [Text.RegularExpressions.RegexOptions]::CultureInvariant)).Count -eq 3) (
+            "$Name must create AppShell independently for desktop, activity and single-view lifetimes.")
         $pageSources = (@(
             Get-ChildItem -LiteralPath $Directory -Recurse -File |
-                Where-Object { $_.Extension -in @(".cs", ".axaml") } |
+                Where-Object { $_.Extension -in @(".cs", ".axaml", ".akbura") } |
                 ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }
         ) -join "`n")
         if ($PageType -eq "None") {
-            Assert-Condition ($hostContent.Contains("new UserControl", [StringComparison]::Ordinal) -and
-                $hostContent.Contains("Content = CreateMainView(viewModel)", [StringComparison]::Ordinal)) (
-                "$Name must wrap MainView in an ordinary UserControl host.")
+            Assert-Condition ($shellMarkup.Contains("<UserControl", [StringComparison]::Ordinal) -and
+                $shellMarkup.Contains("<MainView DataContext={Vm}", [StringComparison]::Ordinal) -and
+                !$shellMarkup.Contains("PageNavigationHost", [StringComparison]::Ordinal) -and
+                !$shellMarkup.Contains("PageList", [StringComparison]::Ordinal)) (
+                "$Name must declare an ordinary UserControl AppShell.")
+        }
+        elseif ($PageType -eq "ContentPage") {
+            Assert-Condition ($shellMarkup.Contains("<PageNavigationHost.Page>", [StringComparison]::Ordinal) -and
+                $shellMarkup.Contains('<ContentPage Header="Home">', [StringComparison]::Ordinal) -and
+                $shellMarkup.Contains("<MainView DataContext={Vm}", [StringComparison]::Ordinal)) (
+                "$Name must declare a native ContentPage inside PageNavigationHost.Page.")
+        }
+        elseif ($PageType -eq "TabbedPage") {
+            Assert-Condition ($shellMarkup.Contains(
+                "using PageList = Avalonia.Collections.AvaloniaList<Avalonia.Controls.Page>;",
+                [StringComparison]::Ordinal) -and
+                $shellMarkup.Contains("<TabbedPage.Pages>", [StringComparison]::Ordinal) -and
+                $shellMarkup.Contains("<PageList>", [StringComparison]::Ordinal) -and
+                $shellMarkup.Contains('<ContentPage Header="Home">', [StringComparison]::Ordinal) -and
+                $shellMarkup.Contains('<ContentPage Header="Settings">', [StringComparison]::Ordinal)) (
+                "$Name must use the exact PageList alias and native tab pages.")
+        }
+        elseif ($PageType -eq "DrawerPage") {
+            Assert-Condition ($shellMarkup.Contains("state int selectedPage = 0;", [StringComparison]::Ordinal) -and
+                $shellMarkup.Contains("<DrawerPage", [StringComparison]::Ordinal) -and
+                $shellMarkup.Contains("<ListBox", [StringComparison]::Ordinal) -and
+                $shellMarkup.Contains("selectedIndex < 0", [StringComparison]::Ordinal) -and
+                $shellMarkup.Contains("drawer.IsOpen = false", [StringComparison]::Ordinal) -and
+                $shellMarkup.Contains('<ContentPage Header="Home">', [StringComparison]::Ordinal) -and
+                $shellMarkup.Contains('<ContentPage Header="Settings">', [StringComparison]::Ordinal)) (
+                "$Name must declare native drawer navigation and guard invalid selections.")
+        }
+        elseif ($PageType -eq "NavigationPage") {
+            Assert-Condition ($shellMarkup.Contains("<PageNavigationHost.Resources>", [StringComparison]::Ordinal) -and
+                $shellMarkup.Contains("<DataTemplate", [StringComparison]::Ordinal) -and
+                $shellMarkup.Contains('x.Key="SettingsPageTemplate"', [StringComparison]::Ordinal) -and
+                $shellMarkup.Contains('x.Name="settingsPageTemplate"', [StringComparison]::Ordinal) -and
+                $shellMarkup.Contains("<NavigationPage.Content>", [StringComparison]::Ordinal) -and
+                $shellMarkup.Contains("PushAsync", [StringComparison]::Ordinal) -and
+                $shellMarkup.Contains("PopAsync", [StringComparison]::Ordinal) -and
+                !$shellMarkup.Contains("PageList", [StringComparison]::Ordinal)) (
+                "$Name must declare native navigation pages and a reusable settings DataTemplate.")
         }
         else {
-            Assert-Condition ($hostContent.Contains($PageType, [StringComparison]::Ordinal) -or
-                $pageSources.Contains($PageType, [StringComparison]::Ordinal)) (
-                "$Name did not generate its $PageType shell.")
+            throw "Unsupported page type '$PageType'."
         }
+        Assert-Condition ($pageSources.Contains($PageType, [StringComparison]::Ordinal) -or
+            $PageType -eq "None") (
+            "$Name did not generate its $PageType shell.")
     }
 
     $forbidden = @("AkburaAppTemplate", "AkburaMvvmTemplate", "AkburaXplatTemplate",
@@ -1119,12 +1206,21 @@ foreach ($case in $startupCases) {
         "clean", $probeProject) + $properties + @(
         "--configuration", "Release")
     Invoke-DotNetLogged "$caseId-release-clean" $cleanArguments
+    $startupFilter = if ($case.Kind -eq "xplat") {
+        "FullyQualifiedName~GeneratedApplicationStartsWithRegisteredServices" +
+            "|FullyQualifiedName~SelectedPageTypeBuildsRealPageShells" +
+            "|FullyQualifiedName~ProviderOnlyAppShellUsesRegisteredViewModel" +
+            "|FullyQualifiedName~AppShellWithoutViewModelPreservesRequiredServiceError"
+    }
+    else {
+        "FullyQualifiedName~GeneratedApplicationStartsWithRegisteredServices"
+    }
     $testArguments = @(
         "test", $probeProject) + $properties + @(
         "--configuration", "Release",
         "--no-restore",
         "--filter",
-        "FullyQualifiedName~GeneratedApplicationStartsWithRegisteredServices",
+        $startupFilter,
         "--blame-hang-timeout", "2m")
     Invoke-DotNetLogged "$caseId-release-test" $testArguments
     Remove-SuccessfulDirectory $directory

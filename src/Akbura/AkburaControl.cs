@@ -553,6 +553,11 @@ public abstract partial class AkburaControl : Control, IComponentTree
         RequestUpdate();
     }
 
+    internal void OnServiceChanged()
+    {
+        RequestUpdate();
+    }
+
     internal void ApplyHotReload(Action<long> scheduleRefresh)
     {
         ArgumentNullException.ThrowIfNull(scheduleRefresh);

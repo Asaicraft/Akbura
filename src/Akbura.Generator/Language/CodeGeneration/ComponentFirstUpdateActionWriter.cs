@@ -26,11 +26,19 @@ internal readonly ref struct ComponentFirstUpdateActionWriter
     {
         Debug.Assert(!string.IsNullOrEmpty(targetExpression));
 
+        if (!plan.AssignsClrName && string.IsNullOrEmpty(nameScopeExpression))
+        {
+            return;
+        }
+
         using var mapping = _mappings.WriteStart(plan.Syntax);
-        _writer.Write(targetExpression);
-        _writer.Write(".Name = ");
-        _writer.WriteStringLiteral(plan.Name);
-        _writer.WriteLine(";");
+        if (plan.AssignsClrName)
+        {
+            _writer.Write(targetExpression);
+            _writer.Write(".Name = ");
+            _writer.WriteStringLiteral(plan.Name);
+            _writer.WriteLine(";");
+        }
 
         if (string.IsNullOrEmpty(nameScopeExpression))
         {

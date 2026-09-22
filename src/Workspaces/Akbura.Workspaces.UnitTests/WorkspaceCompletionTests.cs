@@ -793,6 +793,45 @@ public sealed class WorkspaceCompletionTests
             });
     }
 
+    [Fact]
+    public void Completion_InsideAliasedPageListResolvesAliasAndOffersPageTypes()
+    {
+        const string sourceWithCaret = """
+            using Avalonia.Controls;
+            using PageList = Avalonia.Collections.AvaloniaList<Avalonia.Controls.Page>;
+
+            <PageList>
+                <|
+            </PageList>
+            """;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, count: 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var semanticModel = semanticContext.Project.Compilation
+                    .GetSemanticModel(semanticContext.Document.SyntaxTree);
+                AssertDataType(
+                    semanticModel,
+                    "PageList",
+                    "global::Avalonia.Collections.AvaloniaList<global::Avalonia.Controls.Page>");
+
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.Contains(
+                    result.Items,
+                    static item =>
+                        item.DisplayText == "ContentPage" &&
+                        item.Kind == AkburaCompletionKind.Component);
+            });
+    }
+
     [Theory]
     [InlineData("<|", "")]
     [InlineData("<Bord|", "Bord")]
@@ -5956,6 +5995,14 @@ public sealed class WorkspaceCompletionTests
                 {
                 }
 
+                public class Page : Control
+                {
+                }
+
+                public sealed class ContentPage : Page
+                {
+                }
+
                 public sealed class ItemsControl : Control
                 {
                     public object? ItemsSource { get; set; }
@@ -6075,6 +6122,14 @@ public sealed class WorkspaceCompletionTests
                         int value)
                     {
                     }
+                }
+            }
+
+            namespace Avalonia.Collections
+            {
+                public class AvaloniaList<T> :
+                    System.Collections.Generic.List<T>
+                {
                 }
             }
 

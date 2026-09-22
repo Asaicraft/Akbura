@@ -1,5 +1,6 @@
 using System.Windows.Input;
 using System.Reflection;
+using Akbura;
 using Akbura.Engine;
 using Avalonia;
 using Avalonia.Controls;
@@ -98,6 +99,14 @@ public sealed class GeneratedBindingTests
 
     private static readonly Type GreetingCardType = typeof(MainViewModel).Assembly.GetType(
         "TemplateRuntimeProbeApp.Components.GreetingCard", throwOnError: true)!;
+
+#if XPLAT_TEMPLATE
+    private static readonly Type AppShellType = typeof(MainViewModel).Assembly.GetType(
+        "TemplateRuntimeProbeApp.Views.AppShell", throwOnError: true)!;
+
+    private static readonly PropertyInfo AppShellVmProperty = AppShellType.GetProperty(
+        "Vm", BindingFlags.Public | BindingFlags.Instance)!;
+#endif
 
 #if TEMPLATE_STARTUP
     [Fact]
@@ -280,156 +289,168 @@ public sealed class GeneratedBindingTests
     {
         await Dispatch(() =>
         {
-            var expectedPageType = typeof(GeneratedBindingTests).Assembly
-                .GetCustomAttributes<AssemblyMetadataAttribute>()
-                .Single(attribute =>
-                    attribute.Key == "AkburaTemplatePageType")
-                .Value;
+            var expectedPageType = GetExpectedPageType();
             var viewModel = NewViewModel();
-            var root = CreateHostWithDataContext(viewModel);
+            var shell = CreateAppShell(viewModel);
+            var window = new Window { Content = shell };
 
-            if (expectedPageType == "None")
+            try
             {
-                var userControl = Assert.IsType<UserControl>(root);
-                var mainView = Assert.IsAssignableFrom<Control>(
-                    userControl.Content);
-                Assert.Equal(MainViewType, mainView.GetType());
-                Assert.Same(root.DataContext, mainView.DataContext);
-                return;
-            }
+                window.Show();
+                var root = GetInitializedRoot(shell);
 
-            var host = Assert.IsType<PageNavigationHost>(root);
-            Assert.NotNull(host.Page);
+                Assert.Same(viewModel, AppShellVmProperty.GetValue(shell));
+                Assert.Same(viewModel, shell.DataContext);
+#if TEMPLATE_DI
+                Assert.NotSame(GeneratedServices.ViewModel, viewModel);
+#endif
 
-            switch (expectedPageType)
-            {
-                case "ContentPage":
+                if (expectedPageType == "None")
                 {
-                    var page = Assert.IsType<ContentPage>(host.Page);
-                    Assert.Equal("Home", page.Header);
-                    Assert.Equal(MainViewType,
-                        Assert.IsAssignableFrom<Control>(page.Content)
-                            .GetType());
-                    break;
+                    var userControl = Assert.IsType<UserControl>(root);
+                    var mainView = Assert.IsAssignableFrom<Control>(
+                        userControl.Content);
+                    Assert.Equal(MainViewType, mainView.GetType());
+                    Assert.Same(viewModel, mainView.DataContext);
+                    return;
                 }
 
-                case "TabbedPage":
+                var host = Assert.IsType<PageNavigationHost>(root);
+                Assert.NotNull(host.Page);
+
+                switch (expectedPageType)
                 {
-                    var tabs = Assert.IsType<TabbedPage>(host.Page);
-                    Assert.NotNull(tabs.Pages);
-                    var pages = tabs.Pages.ToArray();
-                    Assert.Equal(2, pages.Length);
-                    var home = Assert.IsType<ContentPage>(pages[0]);
-                    var settings = Assert.IsType<ContentPage>(pages[1]);
-                    Assert.Equal("Home", home.Header);
-                    Assert.Equal("Settings", settings.Header);
-                    Assert.Equal(MainViewType,
-                        Assert.IsAssignableFrom<Control>(home.Content)
-                            .GetType());
-                    Assert.IsType<TextBlock>(settings.Content);
-                    break;
-                }
-
-                case "DrawerPage":
-                {
-                    var drawer = Assert.IsType<DrawerPage>(host.Page);
-                    var menu = Assert.IsType<ListBox>(drawer.Drawer);
-                    var home = Assert.IsType<ContentPage>(drawer.Content);
-                    Assert.Equal("Home", home.Header);
-                    Assert.Equal(MainViewType,
-                        Assert.IsAssignableFrom<Control>(home.Content)
-                            .GetType());
-
-                    menu.SelectedIndex = 1;
-                    Drain();
-                    var settings = Assert.IsType<ContentPage>(drawer.Content);
-                    Assert.Equal("Settings", settings.Header);
-                    Assert.IsType<TextBlock>(settings.Content);
-
-                    menu.SelectedIndex = 0;
-                    Drain();
-                    var recreatedHome = Assert.IsType<ContentPage>(
-                        drawer.Content);
-                    Assert.Equal("Home", recreatedHome.Header);
-                    Assert.Same(
-                        viewModel,
-                        Assert.IsAssignableFrom<Control>(recreatedHome.Content)
-                            .DataContext);
-                    break;
-                }
-
-                case "NavigationPage":
-                {
-                    var navigation = Assert.IsAssignableFrom<NavigationPage>(
-                        host.Page);
-                    // Headless Dispatch runs this assertion on the UI thread, so
-                    // animated transitions cannot advance while it waits.
-                    // Keep real PushAsync/PopAsync and stack behavior under test.
-                    navigation.PageTransition = null;
-                    var assembly = typeof(MainViewModel).Assembly;
-                    var homeType = assembly.GetType(
-                        "TemplateRuntimeProbeApp.Views.HomePage",
-                        throwOnError: true)!;
-                    var settingsType = assembly.GetType(
-                        "TemplateRuntimeProbeApp.Views.SettingsPage",
-                        throwOnError: true)!;
-                    var home = Assert.IsAssignableFrom<ContentPage>(
-                        Activator.CreateInstance(homeType, nonPublic: true));
-                    var settings = Assert.IsAssignableFrom<ContentPage>(
-                        Activator.CreateInstance(settingsType,
-                            nonPublic: true));
-                    Assert.Equal("Home", home.Header);
-                    Assert.Equal("Settings", settings.Header);
-                    var homeContent = Assert.IsType<StackPanel>(home.Content);
-                    Assert.Contains(homeContent.Children,
-                        child => child.GetType() == MainViewType);
-                    Assert.Contains(homeContent.Children.OfType<Button>(),
-                        button => button.Content?.ToString() ==
-                            "Open Settings");
-                    var settingsContent = Assert.IsType<StackPanel>(
-                        settings.Content);
-                    Assert.Contains(settingsContent.Children.OfType<Button>(),
-                        button => button.Content?.ToString() ==
-                            "Back to Home");
-
-                    var window = new Window { Content = root };
-                    try
+                    case "ContentPage":
                     {
-                        window.Show();
-                        WaitForPage(navigation, homeType);
+                        var page = Assert.IsType<ContentPage>(host.Page);
+                        Assert.Equal("Home", page.Header);
+                        var mainView = Assert.IsAssignableFrom<Control>(page.Content);
+                        Assert.Equal(MainViewType, mainView.GetType());
+                        Assert.Same(viewModel, mainView.DataContext);
+                        break;
+                    }
 
+                    case "TabbedPage":
+                    {
+                        var tabs = Assert.IsType<TabbedPage>(host.Page);
+                        var pages = Assert.IsType<
+                            Avalonia.Collections.AvaloniaList<Page>>(tabs.Pages);
+                        Assert.Equal(2, pages.Count);
+                        var home = Assert.IsType<ContentPage>(pages[0]);
+                        var settings = Assert.IsType<ContentPage>(pages[1]);
+                        Assert.Equal("Home", home.Header);
+                        Assert.Equal("Settings", settings.Header);
+                        var mainView = Assert.IsAssignableFrom<Control>(home.Content);
+                        Assert.Equal(MainViewType, mainView.GetType());
+                        Assert.Same(viewModel, mainView.DataContext);
+                        var settingsText = Assert.IsType<TextBlock>(settings.Content);
+                        Assert.Equal(
+                            "Settings for your Akbura application",
+                            settingsText.Text);
+                        Assert.Equal(new Thickness(24), settingsText.Margin);
+                        break;
+                    }
+
+                    case "DrawerPage":
+                    {
+                        var drawer = Assert.IsType<DrawerPage>(host.Page);
+                        Assert.Equal("Akbura", drawer.Header);
+                        var menu = Assert.IsType<ListBox>(drawer.Drawer);
+                        Assert.Equal(0, menu.SelectedIndex);
+                        Assert.Equal(
+                            ["Home", "Settings"],
+                            Assert.IsAssignableFrom<IEnumerable<string>>(
+                                menu.ItemsSource).ToArray());
+                        var home = Assert.IsType<ContentPage>(drawer.Content);
+                        Assert.Equal("Home", home.Header);
+                        Assert.Same(
+                            viewModel,
+                            Assert.IsAssignableFrom<Control>(home.Content)
+                                .DataContext);
+
+                        menu.SelectedIndex = -1;
+                        Drain();
+                        Assert.Same(home, drawer.Content);
+
+                        drawer.IsOpen = true;
+                        menu.SelectedIndex = 1;
+                        Drain();
+                        var settings = Assert.IsType<ContentPage>(drawer.Content);
+                        Assert.Equal("Settings", settings.Header);
+                        Assert.False(drawer.IsOpen);
+                        var settingsText = Assert.IsType<TextBlock>(
+                            settings.Content);
+                        Assert.Equal(new Thickness(24), settingsText.Margin);
+
+                        menu.SelectedIndex = 0;
+                        Drain();
+                        var returnedHome = Assert.IsType<ContentPage>(
+                            drawer.Content);
+                        Assert.Equal("Home", returnedHome.Header);
+                        Assert.Same(
+                            viewModel,
+                            Assert.IsAssignableFrom<Control>(returnedHome.Content)
+                                .DataContext);
+                        break;
+                    }
+
+                    case "NavigationPage":
+                    {
+                        Assert.True(host.Resources.ContainsKey(
+                            "SettingsPageTemplate"));
+                        Assert.IsType<Avalonia.Markup.Xaml.Templates.DataTemplate>(
+                            host.Resources["SettingsPageTemplate"]);
+                        var navigation = Assert.IsType<NavigationPage>(host.Page);
+                        navigation.PageTransition = null;
+                        var home = WaitForPage(navigation, "Home");
+                        Assert.Equal(1, navigation.StackDepth);
+                        var homeContent = Assert.IsType<StackPanel>(home.Content);
+                        Assert.Contains(
+                            homeContent.Children,
+                            child => child.GetType() == MainViewType);
                         var openSettings = Assert.Single(
-                            Assert.IsType<StackPanel>(
-                                Assert.IsAssignableFrom<ContentPage>(
-                                    navigation.CurrentPage).Content)
-                                .Children.OfType<Button>(),
+                            homeContent.Children.OfType<Button>(),
                             button => button.Content?.ToString() ==
                                 "Open Settings");
+                        Assert.Equal(new Thickness(16), openSettings.Margin);
+
                         openSettings.RaiseEvent(new RoutedEventArgs(
                             Button.ClickEvent));
-                        WaitForPage(navigation, settingsType);
-
+                        var firstSettings = WaitForPage(
+                            navigation,
+                            "Settings");
+                        Assert.Equal(2, navigation.StackDepth);
+                        var settingsContent = Assert.IsType<StackPanel>(
+                            firstSettings.Content);
+                        Assert.Equal(new Thickness(24), settingsContent.Margin);
+                        Assert.Equal(12, settingsContent.Spacing);
                         var back = Assert.Single(
-                            Assert.IsType<StackPanel>(
-                                Assert.IsAssignableFrom<ContentPage>(
-                                    navigation.CurrentPage).Content)
-                                .Children.OfType<Button>(),
+                            settingsContent.Children.OfType<Button>(),
                             button => button.Content?.ToString() ==
                                 "Back to Home");
-                        back.RaiseEvent(new RoutedEventArgs(
-                            Button.ClickEvent));
-                        WaitForPage(navigation, homeType);
-                    }
-                    finally
-                    {
-                        window.Close();
-                    }
-                    break;
-                }
 
-                default:
-                    throw new InvalidOperationException(
-                        $"Unexpected page type '{expectedPageType}'.");
+                        back.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        Assert.Same(home, WaitForPage(navigation, "Home"));
+                        Assert.Equal(1, navigation.StackDepth);
+
+                        openSettings.RaiseEvent(new RoutedEventArgs(
+                            Button.ClickEvent));
+                        var secondSettings = WaitForPage(
+                            navigation,
+                            "Settings");
+                        Assert.NotSame(firstSettings, secondSettings);
+                        Assert.Equal(2, navigation.StackDepth);
+                        break;
+                    }
+
+                    default:
+                        throw new InvalidOperationException(
+                            $"Unexpected page type '{expectedPageType}'.");
+                }
+            }
+            finally
+            {
+                window.Close();
             }
         });
     }
@@ -440,25 +461,19 @@ public sealed class GeneratedBindingTests
         await Dispatch(() =>
         {
             var viewModel = NewViewModel();
-            var root = CreateHostWithDataContext(viewModel);
-            var window = new Window { Content = root };
-            var navigation = (root as PageNavigationHost)?.Page as
-                NavigationPage;
-            if (navigation is not null)
-            {
-                navigation.PageTransition = null;
-            }
+            var shell = CreateAppShell(viewModel);
+            var window = new Window { Content = shell };
 
             try
             {
                 window.Show();
-
+                var root = GetInitializedRoot(shell);
+                var navigation = (root as PageNavigationHost)?.Page as
+                    NavigationPage;
                 if (navigation is not null)
                 {
-                    var homeType = typeof(MainViewModel).Assembly.GetType(
-                        "TemplateRuntimeProbeApp.Views.HomePage",
-                        throwOnError: true)!;
-                    WaitForPage(navigation, homeType);
+                    navigation.PageTransition = null;
+                    WaitForPage(navigation, "Home");
                 }
 
                 if ((root as PageNavigationHost)?.Page is DrawerPage drawer)
@@ -467,13 +482,10 @@ public sealed class GeneratedBindingTests
                     menu.SelectedIndex = 1;
                     Drain();
                     menu.SelectedIndex = 0;
+                    Drain();
                 }
 
-                Drain();
-
-                var mainView = Assert.Single(
-                    root.GetVisualDescendants().OfType<Control>(),
-                    control => control.GetType() == MainViewType);
+                var mainView = FindMainView(shell);
                 Assert.Same(viewModel, mainView.DataContext);
 
                 var count = Assert.Single(mainView.GetVisualDescendants()
@@ -498,69 +510,226 @@ public sealed class GeneratedBindingTests
     }
 
     [Fact]
-    public async Task MainViewHostCreatesFreshVisualTreesForOneViewModel()
+    public async Task AppShellCreatesFreshInitializedTreesForOneViewModel()
     {
         await Dispatch(() =>
         {
             var viewModel = NewViewModel();
-            var first = CreateHostWithDataContext(viewModel);
-            var second = CreateHostWithDataContext(viewModel);
+            var first = CreateAppShell(viewModel);
+            var second = CreateAppShell(viewModel);
+            var firstWindow = new Window { Content = first };
+            var secondWindow = new Window { Content = second };
 
-            Assert.NotSame(first, second);
-            Assert.Same(viewModel, first.DataContext);
-            Assert.Same(viewModel, second.DataContext);
-
-            if (first is UserControl firstHost)
+            try
             {
-                var secondHost = Assert.IsType<UserControl>(second);
-                var firstView = Assert.IsAssignableFrom<Control>(
-                    firstHost.Content);
-                var secondView = Assert.IsAssignableFrom<Control>(
-                    secondHost.Content);
+                firstWindow.Show();
+                secondWindow.Show();
+                var firstRoot = GetInitializedRoot(first);
+                var secondRoot = GetInitializedRoot(second);
+                var firstView = FindMainView(first);
+                var secondView = FindMainView(second);
 
-                Assert.Equal(MainViewType, firstView.GetType());
-                Assert.Equal(MainViewType, secondView.GetType());
+                Assert.NotSame(first, second);
+                Assert.NotSame(firstRoot, secondRoot);
                 Assert.NotSame(firstView, secondView);
+                Assert.Same(viewModel, first.DataContext);
+                Assert.Same(viewModel, second.DataContext);
                 Assert.Same(viewModel, firstView.DataContext);
                 Assert.Same(viewModel, secondView.DataContext);
+
+                if (firstRoot is PageNavigationHost firstHost)
+                {
+                    var secondHost = Assert.IsType<PageNavigationHost>(secondRoot);
+                    Assert.NotSame(firstHost.Page, secondHost.Page);
+
+                    if (firstHost.Page is TabbedPage firstTabs)
+                    {
+                        var secondTabs = Assert.IsType<TabbedPage>(secondHost.Page);
+                        Assert.NotSame(firstTabs.Pages, secondTabs.Pages);
+                        var firstPages = firstTabs.Pages!.ToArray();
+                        var secondPages = secondTabs.Pages!.ToArray();
+                        Assert.Equal(2, firstPages.Length);
+                        Assert.Equal(2, secondPages.Length);
+                        Assert.NotSame(firstPages[0], secondPages[0]);
+                        Assert.NotSame(firstPages[1], secondPages[1]);
+                    }
+                }
+                else
+                {
+                    var firstUserControl = Assert.IsType<UserControl>(firstRoot);
+                    var secondUserControl = Assert.IsType<UserControl>(secondRoot);
+                    Assert.NotSame(firstUserControl.Content, secondUserControl.Content);
+                }
+            }
+            finally
+            {
+                firstWindow.Close();
+                secondWindow.Close();
             }
         });
     }
 
-    private static Control CreateHostWithDataContext(
-        MainViewModel viewModel)
+    [Fact]
+    public async Task TabbedShellUpdateAndReattachmentPreserveStaticPagesAndSelection()
     {
-        var hostType = typeof(MainViewModel).Assembly.GetType(
-            "TemplateRuntimeProbeApp.Views.MainViewHost",
-            throwOnError: true)!;
-        var factory = hostType.GetMethod(
-            "CreateWithDataContext",
-            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
-            binder: null,
-            types: [typeof(MainViewModel)],
-            modifiers: null);
-        Assert.NotNull(factory);
+        if (GetExpectedPageType() != "TabbedPage")
+        {
+            return;
+        }
 
-        return Assert.IsAssignableFrom<Control>(
-            factory.Invoke(null, [viewModel]));
+        await Dispatch(() =>
+        {
+            var previous = NewViewModel();
+            var current = NewViewModel();
+            var shell = CreateAppShell(previous);
+            var window = new Window { Content = shell };
+
+            try
+            {
+                window.Show();
+                var host = Assert.IsType<PageNavigationHost>(
+                    GetInitializedRoot(shell));
+                var tabs = Assert.IsType<TabbedPage>(host.Page);
+                var pages = Assert.IsType<
+                    Avalonia.Collections.AvaloniaList<Page>>(tabs.Pages);
+                var home = Assert.IsType<ContentPage>(pages[0]);
+                var mainView = Assert.IsAssignableFrom<Control>(home.Content);
+                tabs.SelectedIndex = 1;
+                Drain();
+
+                AppShellVmProperty.SetValue(shell, current);
+                shell.DataContext = current;
+                Drain();
+
+                Assert.Same(host, shell.Child);
+                Assert.Same(tabs, host.Page);
+                Assert.Same(pages, tabs.Pages);
+                Assert.Equal(2, pages.Count);
+                Assert.Equal(1, tabs.SelectedIndex);
+                Assert.Same(mainView, home.Content);
+                Assert.Same(current, mainView.DataContext);
+
+                window.Content = null;
+                Drain();
+                window.Content = shell;
+                Drain();
+
+                Assert.Same(host, shell.Child);
+                Assert.Same(pages, tabs.Pages);
+                Assert.Equal(2, pages.Count);
+                Assert.Equal(1, tabs.SelectedIndex);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
     }
 
-    private static void WaitForPage(
+#if TEMPLATE_DI
+    [Fact]
+    public async Task ProviderOnlyAppShellUsesRegisteredViewModel()
+    {
+        await Dispatch(() =>
+        {
+            var shell = CreateAppShellWithoutViewModel();
+            var window = new Window { Content = shell };
+
+            try
+            {
+                window.Show();
+                GetInitializedRoot(shell);
+                Assert.Same(
+                    GeneratedServices.ViewModel,
+                    AppShellVmProperty.GetValue(shell));
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+#else
+    [Fact]
+    public async Task AppShellWithoutViewModelPreservesRequiredServiceError()
+    {
+        await Dispatch(() =>
+        {
+            var shell = CreateAppShellWithoutViewModel();
+            var window = new Window { Content = shell };
+
+            try
+            {
+                var exception = Assert.Throws<AkburaServiceNotFoundException>(
+                    window.Show);
+                Assert.Contains(
+                    nameof(MainViewModel),
+                    exception.Message,
+                    StringComparison.Ordinal);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+#endif
+
+    private static string GetExpectedPageType()
+    {
+        return typeof(GeneratedBindingTests).Assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .Single(attribute =>
+                attribute.Key == "AkburaTemplatePageType")
+            .Value!;
+    }
+
+    private static AkburaControl CreateAppShell(MainViewModel viewModel)
+    {
+        var shell = CreateAppShellWithoutViewModel();
+        AppShellVmProperty.SetValue(shell, viewModel);
+        shell.DataContext = viewModel;
+        return shell;
+    }
+
+    private static AkburaControl CreateAppShellWithoutViewModel()
+    {
+        return Assert.IsAssignableFrom<AkburaControl>(
+            Activator.CreateInstance(AppShellType, nonPublic: true));
+    }
+
+    private static Control GetInitializedRoot(AkburaControl shell)
+    {
+        Drain();
+        return Assert.IsAssignableFrom<Control>(shell.Child);
+    }
+
+    private static Control FindMainView(AkburaControl shell)
+    {
+        return Assert.Single(
+            shell.GetVisualDescendants().OfType<Control>(),
+            control => control.GetType() == MainViewType);
+    }
+
+    private static ContentPage WaitForPage(
         NavigationPage navigation,
-        Type expected)
+        string header)
     {
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(3);
-        while ((navigation.CurrentPage?.GetType() != expected ||
-                navigation.IsNavigating) &&
+        while (((navigation.CurrentPage as ContentPage)?.Header?.ToString() !=
+                    header || navigation.IsNavigating) &&
                DateTime.UtcNow < deadline)
         {
             Dispatcher.UIThread.RunJobs();
             Thread.Sleep(10);
         }
 
-        Assert.Equal(expected, navigation.CurrentPage?.GetType());
-        Assert.False(navigation.IsNavigating,
-            $"Navigation to {expected.Name} did not finish before the timeout.");
+        var page = Assert.IsType<ContentPage>(navigation.CurrentPage);
+        Assert.Equal(header, page.Header);
+        Assert.False(
+            navigation.IsNavigating,
+            $"Navigation to {header} did not finish before the timeout.");
+        return page;
     }
 #endif
 

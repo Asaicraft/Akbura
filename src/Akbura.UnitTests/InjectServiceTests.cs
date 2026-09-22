@@ -52,6 +52,24 @@ public sealed class InjectServiceTests
     }
 
     [Fact]
+    public void ServiceChangeAfterInitializationRequestsComponentUpdate()
+    {
+        var initialService = new TestService();
+        var control = new TestComponent(
+            CreateEngine(new RecordingServiceProvider(initialService)),
+            useOptionalService: false,
+            returnNewArray: false);
+        control.InitializeForTest();
+        var previousUpdateCount = control.UpdateCount;
+        var replacement = new TestService();
+
+        control.Service = replacement;
+
+        Assert.Same(replacement, control.Service);
+        Assert.Equal(previousUpdateCount + 1, control.UpdateCount);
+    }
+
+    [Fact]
     public void OnInitialized_AllowsMissingOptionalService()
     {
         var provider = new RecordingServiceProvider(service: null);
@@ -206,6 +224,11 @@ public sealed class InjectServiceTests
             get; private set;
         }
 
+        public int UpdateCount
+        {
+            get; private set;
+        }
+
         public void InitializeForTest()
         {
             base.OnInitialized();
@@ -213,6 +236,7 @@ public sealed class InjectServiceTests
 
         protected override Control Update()
         {
+            UpdateCount++;
             return new Border();
         }
 

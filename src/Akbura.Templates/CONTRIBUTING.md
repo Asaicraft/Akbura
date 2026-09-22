@@ -10,7 +10,7 @@ Keep the attribution and license notices of copied sources and resources.
 | Akbura template | Upstream source | Shared user choice | Deliberate difference |
 | --- | --- | --- | --- |
 | `akbura.mvvm` | `templates/csharp/app-mvvm` | MVVM toolkit, ViewLocator, Avalonia version, restore opt-out | Akbura `.akbura` UI, .NET 10/C# only, Akbura version, DI, optional CPM. |
-| `akbura.xplat` | `templates/csharp/xplat` | MVVM toolkit, ViewLocator, Avalonia version, CPM, five page types | Akbura `.akbura` UI in thin page shells, .NET 10/C# only, Akbura version and DI; no whole-solution restore. |
+| `akbura.xplat` | `templates/csharp/xplat` | MVVM toolkit, ViewLocator, Avalonia version, CPM, five page types | Declarative `AppShell.akbura` with native Avalonia pages, .NET 10/C# only, Akbura version and DI; no whole-solution restore. |
 
 `akbura.app` is independent and intentionally remains a local-state/hooks
 demonstration; it is not replaced by MVVM. The component item templates are
@@ -34,10 +34,14 @@ The two new templates support `net10.0` and C# only. F#, net8.0, and net9.0
 are not offered because the current Akbura runtime and compiler template path
 do not support those combinations. `--di` and `--mvvm` are independent: selecting
 ReactiveUI does not imply Splat.Locator registrations, and selecting a container
-does not select a toolkit. The generated UI uses native `${Binding ...}` with a
-runtime DataContext and a compile-time `x.DataType`; `.axaml` page shells use
-normal Avalonia XAML syntax. AkburaControl remains a Control, so an Avalonia
-Page navigation host must receive an actual thin Page shell.
+does not select a toolkit. The generated UI uses native `${Binding ...}` with a runtime DataContext and a
+compile-time `x.DataType`. Every xplat page choice emits one declarative
+`Views/AppShell.akbura`; startup supplies the application-owned ViewModel to
+both its required `Vm` property and outer `DataContext`. The tabbed shell keeps
+its local `PageList` alias to `AvaloniaList<Page>` so the native
+`IEnumerable<Page>` property receives one concrete collection containing real
+`ContentPage` objects. AkburaControl remains a Control, so page hosts must
+receive actual Avalonia Page instances from the shell markup.
 
 ## Known drift points
 
@@ -51,8 +55,10 @@ Page navigation host must receive an actual thin Page shell.
   example ViewModel remains application-scoped.
 - In xplat ReactiveUI variants, call `UseReactiveUI` before `UseAkbura` resolves
   `AppServices.Current`: constructing `MainViewModel` first fails on Browser.
-- Recheck all five `MainViewPageType` choices. No choice may silently fall back
-  to an ordinary Control or leave unused page implementations in the output.
+- Recheck all five `MainViewPageType` choices. Each generated project must have
+  exactly one selected `Views/AppShell.akbura`, no `MainViewHost.cs` or C# page
+  factory, and no unselected variant sources. Activity startup must create a
+  fresh shell tree for the shared application ViewModel.
 - Keep all application-template version defaults in sync. Both template CI and
   NuGet release invoke `eng/Set-AkburaTemplateVersions.ps1`, which stamps
   `app`, `app-mvvm`, and `xplat` and checks their values inside the packed nupkg.

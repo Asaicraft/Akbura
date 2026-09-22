@@ -67,9 +67,10 @@
     { "path": "AkburaXplatTemplate.iOS/AkburaXplatTemplate.iOS.csproj" },
     { "path": "AkburaXplatTemplate.Browser/AkburaXplatTemplate.Browser.csproj" },
     { "condition": "(HostIdentifier != \"dotnetcli\" && HostIdentifier != \"dotnetcli-preview\")", "path": "AkburaXplatTemplate/ViewModels/MainViewModel.cs" },
-    { "condition": "(HostIdentifier != \"dotnetcli\" && HostIdentifier != \"dotnetcli-preview\")", "path": "AkburaXplatTemplate/Views/MainView.akbura" }
+    { "condition": "(HostIdentifier != \"dotnetcli\" && HostIdentifier != \"dotnetcli-preview\")", "path": "AkburaXplatTemplate/Views/MainView.akbura" },
+    { "condition": "(HostIdentifier != \"dotnetcli\" && HostIdentifier != \"dotnetcli-preview\")", "path": "AkburaXplatTemplate/Views/AppShell.akbura" }
   ],
   "postActions": [
-    { "id": "editor", "condition": "(HostIdentifier != \"dotnetcli\" && HostIdentifier != \"dotnetcli-preview\")", "description": "Open MainView and MainViewModel", "manualInstructions": [], "actionId": "84C0DA21-51C8-4541-9940-6CA19AF04EE6", "args": { "files": "5;6" }, "continueOnError": true }
+    { "id": "editor", "condition": "(HostIdentifier != \"dotnetcli\" && HostIdentifier != \"dotnetcli-preview\")", "description": "Open AppShell, MainView and MainViewModel", "manualInstructions": [], "actionId": "84C0DA21-51C8-4541-9940-6CA19AF04EE6", "args": { "files": "5;6;7" }, "continueOnError": true }
   ]
 }

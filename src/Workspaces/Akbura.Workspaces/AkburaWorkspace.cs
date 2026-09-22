@@ -201,6 +201,7 @@ public sealed class AkburaWorkspace : IDisposable
                         oldDocument))
                 {
                     return new AkburaDocumentContext(
+                        oldSolution,
                         oldProject,
                         oldDocument);
                 }
@@ -232,6 +233,7 @@ public sealed class AkburaWorkspace : IDisposable
 
                 result =
                     new AkburaDocumentContext(
+                        newSolution,
                         newProject,
                         newDocument);
             }
@@ -275,6 +277,7 @@ public sealed class AkburaWorkspace : IDisposable
 
                 result =
                     new AkburaDocumentContext(
+                        newSolution,
                         newProject,
                         newDocument);
             }

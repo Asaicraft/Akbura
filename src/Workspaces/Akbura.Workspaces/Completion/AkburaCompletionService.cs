@@ -66,6 +66,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        semanticContext = AkburaSemanticContextNormalizer.Normalize(document, semanticContext, cancellationToken).Context;
         var isAkcssRegion = document.TryGetAkcssCompletionRegion(
             position,
             out _);

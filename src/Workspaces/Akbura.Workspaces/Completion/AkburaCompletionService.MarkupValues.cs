@@ -23,9 +23,12 @@ internal sealed partial class AkburaCompletionService
         var items = new Dictionary<string, AkburaCompletionItem>(
             StringComparer.Ordinal);
         var completedPath = context.CompletedPath ?? string.Empty;
+        var rootCandidateCount = 0;
         if (completedPath.Length == 0)
         {
-            foreach (var root in semanticModel.LookupMarkupBindingPathRootsForCompletion(attribute, cancellationToken))
+            var roots = semanticModel.LookupMarkupBindingPathRootsForCompletion(attribute, cancellationToken);
+            rootCandidateCount = roots.Length;
+            foreach (var root in roots)
             {
                 if (!MatchesPrefix(root.Name, context.Prefix))
                 {
@@ -44,7 +47,8 @@ internal sealed partial class AkburaCompletionService
             }
         }
 
-        foreach (var candidate in semanticModel.LookupMarkupBindingPathMembersForCompletion(attribute, extension, completedPath, cancellationToken))
+        var members = semanticModel.LookupMarkupBindingPathMembersForCompletion(attribute, extension, completedPath, out var receiverResolved, cancellationToken);
+        foreach (var candidate in members)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!MatchesPrefix(
@@ -66,6 +70,20 @@ internal sealed partial class AkburaCompletionService
                     SymbolDisplayFormat.MinimallyQualifiedFormat),
                 priority: priority);
         }
+
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Completion,
+            $"Binding completion resolved: " +
+            $"extensionSpanResolved={extension.Span}, " +
+            $"argumentIndex={context.MarkupExtensionArgumentIndex}, " +
+            $"argumentName='{FormatMarkupCompletionDiagnosticValue(context.MarkupExtensionArgumentName)}', " +
+            $"completedPath='{FormatMarkupCompletionDiagnosticValue(completedPath)}', " +
+            $"prefix='{FormatMarkupCompletionDiagnosticValue(context.Prefix)}', " +
+            $"rootTypeResolved={receiverResolved}, " +
+            $"memberCandidateCount={members.Length}, " +
+            $"rootCandidateCount={rootCandidateCount}, " +
+            $"filteredCount={items.Count}, " +
+            $"emptyReason={(items.Count != 0 ? "none" : !receiverResolved ? "receiver-unresolved" : members.Length + rootCandidateCount == 0 ? "no-members" : "no-prefix-matches")}.");
 
         return OrderCompletionItems(
             items.Values,
@@ -182,6 +200,15 @@ internal sealed partial class AkburaCompletionService
             context.MarkupExtensionSpan)!;
         if (extension == null)
         {
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Completion,
+                $"Markup extension completion empty: " +
+                $"extensionSpanCurrent={context.MarkupExtensionSpan}, " +
+                $"argumentIndex={context.MarkupExtensionArgumentIndex}, " +
+                $"argumentName='{FormatMarkupCompletionDiagnosticValue(context.MarkupExtensionArgumentName)}', " +
+                $"completedPath='{FormatMarkupCompletionDiagnosticValue(context.CompletedPath)}', " +
+                $"prefix='{FormatMarkupCompletionDiagnosticValue(context.Prefix)}', " +
+                $"emptyReason=extension-not-found.");
             attribute = null!;
             return false;
         }
@@ -197,7 +224,32 @@ internal sealed partial class AkburaCompletionService
 
         attribute = null!;
         extension = null!;
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Completion,
+            $"Markup extension completion empty: " +
+            $"extensionSpanCurrent={context.MarkupExtensionSpan}, " +
+            $"argumentIndex={context.MarkupExtensionArgumentIndex}, " +
+            $"argumentName='{FormatMarkupCompletionDiagnosticValue(context.MarkupExtensionArgumentName)}', " +
+            $"completedPath='{FormatMarkupCompletionDiagnosticValue(context.CompletedPath)}', " +
+            $"prefix='{FormatMarkupCompletionDiagnosticValue(context.Prefix)}', " +
+            $"emptyReason=owner-attribute-not-found.");
         return false;
+    }
+
+    private static string FormatMarkupCompletionDiagnosticValue(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        const int maximumLength = 80;
+        var sanitized = value!
+            .Replace('\r', ' ')
+            .Replace('\n', ' ');
+        return sanitized.Length <= maximumLength
+            ? sanitized
+            : sanitized[..maximumLength] + "…";
     }
 
     private static MarkupExtensionSyntax? FindMarkupExtensionSyntax(AkburaSemanticModel semanticModel, Microsoft.CodeAnalysis.Text.TextSpan span)

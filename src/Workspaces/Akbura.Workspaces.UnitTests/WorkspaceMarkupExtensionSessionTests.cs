@@ -162,6 +162,235 @@ public sealed class WorkspaceMarkupExtensionSessionTests
             context.MarkupExtensionName);
     }
 
+    [Theory]
+    [InlineData("<StackPanel><TextBlock Text=${Binding |} /></StackPanel>", AkburaCompletionContextKind.BindingPath)]
+    [InlineData("<StackPanel>\r\n<TextBlock Grid.Row=\"0\"\r\n Text=${Binding |   }\r\n Width=\"20\" />\r\n</StackPanel>", AkburaCompletionContextKind.BindingPath)]
+    [InlineData("<StackPanel><TextBlock Text=${Binding Path=|} /></StackPanel>", AkburaCompletionContextKind.BindingPath)]
+    [InlineData("<StackPanel><TextBlock Text=${Binding Path=| Name} /></StackPanel>", AkburaCompletionContextKind.BindingPath)]
+    [InlineData("<StackPanel><TextBlock Text=${Binding |", AkburaCompletionContextKind.BindingPath)]
+    [InlineData("<StackPanel><TextBlock Text=${Binding |</StackPanel>", AkburaCompletionContextKind.BindingPath)]
+    [InlineData("<StackPanel><TextBlock Text=${ReflectionBinding |} /></StackPanel>", AkburaCompletionContextKind.BindingPath)]
+    [InlineData("<StackPanel><TextBlock Text=${CompiledBinding |} /></StackPanel>", AkburaCompletionContextKind.BindingPath)]
+    [InlineData("<StackPanel><TextBlock Text=${Binding Name, Converter=${StaticResource |}} /></StackPanel>", AkburaCompletionContextKind.MarkupExtensionArgumentValue)]
+    public void ExtensionOwnedPositions_DoNotBecomeMarkupStatements(string marked, AkburaCompletionContextKind expectedKind)
+    {
+        var (document, position, _) = Parse(marked);
+        using var workspace = new AkburaWorkspace();
+
+        var context = document.GetCompletionContext(position);
+        var result = workspace.LanguageServices.Completion.GetCompletions(document, null, position);
+
+        Assert.Equal(expectedKind, context.Kind);
+        Assert.DoesNotContain(result.Items, static item => item.DisplayText is "$if" or "$foreach" or "$else" or "$else if");
+    }
+
+    [Theory]
+    [InlineData("<Border Command=${Binding |   } />", "")]
+    [InlineData("<Border Command=${Binding Path=|   } />", "")]
+    [InlineData("<Border Command=${Binding Path=| Name} />", "")]
+    [InlineData("<Border Command=${Binding Path=|Name} />", "Name")]
+    [InlineData("<Border Command=${Binding Customer.Name, |} />", "")]
+    [InlineData("<Border Command=${Binding Mode=|} />", "")]
+    public void ArgumentWhitespaceAndSuffix_UseCursorSafeReplacementSpan(string marked, string expectedApplicableText)
+    {
+        var (document, position, _) = Parse(marked);
+
+        var context = document.GetCompletionContext(position);
+
+        Assert.True(context.Kind is AkburaCompletionContextKind.BindingPath or AkburaCompletionContextKind.MarkupExtensionArgumentName or AkburaCompletionContextKind.MarkupExtensionArgumentValue);
+        Assert.Equal(string.Empty, context.Prefix);
+        Assert.Equal(expectedApplicableText, document.Text.ToString(context.ApplicableSpan));
+        Assert.True(context.ApplicableSpan.Length != 0 || context.ApplicableSpan.Start == position);
+    }
+
+    [Theory]
+    [InlineData("\n", true)]
+    [InlineData("\r\n", true)]
+    [InlineData("\n", false)]
+    [InlineData("\r\n", false)]
+    public void IncrementalWhitespaceAndRecovery_KeepBindingOwnership(string newline, bool keepAutomaticCloseBrace)
+    {
+        var initialSource = "<StackPanel>" + newline + "<TextBlock Text=${Binding} />" + newline + "</StackPanel>";
+        var initialText = SourceText.From(initialSource);
+        var incremental = AkburaSyntacticDocument.Parse(initialText, "MainView.akbura");
+        var bindingEnd = initialSource.IndexOf("Binding", StringComparison.Ordinal) + "Binding".Length;
+        var changedText = initialText.WithChanges(new TextChange(new TextSpan(bindingEnd, 0), "   "));
+        if (!keepAutomaticCloseBrace)
+        {
+            var closeBrace = changedText.ToString().IndexOf('}', bindingEnd);
+            changedText = changedText.WithChanges(new TextChange(new TextSpan(closeBrace, 1), string.Empty));
+        }
+
+        incremental = incremental.WithText(changedText);
+        var full = AkburaSyntacticDocument.Parse(changedText, "MainView.akbura");
+        var position = bindingEnd + 1;
+
+        Assert.Equal(AkburaCompletionContextKind.BindingPath, full.GetCompletionContext(position).Kind);
+        Assert.Equal(AkburaCompletionContextKind.BindingPath, incremental.GetCompletionContext(position).Kind);
+        Assert.Equal(full.GetCompletionContext(position).ApplicableSpan, incremental.GetCompletionContext(position).ApplicableSpan);
+    }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void IncrementalTypingFromEmptyExtension_NeverFallsBackToStatements(string newline)
+    {
+        var source = "<StackPanel>" + newline + "<TextBlock Text=${} />" + newline + "</StackPanel>";
+        var text = SourceText.From(source);
+        var incremental = AkburaSyntacticDocument.Parse(text, "MainView.akbura");
+        var position = source.IndexOf("${", StringComparison.Ordinal) + 2;
+
+        foreach (var character in "Binding ")
+        {
+            text = text.WithChanges(new TextChange(new TextSpan(position++, 0), character.ToString()));
+            incremental = incremental.WithText(text);
+            var full = AkburaSyntacticDocument.Parse(text, "MainView.akbura");
+            var incrementalContext = incremental.GetCompletionContext(position);
+            var fullContext = full.GetCompletionContext(position);
+
+            Assert.DoesNotContain(incrementalContext.Kind, new[] { AkburaCompletionContextKind.MarkupStatement, AkburaCompletionContextKind.MarkupConditionalContinuation });
+            Assert.Equal(fullContext.Kind, incrementalContext.Kind);
+            Assert.Equal(fullContext.ApplicableSpan, incrementalContext.ApplicableSpan);
+        }
+
+        Assert.Equal(AkburaCompletionContextKind.BindingPath, incremental.GetCompletionContext(position).Kind);
+    }
+
+    [Theory]
+    [InlineData("<TextBlock Text=\"${Binding |}\" />", AkburaCompletionContextKind.AttributeValue)]
+    [InlineData("state string text = \"${Binding |}\";", AkburaCompletionContextKind.None)]
+    [InlineData("// ${Binding |", AkburaCompletionContextKind.None)]
+    public void MarkupLikeTextOutsideExtensions_IsNotBindingOrStatement(string marked, AkburaCompletionContextKind expectedKind)
+    {
+        var (document, position, _) = Parse(marked);
+
+        var context = document.GetCompletionContext(position);
+
+        Assert.Equal(expectedKind, context.Kind);
+    }
+
+    [Theory]
+    [InlineData("<Button Content={ /* ${Bi| */ ViewModel.Name } />")]
+    [InlineData("<Button Content={ // ${Bi|\r\n ViewModel.Name } />")]
+    [InlineData("state string text = \"<Button ${Bi|\";")]
+    [InlineData("// <Button ${Bi|")]
+    [InlineData("/* <Button ${Bi| */")]
+    [InlineData("state string text = \"> <Fake ${Bi|\";")]
+    [InlineData("<TextBlock Text=\"prefix <Fake ${Bi|\" />")]
+    [InlineData("<TextBlock Text='prefix <Fake ${Bi|' />")]
+    public void RawMarkupLikeTextOutsideMarkup_DoesNotSelectExtensionType(string marked)
+    {
+        var (document, position, _) = Parse(marked);
+
+        Assert.NotEqual(AkburaCompletionContextKind.MarkupExtensionType, document.GetCompletionContext(position).Kind);
+    }
+
+    [Theory]
+    [InlineData("<Button Content={ /* | */ ViewModel.Name } />")]
+    [InlineData("<Button Content={ // |\n ViewModel.Name } />")]
+    [InlineData("<Button Content={ // |\r\n ViewModel.Name } />")]
+    public void IncrementalMarkupLikeTextInCSharpComments_DoesNotSelectExtensionType(string marked)
+    {
+        var position = marked.IndexOf('|');
+        var text = SourceText.From(marked.Remove(position, 1));
+        var incremental = AkburaSyntacticDocument.Parse(text, "MainView.akbura");
+
+        foreach (var character in "${Bi")
+        {
+            text = text.WithChanges(new TextChange(new TextSpan(position++, 0), character.ToString()));
+            incremental = incremental.WithText(text);
+            var full = AkburaSyntacticDocument.Parse(text, "MainView.akbura");
+            var incrementalContext = incremental.GetCompletionContext(position);
+            var fullContext = full.GetCompletionContext(position);
+
+            Assert.NotEqual(AkburaCompletionContextKind.MarkupExtensionType, incrementalContext.Kind);
+            Assert.Equal(fullContext.Kind, incrementalContext.Kind);
+        }
+    }
+
+    [Theory]
+    [InlineData("<StackPanel><TextBlock |/></StackPanel>")]
+    [InlineData("<StackPanel><TextBlock |></TextBlock></StackPanel>")]
+    [InlineData("<StackPanel><TextBlock Foo=\"x\" |></TextBlock></StackPanel>")]
+    [InlineData("<StackPanel><TextBlock Text=${Binding}| /></StackPanel>")]
+    [InlineData("<StackPanel><TextBlock Text=${Binding} |/></StackPanel>")]
+    [InlineData("<StackPanel><TextBlock Text={Foo}| /></StackPanel>")]
+    [InlineData("<StackPanel><TextBlock Text={Foo} |/></StackPanel>")]
+    [InlineData("<StackPanel><TextBlock Text=\"foo\" |/></StackPanel>")]
+    public void StartTagOwnedPositions_DoNotBecomeMarkupStatements(string marked)
+    {
+        var position = marked.IndexOf('|');
+        var document = AkburaSyntacticDocument.Parse(SourceText.From(marked.Remove(position, 1)), "MainView.akbura");
+        using var workspace = new AkburaWorkspace();
+
+        var context = document.GetCompletionContext(position);
+        var result = workspace.LanguageServices.Completion.GetCompletions(document, null, position);
+
+        Assert.Equal(AkburaCompletionContextKind.AttributeName, context.Kind);
+        Assert.DoesNotContain(result.Items, static item => item.DisplayText is "$if" or "$foreach" or "$else" or "$else if");
+    }
+
+    [Fact]
+    public void NestedExtensionOwnership_SelectsInnermostArgument()
+    {
+        var (document, position, _) = Parse("<Border Tag=${Binding Name, Converter=${StaticResource |}} />");
+
+        var context = document.GetCompletionContext(position);
+
+        Assert.Equal(AkburaCompletionContextKind.MarkupExtensionArgumentValue, context.Kind);
+        Assert.Equal("StaticResource", context.MarkupExtensionName);
+        Assert.Equal(0, context.MarkupExtensionArgumentIndex);
+        Assert.Equal(new TextSpan(position, 0), context.ApplicableSpan);
+    }
+
+    [Theory]
+    [InlineData("<StackPanel><TextBlock Text=|")]
+    [InlineData("<StackPanel><TextBlock Text=|   ")]
+    public void IncompleteAttributeValues_DoNotBecomeMarkupStatements(string marked)
+    {
+        var position = marked.IndexOf('|');
+        Assert.True(position >= 0);
+        var document = AkburaSyntacticDocument.Parse(SourceText.From(marked.Remove(position, 1)), "MainView.akbura");
+        using var workspace = new AkburaWorkspace();
+
+        var context = document.GetCompletionContext(position);
+        var result = workspace.LanguageServices.Completion.GetCompletions(document, null, position);
+
+        Assert.DoesNotContain(context.Kind, new[] { AkburaCompletionContextKind.MarkupStatement, AkburaCompletionContextKind.MarkupConditionalContinuation });
+        Assert.DoesNotContain(result.Items, static item => item.DisplayText is "$if" or "$foreach" or "$else" or "$else if");
+    }
+
+    [Fact]
+    public void EmbeddedCSharpAttributeValue_RemainsOwnedByCSharp()
+    {
+        const string marked = "<Button Content={ViewModel.|}/>";
+        var position = marked.IndexOf('|');
+        var document = AkburaSyntacticDocument.Parse(SourceText.From(marked.Remove(position, 1)), "MainView.akbura");
+
+        Assert.True(document.TryGetCSharpCompletionContext(position, out var csharpContext));
+        Assert.InRange(position, csharpContext.HostSpan.Start, csharpContext.HostSpan.End);
+        Assert.DoesNotContain(document.GetCompletionContext(position).Kind, new[] { AkburaCompletionContextKind.MarkupStatement, AkburaCompletionContextKind.MarkupConditionalContinuation });
+    }
+
+    [Theory]
+    [InlineData("<StackPanel><TextBlock /> | <TextBlock /></StackPanel>")]
+    [InlineData("<StackPanel>$if (true) { <TextBlock />| }</StackPanel>")]
+    [InlineData("<StackPanel>$foreach (var item in items) { <TextBlock />| }</StackPanel>")]
+    public void MarkupContentPositions_StillOfferStatements(string marked)
+    {
+        var position = marked.IndexOf('|');
+        Assert.True(position >= 0);
+        var document = AkburaSyntacticDocument.Parse(SourceText.From(marked.Remove(position, 1)), "MainView.akbura");
+        using var workspace = new AkburaWorkspace();
+
+        var context = document.GetCompletionContext(position);
+        var result = workspace.LanguageServices.Completion.GetCompletions(document, null, position);
+
+        Assert.Equal(AkburaCompletionContextKind.MarkupStatement, context.Kind);
+        Assert.Contains(result.Items, static item => item.DisplayText == "$if");
+        Assert.Contains(result.Items, static item => item.DisplayText == "$foreach");
+    }
+
     [Fact]
     public void ARequestForAnOuterOpener_CannotSwitchANestedSession()
     {

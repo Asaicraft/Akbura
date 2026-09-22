@@ -27,10 +27,7 @@ internal sealed class AkburaCompletionCommitManagerProvider :
     private readonly AkburaParserService _parserService;
 
     [ImportingConstructor]
-    public AkburaCompletionCommitManagerProvider(
-        IAsyncCompletionBroker completionBroker,
-        ITextUndoHistoryRegistry undoHistoryRegistry,
-        AkburaParserService parserService)
+    public AkburaCompletionCommitManagerProvider(IAsyncCompletionBroker completionBroker, ITextUndoHistoryRegistry undoHistoryRegistry, AkburaParserService parserService)
     {
         _completionBroker = completionBroker ??
             throw new ArgumentNullException(
@@ -75,10 +72,7 @@ internal sealed class AkburaCompletionCommitManager :
 
     private readonly AkburaParserService _parserService;
 
-    public AkburaCompletionCommitManager(
-        IAsyncCompletionBroker completionBroker,
-        ITextUndoHistoryRegistry undoHistoryRegistry,
-        AkburaParserService parserService)
+    public AkburaCompletionCommitManager(IAsyncCompletionBroker completionBroker, ITextUndoHistoryRegistry undoHistoryRegistry, AkburaParserService parserService)
     {
         _completionBroker = completionBroker ??
             throw new ArgumentNullException(
@@ -94,11 +88,7 @@ internal sealed class AkburaCompletionCommitManager :
     public IEnumerable<char> PotentialCommitCharacters =>
         CommitCharacters;
 
-    public bool ShouldCommitCompletion(
-        IAsyncCompletionSession session,
-        SnapshotPoint location,
-        char typedChar,
-        CancellationToken token)
+    public bool ShouldCommitCompletion(IAsyncCompletionSession session, SnapshotPoint location, char typedChar, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         var computedItems = session.GetComputedItems(token);
@@ -108,14 +98,27 @@ internal sealed class AkburaCompletionCommitManager :
                 typedChar) == true;
     }
 
-    public CommitResult TryCommit(
-        IAsyncCompletionSession session,
-        ITextBuffer buffer,
-        CompletionItem item,
-        char typedChar,
-        CancellationToken token)
+    public CommitResult TryCommit(IAsyncCompletionSession session, ITextBuffer buffer, CompletionItem item, char typedChar, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        var currentSnapshot = buffer.CurrentSnapshot;
+        if (!IsCurrentCompletionContext(
+                session,
+                buffer,
+                item,
+                currentSnapshot,
+                token))
+        {
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Completion,
+                $"Stale completion commit rejected: " +
+                $"sourceSnapshot={item.ApplicableToSpan.Snapshot.Version.VersionNumber}, " +
+                $"snapshot={currentSnapshot.Version.VersionNumber}.");
+            return new CommitResult(
+                isHandled: true,
+                CommitBehavior.CancelCommit);
+        }
+
         if (item.Properties.TryGetProperty(
                 AkburaCompletionProperties.RoslynItem,
                 out AkburaRoslynCompletionItemData roslynData))
@@ -135,7 +138,6 @@ internal sealed class AkburaCompletionCommitManager :
             return CommitResult.Unhandled;
         }
 
-        var currentSnapshot = buffer.CurrentSnapshot;
         SnapshotSpan applicableSpan;
         try
         {
@@ -156,8 +158,13 @@ internal sealed class AkburaCompletionCommitManager :
         {
             var position = session.TextView.Caret.Position.BufferPosition
                 .TranslateTo(currentSnapshot, PointTrackingMode.Positive).Position;
-            var document = ThreadHelper.JoinableTaskFactory.Run(async () =>
-                await _parserService.GetSyntacticDocumentAsync(currentSnapshot).ConfigureAwait(false));
+            if (!_parserService.TryGetCachedSyntacticDocument(
+                    currentSnapshot,
+                    out var document))
+            {
+                return new CommitResult(isHandled: true, CommitBehavior.CancelCommit);
+            }
+
             token.ThrowIfCancellationRequested();
             if (!ReferenceEquals(currentSnapshot, buffer.CurrentSnapshot))
             {
@@ -319,11 +326,215 @@ internal sealed class AkburaCompletionCommitManager :
             : CommitResult.Handled;
     }
 
-    private TextChange? CreateNamespaceImportChange(
-        ITextSnapshot snapshot,
-        string? namespaceName,
-        int position,
-        CancellationToken cancellationToken)
+    private bool IsCurrentCompletionContext(IAsyncCompletionSession session, ITextBuffer buffer, CompletionItem item, ITextSnapshot currentSnapshot, CancellationToken cancellationToken)
+    {
+        var hasSyntacticContext = item.Properties.TryGetProperty(
+            AkburaCompletionProperties.SyntacticContext,
+            out AkburaSyntacticCompletionContext syntacticContext);
+        var hasCSharpContext = item.Properties.TryGetProperty(
+            AkburaCompletionProperties.CSharpContext,
+            out AkburaCSharpCompletionContext csharpContext);
+        if (!hasSyntacticContext && !hasCSharpContext)
+        {
+            return true;
+        }
+
+        if (!ReferenceEquals(
+                session.TextView.TextBuffer,
+                buffer) ||
+            !ReferenceEquals(
+                item.ApplicableToSpan.Snapshot.TextBuffer,
+                buffer))
+        {
+            return false;
+        }
+
+        var position = session.TextView.Caret.Position.BufferPosition
+            .TranslateTo(
+                currentSnapshot,
+                PointTrackingMode.Positive)
+            .Position;
+        if (!_parserService.TryGetCachedSyntacticDocument(
+                currentSnapshot,
+                out var document))
+        {
+            return false;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!ReferenceEquals(
+                currentSnapshot,
+                buffer.CurrentSnapshot))
+        {
+            return false;
+        }
+
+        if (hasSyntacticContext)
+        {
+            var currentContext = document.GetCompletionContext(
+                position,
+                cancellationToken);
+            return IsMatchingSyntacticContext(
+                item.ApplicableToSpan.Snapshot,
+                currentSnapshot,
+                syntacticContext,
+                currentContext);
+        }
+
+        return document.TryGetCSharpCompletionContext(
+                position,
+                out var currentCSharpContext,
+                cancellationToken) &&
+            IsMatchingCSharpContext(
+                item.ApplicableToSpan.Snapshot,
+                currentSnapshot,
+                csharpContext,
+                currentCSharpContext);
+    }
+
+    private static bool IsMatchingSyntacticContext(ITextSnapshot sourceSnapshot, ITextSnapshot currentSnapshot, AkburaSyntacticCompletionContext source, AkburaSyntacticCompletionContext current)
+    {
+        if (source.Kind != current.Kind ||
+            !string.Equals(
+                source.ComponentName,
+                current.ComponentName,
+                StringComparison.Ordinal) ||
+            !string.Equals(
+                source.ParentComponentName,
+                current.ParentComponentName,
+                StringComparison.Ordinal) ||
+            !string.Equals(
+                source.AttributeName,
+                current.AttributeName,
+                StringComparison.Ordinal) ||
+            !string.Equals(
+                source.MarkupExtensionName,
+                current.MarkupExtensionName,
+                StringComparison.Ordinal) ||
+            !string.Equals(
+                source.MarkupExtensionArgumentName,
+                current.MarkupExtensionArgumentName,
+                StringComparison.Ordinal) ||
+            source.MarkupExtensionArgumentIndex !=
+                current.MarkupExtensionArgumentIndex ||
+            !string.Equals(
+                source.CompletedPath,
+                current.CompletedPath,
+                StringComparison.Ordinal) ||
+            !TryTranslateSpan(
+                sourceSnapshot,
+                currentSnapshot,
+                source.ApplicableSpan,
+                out var applicableSpan) ||
+            applicableSpan != current.ApplicableSpan ||
+            !TextOutsideSpanMatches(
+                sourceSnapshot,
+                currentSnapshot,
+                source.ApplicableSpan,
+                current.ApplicableSpan))
+        {
+            return false;
+        }
+
+        if (source.Kind is not (
+                AkburaCompletionContextKind.MarkupExtensionType or
+                AkburaCompletionContextKind.MarkupExtensionArgumentName or
+                AkburaCompletionContextKind.MarkupExtensionArgumentValue or
+                AkburaCompletionContextKind.BindingPath))
+        {
+            return true;
+        }
+
+        return TryTranslateSpan(
+                sourceSnapshot,
+                currentSnapshot,
+                source.MarkupExtensionSpan,
+                out var extensionSpan) &&
+            extensionSpan == current.MarkupExtensionSpan;
+    }
+
+    private static bool IsMatchingCSharpContext(ITextSnapshot sourceSnapshot, ITextSnapshot currentSnapshot, AkburaCSharpCompletionContext source, AkburaCSharpCompletionContext current)
+    {
+        return source.Kind == current.Kind &&
+            source.OwnerKind == current.OwnerKind &&
+            TryTranslateSpan(
+                sourceSnapshot,
+                currentSnapshot,
+                source.OwnerSpan,
+                out var ownerSpan) &&
+            ownerSpan == current.OwnerSpan &&
+            TryTranslateSpan(
+                sourceSnapshot,
+                currentSnapshot,
+                source.HostSpan,
+                out var hostSpan) &&
+            hostSpan == current.HostSpan;
+    }
+
+    private static bool TextOutsideSpanMatches(ITextSnapshot sourceSnapshot, ITextSnapshot currentSnapshot, TextSpan sourceSpan, TextSpan currentSpan)
+    {
+        if (sourceSpan.Start != currentSpan.Start ||
+            sourceSnapshot.Length - sourceSpan.End !=
+                currentSnapshot.Length - currentSpan.End)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < sourceSpan.Start; index++)
+        {
+            if (sourceSnapshot[index] != currentSnapshot[index])
+            {
+                return false;
+            }
+        }
+
+        var sourceIndex = sourceSpan.End;
+        var currentIndex = currentSpan.End;
+        while (sourceIndex < sourceSnapshot.Length)
+        {
+            if (sourceSnapshot[sourceIndex] !=
+                currentSnapshot[currentIndex])
+            {
+                return false;
+            }
+
+            sourceIndex++;
+            currentIndex++;
+        }
+
+        return true;
+    }
+
+    private static bool TryTranslateSpan(ITextSnapshot sourceSnapshot, ITextSnapshot currentSnapshot, TextSpan sourceSpan, out TextSpan currentSpan)
+    {
+        if (sourceSpan.Start < 0 ||
+            sourceSpan.End > sourceSnapshot.Length)
+        {
+            currentSpan = default;
+            return false;
+        }
+
+        try
+        {
+            var translated = new SnapshotSpan(
+                    sourceSnapshot,
+                    new Span(sourceSpan.Start, sourceSpan.Length))
+                .TranslateTo(
+                    currentSnapshot,
+                    SpanTrackingMode.EdgeInclusive);
+            currentSpan = new TextSpan(
+                translated.Start.Position,
+                translated.Length);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            currentSpan = default;
+            return false;
+        }
+    }
+
+    private TextChange? CreateNamespaceImportChange(ITextSnapshot snapshot, string? namespaceName, int position, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(namespaceName))
         {
@@ -347,12 +558,7 @@ internal sealed class AkburaCompletionCommitManager :
                 : null;
     }
 
-    private CommitResult TryCommitRoslynCompletion(
-        IAsyncCompletionSession session,
-        ITextBuffer buffer,
-        AkburaRoslynCompletionItemData data,
-        char typedChar,
-        CancellationToken cancellationToken)
+    private CommitResult TryCommitRoslynCompletion(IAsyncCompletionSession session, ITextBuffer buffer, AkburaRoslynCompletionItemData data, char typedChar, CancellationToken cancellationToken)
     {
         if (!ReferenceEquals(
                 data.State.HostSnapshot.TextBuffer,
@@ -467,9 +673,7 @@ internal sealed class AkburaCompletionCommitManager :
         using var transaction = undoHistory.CreateTransaction(
             "Akbura C# completion");
         using var edit = buffer.CreateEdit();
-        foreach (var change in mappedChanges
-                     .OrderByDescending(static change =>
-                         change.Span.Start))
+        foreach (var change in mappedChanges.OrderByDescending(static change => change.Span.Start))
         {
             if (!edit.Replace(
                     change.Span,
@@ -501,20 +705,15 @@ internal sealed class AkburaCompletionCommitManager :
             : CommitResult.Handled;
     }
 
-    private static bool IsImportChange(
-        TextChange change,
-        AkburaCSharpProjection projection)
+    private static bool IsImportChange(TextChange change, AkburaCSharpProjection projection)
     {
         return projection.ImportContext.IsImportInsertion(change);
     }
 
-    private static int GetActiveStartAfterChanges(
-        int activeStart,
-        IEnumerable<MappedCompletionChange> changes)
+    private static int GetActiveStartAfterChanges(int activeStart, IEnumerable<MappedCompletionChange> changes)
     {
         var result = activeStart;
-        foreach (var change in changes.OrderBy(static change =>
-                     change.Span.Start))
+        foreach (var change in changes.OrderBy(static change => change.Span.Start))
         {
             if (change.IsImport &&
                 change.Span.Start <= activeStart ||
@@ -528,10 +727,7 @@ internal sealed class AkburaCompletionCommitManager :
         return result;
     }
 
-    private void TriggerNextCompletion(
-        IAsyncCompletionSession currentSession,
-        ITextSnapshot snapshotAfterCommit,
-        int caretPosition)
+    private void TriggerNextCompletion(IAsyncCompletionSession currentSession, ITextSnapshot snapshotAfterCommit, int caretPosition)
     {
         var textView = currentSession.TextView;
         var trackingPoint = snapshotAfterCommit.CreateTrackingPoint(
@@ -572,10 +768,7 @@ internal sealed class AkburaCompletionCommitManager :
 
     private readonly struct MappedCompletionChange
     {
-        public MappedCompletionChange(
-            Span span,
-            string newText,
-            bool isImport)
+        public MappedCompletionChange(Span span, string newText, bool isImport)
         {
             Span = span;
             NewText = newText;

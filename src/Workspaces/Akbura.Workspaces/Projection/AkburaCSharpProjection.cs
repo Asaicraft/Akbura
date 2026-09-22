@@ -264,16 +264,16 @@ internal static class AkburaCSharpProjectionFactory
             throw new ArgumentNullException(nameof(semanticContext));
         }
 
-        if (!TryGetCurrentContext(
-                syntacticDocument,
-                semanticContext,
-                out semanticContext))
+        var normalization = AkburaSemanticContextNormalizer.Normalize(syntacticDocument, semanticContext, cancellationToken);
+        if (normalization.Context == null)
         {
             projection = null!;
             failureReason =
                 "current-semantic-context-unavailable";
             return false;
         }
+
+        semanticContext = normalization.Context;
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -553,58 +553,6 @@ internal static class AkburaCSharpProjectionFactory
             .FirstOrDefault(candidate =>
                 candidate.Kind == context.OwnerKind &&
                 candidate.FullSpan == context.OwnerSpan);
-    }
-
-    private static bool TryGetCurrentContext(AkburaSyntacticDocument syntacticDocument, AkburaDocumentContext semanticContext, out AkburaDocumentContext currentContext)
-    {
-        var semanticDocument = semanticContext.Document;
-        if (semanticDocument.Text.ContentEquals(
-                syntacticDocument.Text))
-        {
-            currentContext = semanticContext;
-            return true;
-        }
-
-        if (!string.Equals(
-                semanticDocument.FilePath,
-                syntacticDocument.FilePath,
-                StringComparison.OrdinalIgnoreCase) ||
-            semanticDocument.SyntaxTree.Kind !=
-                syntacticDocument.SyntaxTree.Kind)
-        {
-            currentContext = null!;
-            return false;
-        }
-
-        var currentDocument = new AkburaDocumentSnapshot(
-            semanticDocument.Id,
-            semanticDocument.ProjectId,
-            semanticDocument.Uri,
-            semanticDocument.FilePath,
-            VersionStamp.Create(),
-            syntacticDocument.Text,
-            syntacticDocument.SyntaxTree,
-            semanticDocument.IsOpen);
-
-        try
-        {
-            var currentProject = semanticContext.Project
-                .ReplaceDocument(currentDocument);
-            currentContext = new AkburaDocumentContext(
-                currentProject,
-                currentDocument);
-            return true;
-        }
-        catch (ArgumentException)
-        {
-            currentContext = null!;
-            return false;
-        }
-        catch (InvalidOperationException)
-        {
-            currentContext = null!;
-            return false;
-        }
     }
 
     private static CompilationUnitSyntax AddUsingMappings(AkburaSyntacticDocument document, AkburaEmbeddedCSharpContext context, CSharpProbeProjection probe, out TextSpan projectedActiveSpan, out ImmutableArray<AkburaCSharpProjectionMapping> mappings)

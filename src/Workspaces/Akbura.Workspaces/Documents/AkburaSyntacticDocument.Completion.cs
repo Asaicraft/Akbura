@@ -22,19 +22,6 @@ public sealed partial class AkburaSyntacticDocument
         cancellationToken.ThrowIfCancellationRequested();
 
         var root = SyntaxTree.GetRootSyntax();
-        if (TryGetMarkupStatementContext(root, position, out var statementContext))
-        {
-            return statementContext;
-        }
-
-        if (TryGetDeclarationModifierContext(
-                root,
-                position,
-                out var declarationModifierContext))
-        {
-            return declarationModifierContext;
-        }
-
         if (TryGetMarkupExtensionTypeContext(
                 root,
                 position,
@@ -49,6 +36,19 @@ public sealed partial class AkburaSyntacticDocument
                 out var markupValueContext))
         {
             return markupValueContext;
+        }
+
+        if (TryGetMarkupStatementContext(root, position, out var statementContext))
+        {
+            return statementContext;
+        }
+
+        if (TryGetDeclarationModifierContext(
+                root,
+                position,
+                out var declarationModifierContext))
+        {
+            return declarationModifierContext;
         }
 
         if (TryGetIncompleteClosingTagContext(
@@ -401,13 +401,17 @@ public sealed partial class AkburaSyntacticDocument
             return false;
         }
 
-        var token = root.FindTokenInternal(
-            Math.Min(position - 1, Text.Length - 1));
-        var extension = FindAncestor<MarkupExtensionSyntax>(
-            token.Parent);
-        if ((extension == null ||
-             extension.OpenBrace.Span.Start != openBracePosition) &&
-            !IsInsideMarkupStartTag(openBracePosition - 1))
+        if (TryGetEmbeddedCSharpContext(position, out _))
+        {
+            context = default;
+            return false;
+        }
+
+        var hasParsedExtension = TryFindInnermostMarkupExtension(root, position, out var extension) &&
+            extension.OpenBrace.Span.Start == openBracePosition;
+        if (!hasParsedExtension &&
+            (IsPositionOwnedByMarkupAttributeValue(root, position) ||
+             !TryFindMarkupStartTagOwner(root, position, out _)))
         {
             context = default;
             return false;
@@ -424,11 +428,6 @@ public sealed partial class AkburaSyntacticDocument
             parentComponentName: null,
             ImmutableArray<string>.Empty);
         return true;
-    }
-
-    private bool IsInsideMarkupStartTag(int position)
-    {
-        return GetMarkupStartTagStart(position) >= 0;
     }
 
     private MarkupStartTagSyntax? GetStartTagAtPosition(AkburaSyntax root, AkburaSyntax? node, int position)

@@ -9,26 +9,13 @@ public sealed partial class AkburaSyntacticDocument
     private bool TryGetMarkupExtensionArgumentContext(AkburaSyntax root, int position, out AkburaSyntacticCompletionContext context)
     {
         context = default;
-
-        MarkupExtensionSyntax? extension = null;
-        if (root.FullSpan.Length != 0)
+        if (!TryFindInnermostMarkupExtension(root, position, out var extension) ||
+            position < extension.Type.Span.End)
         {
-            var tokenPosition = Math.Min(
-                Math.Max(position, root.FullSpan.Start),
-                root.FullSpan.End - 1);
-            for (var node = root.FindToken(tokenPosition).Parent; node != null; node = node.Parent)
-            {
-                if (node is MarkupExtensionSyntax candidate &&
-                    candidate.OpenBrace.Span.End <= position &&
-                    position <= GetMarkupExtensionContentEnd(candidate))
-                {
-                    extension = candidate;
-                    break;
-                }
-            }
+            return false;
         }
-        if (extension == null ||
-            position < extension.Type.FullSpan.End)
+
+        if (TryGetEmbeddedCSharpContext(position, out _))
         {
             return false;
         }
@@ -41,7 +28,7 @@ public sealed partial class AkburaSyntacticDocument
             return false;
         }
 
-        var contentStart = extension.Type.FullSpan.End;
+        var contentStart = extension.Type.Span.End;
         var contentEnd = GetMarkupExtensionContentEnd(extension);
         if (position < contentStart || position > contentEnd)
         {
@@ -103,8 +90,7 @@ public sealed partial class AkburaSyntacticDocument
             argumentEnd,
             out var valueContentStart,
             out var valueContentEnd);
-        if (position < valueContentStart ||
-            position > valueContentEnd)
+        if (position < valueStart || position > argumentEnd)
         {
             return false;
         }
@@ -118,18 +104,22 @@ public sealed partial class AkburaSyntacticDocument
                 ? AkburaCompletionContextKind.BindingPath
                 : AkburaCompletionContextKind
                     .MarkupExtensionArgumentValue;
-        var applicableSpan = GetMarkupWordSpan(
-            position,
-            valueContentStart,
-            valueContentEnd,
-            includeBindingRootPrefix:
-                kind == AkburaCompletionContextKind.BindingPath);
+        var applicableSpan = position < valueContentStart || position > valueContentEnd
+            ? new TextSpan(position, 0)
+            : GetMarkupWordSpan(
+                position,
+                valueContentStart,
+                valueContentEnd,
+                includeBindingRootPrefix:
+                    kind == AkburaCompletionContextKind.BindingPath);
         var completedPath = kind ==
                 AkburaCompletionContextKind.BindingPath
-            ? Text.ToString(TextSpan.FromBounds(
-                    valueContentStart,
-                    applicableSpan.Start))
-                .Trim()
+            ? position <= valueContentStart
+                ? string.Empty
+                : Text.ToString(TextSpan.FromBounds(
+                        valueContentStart,
+                        Math.Min(applicableSpan.Start, valueContentEnd)))
+                    .Trim()
             : null;
 
         context = CreateMarkupExtensionContext(
@@ -142,6 +132,182 @@ public sealed partial class AkburaSyntacticDocument
             argumentIndex,
             completedPath);
         return true;
+    }
+
+    private bool TryFindInnermostMarkupExtension(AkburaSyntax root, int position, out MarkupExtensionSyntax extension)
+    {
+        MarkupExtensionSyntax? candidate = null;
+        if (root.FullSpan.Length != 0)
+        {
+            var minimum = root.FullSpan.Start;
+            var maximum = root.FullSpan.End - 1;
+            ConsiderMarkupExtensionAncestors(root.FindToken(Math.Min(Math.Max(position, minimum), maximum)).Parent, position, ref candidate);
+            ConsiderMarkupExtensionAncestors(root.FindToken(Math.Min(Math.Max(position - 1, minimum), maximum)).Parent, position, ref candidate);
+            ConsiderMarkupExtensionAncestors(root.FindToken(Math.Min(Math.Max(position + 1, minimum), maximum)).Parent, position, ref candidate);
+        }
+
+        extension = candidate!;
+        return candidate != null;
+    }
+
+    private void ConsiderMarkupExtensionAncestors(AkburaSyntax? node, int position, ref MarkupExtensionSyntax? candidate)
+    {
+        for (var current = node; current != null; current = current.Parent)
+        {
+            if (current is not MarkupExtensionSyntax extension ||
+                !HasMarkupExtensionDelimiters(extension) ||
+                position < extension.OpenBrace.Span.End ||
+                position > GetMarkupExtensionContentEnd(extension))
+            {
+                continue;
+            }
+
+            if (candidate == null || extension.OpenBrace.Span.Start > candidate.OpenBrace.Span.Start)
+            {
+                candidate = extension;
+            }
+        }
+    }
+
+    private bool TryFindMarkupStartTagOwner(AkburaSyntax root, int position, out MarkupStartTagSyntax startTag)
+    {
+        MarkupStartTagSyntax? candidate = null;
+        if (root.FullSpan.Length != 0)
+        {
+            var minimum = root.FullSpan.Start;
+            var maximum = root.FullSpan.End - 1;
+            ConsiderMarkupStartTagAncestors(root.FindToken(Math.Min(Math.Max(position, minimum), maximum)).Parent, position, ref candidate);
+            ConsiderMarkupStartTagAncestors(root.FindToken(Math.Min(Math.Max(position - 1, minimum), maximum)).Parent, position, ref candidate);
+            ConsiderMarkupStartTagAncestors(root.FindToken(Math.Min(Math.Max(position + 1, minimum), maximum)).Parent, position, ref candidate);
+        }
+
+        startTag = candidate!;
+        return candidate != null;
+    }
+
+    private void ConsiderMarkupStartTagAncestors(AkburaSyntax? node, int position, ref MarkupStartTagSyntax? candidate)
+    {
+        for (var current = node; current != null; current = current.Parent)
+        {
+            if (current is not MarkupStartTagSyntax startTag ||
+                !IsPositionOwnedByMarkupStartTag(startTag, position))
+            {
+                continue;
+            }
+
+            if (candidate == null || startTag.LessToken.Span.Start > candidate.LessToken.Span.Start)
+            {
+                candidate = startTag;
+            }
+        }
+    }
+
+    private bool IsPositionOwnedByMarkupStartTag(MarkupStartTagSyntax startTag, int position)
+    {
+        if (startTag.LessToken.IsMissing ||
+            startTag.LessToken.Span.Start < 0 ||
+            startTag.LessToken.Span.Start >= Text.Length ||
+            Text[startTag.LessToken.Span.Start] != '<' ||
+            position < startTag.LessToken.Span.End)
+        {
+            return false;
+        }
+
+        if (startTag.CloseToken.IsMissing)
+        {
+            return position <= Math.Min(startTag.FullSpan.End, Text.Length);
+        }
+
+        var closeEnd = Math.Min(startTag.Span.End, Text.Length);
+        return closeEnd > startTag.LessToken.Span.End &&
+            Text[closeEnd - 1] == '>' &&
+            position < closeEnd;
+    }
+
+    private bool HasMarkupExtensionDelimiters(MarkupExtensionSyntax extension)
+    {
+        return !extension.DollarToken.IsMissing &&
+            !extension.OpenBrace.IsMissing &&
+            extension.DollarToken.Span.Start >= 0 &&
+            extension.DollarToken.Span.Start < Text.Length &&
+            extension.OpenBrace.Span.Start >= 0 &&
+            extension.OpenBrace.Span.Start < Text.Length &&
+            Text[extension.DollarToken.Span.Start] == '$' &&
+            Text[extension.OpenBrace.Span.Start] == '{';
+    }
+
+    private bool IsPositionOwnedByMarkupAttributeValue(AkburaSyntax root, int position)
+    {
+        if (TryFindInnermostMarkupExtension(root, position, out _))
+        {
+            return true;
+        }
+
+        if (Text.Length == 0)
+        {
+            return false;
+        }
+
+        var tokenPosition = Math.Min(Math.Max(position - 1, 0), Text.Length - 1);
+        var token = root.FindTokenInternal(tokenPosition);
+        var startTag = GetStartTagAtPosition(root, token.Parent, position);
+        if (startTag == null)
+        {
+            return false;
+        }
+
+        foreach (var attribute in startTag.Attributes)
+        {
+            if (IsPositionOwnedByMarkupAttribute(attribute, position))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool IsPositionOwnedByMarkupAttribute(AkburaSyntax attribute, int position)
+    {
+        SyntaxToken equalsToken;
+        MarkupAttributeValueSyntax? value;
+        switch (attribute)
+        {
+            case MarkupPlainAttributeSyntax plain:
+                equalsToken = plain.EqualsToken;
+                value = plain.Value;
+                break;
+            case MarkupAttachedPropertyAttributeSyntax attached:
+                equalsToken = attached.EqualsToken;
+                value = attached.Value;
+                break;
+            case MarkupPrefixedAttributeSyntax prefixed:
+                equalsToken = prefixed.EqualsToken;
+                value = prefixed.Value;
+                break;
+            case IncompleteAttributeSyntax incomplete:
+                equalsToken = incomplete.EqualsToken;
+                value = null;
+                break;
+            default:
+                return false;
+        }
+
+        if (equalsToken.IsMissing || position < equalsToken.Span.End)
+        {
+            return false;
+        }
+
+        if (value == null)
+        {
+            return position <= Math.Min(attribute.FullSpan.End, Text.Length);
+        }
+
+        var isComplete = IsCompleteAttributeValue(value);
+        var valueEnd = isComplete
+            ? value.Span.End
+            : Math.Min(value.FullSpan.End, Text.Length);
+        return isComplete ? position < valueEnd : position <= valueEnd;
     }
 
     private AkburaSyntacticCompletionContext CreateMarkupExtensionContext(AkburaCompletionContextKind kind, TextSpan applicableSpan, int position, MarkupExtensionSyntax extension, string extensionName, string? argumentName, int argumentIndex, string? completedPath)

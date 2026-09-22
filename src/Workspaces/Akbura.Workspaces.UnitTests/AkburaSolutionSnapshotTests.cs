@@ -5,6 +5,47 @@ namespace Akbura.Workspaces.UnitTests;
 public sealed class AkburaSolutionSnapshotTests
 {
     [Fact]
+    public void OpenOrChangeDocumentContext_PreservesFullSolutionAcrossCreateNoChangeAndUpdate()
+    {
+        using var workspace = new AkburaWorkspace();
+        var secondaryProject = workspace.AddOrUpdateProject(
+            ProjectContext.CreateSyntaxOnly("Secondary"));
+        var uri = new Uri(
+            Path.GetFullPath(
+                $"Solution-{Guid.NewGuid():N}.akbura"));
+
+        var createdContext = workspace.OpenOrChangeDocumentContext(
+            uri,
+            SourceText.From("<Created/>"));
+        AssertFullSolutionContext(
+            workspace,
+            createdContext,
+            secondaryProject.Id);
+
+        var unchangedContext = workspace.OpenOrChangeDocumentContext(
+            uri,
+            SourceText.From("<Created/>"));
+        Assert.Same(
+            createdContext.Document,
+            unchangedContext.Document);
+        AssertFullSolutionContext(
+            workspace,
+            unchangedContext,
+            secondaryProject.Id);
+
+        var updatedContext = workspace.OpenOrChangeDocumentContext(
+            uri,
+            SourceText.From("<Updated/>"));
+        Assert.NotSame(
+            unchangedContext.Document,
+            updatedContext.Document);
+        AssertFullSolutionContext(
+            workspace,
+            updatedContext,
+            secondaryProject.Id);
+    }
+
+    [Fact]
     public void TryGetDocumentContext_ReturnsContextFromCapturedSnapshot()
     {
         using var workspace =
@@ -88,5 +129,25 @@ public sealed class AkburaSolutionSnapshotTests
                     .TryGetDocumentContext(
                         uri: null!,
                         out _));
+    }
+
+    private static void AssertFullSolutionContext(AkburaWorkspace workspace, AkburaDocumentContext context, AkburaProjectId secondaryProjectId)
+    {
+        Assert.Same(
+            workspace.CurrentSolution,
+            context.Solution);
+        Assert.Equal(
+            2,
+            context.Solution.Projects.Count);
+        Assert.Same(
+            context.Project,
+            context.Solution.GetRequiredProject(context.Project.Id));
+        Assert.Same(
+            context.Document,
+            context.Project.Documents[context.Document.Id]);
+        Assert.True(
+            context.Solution.TryGetProject(
+                secondaryProjectId,
+                out _));
     }
 }

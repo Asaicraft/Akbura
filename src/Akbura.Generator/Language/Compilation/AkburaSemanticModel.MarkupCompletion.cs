@@ -194,14 +194,15 @@ internal partial class AkburaSemanticModel
         }
     }
 
-    internal ImmutableArray<MarkupBindingPathCompletionCandidate> LookupMarkupBindingPathMembersForCompletion(MarkupAttributeSyntax attribute, MarkupExtensionSyntax extension, string completedPath, CancellationToken cancellationToken = default)
+    internal ImmutableArray<MarkupBindingPathCompletionCandidate> LookupMarkupBindingPathMembersForCompletion(MarkupAttributeSyntax attribute, MarkupExtensionSyntax extension, string completedPath, out bool receiverResolved, CancellationToken cancellationToken = default)
     {
         ValidateMarkupCompletionSyntax(attribute, extension);
-        if (!TryGetMarkupBindingPathCompletionType(
+        receiverResolved = TryGetMarkupBindingPathCompletionType(
                 attribute,
                 extension,
                 completedPath,
-                out var receiverType))
+                out var receiverType);
+        if (!receiverResolved)
         {
             return [];
         }

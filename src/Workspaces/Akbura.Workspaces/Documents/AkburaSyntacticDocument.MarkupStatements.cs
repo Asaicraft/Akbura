@@ -5,13 +5,12 @@ namespace Akbura.Workspaces.Documents;
 
 public sealed partial class AkburaSyntacticDocument
 {
-    private bool TryGetMarkupStatementContext(
-        AkburaSyntax root,
-        int position,
-        out AkburaSyntacticCompletionContext context)
+    private bool TryGetMarkupStatementContext(AkburaSyntax root, int position, out AkburaSyntacticCompletionContext context)
     {
         context = default;
-        if (IsInsideComment(root, position))
+        if (IsInsideComment(root, position) ||
+            TryFindMarkupStartTagOwner(root, position, out _) ||
+            IsPositionOwnedByMarkupAttributeValue(root, position))
         {
             return false;
         }

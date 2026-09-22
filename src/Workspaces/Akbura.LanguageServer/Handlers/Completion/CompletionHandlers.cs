@@ -9,27 +9,36 @@ internal sealed class CompletionHandler :
 
     public override bool RequiresDocument => true;
 
-    public override Uri? GetDocumentUri(
-        CompletionParams parameters)
+    public override Uri? GetDocumentUri(CompletionParams parameters)
     {
         return AkburaProtocolMapper.ParseUri(
             parameters.TextDocument.Uri);
     }
 
-    public override async Task<AkburaLspHandlerResult<CompletionList>>
-        HandleAsync(
-            CompletionParams parameters,
-            AkburaRequestContext context,
-            CancellationToken cancellationToken)
+    public override async Task<AkburaLspHandlerResult<CompletionList>> HandleAsync(CompletionParams parameters, AkburaRequestContext context, CancellationToken cancellationToken)
     {
         var document = context.OpenDocument!;
         var position = context.Services.PositionConverter.ToOffset(
             document.Text,
             parameters.Position);
         var services = context.Services.Workspace.LanguageServices;
-        var native = services.Completion.GetCompletions(
+        var syntaxContext = document.SyntacticDocument
+            .GetCompletionContext(
+                position,
+                cancellationToken);
+        var hasCSharpContext = document.SyntacticDocument
+            .TryGetCSharpCompletionContext(
+                position,
+                out var csharpContext,
+                cancellationToken);
+        var normalized = AkburaSemanticContextNormalizer.Normalize(
             document.SyntacticDocument,
             context.SemanticDocument,
+            cancellationToken);
+        var semanticContext = normalized.Context;
+        var native = services.Completion.GetCompletions(
+            document.SyntacticDocument,
+            semanticContext,
             position,
             cancellationToken);
         var triggerKind = parameters.Context?.TriggerKind ?? 1;
@@ -37,7 +46,7 @@ internal sealed class CompletionHandler :
         var projected = await services.ProjectedCSharp
             .GetCompletionsAsync(
                 document.SyntacticDocument,
-                context.SemanticDocument,
+                semanticContext,
                 position,
                 new AkburaProjectedCompletionTrigger(
                     IsExplicit: triggerKind == 1,
@@ -51,11 +60,26 @@ internal sealed class CompletionHandler :
         context.Services.Logger.Log(
             AkburaServerLogLevel.Trace,
             $"Completion: uri='{document.Uri}', " +
-            $"version={document.Version}, " +
-            $"semantic={context.SemanticDocument != null}, " +
+            $"editorSnapshot={document.Version}, " +
+            $"publishedSemanticSnapshot='{context.SemanticDocument?.Document.Version.ToString() ?? "none"}', " +
+            $"projectId='{semanticContext?.Project.Id.ToString() ?? context.SemanticDocument?.Project.Id.ToString() ?? "none"}', " +
+            $"projectVersion='{semanticContext?.Project.Version.ToString() ?? context.SemanticDocument?.Project.Version.ToString() ?? "none"}', " +
+            $"documentId='{semanticContext?.Document.Id.ToString() ?? context.SemanticDocument?.Document.Id.ToString() ?? "none"}', " +
+            $"semanticAvailable={semanticContext != null}, " +
+            $"semanticTextMatches={normalized.TextMatches}, " +
+            $"semanticContextMode={normalized.Mode.ToString().ToLowerInvariant()}, " +
+            $"position={position}, " +
+            $"contextKind={(hasCSharpContext ? csharpContext.Kind.ToString() : syntaxContext.Kind.ToString())}, " +
+            $"contextOwner={(hasCSharpContext ? "csharp" : GetContextOwner(syntaxContext.Kind))}, " +
+            $"extensionSpanCurrent={syntaxContext.MarkupExtensionSpan}, " +
+            $"extensionSpanResolved={(semanticContext == null ? "none" : syntaxContext.MarkupExtensionSpan.ToString())}, " +
+            $"argumentIndex={syntaxContext.MarkupExtensionArgumentIndex}, " +
+            $"argumentName='{FormatCompletionValue(syntaxContext.MarkupExtensionArgumentName)}', " +
+            $"completedPath='{FormatCompletionValue(syntaxContext.CompletedPath)}', " +
+            $"prefix='{FormatCompletionValue(syntaxContext.Prefix)}', " +
             $"native={native.Items.Length}, " +
             $"projected={projected?.Items.Length ?? 0}, " +
-            $"position={position}.");
+            $"emptyReason={GetEmptyReason(normalized, native, projected)}.");
 
         var capacity = native.Items.Length +
             (projected?.Items.Length ?? 0);
@@ -87,7 +111,7 @@ internal sealed class CompletionHandler :
 
             var change = services.Completion.GetCompletionChange(
                 document.SyntacticDocument,
-                context.SemanticDocument,
+                semanticContext,
                 position,
                 sourceItem,
                 cancellationToken);
@@ -109,11 +133,67 @@ internal sealed class CompletionHandler :
             });
     }
 
-    private static Protocol.CompletionItem MapProjectedItem(
-        AkburaProjectedCompletionItem source,
-        AkburaOpenDocument document,
-        int position,
-        AkburaRequestContext context)
+    private static string GetContextOwner(AkburaCompletionContextKind kind)
+    {
+        return kind switch
+        {
+            AkburaCompletionContextKind.MarkupExtensionType =>
+                "extension-type",
+            AkburaCompletionContextKind.MarkupExtensionArgumentName or
+            AkburaCompletionContextKind.MarkupExtensionArgumentValue or
+            AkburaCompletionContextKind.BindingPath =>
+                "extension-argument",
+            AkburaCompletionContextKind.AttributeName or
+            AkburaCompletionContextKind.AttributeValue =>
+                "attribute",
+            AkburaCompletionContextKind.MarkupStatement or
+            AkburaCompletionContextKind.MarkupConditionalContinuation =>
+                "statement",
+            AkburaCompletionContextKind.None => "none",
+            _ => "document",
+        };
+    }
+
+    private static string FormatCompletionValue(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        const int maximumLength = 80;
+        var sanitized = value!
+            .Replace('\r', ' ')
+            .Replace('\n', ' ');
+        return sanitized.Length <= maximumLength
+            ? sanitized
+            : sanitized[..maximumLength] + "…";
+    }
+
+    private static string GetEmptyReason(AkburaSemanticContextNormalizationResult normalized, AkburaCompletionResult native, AkburaProjectedCompletionResult? projected)
+    {
+        if (!native.IsEmpty ||
+            projected is { } projectedResult &&
+            !projectedResult.Items.IsDefaultOrEmpty)
+        {
+            return "none";
+        }
+
+        return normalized.FailureReason switch
+        {
+            AkburaSemanticContextFailureReason.NoSemanticContext =>
+                "no-semantic-context",
+            AkburaSemanticContextFailureReason.DocumentMismatch =>
+                "document-mismatch",
+            AkburaSemanticContextFailureReason.ProjectMismatch =>
+                "project-mismatch",
+            AkburaSemanticContextFailureReason.RebaseFailed =>
+                "rebase-failed",
+            _ => "no-completion-items",
+        };
+    }
+
+    private static Protocol.CompletionItem MapProjectedItem(AkburaProjectedCompletionItem source, AkburaOpenDocument document, int position, AkburaRequestContext context)
     {
         return new Protocol.CompletionItem
         {
@@ -139,13 +219,7 @@ internal sealed class CompletionHandler :
         };
     }
 
-    private static Protocol.CompletionItem MapNativeItem(
-        AkburaCompletionItem source,
-        AkburaCompletionChange change,
-        TextSpan applicableSpan,
-        AkburaOpenDocument document,
-        int position,
-        AkburaRequestContext context)
+    private static Protocol.CompletionItem MapNativeItem(AkburaCompletionItem source, AkburaCompletionChange change, TextSpan applicableSpan, AkburaOpenDocument document, int position, AkburaRequestContext context)
     {
         var item = new Protocol.CompletionItem
         {
@@ -173,13 +247,7 @@ internal sealed class CompletionHandler :
         return item;
     }
 
-    internal static void ApplyCompletionChange(
-        Protocol.CompletionItem item,
-        AkburaCompletionChange change,
-        TextSpan applicableSpan,
-        string fallbackText,
-        AkburaOpenDocument document,
-        AkburaRequestContext context)
+    internal static void ApplyCompletionChange(Protocol.CompletionItem item, AkburaCompletionChange change, TextSpan applicableSpan, string fallbackText, AkburaOpenDocument document, AkburaRequestContext context)
     {
         var changes = change.Changes;
         var mainIndex = FindMainChange(changes, applicableSpan);
@@ -255,12 +323,7 @@ internal sealed class CompletionHandler :
             : additional.ToArray();
     }
 
-    private static JsonElement CreateResolveData(
-        AkburaOpenDocument document,
-        int position,
-        string resolveKey,
-        string provider,
-        TextSpan sourceSpan)
+    private static JsonElement CreateResolveData(AkburaOpenDocument document, int position, string resolveKey, string provider, TextSpan sourceSpan)
     {
         return JsonSerializer.SerializeToElement(
             new AkburaCompletionResolveData
@@ -275,9 +338,7 @@ internal sealed class CompletionHandler :
             });
     }
 
-    private static int FindMainChange(
-        ImmutableArray<TextChange> changes,
-        TextSpan applicableSpan)
+    private static int FindMainChange(ImmutableArray<TextChange> changes, TextSpan applicableSpan)
     {
         if (changes.IsDefaultOrEmpty)
         {
@@ -309,11 +370,7 @@ internal sealed class CompletionResolveHandler :
 {
     public override string Method => LspMethods.CompletionResolve;
 
-    public override async Task<AkburaLspHandlerResult<Protocol.CompletionItem>>
-        HandleAsync(
-            Protocol.CompletionItem parameters,
-            AkburaRequestContext context,
-            CancellationToken cancellationToken)
+    public override async Task<AkburaLspHandlerResult<Protocol.CompletionItem>> HandleAsync(Protocol.CompletionItem parameters, AkburaRequestContext context, CancellationToken cancellationToken)
     {
         if (parameters.Data is not { } dataElement)
         {

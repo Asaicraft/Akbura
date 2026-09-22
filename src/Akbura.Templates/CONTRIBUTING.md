@@ -22,7 +22,7 @@ updating MVVM examples.
 | Package family | Version at the baseline | Rule |
 | --- | --- | --- |
 | Avalonia packages | `12.0.4` | Use one compatible `AvaloniaVersion`; do not take a newer upstream value without validating Akbura. |
-| Akbura and Akbura.Diagnostics | `12.0.4-alpha.6` | Use one `AkburaVersion`, stamped from the local CI package or release tag. |
+| Akbura and Akbura.Diagnostics | `12.0.4-alpha.8` | Use one `AkburaVersion`, stamped from the local CI package or release tag. |
 | CommunityToolkit.Mvvm | `8.4.2` | Only CommunityToolkit variants. |
 | ReactiveUI.Avalonia | `12.0.3` | Only ReactiveUI variants. |
 | Microsoft.Extensions.DependencyInjection | `10.0.0` | Only Microsoft DI variants. |

@@ -15,7 +15,7 @@
 | `--cpm` / `-cpm` | `true` | `true`, `false` |
 | `--remove-view-locator` / `-rvl` | `false` | `true`, `false` |
 | `--avalonia-version` / `-av` | `12.0.4` | compatible Avalonia version |
-| `--akbura-version` / `-akv` | `12.0.4-alpha.6` | compatible Akbura version |
+| `--akbura-version` / `-akv` | `12.0.4-alpha.8` | compatible Akbura version |
 
 `--cpm true` uses `Directory.Packages.props`; `--cpm false` uses `Directory.Build.props`, pins matching versions on each `PackageReference`, and disables inherited CPM imports. `--remove-view-locator true` removes the optional typed ViewLocator and its registration; views are still explicitly composed by the app. The page-type choice emits only its selected shell. `PageNavigationHost` provides safe-area and system Back integration for Page modes. The `.akbura` view remains a `Control`, so each Page mode wraps it in a real Avalonia `Page`.
 

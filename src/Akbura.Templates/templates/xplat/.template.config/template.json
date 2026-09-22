@@ -27,7 +27,7 @@
     "Framework": { "type": "parameter", "datatype": "choice", "defaultValue": "net10.0", "replaces": "FrameworkParameter", "description": "Target framework.", "choices": [{ "choice": "net10.0", "description": ".NET 10" }] },
     "MVVMToolkit": { "type": "parameter", "datatype": "choice", "defaultValue": "CommunityToolkit", "description": "MVVM toolkit.", "choices": [{ "choice": "CommunityToolkit" }, { "choice": "ReactiveUI" }] },
     "MainViewPageType": { "type": "parameter", "datatype": "choice", "defaultValue": "None", "description": "Main view page shell.", "choices": [{ "choice": "None" }, { "choice": "ContentPage" }, { "choice": "TabbedPage" }, { "choice": "DrawerPage" }, { "choice": "NavigationPage" }] },
-    "AkburaVersion": { "type": "parameter", "datatype": "text", "defaultValue": "12.0.4-alpha.6", "replaces": "AkburaVersionTemplateParameter", "description": "Akbura and Akbura.Diagnostics package version." },
+    "AkburaVersion": { "type": "parameter", "datatype": "text", "defaultValue": "12.0.4-alpha.8", "replaces": "AkburaVersionTemplateParameter", "description": "Akbura and Akbura.Diagnostics package version." },
     "AvaloniaVersion": { "type": "parameter", "datatype": "text", "defaultValue": "12.0.4", "replaces": "AvaloniaVersionTemplateParameter", "description": "Avalonia package version." },
     "RemoveViewLocator": { "type": "parameter", "datatype": "bool", "defaultValue": "false", "description": "Omit the reflection-based ViewLocator." },
     "UseCentralPackageManagement": { "type": "parameter", "datatype": "bool", "defaultValue": "true", "description": "Manage package versions in Directory.Packages.props." },

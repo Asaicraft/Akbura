@@ -1,5 +1,11 @@
 # Change Log
 
+## 12.0.6
+
+- Stabilized `${Binding ...}` completion while semantic snapshots lag behind typing.
+- Prevented markup statement snippets from appearing inside binding extensions.
+- Added current-snapshot completion diagnostics and LSP regression coverage.
+
 ## 12.0.5
 
 - Added reactive markup $foreach support.

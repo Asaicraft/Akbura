@@ -21,6 +21,12 @@ Language support for `.akbura` and `.akcss` files in Visual Studio.
 The extension keeps its stable VSIX identity so installed copies receive future
 updates from the same Marketplace listing.
 
+## What's new in 12.0.4.5
+
+- Stabilized `${Binding ...}` completion while semantic snapshots lag behind typing.
+- Prevented `$if` and `$foreach` suggestions from appearing inside binding extensions.
+- Rejects stale completion commits after the editor snapshot changes.
+
 ## What's new in 12.0.4.3
 
 - Added editor support for reactive $foreach markup.

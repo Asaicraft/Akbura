@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
+using System.Xml.Linq;
 
 namespace Akbura.UnitTests;
 
@@ -85,6 +86,58 @@ public sealed class AkburaBuildTargetsTests
         Assert.Contains(
             AkburaModuleManifest.ResourceName,
             typeof(AkburaControl).Assembly.GetManifestResourceNames());
+    }
+
+    [Fact]
+    public void AkburaTargets_InjectAvaloniaResourcesOnlyWhenRoslynRequestsAdditionalFiles()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var targetsPath = Path.Combine(
+            repositoryRoot,
+            "src",
+            "Akbura",
+            "buildTransitive",
+            "Akbura.targets");
+        var project = XDocument.Load(targetsPath);
+        var root = Assert.IsType<XElement>(project.Root);
+
+        Assert.DoesNotContain(
+            root.Elements("ItemGroup").Elements("AdditionalFiles"),
+            static item => IncludesItem(item, "AvaloniaResource"));
+        Assert.DoesNotContain(
+            root.Descendants("AdditionalFiles"),
+            static item => IncludesItem(item, "AvaloniaXaml"));
+
+        var target = Assert.Single(
+            root.Elements("Target"),
+            static target =>
+                target.Attribute("Name")?.Value ==
+                "_AkburaInjectAvaloniaResourceAdditionalFiles");
+        Assert.Equal(
+            "_InjectAdditionalFiles",
+            target.Attribute("AfterTargets")?.Value);
+        Assert.Equal(
+            "GenerateMSBuildEditorConfigFileShouldRun",
+            target.Attribute("BeforeTargets")?.Value);
+
+        var additionalFiles = Assert.Single(
+            target.Elements("ItemGroup").Elements("AdditionalFiles"));
+        Assert.Equal(
+            "@(AvaloniaResource->WithMetadataValue('Extension', '.axaml'))",
+            additionalFiles.Attribute("Include")?.Value);
+        Assert.Equal(
+            "@(AdditionalFiles)",
+            additionalFiles.Attribute("Exclude")?.Value);
+        Assert.Equal(
+            "AvaloniaResource",
+            additionalFiles.Attribute("SourceItemGroup")?.Value);
+    }
+
+    private static bool IncludesItem(XElement item, string itemName)
+    {
+        return item.Attribute("Include")?.Value.Contains(
+            itemName,
+            StringComparison.Ordinal) == true;
     }
 
     private static string FindRepositoryRoot()

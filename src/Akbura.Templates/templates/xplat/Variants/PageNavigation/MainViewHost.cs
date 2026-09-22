@@ -6,25 +6,43 @@ namespace AkburaTemplateNamespace.Views;
 
 internal static class MainViewHost
 {
-    public static Control Create() => new PageNavigationHost { Page = new MainNavigationPage() };
+    public static Control Create() => Create(viewModel: null);
 
     public static Control CreateWithDataContext(MainViewModel viewModel)
     {
-        var view = Create();
+        var view = Create(viewModel);
         view.DataContext = viewModel;
         return view;
     }
+
+    private static Control Create(MainViewModel? viewModel) =>
+        new PageNavigationHost
+        {
+            Page = new MainNavigationPage(viewModel)
+        };
 }
 
 internal sealed class MainNavigationPage : NavigationPage
 {
+    private readonly MainViewModel? _viewModel;
+
+    public MainNavigationPage()
+        : this(viewModel: null)
+    {
+    }
+
+    public MainNavigationPage(MainViewModel? viewModel)
+    {
+        _viewModel = viewModel;
+    }
+
     protected override async void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
 
         if (CurrentPage is null)
         {
-            await PushAsync(new HomePage());
+            await PushAsync(new HomePage(_viewModel));
         }
     }
 }
@@ -32,6 +50,11 @@ internal sealed class MainNavigationPage : NavigationPage
 internal sealed class HomePage : ContentPage
 {
     public HomePage()
+        : this(viewModel: null)
+    {
+    }
+
+    public HomePage(MainViewModel? viewModel)
     {
         Header = "Home";
 
@@ -46,8 +69,19 @@ internal sealed class HomePage : ContentPage
 
         Content = new StackPanel
         {
-            Children = { new MainView(), openSettings }
+            Children = { CreateMainView(viewModel), openSettings }
         };
+    }
+
+    private static MainView CreateMainView(MainViewModel? viewModel)
+    {
+        var view = new MainView();
+        if (viewModel is not null)
+        {
+            view.DataContext = viewModel;
+        }
+
+        return view;
     }
 }
 

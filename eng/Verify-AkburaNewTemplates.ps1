@@ -286,6 +286,12 @@ function Assert-GeneratedTemplate {
         Assert-Condition ($mainViewHosts.Count -eq 1) (
             "$Name must have exactly one selected MainViewHost.cs.")
         $hostContent = Get-Content -LiteralPath $mainViewHosts[0].FullName -Raw
+        $appSource = Get-Content -LiteralPath (
+            Join-Path $Directory "$Name/App.axaml.cs") -Raw
+        Assert-Condition ($appSource.Contains(
+            "Content = MainViewHost.CreateWithDataContext(viewModel)",
+            [StringComparison]::Ordinal)) (
+            "$Name desktop startup does not pass MainViewModel to MainViewHost.")
         $pageSources = (@(
             Get-ChildItem -LiteralPath $Directory -Recurse -File |
                 Where-Object { $_.Extension -in @(".cs", ".axaml") } |
@@ -293,7 +299,7 @@ function Assert-GeneratedTemplate {
         ) -join "`n")
         if ($PageType -eq "None") {
             Assert-Condition ($hostContent.Contains("new UserControl", [StringComparison]::Ordinal) -and
-                $hostContent.Contains("Content = new MainView", [StringComparison]::Ordinal)) (
+                $hostContent.Contains("Content = CreateMainView(viewModel)", [StringComparison]::Ordinal)) (
                 "$Name must wrap MainView in an ordinary UserControl host.")
         }
         else {

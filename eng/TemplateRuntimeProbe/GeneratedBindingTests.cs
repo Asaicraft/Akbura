@@ -285,7 +285,8 @@ public sealed class GeneratedBindingTests
                 .Single(attribute =>
                     attribute.Key == "AkburaTemplatePageType")
                 .Value;
-            var root = CreateHostWithDataContext(NewViewModel());
+            var viewModel = NewViewModel();
+            var root = CreateHostWithDataContext(viewModel);
 
             if (expectedPageType == "None")
             {
@@ -347,8 +348,13 @@ public sealed class GeneratedBindingTests
 
                     menu.SelectedIndex = 0;
                     Drain();
-                    Assert.Equal("Home",
-                        Assert.IsType<ContentPage>(drawer.Content).Header);
+                    var recreatedHome = Assert.IsType<ContentPage>(
+                        drawer.Content);
+                    Assert.Equal("Home", recreatedHome.Header);
+                    Assert.Same(
+                        viewModel,
+                        Assert.IsAssignableFrom<Control>(recreatedHome.Content)
+                            .DataContext);
                     break;
                 }
 
@@ -424,6 +430,69 @@ public sealed class GeneratedBindingTests
                 default:
                     throw new InvalidOperationException(
                         $"Unexpected page type '{expectedPageType}'.");
+            }
+        });
+    }
+
+    [Fact]
+    public async Task SelectedPageTypePropagatesViewModelToAttachedMainView()
+    {
+        await Dispatch(() =>
+        {
+            var viewModel = NewViewModel();
+            var root = CreateHostWithDataContext(viewModel);
+            var window = new Window { Content = root };
+            var navigation = (root as PageNavigationHost)?.Page as
+                NavigationPage;
+            if (navigation is not null)
+            {
+                navigation.PageTransition = null;
+            }
+
+            try
+            {
+                window.Show();
+
+                if (navigation is not null)
+                {
+                    var homeType = typeof(MainViewModel).Assembly.GetType(
+                        "TemplateRuntimeProbeApp.Views.HomePage",
+                        throwOnError: true)!;
+                    WaitForPage(navigation, homeType);
+                }
+
+                if ((root as PageNavigationHost)?.Page is DrawerPage drawer)
+                {
+                    var menu = Assert.IsType<ListBox>(drawer.Drawer);
+                    menu.SelectedIndex = 1;
+                    Drain();
+                    menu.SelectedIndex = 0;
+                }
+
+                Drain();
+
+                var mainView = Assert.Single(
+                    root.GetVisualDescendants().OfType<Control>(),
+                    control => control.GetType() == MainViewType);
+                Assert.Same(viewModel, mainView.DataContext);
+
+                var count = Assert.Single(mainView.GetVisualDescendants()
+                    .OfType<TextBlock>(), text => text.Text == "0");
+                var increment = Assert.Single(mainView
+                    .GetVisualDescendants().OfType<Button>(), button =>
+                        ReferenceEquals(
+                            button.Command,
+                            viewModel.IncrementCommand));
+
+                Execute(Assert.IsAssignableFrom<ICommand>(increment.Command));
+                Drain();
+
+                Assert.Equal(1, viewModel.Count);
+                Assert.Equal("1", count.Text);
+            }
+            finally
+            {
+                window.Close();
             }
         });
     }

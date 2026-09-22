@@ -5,7 +5,16 @@ namespace AkburaTemplateNamespace.Views;
 
 internal static class MainViewHost
 {
-    public static Control Create()
+    public static Control Create() => Create(viewModel: null);
+
+    public static Control CreateWithDataContext(MainViewModel viewModel)
+    {
+        var view = Create(viewModel);
+        view.DataContext = viewModel;
+        return view;
+    }
+
+    private static Control Create(MainViewModel? viewModel)
     {
         var menu = new ListBox
         {
@@ -17,7 +26,7 @@ internal static class MainViewHost
         {
             Header = "Akbura",
             Drawer = menu,
-            Content = CreatePage(0)
+            Content = CreatePage(0, viewModel)
         };
 
         menu.SelectionChanged += (_, _) =>
@@ -27,23 +36,22 @@ internal static class MainViewHost
                 return;
             }
 
-            drawer.Content = CreatePage(menu.SelectedIndex);
+            drawer.Content = CreatePage(menu.SelectedIndex, viewModel);
             drawer.IsOpen = false;
         };
 
         return new PageNavigationHost { Page = drawer };
     }
 
-    public static Control CreateWithDataContext(MainViewModel viewModel)
+    private static ContentPage CreatePage(
+        int selectedIndex,
+        MainViewModel? viewModel) => selectedIndex switch
     {
-        var view = Create();
-        view.DataContext = viewModel;
-        return view;
-    }
-
-    private static ContentPage CreatePage(int selectedIndex) => selectedIndex switch
-    {
-        0 => new ContentPage { Header = "Home", Content = new MainView() },
+        0 => new ContentPage
+        {
+            Header = "Home",
+            Content = CreateMainView(viewModel)
+        },
         1 => new ContentPage
         {
             Header = "Settings",
@@ -51,4 +59,15 @@ internal static class MainViewHost
         },
         _ => throw new ArgumentOutOfRangeException(nameof(selectedIndex))
     };
+
+    private static MainView CreateMainView(MainViewModel? viewModel)
+    {
+        var view = new MainView();
+        if (viewModel is not null)
+        {
+            view.DataContext = viewModel;
+        }
+
+        return view;
+    }
 }

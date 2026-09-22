@@ -28,7 +28,7 @@ public partial class App : Application
             desktop.MainWindow = new MainWindow
             {
                 DataContext = viewModel,
-                Content = MainViewHost.Create()
+                Content = MainViewHost.CreateWithDataContext(viewModel)
             };
 
             desktop.Exit += (_, _) => AppServices.DisposeOwnedServices();

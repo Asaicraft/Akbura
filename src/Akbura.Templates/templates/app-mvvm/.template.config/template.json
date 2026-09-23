@@ -10,13 +10,22 @@
   "sourceName": "AkburaMvvmTemplate",
   "defaultName": "AkburaApplication",
   "preferNameDirectory": true,
-  "tags": { "language": "C#", "type": "project" },
+  "tags": { "language": "C#", "type": "solution", "editorTreatAs": "solution" },
+  "forms": {
+    "rawName": { "identifier": "identity" }
+  },
   "symbols": {
     "RootNamespace": {
       "type": "derived",
       "valueSource": "name",
       "valueTransform": "safe_namespace",
       "replaces": "AkburaTemplateNamespace"
+    },
+    "RawProjectName": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "rawName",
+      "replaces": "AkburaRawProjectNamePlaceholder"
     },
     "Framework": {
       "type": "parameter",
@@ -115,28 +124,28 @@
         },
         {
           "condition": "(RemoveViewLocator)",
-          "exclude": ["App.axaml", "ViewLocator.cs"],
-          "rename": { "App.RemoveViewLocator.axaml": "App.axaml" }
+          "exclude": ["AkburaMvvmTemplate/App.axaml", "AkburaMvvmTemplate/ViewLocator.cs"],
+          "rename": { "AkburaMvvmTemplate/App.RemoveViewLocator.axaml": "AkburaMvvmTemplate/App.axaml" }
         },
         {
           "condition": "(!RemoveViewLocator)",
-          "exclude": ["App.RemoveViewLocator.axaml"]
+          "exclude": ["AkburaMvvmTemplate/App.RemoveViewLocator.axaml"]
         },
         {
           "condition": "(!UseSplat)",
-          "exclude": ["Infrastructure/SplatServiceProvider.cs"]
+          "exclude": ["AkburaMvvmTemplate/Infrastructure/SplatServiceProvider.cs"]
         }
       ]
     },
     {
       "condition": "(UseCommunityToolkit)",
       "source": "./Variants/CommunityToolkit/",
-      "target": "./"
+      "target": "./AkburaMvvmTemplate.ViewModels/"
     },
     {
       "condition": "(UseReactiveUI)",
       "source": "./Variants/ReactiveUI/",
-      "target": "./"
+      "target": "./AkburaMvvmTemplate.ViewModels/"
     },
     {
       "condition": "(UseCentralPackageManagement)",
@@ -150,14 +159,16 @@
     }
   ],
   "primaryOutputs": [
-    { "path": "AkburaMvvmTemplate.csproj" },
+    { "path": "AkburaMvvmTemplate/AkburaMvvmTemplate.csproj" },
+    { "path": "AkburaMvvmTemplate.ViewModels/AkburaMvvmTemplate.ViewModels.csproj" },
+    { "path": "AkburaMvvmTemplate.slnx" },
     {
       "condition": "(HostIdentifier != \"dotnetcli\" && HostIdentifier != \"dotnetcli-preview\")",
-      "path": "Views/MainView.akbura"
+      "path": "AkburaMvvmTemplate/Views/MainView.akbura"
     },
     {
       "condition": "(HostIdentifier != \"dotnetcli\" && HostIdentifier != \"dotnetcli-preview\")",
-      "path": "ViewModels/MainViewModel.cs"
+      "path": "AkburaMvvmTemplate.ViewModels/ViewModels/MainViewModel.cs"
     }
   ],
   "postActions": [
@@ -175,7 +186,7 @@
       "description": "Open MainView and MainViewModel in the editor.",
       "manualInstructions": [],
       "actionId": "84C0DA21-51C8-4541-9940-6CA19AF04EE6",
-      "args": { "files": "1;2" },
+      "args": { "files": "3;4" },
       "continueOnError": true
     }
   ]

@@ -134,6 +134,7 @@ namespace AkburaTemplateNamespace.Views;
                             class="cardBodyText"
                             Text="x.DataType checks binding paths. App assigns the runtime DataContext."
                             TextWrapping="Wrap" />
+                        <TextBlock class="cardBodyText" Text=${Binding GeneratedStatus} />
                     </StackPanel>
                 </Border>
 

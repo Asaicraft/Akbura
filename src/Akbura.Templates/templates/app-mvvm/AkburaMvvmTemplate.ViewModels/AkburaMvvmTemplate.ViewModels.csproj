@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>TemplateTargetFramework</TargetFramework>
+    <RootNamespace>AkburaTemplateNamespace</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--#if (UseCommunityToolkit)-->
+    <!--#if (UseCentralPackageManagement)-->
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <!--#else-->
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="$(CommunityToolkitMvvmVersion)" />
+    <!--#endif-->
+    <!--#endif-->
+    <!--#if (UseReactiveUI)-->
+    <!--#if (UseCentralPackageManagement)-->
+    <PackageReference Include="ReactiveUI" />
+    <PackageReference Include="System.Reactive" />
+    <!--#else-->
+    <PackageReference Include="ReactiveUI" Version="$(ReactiveUIVersion)" />
+    <PackageReference Include="System.Reactive" Version="$(SystemReactiveVersion)" />
+    <!--#endif-->
+    <!--#endif-->
+  </ItemGroup>
+
+</Project>

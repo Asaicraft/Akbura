@@ -26,6 +26,13 @@ using TemplateRuntimeProbeApp.Infrastructure;
 
 namespace Akbura.TemplateRuntimeProbe;
 
+internal static class GeneratedAssemblies
+{
+    public static Assembly Ui { get; } = typeof(TemplateRuntimeProbeApp.App).Assembly;
+
+    public static Assembly ViewModels { get; } = typeof(MainViewModel).Assembly;
+}
+
 public static class ProbeAppBuilder
 {
     public static AppBuilder BuildAvaloniaApp()
@@ -57,7 +64,7 @@ public static class ProbeAppBuilder
 internal static class GeneratedServices
 {
     private static readonly Type ServicesType =
-        typeof(MainViewModel).Assembly.GetType(
+        GeneratedAssemblies.Ui.GetType(
             "TemplateRuntimeProbeApp.Infrastructure.AppServices",
             throwOnError: true)!;
 
@@ -94,14 +101,23 @@ public sealed class HeadlessCollection
 [Collection(HeadlessCollection.Name)]
 public sealed class GeneratedBindingTests
 {
-    private static readonly Type MainViewType = typeof(MainViewModel).Assembly.GetType(
+    [Fact]
+    public void UiAndViewModelTypesAreOwnedByDifferentAssemblies()
+    {
+        Assert.NotSame(GeneratedAssemblies.Ui, GeneratedAssemblies.ViewModels);
+        Assert.Equal(GeneratedAssemblies.ViewModels, typeof(MainViewModel).Assembly);
+        Assert.Equal(GeneratedAssemblies.Ui, MainViewType.Assembly);
+        Assert.Equal(GeneratedAssemblies.Ui, GreetingCardType.Assembly);
+    }
+
+    private static readonly Type MainViewType = GeneratedAssemblies.Ui.GetType(
         "TemplateRuntimeProbeApp.Views.MainView", throwOnError: true)!;
 
-    private static readonly Type GreetingCardType = typeof(MainViewModel).Assembly.GetType(
+    private static readonly Type GreetingCardType = GeneratedAssemblies.Ui.GetType(
         "TemplateRuntimeProbeApp.Components.GreetingCard", throwOnError: true)!;
 
 #if XPLAT_TEMPLATE
-    private static readonly Type AppShellType = typeof(MainViewModel).Assembly.GetType(
+    private static readonly Type AppShellType = GeneratedAssemblies.Ui.GetType(
         "TemplateRuntimeProbeApp.Views.AppShell", throwOnError: true)!;
 
     private static readonly PropertyInfo AppShellVmProperty = AppShellType.GetProperty(
@@ -167,6 +183,8 @@ public sealed class GeneratedBindingTests
                     textBlocks.Any(text => text.Text == "0"),
                     "Initial TextBlocks: " + string.Join(" | ",
                         textBlocks.Select(text => text.Text)));
+                Assert.Contains(textBlocks,
+                    text => text.Text == viewModel.GeneratedStatus);
                 var count = Assert.Single(textBlocks,
                     text => text.Text == "0");
                 var name = Assert.Single(view.GetVisualDescendants()

@@ -1,15 +1,17 @@
 # Akbura desktop MVVM app
 
-This project pairs Akbura `.akbura` views and AKCSS with an Avalonia desktop host. `MainViewModel` owns the counter, editable name, dependent greeting and commands. `App` creates one ViewModel and assigns it as the window's runtime `DataContext`; `x.DataType="MainViewModel"` in `MainView.akbura` gives the compiler the binding type but does not create that context.
+This solution pairs an Akbura `.akbura` UI project with a sibling, platform-neutral ViewModels class library. `MainViewModel` owns the counter, editable name, dependent greeting and commands. `App` creates one ViewModel and assigns it as the window's runtime `DataContext`; `x.DataType="MainViewModel"` in `MainView.akbura` gives the compiler the binding type but does not create that context.
 
 The view uses `${Binding CountText}`, `${Binding UserName, Mode=TwoWay}` and command bindings. `GreetingCard` receives `${Binding Greeting}` as a component parameter, then renders its parameter with a C# expression. The ViewModel source uses the selected CommunityToolkit.Mvvm or ReactiveUI implementation. The optional `ViewLocator` is a typed DataTemplate for `MainViewModel`; startup uses explicit composition and works without it.
 
 ## Run
 
 ```bash
-dotnet restore AkburaMvvmTemplate.csproj
-dotnet run --project AkburaMvvmTemplate.csproj
+dotnet restore AkburaMvvmTemplate/AkburaMvvmTemplate.csproj
+dotnet run --project AkburaMvvmTemplate/AkburaMvvmTemplate.csproj
 ```
+
+The normal project reference builds `AkburaMvvmTemplate.ViewModels` first. Do not prebuild it or run the application build twice. See [`AkburaMvvmTemplate.ViewModels/ViewModels/README.md`](AkburaMvvmTemplate.ViewModels/ViewModels/README.md) for the source-generator boundary and editing rules.
 
 `akbura.app` demonstrates local state/hooks, `akbura.mvvm` demonstrates native MVVM bindings, and `akbura.xplat` carries the same MVVM idea into Desktop, Browser, Android and iOS hosts.
 

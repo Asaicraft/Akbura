@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
@@ -13,6 +13,8 @@
 	</PropertyGroup>
 	<ItemGroup>
 		<PackageReference Include="Avalonia.Headless" />
+		<PackageReference Include="CommunityToolkit.Mvvm" VersionOverride="8.4.2" GeneratePathProperty="true" PrivateAssets="all" />
+
 		<PackageReference Include="Avalonia.Themes.Fluent" />
 		<PackageReference Include="coverlet.collector">
 			<PrivateAssets>all</PrivateAssets>
@@ -37,6 +39,13 @@
 		<ProjectReference Include="..\Akbura.BlackSilence\Akbura.BlackSilence.csproj" />
 		<ProjectReference Include="..\Akbura.Diagnostics\Akbura.Diagnostics.csproj" />
 		<ProjectReference Include="..\Akbura\Akbura.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+			<_Parameter1>CommunityToolkitMvvmPackagePath</_Parameter1>
+			<_Parameter2>$(PkgCommunityToolkit_Mvvm)</_Parameter2>
+		</AssemblyAttribute>
 	</ItemGroup>
 
 	<ItemGroup>

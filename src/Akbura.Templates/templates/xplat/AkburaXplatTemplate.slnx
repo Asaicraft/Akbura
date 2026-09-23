@@ -7,5 +7,6 @@
   <Project Path="AkburaRawProjectNamePlaceholder.iOS/AkburaRawProjectNamePlaceholder.iOS.csproj">
     <Deploy />
   </Project>
+  <Project Path="AkburaRawProjectNamePlaceholder.ViewModels/AkburaRawProjectNamePlaceholder.ViewModels.csproj" />
   <Project Path="AkburaRawProjectNamePlaceholder/AkburaRawProjectNamePlaceholder.csproj" />
 </Solution>

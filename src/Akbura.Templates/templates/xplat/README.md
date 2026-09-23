@@ -1,6 +1,6 @@
 # Akbura cross-platform application
 
-`akbura.xplat` creates a shared Akbura MVVM UI and separate Desktop, Browser, Android and iOS hosts. Edit `AkburaRawProjectNamePlaceholder/Views/AppShell.akbura` to change the application shell, tabs, drawer, or navigation pages. `MainView.akbura` remains the shared Home content, while `MainViewModel` owns the counter, greeting and commands.
+`akbura.xplat` creates a shared Akbura MVVM UI, one sibling platform-neutral ViewModels library, and separate Desktop, Browser, Android and iOS hosts. Edit `AkburaRawProjectNamePlaceholder/Views/AppShell.akbura` to change the application shell, tabs, drawer, or navigation pages. `MainView.akbura` remains the shared Home content, while `MainViewModel` owns the counter, greeting and commands.
 
 The composition root owns one `MainViewModel` and assigns it to both the shell's required `Vm` property and its outer `DataContext`. `Vm` satisfies dependency injection; `DataContext={Vm}` supplies the runtime binding context, and `x.DataType` only checks binding paths at compile time. Provider-enabled variants still pass `Vm` explicitly, while a directly created shell can resolve it from the configured provider. Every Activity factory invocation creates a fresh `AppShell` and control tree for the application-owned ViewModel.
 
@@ -31,6 +31,8 @@ Creating this template does not restore packages or install workloads. Build onl
 dotnet restore AkburaRawProjectNamePlaceholder.Desktop/AkburaRawProjectNamePlaceholder.Desktop.csproj
 dotnet run --project AkburaRawProjectNamePlaceholder.Desktop/AkburaRawProjectNamePlaceholder.Desktop.csproj
 ```
+
+The Desktop host reaches the shared UI and `AkburaRawProjectNamePlaceholder.ViewModels` through ordinary project references. No manual producer build or second application build is required. See [`AkburaRawProjectNamePlaceholder.ViewModels/ViewModels/README.md`](AkburaRawProjectNamePlaceholder.ViewModels/ViewModels/README.md) for the source-generator boundary and editing rules.
 
 For Browser, install the .NET 10 `wasm-tools` workload and run:
 

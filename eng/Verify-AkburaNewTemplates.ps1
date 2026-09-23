@@ -191,10 +191,10 @@ Write-VerificationReport -OverallStatus "Running"
 try {
 $templateRoot = Join-Path $PSScriptRoot "../src/Akbura.Templates/templates"
 $sharedSources = @(
-    @{ Desktop = "Views/MainView.akbura"; Xplat = "AkburaXplatTemplate/Views/MainView.akbura" },
-    @{ Desktop = "Components/GreetingCard.akbura"; Xplat = "AkburaXplatTemplate/Components/GreetingCard.akbura" },
-    @{ Desktop = "Services/IGreetingService.cs"; Xplat = "AkburaXplatTemplate/Services/IGreetingService.cs" },
-    @{ Desktop = "Services/GreetingService.cs"; Xplat = "AkburaXplatTemplate/Services/GreetingService.cs" },
+    @{ Desktop = "AkburaMvvmTemplate/Views/MainView.akbura"; Xplat = "AkburaXplatTemplate/Views/MainView.akbura" },
+    @{ Desktop = "AkburaMvvmTemplate/Components/GreetingCard.akbura"; Xplat = "AkburaXplatTemplate/Components/GreetingCard.akbura" },
+    @{ Desktop = "AkburaMvvmTemplate.ViewModels/Services/IGreetingService.cs"; Xplat = "AkburaXplatTemplate.ViewModels/Services/IGreetingService.cs" },
+    @{ Desktop = "AkburaMvvmTemplate.ViewModels/Services/GreetingService.cs"; Xplat = "AkburaXplatTemplate.ViewModels/Services/GreetingService.cs" },
     @{ Desktop = "Variants/CommunityToolkit/ViewModels/ViewModelBase.cs"; Xplat = "Variants/CommunityToolkit/ViewModelBase.cs" },
     @{ Desktop = "Variants/CommunityToolkit/ViewModels/MainViewModel.cs"; Xplat = "Variants/CommunityToolkit/MainViewModel.cs" },
     @{ Desktop = "Variants/ReactiveUI/ViewModels/ViewModelBase.cs"; Xplat = "Variants/ReactiveUI/ViewModelBase.cs" },
@@ -237,7 +237,7 @@ function Assert-GeneratedTemplate {
     )
 
     $projects = @(Get-ChildItem -LiteralPath $Directory -Recurse -Filter *.csproj)
-    $expectedProjects = if ($Kind -eq "mvvm") { 1 } else { 5 }
+    $expectedProjects = if ($Kind -eq "mvvm") { 2 } else { 6 }
     Assert-Condition ($projects.Count -eq $expectedProjects) (
         "$Name generated $($projects.Count) projects, expected $expectedProjects.")
 
@@ -245,8 +245,88 @@ function Assert-GeneratedTemplate {
     $mainViewModel = @(Get-ChildItem -LiteralPath $Directory -Recurse -Filter MainViewModel.cs)
     Assert-Condition ($mainView.Count -eq 1 -and $mainViewModel.Count -eq 1) (
         "$Name must contain one Akbura MainView and one MainViewModel.")
+
+    $uiProjectPath = Join-Path $Directory "$Name/$Name.csproj"
+    $viewModelsProjectPath = Join-Path $Directory (
+        "$Name.ViewModels/$Name.ViewModels.csproj")
+    Assert-Condition (Test-Path -LiteralPath $uiProjectPath -PathType Leaf) (
+        "$Name is missing its UI project.")
+    Assert-Condition (Test-Path -LiteralPath $viewModelsProjectPath -PathType Leaf) (
+        "$Name is missing its ViewModels project.")
+    Assert-Condition ($mainView[0].FullName.StartsWith(
+        (Join-Path $Directory "$Name/"), [StringComparison]::OrdinalIgnoreCase)) (
+        "$Name MainView.akbura is not owned by the UI project.")
+    Assert-Condition ($mainViewModel[0].FullName.StartsWith(
+        (Join-Path $Directory "$Name.ViewModels/"), [StringComparison]::OrdinalIgnoreCase)) (
+        "$Name MainViewModel.cs is not owned by the ViewModels project.")
+    $viewModelsReadmePath = Join-Path $Directory (
+        "$Name.ViewModels/ViewModels/README.md")
+    Assert-Condition (Test-Path -LiteralPath $viewModelsReadmePath -PathType Leaf) (
+        "$Name omitted ViewModels/ViewModels/README.md.")
+    $viewModelsReadme = Get-Content -LiteralPath $viewModelsReadmePath -Raw
+    $expectedBuildCommand = if ($Kind -eq "mvvm") {
+        "dotnet build $Name/$Name.csproj"
+    }
+    else {
+        "dotnet build $Name.Desktop/$Name.Desktop.csproj"
+    }
+    Assert-Condition ($viewModelsReadme.Contains(
+        $expectedBuildCommand, [StringComparison]::Ordinal) -and
+        $viewModelsReadme.Contains(
+            "incremental-generators.cookbook.md", [StringComparison]::Ordinal) -and
+        $viewModelsReadme.Contains(
+            "communitytoolkit/mvvm/generators/observableproperty", [StringComparison]::Ordinal) -and
+        $viewModelsReadme.Contains(
+            "communitytoolkit/mvvm/generators/relaycommand", [StringComparison]::Ordinal) -and
+        !$viewModelsReadme.Contains(
+            "[Insert", [StringComparison]::Ordinal)) (
+        "$Name generated an incomplete ViewModels README.")
+    foreach ($service in @("IGreetingService.cs", "GreetingService.cs")) {
+        Assert-Condition (Test-Path -LiteralPath (Join-Path $Directory (
+            "$Name.ViewModels/Services/$service")) -PathType Leaf) (
+            "$Name did not move $service into the ViewModels project.")
+        Assert-Condition (!(Test-Path -LiteralPath (Join-Path $Directory (
+            "$Name/Services/$service")))) (
+            "$Name duplicated $service in the UI project.")
+    }
+
+    $uiProjectXml = [xml] (Get-Content -LiteralPath $uiProjectPath -Raw)
+    $viewModelsProjectXml = [xml] (Get-Content -LiteralPath $viewModelsProjectPath -Raw)
+    $uiProjectReferences = @($uiProjectXml.SelectNodes(
+        "//*[local-name()='ProjectReference']"))
+    $viewModelsProjectReferences = @($viewModelsProjectXml.SelectNodes(
+        "//*[local-name()='ProjectReference']"))
+    Assert-Condition ($uiProjectReferences.Count -eq 1 -and
+        $uiProjectReferences[0].GetAttribute("Include") -eq
+            "..\$Name.ViewModels\$Name.ViewModels.csproj") (
+        "$Name UI project does not have the expected ViewModels ProjectReference.")
+    Assert-Condition ([string]::IsNullOrWhiteSpace(
+        $uiProjectReferences[0].GetAttribute("OutputItemType")) -and
+        [string]::IsNullOrWhiteSpace(
+            $uiProjectReferences[0].GetAttribute("ReferenceOutputAssembly")) -and
+        [string]::IsNullOrWhiteSpace(
+            $uiProjectReferences[0].GetAttribute("BuildReference"))) (
+        "$Name ViewModels dependency is not an ordinary ProjectReference.")
+    Assert-Condition ($viewModelsProjectReferences.Count -eq 0) (
+        "$Name ViewModels project has a reverse project dependency.")
+    Assert-Condition (!$viewModelsProjectXml.OuterXml.Contains(
+        "Akbura", [StringComparison]::Ordinal) -and
+        !$viewModelsProjectXml.OuterXml.Contains(
+            "Avalonia", [StringComparison]::Ordinal)) (
+        "$Name ViewModels project must remain independent of Akbura and Avalonia.")
+
+    $solution = @(Get-ChildItem -LiteralPath $Directory -Filter *.slnx)
+    Assert-Condition ($solution.Count -eq 1) (
+        "$Name does not contain exactly one solution file.")
+    $solutionSource = Get-Content -LiteralPath $solution[0].FullName -Raw
+    Assert-Condition ($solutionSource.Contains(
+        "$Name/$Name.csproj", [StringComparison]::Ordinal) -and
+        $solutionSource.Contains(
+            "$Name.ViewModels/$Name.ViewModels.csproj", [StringComparison]::Ordinal)) (
+        "$Name solution does not include both sibling projects.")
+
     $markup = Get-Content -LiteralPath $mainView[0].FullName -Raw
-    foreach ($binding in @("CountText", "IncrementCommand", "ResetCounterCommand", "UserName", "Greeting", "UseExampleNameCommand")) {
+    foreach ($binding in @("CountText", "IncrementCommand", "ResetCounterCommand", "UserName", "Greeting", "GeneratedStatus", "UseExampleNameCommand")) {
         Assert-Condition ($markup.Contains("Binding $binding", [StringComparison]::Ordinal)) (
             "$Name does not bind $binding in MainView.akbura.")
     }
@@ -288,9 +368,11 @@ function Assert-GeneratedTemplate {
         Assert-Condition (($centralNames -contains "CommunityToolkit.Mvvm") -eq
             ($Toolkit -eq "CommunityToolkit")) (
             "$Name included the wrong toolkit in Directory.Packages.props.")
-        Assert-Condition (($centralNames -contains "ReactiveUI.Avalonia") -eq
-            ($Toolkit -eq "ReactiveUI")) (
-            "$Name included the wrong ReactiveUI central version.")
+        foreach ($reactivePackage in @("ReactiveUI.Avalonia", "ReactiveUI", "System.Reactive")) {
+            Assert-Condition (($centralNames -contains $reactivePackage) -eq
+                ($Toolkit -eq "ReactiveUI")) (
+                "$Name included the wrong $reactivePackage central version.")
+        }
         Assert-Condition (($centralNames -contains "Microsoft.Extensions.DependencyInjection") -eq
             ($DependencyInjection -eq "Microsoft.Extensions.DependencyInjection")) (
             "$Name included the wrong Microsoft DI central version.")
@@ -320,9 +402,32 @@ function Assert-GeneratedTemplate {
     Assert-Condition (($referenceNames -contains "CommunityToolkit.Mvvm") -eq
         ($Toolkit -eq "CommunityToolkit")) (
         "$Name selected an incorrect MVVM toolkit package.")
-    Assert-Condition (($referenceNames -contains "ReactiveUI.Avalonia") -eq
+    foreach ($reactivePackage in @("ReactiveUI.Avalonia", "ReactiveUI", "System.Reactive")) {
+        Assert-Condition (($referenceNames -contains $reactivePackage) -eq
+            ($Toolkit -eq "ReactiveUI")) (
+            "$Name selected an incorrect $reactivePackage package.")
+    }
+
+    $uiReferences = @($references | Where-Object {
+        $_.Project -eq [IO.Path]::GetFullPath($uiProjectPath)
+    })
+    $viewModelsReferences = @($references | Where-Object {
+        $_.Project -eq [IO.Path]::GetFullPath($viewModelsProjectPath)
+    })
+    Assert-Condition (!(Compare-Object @($viewModelsReferences.Name) @(
+        if ($Toolkit -eq "CommunityToolkit") {
+            "CommunityToolkit.Mvvm"
+        }
+        else {
+            "ReactiveUI"
+            "System.Reactive"
+        }
+    ))) ("$Name ViewModels project has incorrect package ownership.")
+    Assert-Condition (($uiReferences.Name -contains "CommunityToolkit.Mvvm") -eq $false) (
+        "$Name UI project directly references CommunityToolkit.Mvvm.")
+    Assert-Condition (($uiReferences.Name -contains "ReactiveUI.Avalonia") -eq
         ($Toolkit -eq "ReactiveUI")) (
-        "$Name selected an incorrect ReactiveUI package.")
+        "$Name UI project has incorrect ReactiveUI.Avalonia ownership.")
     Assert-Condition (($referenceNames -contains "Microsoft.Extensions.DependencyInjection") -eq
         ($DependencyInjection -eq "Microsoft.Extensions.DependencyInjection")) (
         "$Name selected an incorrect Microsoft DI package.")
@@ -358,9 +463,7 @@ function Assert-GeneratedTemplate {
             Assert-Condition (!$builderSource.Contains("UseReactiveUI(", [StringComparison]::Ordinal)) (
                 "$Name unexpectedly initializes ReactiveUI for CommunityToolkit.")
         }
-        $solution = @(Get-ChildItem -LiteralPath $Directory -Filter *.slnx)
-        Assert-Condition ($solution.Count -eq 1) (
-            "$Name does not contain exactly one solution file.")
+
         foreach ($suffix in @("", ".Desktop", ".Browser", ".Android", ".iOS")) {
             Assert-Condition (Test-Path -LiteralPath (Join-Path $Directory (
                 "$Name$suffix/$Name$suffix.csproj"))) (
@@ -575,7 +678,7 @@ function Get-BuildProjectPath {
     )
 
     if ($Case.Kind -eq "mvvm") {
-        return Join-Path $Directory "$($Case.Name).csproj"
+        return Join-Path $Directory "$($Case.Name)/$($Case.Name).csproj"
     }
 
     return Join-Path $Directory (
@@ -618,8 +721,11 @@ function Assert-BuildOutput {
     $diagnosticsOutput = Join-Path $outputPath "Akbura.Diagnostics.dll"
     $avaloniaDiagnosticsOutput = Join-Path $outputPath (
         "AvaloniaUI.DiagnosticsSupport.Avalonia.dll")
+    $viewModelsOutput = Join-Path $outputPath "$Name.ViewModels.dll"
     $debug = $Configuration -eq "Debug"
 
+    Assert-Condition (Test-Path -LiteralPath $viewModelsOutput -PathType Leaf) (
+        "$Name $Configuration did not copy its ViewModels dependency to output.")
     Assert-Condition ((Test-Path -LiteralPath $diagnosticsOutput) -eq $debug) (
         "$Name $Configuration has incorrect Akbura.Diagnostics output.")
     Assert-Condition ((Test-Path -LiteralPath $avaloniaDiagnosticsOutput) -eq $debug) (
@@ -842,6 +948,179 @@ Write-Host (
 
 $additionalChecksStopwatch = [Diagnostics.Stopwatch]::StartNew()
 
+# This boundary gate is intentionally independent of the sampled matrix. It
+# proves real CommunityToolkit generation in both package-management modes and
+# clean first builds through the UI entry point without prebuilding the producer.
+$boundaryCases = @(
+    New-TemplateCase "BoundaryDirect" "mvvm" "CommunityToolkit" "None" `
+        $false $false "None"
+    New-TemplateCase "BoundaryCpm" "mvvm" "CommunityToolkit" "None" `
+        $true $false "None"
+)
+$incrementalBoundary = $null
+foreach ($case in $boundaryCases) {
+    $binaryLogStart = $createdBinaryLogs.Count
+    $directory = Join-Path $Projects ("boundary-" + $case.Name)
+    New-GeneratedTemplateCase $case $directory
+    $projectPath = Get-BuildProjectPath $case $directory
+    $viewModelsProject = Join-Path $directory (
+        "$($case.Name).ViewModels/$($case.Name).ViewModels.csproj")
+    $configurations = if ($case.Cpm) { @("Debug") } else { @("Debug", "Release") }
+
+    foreach ($configuration in $configurations) {
+        foreach ($relativePath in @(
+            "$($case.Name)/bin",
+            "$($case.Name)/obj",
+            "$($case.Name).ViewModels/bin",
+            "$($case.Name).ViewModels/obj")) {
+            $outputDirectory = Join-Path $directory $relativePath
+            if (Test-Path -LiteralPath $outputDirectory) {
+                Remove-DirectoryWithRetry $outputDirectory
+            }
+        }
+
+        Invoke-DotNetLogged "$($case.Name)-boundary-$configuration-restore" @(
+            "restore", $projectPath,
+            "-p:Configuration=$configuration",
+            "--configfile", $NuGetConfig,
+            "--packages", $Packages)
+        $graph = @(Get-PackageGraph $projectPath)
+        Assert-RestoredPackages $case.Name $configuration $graph
+        Invoke-DotNetLogged "$($case.Name)-boundary-$configuration-build" @(
+            "build", $projectPath,
+            "--configuration", $configuration,
+            "--no-restore")
+        Assert-BuildOutput $case.Name $projectPath $configuration
+
+        $referenceAssembly = Join-Path $directory (
+            "$($case.Name).ViewModels/obj/$configuration/net10.0/ref/" +
+            "$($case.Name).ViewModels.dll")
+        Assert-Condition (Test-Path -LiteralPath $referenceAssembly -PathType Leaf) (
+            "$($case.Name) $configuration did not produce an SDK reference assembly.")
+    }
+
+    $producerConfiguration = if ($case.Cpm) { "Debug" } else { "Release" }
+    Invoke-DotNetLogged "$($case.Name)-producer-independent-build" @(
+        "build", $viewModelsProject,
+        "--configuration", $producerConfiguration,
+        "--no-restore")
+
+    if (!$case.Cpm) {
+        $incrementalBoundary = [pscustomobject] @{
+            Directory = $directory
+            Project = $projectPath
+            Configuration = $producerConfiguration
+        }
+    }
+    else {
+        Remove-SuccessfulDirectory $directory
+        Clear-BinaryLogsSince $binaryLogStart
+    }
+}
+
+# Rename a generated command in the producer. One ordinary UI rebuild must
+# reject the stale path; correcting the markup must then succeed immediately.
+$incrementalSource = Join-Path $incrementalBoundary.Directory (
+    "BoundaryDirect.ViewModels/ViewModels/MainViewModel.cs")
+$incrementalMarkup = Join-Path $incrementalBoundary.Directory (
+    "BoundaryDirect/Views/MainView.akbura")
+$sourceText = [IO.File]::ReadAllText($incrementalSource)
+Assert-Condition ($sourceText.Contains(
+    "private void Increment() => Count++;", [StringComparison]::Ordinal)) (
+    "Boundary fixture does not contain Increment().")
+$sourceText = $sourceText.Replace(
+    "private void Increment() => Count++;",
+    "private void Advance() => Count++;")
+[IO.File]::WriteAllText(
+    $incrementalSource,
+    $sourceText.Replace("`r`n", "`n").Replace("`n", "`r`n"),
+    [Text.UTF8Encoding]::new($false))
+$failureOutput = (& dotnet build $incrementalBoundary.Project `
+    --configuration $incrementalBoundary.Configuration `
+    --no-restore `
+    -p:UseSharedCompilation=false 2>&1 | Out-String)
+$failureExitCode = $LASTEXITCODE
+Assert-Condition ($failureExitCode -ne 0 -and
+    $failureOutput.Contains("IncrementCommand", [StringComparison]::Ordinal)) (
+    "Renaming the generated command did not reject the stale binding.")
+
+$markupText = [IO.File]::ReadAllText($incrementalMarkup)
+Assert-Condition ($markupText.Contains(
+    "Binding IncrementCommand", [StringComparison]::Ordinal)) (
+    "Boundary fixture does not bind IncrementCommand.")
+$markupText = $markupText.Replace(
+    "Binding IncrementCommand",
+    "Binding AdvanceCommand")
+[IO.File]::WriteAllText(
+    $incrementalMarkup,
+    $markupText.Replace("`r`n", "`n").Replace("`n", "`r`n"),
+    [Text.UTF8Encoding]::new($false))
+Invoke-DotNetLogged "BoundaryDirect-command-rename-build" @(
+    "build", $incrementalBoundary.Project,
+    "--configuration", $incrementalBoundary.Configuration,
+    "--no-restore")
+
+# Change only producer implementation and execute both generated commands from
+# a fresh runner that references the producer normally.
+$sourceText = [IO.File]::ReadAllText($incrementalSource)
+Assert-Condition ($sourceText.Contains(
+    'UserName = "Developer"', [StringComparison]::Ordinal)) (
+    "Boundary fixture does not contain the expected command implementation.")
+$sourceText = $sourceText.Replace(
+    'UserName = "Developer"',
+    'UserName = "Architect"')
+[IO.File]::WriteAllText(
+    $incrementalSource,
+    $sourceText.Replace("`r`n", "`n").Replace("`n", "`r`n"),
+    [Text.UTF8Encoding]::new($false))
+Invoke-DotNetLogged "BoundaryDirect-implementation-build" @(
+    "build", $incrementalBoundary.Project,
+    "--configuration", $incrementalBoundary.Configuration,
+    "--no-restore")
+
+$runnerDirectory = Join-Path $incrementalBoundary.Directory "BoundaryRunner"
+[IO.Directory]::CreateDirectory($runnerDirectory) | Out-Null
+$runnerProject = Join-Path $runnerDirectory "BoundaryRunner.csproj"
+$runnerSource = Join-Path $runnerDirectory "Program.cs"
+$runnerProjectText = [string]::Join("`r`n", @(
+    '<Project Sdk="Microsoft.NET.Sdk">',
+    '  <PropertyGroup>',
+    '    <OutputType>Exe</OutputType>',
+    '    <TargetFramework>net10.0</TargetFramework>',
+    '    <Nullable>enable</Nullable>',
+    '  </PropertyGroup>',
+    '  <ItemGroup>',
+    '    <ProjectReference Include="..\BoundaryDirect.ViewModels\BoundaryDirect.ViewModels.csproj" />',
+    '  </ItemGroup>',
+    '</Project>',
+    ''))
+$runnerSourceText = [string]::Join("`r`n", @(
+    'using BoundaryDirect.Services;',
+    'using BoundaryDirect.ViewModels;',
+    '',
+    'var viewModel = new MainViewModel(new GreetingService());',
+    'viewModel.AdvanceCommand.Execute(null);',
+    'viewModel.UseExampleNameCommand.Execute(null);',
+    'return viewModel.Count == 1 && viewModel.UserName == "Architect" ? 0 : 1;',
+    ''))
+[IO.File]::WriteAllText(
+    $runnerProject,
+    $runnerProjectText,
+    [Text.UTF8Encoding]::new($false))
+[IO.File]::WriteAllText(
+    $runnerSource,
+    $runnerSourceText,
+    [Text.UTF8Encoding]::new($false))
+Invoke-DotNetLogged "BoundaryDirect-runtime-restore" @(
+    "restore", $runnerProject,
+    "--configfile", $NuGetConfig,
+    "--packages", $Packages)
+Invoke-DotNetLogged "BoundaryDirect-runtime-run" @(
+    "run", "--project", $runnerProject,
+    "--configuration", "Release",
+    "--no-restore")
+Remove-SuccessfulDirectory $incrementalBoundary.Directory
+
 # Unlike the matrix's isolated --no-restore cases, this exercises the default
 # MVVM post-action against the local CI feed.
 $defaultName = "DefaultRestore"
@@ -855,12 +1134,16 @@ try {
 finally {
     $env:NUGET_PACKAGES = $previousPackages
 }
-$defaultProject = Join-Path $defaultDirectory "$defaultName.csproj"
+$defaultProject = Join-Path $defaultDirectory "$defaultName/$defaultName.csproj"
 Assert-Condition (Test-Path -LiteralPath $defaultProject -PathType Leaf) (
     "The default MVVM command did not create its project.")
-$defaultAssets = Join-Path $defaultDirectory "obj/project.assets.json"
+$defaultAssets = Join-Path $defaultDirectory "$defaultName/obj/project.assets.json"
 Assert-Condition (Test-Path -LiteralPath $defaultAssets -PathType Leaf) (
-    "Default MVVM generation did not automatically restore packages.")
+    "Default MVVM generation did not automatically restore the UI project.")
+$defaultViewModelsAssets = Join-Path $defaultDirectory (
+    "$defaultName.ViewModels/obj/project.assets.json")
+Assert-Condition (Test-Path -LiteralPath $defaultViewModelsAssets -PathType Leaf) (
+    "Default MVVM generation did not automatically restore the ViewModels dependency.")
 Assert-Condition ((Get-PackageGraph $defaultProject) -contains "Akbura/$Version") (
     "Default MVVM generation did not restore local Akbura $Version.")
 Remove-SuccessfulDirectory $defaultDirectory
@@ -893,7 +1176,7 @@ foreach ($aliasCase in @(
         $central.Contains("12.0.99", [StringComparison]::Ordinal)) (
         "Short version aliases did not update $($aliasCase.Kind) package versions.")
     $project = if ($aliasCase.Kind -eq "mvvm") {
-        Join-Path $directory "$($aliasCase.Name).csproj"
+        Join-Path $directory "$($aliasCase.Name)/$($aliasCase.Name).csproj"
     }
     else {
         Join-Path $directory "$($aliasCase.Name)/$($aliasCase.Name).csproj"
@@ -1014,13 +1297,13 @@ $negativeName = "BrokenBinding"
 $negativeDirectory = Join-Path $Projects $negativeName
 Invoke-DotNet new akbura.mvvm --name $negativeName `
     --output $negativeDirectory --no-restore --debug:custom-hive $Hive
-$negativeMarkup = Join-Path $negativeDirectory "Views/MainView.akbura"
+$negativeMarkup = Join-Path $negativeDirectory "$negativeName/Views/MainView.akbura"
 $negativeSource = Get-Content -LiteralPath $negativeMarkup -Raw
 Assert-Condition ($negativeSource.Contains('Binding CountText', [StringComparison]::Ordinal)) (
     "The negative typed-binding fixture cannot find CountText.")
 $negativeSource = $negativeSource.Replace('Binding CountText', 'Binding MissingFromViewModel')
 [IO.File]::WriteAllText($negativeMarkup, $negativeSource, [Text.UTF8Encoding]::new($false))
-$negativeProject = Join-Path $negativeDirectory "$negativeName.csproj"
+$negativeProject = Join-Path $negativeDirectory "$negativeName/$negativeName.csproj"
 $binaryLogStart = $createdBinaryLogs.Count
 Invoke-DotNetLogged "negative-binding-restore" @(
     "restore", $negativeProject,
@@ -1101,12 +1384,8 @@ foreach ($case in $runtimeCases) {
         "$caseId.")
     $directory = Join-Path $Projects $caseId
     New-GeneratedTemplateCase $case $directory
-    $projectPath = if ($case.Kind -eq "mvvm") {
-        Join-Path $directory "$($case.Name).csproj"
-    }
-    else {
-        Join-Path $directory "$($case.Name)/$($case.Name).csproj"
-    }
+    $projectPath = Join-Path $directory (
+        "$($case.Name)/$($case.Name).csproj")
     $properties = @(
         "-p:TemplateProject=$projectPath",
         "-p:TemplateKind=$($case.Kind)",
@@ -1180,12 +1459,8 @@ foreach ($case in $startupCases) {
         "Running startup case $startupIndex/$($startupCases.Count): $caseId.")
     $directory = Join-Path $Projects $caseId
     New-GeneratedTemplateCase $case $directory
-    $projectPath = if ($case.Kind -eq "mvvm") {
-        Join-Path $directory "$($case.Name).csproj"
-    }
-    else {
-        Join-Path $directory "$($case.Name)/$($case.Name).csproj"
-    }
+    $projectPath = Join-Path $directory (
+        "$($case.Name)/$($case.Name).csproj")
     $properties = @(
         "-p:TemplateProject=$projectPath",
         "-p:TemplateKind=$($case.Kind)",

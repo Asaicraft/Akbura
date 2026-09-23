@@ -2,19 +2,22 @@
 
 This is a headless integration test for an application generated from the
 **packed** `akbura.mvvm` or `akbura.xplat` template. Generate the application
-with the fixed name `TemplateRuntimeProbeApp`, then reference its MVVM project
-(the shared project for xplat):
+with the fixed name `TemplateRuntimeProbeApp`, then reference its UI project.
+The UI project brings the sibling `TemplateRuntimeProbeApp.ViewModels` producer
+through an ordinary `ProjectReference`:
 
 ```powershell
 dotnet test eng/TemplateRuntimeProbe/TemplateRuntimeProbe.csproj `
-    -p:TemplateProject=C:/absolute/path/TemplateRuntimeProbeApp.csproj `
+    -p:TemplateProject=C:/absolute/path/TemplateRuntimeProbeApp/TemplateRuntimeProbeApp.csproj `
     -p:TemplateKind=mvvm `
     -p:TemplateToolkit=CommunityToolkit `
     -p:TemplateDependencyInjection=None
 ```
 
-The probe instantiates the generated `MainView` and `MainViewModel` under
-Avalonia.Headless. It tests visible counter text, Reset enablement, two-way
+The probe first verifies that `MainViewModel` and the greeting services are
+loaded from the separate ViewModels assembly while views and `AppServices`
+remain in the UI assembly. It then instantiates the generated `MainView` and
+`MainViewModel` under Avalonia.Headless. It tests visible counter text, Reset enablement, two-way
 TextBox binding, updates from VM commands, the bound `GreetingCard`, DataContext
 replacement, and view reattachment. It does not claim to exercise mobile host
 launch, animated navigation, or a real browser/device. For an xplat shared project,

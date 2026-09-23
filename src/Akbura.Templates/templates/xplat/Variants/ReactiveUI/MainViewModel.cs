@@ -60,6 +60,8 @@ public sealed class MainViewModel : ViewModelBase
 
     public string Greeting => _greetingService.CreateGreeting(UserName);
 
+    public string GeneratedStatus => "ReactiveUI ViewModel";
+
     public ReactiveCommand<Unit, Unit> IncrementCommand { get; }
 
     public ReactiveCommand<Unit, Unit> ResetCounterCommand { get; }

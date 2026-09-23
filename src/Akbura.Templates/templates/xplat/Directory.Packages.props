@@ -18,6 +18,8 @@
         <PackageVersion Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3" />
         <!--#if (ReactiveUIToolkitChosen) -->
         <PackageVersion Include="ReactiveUI.Avalonia" Version="12.0.3" />
+        <PackageVersion Include="ReactiveUI" Version="23.2.28" />
+        <PackageVersion Include="System.Reactive" Version="6.1.0" />
         <!--#elif (CommunityToolkitChosen)-->
 
         <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />

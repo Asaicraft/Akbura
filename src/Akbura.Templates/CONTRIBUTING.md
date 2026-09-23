@@ -9,8 +9,8 @@ Keep the attribution and license notices of copied sources and resources.
 
 | Akbura template | Upstream source | Shared user choice | Deliberate difference |
 | --- | --- | --- | --- |
-| `akbura.mvvm` | `templates/csharp/app-mvvm` | MVVM toolkit, ViewLocator, Avalonia version, restore opt-out | Akbura `.akbura` UI, .NET 10/C# only, Akbura version, DI, optional CPM. |
-| `akbura.xplat` | `templates/csharp/xplat` | MVVM toolkit, ViewLocator, Avalonia version, CPM, five page types | Declarative `AppShell.akbura` with native Avalonia pages, .NET 10/C# only, Akbura version and DI; no whole-solution restore. |
+| `akbura.mvvm` | `templates/csharp/app-mvvm` | MVVM toolkit, ViewLocator, Avalonia version, restore opt-out | Two sibling projects: Akbura `.akbura` UI consumes a UI-free ViewModels library through an ordinary project reference; .NET 10/C# only, Akbura version, DI, optional CPM. |
+| `akbura.xplat` | `templates/csharp/xplat` | MVVM toolkit, ViewLocator, Avalonia version, CPM, five page types | Six projects: four hosts and Akbura UI consume a UI-free ViewModels library; declarative `AppShell.akbura` uses native Avalonia pages; no whole-solution restore. |
 
 `akbura.app` is independent and intentionally remains a local-state/hooks
 demonstration; it is not replaced by MVVM. The component item templates are
@@ -23,8 +23,10 @@ updating MVVM examples.
 | --- | --- | --- |
 | Avalonia packages | `12.0.4` | Use one compatible `AvaloniaVersion`; do not take a newer upstream value without validating Akbura. |
 | Akbura and Akbura.Diagnostics | `12.0.4-alpha.8` | Use one `AkburaVersion`, stamped from the local CI package or release tag. |
-| CommunityToolkit.Mvvm | `8.4.2` | Only CommunityToolkit variants. |
-| ReactiveUI.Avalonia | `12.0.3` | Only ReactiveUI variants. |
+| CommunityToolkit.Mvvm | `8.4.2` | Direct dependency of the ViewModels producer in CommunityToolkit variants; its generators run before the UI project compiles. |
+| ReactiveUI.Avalonia | `12.0.3` | UI-project dependency in ReactiveUI variants. |
+| ReactiveUI | `23.2.28` | Direct dependency of the ViewModels producer in ReactiveUI variants. |
+| System.Reactive | `6.1.0` | Direct dependency of the ViewModels producer in ReactiveUI variants. |
 | Microsoft.Extensions.DependencyInjection | `10.0.0` | Only Microsoft DI variants. |
 | Splat | `19.4.1` | Direct reference only for `Splat.Locator`; ReactiveUI may bring it transitively. |
 | AvaloniaUI.DiagnosticsSupport | `2.2.3` | Supported Debug diagnostics paths only. |
@@ -35,7 +37,12 @@ are not offered because the current Akbura runtime and compiler template path
 do not support those combinations. `--di` and `--mvvm` are independent: selecting
 ReactiveUI does not imply Splat.Locator registrations, and selecting a container
 does not select a toolkit. The generated UI uses native `${Binding ...}` with a runtime DataContext and a
-compile-time `x.DataType`. Every xplat page choice emits one declarative
+compile-time `x.DataType`. In both templates, the UI project owns views,
+`AppServices`, and Avalonia/Akbura dependencies; the sibling ViewModels project
+owns ViewModels and neutral greeting services and never references the UI
+project, Akbura, Avalonia, diagnostics, or Roslyn packages. CommunityToolkit
+source-generated properties and commands therefore cross a normal metadata
+boundary before BlackSilence binds the UI. Every xplat page choice emits one declarative
 `Views/AppShell.akbura`; startup supplies the application-owned ViewModel to
 both its required `Vm` property and outer `DataContext`. The tabbed shell keeps
 its local `PageList` alias to `AvaloniaList<Page>` so the native
@@ -46,8 +53,9 @@ receive actual Avalonia Page instances from the shell markup.
 ## Known drift points
 
 - Compare upstream toolkit packages and API signatures before carrying a new
-  version across. In particular, ReactiveUI.Avalonia `12.0.3` requires Splat
-  `>= 19.4.1`; do not reuse the older direct Splat version from `akbura.app`.
+  version across. Keep ReactiveUI.Avalonia in the UI project and matching
+  ReactiveUI/System.Reactive core packages in the ViewModels producer. DI via
+  Splat.Locator remains independent and uses its own direct Splat reference.
 - Upstream's Android SplashScreen version differs between CPM and non-CPM
   branches. Keep one tested value and compare normalized restored package graphs.
 - Recheck Avalonia's desktop, activity (`MainViewFactory`), and single-view
@@ -68,7 +76,8 @@ receive actual Avalonia Page instances from the shell markup.
 
 1. Record the new Avalonia.Templates commit SHA. Compare the complete
    `templates/csharp/app-mvvm/**` and `templates/csharp/xplat/**` trees, especially
-   `.template.config`, package versions, all host entry points, and page options.
+   `.template.config`, package versions, all host entry points, page options,
+   and the sibling ViewModels project boundary.
 2. Carry only compatible behavior into the two new Akbura templates. Preserve
    Akbura UI, DI/version options, attribution, and the state-based `akbura.app`.
    Update this parity table and the dependency baseline when choices change.
@@ -78,8 +87,9 @@ receive actual Avalonia Page instances from the shell markup.
 4. Pack `Akbura.Templates` and install the nupkg in an isolated template home.
    Inspect archived `.template.config` host files and stamped defaults. Run
    `eng/Verify-AkburaTemplates.ps1` against locally packed runtime and
-   diagnostics packages, including desktop Debug/Release builds, binding tests,
-   and CPM/non-CPM restored-graph comparisons.
+   diagnostics packages with an isolated package cache, including desktop
+   Debug/Release builds, producer-assembly ownership, generated-member binding
+   tests, and CPM/non-CPM restored-graph comparisons.
 5. Build/publish platform hosts only where the corresponding .NET workload,
    SDK, simulator, or device exists. Record unavailable environments separately
    from a failed test; no skipped platform is a passed platform.

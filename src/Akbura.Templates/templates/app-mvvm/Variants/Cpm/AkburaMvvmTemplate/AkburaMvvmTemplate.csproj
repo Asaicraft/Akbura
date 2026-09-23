@@ -12,6 +12,7 @@
   <ItemGroup>
     <Folder Include="Models\" />
     <AvaloniaResource Include="Assets\**" />
+    <ProjectReference Include="..\AkburaRawProjectNamePlaceholder.ViewModels\AkburaRawProjectNamePlaceholder.ViewModels.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,9 +21,7 @@
     <PackageReference Include="Avalonia.Desktop" />
     <PackageReference Include="Avalonia.Themes.Fluent" />
     <PackageReference Include="Avalonia.Fonts.Inter" />
-    <!--#if (UseCommunityToolkit)-->
-    <PackageReference Include="CommunityToolkit.Mvvm" />
-    <!--#endif-->
+
     <!--#if (UseReactiveUI)-->
     <PackageReference Include="ReactiveUI.Avalonia" />
     <!--#endif-->

@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
+    <ProjectReference Include="..\AkburaRawProjectNamePlaceholder.ViewModels\AkburaRawProjectNamePlaceholder.ViewModels.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -19,8 +20,6 @@
     <PackageReference Include="Avalonia.Fonts.Inter" />
     <!--#if (ReactiveUIToolkitChosen) -->
     <PackageReference Include="ReactiveUI.Avalonia" />
-    <!--#else -->
-    <PackageReference Include="CommunityToolkit.Mvvm" />
     <!--#endif -->
     <!--#if (UseMicrosoftDI) -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
@@ -35,8 +34,6 @@
     <PackageReference Include="Avalonia.Fonts.Inter" Version="$(AvaloniaVersion)" />
     <!--#if (ReactiveUIToolkitChosen) -->
     <PackageReference Include="ReactiveUI.Avalonia" Version="12.0.3" />
-    <!--#else -->
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <!--#endif -->
     <!--#if (UseMicrosoftDI) -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />

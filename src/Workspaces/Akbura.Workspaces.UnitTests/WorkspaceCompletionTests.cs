@@ -4244,6 +4244,46 @@ public sealed class WorkspaceCompletionTests
                 });
         }
     }
+
+    [Theory]
+    [InlineData(
+        "param System.Collections.Generic.IList<Avalonia.Media.StreamGeometry> |",
+        "")]
+    [InlineData(
+        "param System.Collections.Generic.IList<Avalonia.Media.StreamGeometry> Ge|",
+        "Ge")]
+    public void CSharpProjection_DeclarationNamesUseRoslynCompletion(string declarationWithCaret, string expectedName)
+    {
+        WithCSharpProjection(
+            declarationWithCaret,
+            (semanticContext, context, projection, _) =>
+            {
+                Assert.Equal(
+                    AkburaCSharpCompletionContextKind.DeclarationName,
+                    context.Kind);
+                Assert.Equal(
+                    expectedName,
+                    projection.Root.ToFullString().Substring(
+                        projection.ProjectedSpan.Start,
+                        projection.ProjectedSpan.Length));
+
+                var completionList = RoslynCompletionTestHost
+                    .GetCompletionsAsync(
+                        semanticContext.Project.CSharpCompilation,
+                        projection.Root,
+                        projection.ProjectedPosition,
+                        CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult();
+                Assert.NotNull(completionList);
+                Assert.Contains(
+                    completionList.ItemsList,
+                    static item => item.DisplayText.Contains(
+                        "geometr",
+                        StringComparison.OrdinalIgnoreCase));
+            });
+    }
+
     [Fact]
     public void CSharpProjection_CommandOffersSyntheticMembers()
     {
@@ -6422,6 +6462,10 @@ public sealed class WorkspaceCompletionTests
 
             namespace Avalonia.Media
             {
+                public sealed class StreamGeometry
+                {
+                }
+
                 public interface IBrush
                 {
                 }

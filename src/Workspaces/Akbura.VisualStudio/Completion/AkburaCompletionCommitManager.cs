@@ -107,13 +107,16 @@ internal sealed class AkburaCompletionCommitManager :
                 buffer,
                 item,
                 currentSnapshot,
-                token))
+                token,
+                out var rejectionDetails))
         {
             AkburaWorkspaceDiagnostics.Write(
                 AkburaWorkspaceDiagnostics.Category.Completion,
                 $"Stale completion commit rejected: " +
+                $"item='{item.DisplayText}', " +
                 $"sourceSnapshot={item.ApplicableToSpan.Snapshot.Version.VersionNumber}, " +
-                $"snapshot={currentSnapshot.Version.VersionNumber}.");
+                $"snapshot={currentSnapshot.Version.VersionNumber}, " +
+                $"{rejectionDetails}.");
             return new CommitResult(
                 isHandled: true,
                 CommitBehavior.CancelCommit);
@@ -326,7 +329,7 @@ internal sealed class AkburaCompletionCommitManager :
             : CommitResult.Handled;
     }
 
-    private bool IsCurrentCompletionContext(IAsyncCompletionSession session, ITextBuffer buffer, CompletionItem item, ITextSnapshot currentSnapshot, CancellationToken cancellationToken)
+    private bool IsCurrentCompletionContext(IAsyncCompletionSession session, ITextBuffer buffer, CompletionItem item, ITextSnapshot currentSnapshot, CancellationToken cancellationToken, out string rejectionDetails)
     {
         var hasSyntacticContext = item.Properties.TryGetProperty(
             AkburaCompletionProperties.SyntacticContext,
@@ -336,6 +339,7 @@ internal sealed class AkburaCompletionCommitManager :
             out AkburaCSharpCompletionContext csharpContext);
         if (!hasSyntacticContext && !hasCSharpContext)
         {
+            rejectionDetails = string.Empty;
             return true;
         }
 
@@ -346,6 +350,7 @@ internal sealed class AkburaCompletionCommitManager :
                 item.ApplicableToSpan.Snapshot.TextBuffer,
                 buffer))
         {
+            rejectionDetails = "reason=buffer-changed";
             return false;
         }
 
@@ -354,11 +359,14 @@ internal sealed class AkburaCompletionCommitManager :
                 currentSnapshot,
                 PointTrackingMode.Positive)
             .Position;
+        AkburaSyntacticDocument document;
         if (!_parserService.TryGetCachedSyntacticDocument(
                 currentSnapshot,
-                out var document))
+                out document))
         {
-            return false;
+            document = _parserService.GetSyntacticDocument(
+                currentSnapshot,
+                cancellationToken);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -366,6 +374,8 @@ internal sealed class AkburaCompletionCommitManager :
                 currentSnapshot,
                 buffer.CurrentSnapshot))
         {
+            rejectionDetails =
+                "reason=snapshot-changed-during-validation";
             return false;
         }
 
@@ -374,22 +384,49 @@ internal sealed class AkburaCompletionCommitManager :
             var currentContext = document.GetCompletionContext(
                 position,
                 cancellationToken);
-            return IsMatchingSyntacticContext(
+            var matches = IsMatchingSyntacticContext(
                 item.ApplicableToSpan.Snapshot,
                 currentSnapshot,
                 syntacticContext,
                 currentContext);
+            rejectionDetails = matches
+                ? string.Empty
+                : "reason=syntactic-context-changed";
+            return matches;
         }
 
-        return document.TryGetCSharpCompletionContext(
+        if (!document.TryGetCSharpCompletionContext(
                 position,
                 out var currentCSharpContext,
-                cancellationToken) &&
-            IsMatchingCSharpContext(
+                cancellationToken))
+        {
+            rejectionDetails = CreateCSharpRejectionDetails(
                 item.ApplicableToSpan.Snapshot,
                 currentSnapshot,
                 csharpContext,
-                currentCSharpContext);
+                current: null,
+                "no-current-csharp-context");
+            return false;
+        }
+
+        if (!IsMatchingCSharpContext(
+                item.ApplicableToSpan.Snapshot,
+                currentSnapshot,
+                csharpContext,
+                currentCSharpContext,
+                out var reason))
+        {
+            rejectionDetails = CreateCSharpRejectionDetails(
+                item.ApplicableToSpan.Snapshot,
+                currentSnapshot,
+                csharpContext,
+                currentCSharpContext,
+                reason);
+            return false;
+        }
+
+        rejectionDetails = string.Empty;
+        return true;
     }
 
     private static bool IsMatchingSyntacticContext(ITextSnapshot sourceSnapshot, ITextSnapshot currentSnapshot, AkburaSyntacticCompletionContext source, AkburaSyntacticCompletionContext current)
@@ -453,22 +490,89 @@ internal sealed class AkburaCompletionCommitManager :
             extensionSpan == current.MarkupExtensionSpan;
     }
 
-    private static bool IsMatchingCSharpContext(ITextSnapshot sourceSnapshot, ITextSnapshot currentSnapshot, AkburaCSharpCompletionContext source, AkburaCSharpCompletionContext current)
+    private static bool IsMatchingCSharpContext(ITextSnapshot sourceSnapshot, ITextSnapshot currentSnapshot, AkburaCSharpCompletionContext source, AkburaCSharpCompletionContext current, out string reason)
     {
-        return source.Kind == current.Kind &&
-            source.OwnerKind == current.OwnerKind &&
-            TryTranslateSpan(
+        if (source.Kind != current.Kind)
+        {
+            reason = "context-kind-changed";
+            return false;
+        }
+
+        if (source.OwnerKind != current.OwnerKind)
+        {
+            reason = "owner-kind-changed";
+            return false;
+        }
+
+        if (!TryTranslateSpan(
                 sourceSnapshot,
                 currentSnapshot,
                 source.OwnerSpan,
-                out var ownerSpan) &&
-            ownerSpan == current.OwnerSpan &&
-            TryTranslateSpan(
+                out var ownerSpan))
+        {
+            reason = "owner-span-translation-failed";
+            return false;
+        }
+
+        if (ownerSpan != current.OwnerSpan)
+        {
+            reason = "owner-changed";
+            return false;
+        }
+
+        if (!TryTranslateSpan(
                 sourceSnapshot,
                 currentSnapshot,
                 source.HostSpan,
-                out var hostSpan) &&
-            hostSpan == current.HostSpan;
+                out var hostSpan))
+        {
+            reason = "host-span-translation-failed";
+            return false;
+        }
+
+        if (hostSpan != current.HostSpan)
+        {
+            reason = "host-span-changed";
+            return false;
+        }
+
+        if (!TextOutsideSpanMatches(
+                sourceSnapshot,
+                currentSnapshot,
+                source.HostSpan,
+                current.HostSpan))
+        {
+            reason = "text-outside-host-span-changed";
+            return false;
+        }
+
+        reason = string.Empty;
+        return true;
+    }
+
+    private static string CreateCSharpRejectionDetails(ITextSnapshot sourceSnapshot, ITextSnapshot currentSnapshot, AkburaCSharpCompletionContext source, AkburaCSharpCompletionContext? current, string reason)
+    {
+        var hasTranslatedOwner = TryTranslateSpan(
+            sourceSnapshot,
+            currentSnapshot,
+            source.OwnerSpan,
+            out var translatedOwner);
+        var hasTranslatedHost = TryTranslateSpan(
+            sourceSnapshot,
+            currentSnapshot,
+            source.HostSpan,
+            out var translatedHost);
+        return $"reason={reason}, " +
+            $"sourceContextKind={source.Kind}, " +
+            $"currentContextKind={current?.Kind.ToString() ?? "none"}, " +
+            $"sourceOwnerKind={source.OwnerKind}, " +
+            $"currentOwnerKind={current?.OwnerKind.ToString() ?? "none"}, " +
+            $"sourceOwnerSpan={source.OwnerSpan}, " +
+            $"translatedOwnerSpan={(hasTranslatedOwner ? translatedOwner.ToString() : "unavailable")}, " +
+            $"currentOwnerSpan={(current?.OwnerSpan.ToString() ?? "none")}, " +
+            $"sourceHostSpan={source.HostSpan}, " +
+            $"translatedHostSpan={(hasTranslatedHost ? translatedHost.ToString() : "unavailable")}, " +
+            $"currentHostSpan={(current?.HostSpan.ToString() ?? "none")}";
     }
 
     private static bool TextOutsideSpanMatches(ITextSnapshot sourceSnapshot, ITextSnapshot currentSnapshot, TextSpan sourceSpan, TextSpan currentSpan)

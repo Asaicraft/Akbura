@@ -594,7 +594,8 @@ public sealed partial class AkburaSyntacticDocument
                 out var embeddedContext) &&
             embeddedContext.Kind is
                 AkburaCSharpCompletionContextKind.UsingDirectiveName or
-                AkburaCSharpCompletionContextKind.Type)
+                AkburaCSharpCompletionContextKind.Type or
+                AkburaCSharpCompletionContextKind.DeclarationName)
         {
             return false;
         }

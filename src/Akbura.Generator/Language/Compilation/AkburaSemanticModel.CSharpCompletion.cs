@@ -224,6 +224,39 @@ internal abstract partial class AkburaSemanticModel
             .CreateTypeProjection(type, relativePosition);
     }
 
+    internal CSharpProbeProjection CreateCSharpDeclarationNameCompletionProjection(AkburaSyntax declarationSyntax, CSharp.TypeSyntax type, string name, int relativePosition)
+    {
+        if (declarationSyntax == null)
+        {
+            throw new ArgumentNullException(nameof(declarationSyntax));
+        }
+
+        if (type == null)
+        {
+            throw new ArgumentNullException(nameof(type));
+        }
+
+        ValidateSyntaxTreeOwnership(declarationSyntax);
+        if (declarationSyntax is not (
+                StateDeclarationSyntax or
+                ParamDeclarationSyntax or
+                InjectDeclarationSyntax))
+        {
+            throw new ArgumentException(
+                "Only component declarations support declaration-name completion.",
+                nameof(declarationSyntax));
+        }
+
+        var binder = BindingSession.GetCSharpProbeBinder(
+            declarationSyntax,
+            BinderUsage.Expression);
+        return new CSharpProbeBuilder(binder)
+            .CreateDeclarationNameProjection(
+                type,
+                name,
+                relativePosition);
+    }
+
     internal CSharpProbeProjection CreateCSharpCompletionProjection(UsingDirectiveSyntax usingSyntax, int relativePosition)
     {
         if (usingSyntax == null)

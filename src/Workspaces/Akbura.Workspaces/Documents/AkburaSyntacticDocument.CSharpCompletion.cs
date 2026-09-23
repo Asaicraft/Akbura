@@ -75,15 +75,27 @@ public sealed partial class AkburaSyntacticDocument
         {
             foreach (var member in document.Members)
             {
+                if (TryGetDeclarationNameSpan(
+                        member,
+                        position,
+                        out var declarationNameSpan))
+                {
+                    AddCandidate(
+                        AkburaCSharpCompletionContextKind.DeclarationName,
+                        member,
+                        declarationNameSpan,
+                        priority: -2);
+                }
+
                 if (TryGetDeclarationTypeSpan(
                         member,
                         position,
-                        out var hostSpan))
+                        out var declarationTypeSpan))
                 {
                     AddCandidate(
                         AkburaCSharpCompletionContextKind.Type,
                         member,
-                        hostSpan,
+                        declarationTypeSpan,
                         priority: -1);
                 }
             }
@@ -325,6 +337,66 @@ public sealed partial class AkburaSyntacticDocument
                 best = candidate;
             }
         }
+    }
+
+    private bool TryGetDeclarationNameSpan(AkTopLevelMemberSyntax member, int position, out TextSpan hostSpan)
+    {
+        CSharpTypeSyntax? type;
+        SimpleNameSyntax name;
+        switch (member)
+        {
+            case StateDeclarationSyntax state when state.Type != null:
+                type = state.Type;
+                name = state.Name;
+                break;
+
+            case ParamDeclarationSyntax parameter when parameter.Type != null:
+                type = parameter.Type;
+                name = parameter.Name;
+                break;
+
+            case InjectDeclarationSyntax inject when inject.Type.Tokens.Span.Length != 0:
+                type = inject.Type;
+                name = inject.Name;
+                break;
+
+            default:
+                hostSpan = default;
+                return false;
+        }
+
+        var typeEnd = type.Tokens.Span.End;
+        while (typeEnd > type.Tokens.Span.Start &&
+            char.IsWhiteSpace(Text[typeEnd - 1]))
+        {
+            typeEnd--;
+        }
+
+        if (name.IsMissing)
+        {
+            if (position <= typeEnd ||
+                position > member.FullSpan.End ||
+                !ContainsOnlyWhitespace(Text, typeEnd, position))
+            {
+                hostSpan = default;
+                return false;
+            }
+
+            hostSpan = new TextSpan(position, 0);
+            return true;
+        }
+
+        if (position < name.Span.Start ||
+            position > name.Span.End ||
+            name.Span.Start <= typeEnd ||
+            !ContainsOnlyWhitespace(Text, typeEnd, name.Span.Start))
+        {
+            hostSpan = default;
+            return false;
+        }
+
+        hostSpan = name.Span;
+        return true;
     }
 
     private bool TryGetDeclarationTypeSpan(AkTopLevelMemberSyntax member, int position, out TextSpan hostSpan)

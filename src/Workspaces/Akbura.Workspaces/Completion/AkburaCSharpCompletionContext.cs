@@ -73,6 +73,11 @@ public enum AkburaCSharpCompletionContextKind
     Type,
 
     /// <summary>
+    /// The name of an Akbura state, parameter, or injected service declaration.
+    /// </summary>
+    DeclarationName,
+
+    /// <summary>
     /// The namespace or type name of a C# using directive.
     /// </summary>
     UsingDirectiveName,

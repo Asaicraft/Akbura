@@ -166,6 +166,35 @@ internal sealed partial class CSharpProbeBuilder
             relativePosition);
     }
 
+    public CSharpProbeProjection CreateDeclarationNameProjection(CSharp.TypeSyntax type, string name, int relativePosition)
+    {
+        if (relativePosition < 0 || relativePosition > name.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(relativePosition));
+        }
+
+        var annotation = new SyntaxAnnotation(
+            CompletionAnnotationKind);
+        var declarator = CSharpSyntaxFactory.VariableDeclarator(
+                CSharpSyntaxFactory.Identifier(name))
+            .WithAdditionalAnnotations(annotation);
+        var declaration = CSharpSyntaxFactory.VariableDeclaration(type)
+            .WithVariables(CSharpSyntaxFactory.SingletonSeparatedList(
+                declarator));
+        var field = CSharpSyntaxFactory.FieldDeclaration(declaration)
+            .WithModifiers(CSharpSyntaxFactory.TokenList(
+                CSharpSyntaxFactory.Token(
+                    CSharpSyntaxKind.PrivateKeyword)));
+        var root = _binder.CreateComponentProbeCompilationUnit(
+            ImmutableArray.Create<CSharp.MemberDeclarationSyntax>(field),
+            "__AkburaDeclarationNameProbe");
+        return CreateProjection(
+            root,
+            declarator,
+            annotation,
+            relativePosition);
+    }
+
     public CSharpProbeProjection CreateUsingDirectiveProjection(UsingDirectiveSyntax usingSyntax, int relativePosition)
     {
         var annotation = new SyntaxAnnotation(

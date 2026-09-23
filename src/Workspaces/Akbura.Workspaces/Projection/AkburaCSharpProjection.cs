@@ -310,6 +310,13 @@ internal static class AkburaCSharpProjectionFactory
                         syntacticDocument,
                         embeddedContext),
 
+                AkburaCSharpCompletionContextKind.DeclarationName =>
+                    CreateDeclarationNameProjection(
+                        semanticModel,
+                        root,
+                        syntacticDocument,
+                        embeddedContext),
+
                 AkburaCSharpCompletionContextKind
                     .UsingDirectiveName =>
                     CreateUsingProjection(
@@ -496,6 +503,36 @@ internal static class AkburaCSharpProjectionFactory
         return semanticModel.CreateCSharpCompletionProjection(
             declaration,
             type,
+            context.RelativePosition);
+    }
+
+    private static CSharpProbeProjection CreateDeclarationNameProjection(AkburaSemanticModel semanticModel, AkburaSyntax root, AkburaSyntacticDocument syntacticDocument, AkburaEmbeddedCSharpContext context)
+    {
+        var declaration = FindSyntax<AkTopLevelMemberSyntax>(
+            root,
+            context);
+        var typeSyntax = declaration switch
+        {
+            StateDeclarationSyntax state => state.Type,
+            ParamDeclarationSyntax parameter => parameter.Type,
+            InjectDeclarationSyntax inject => inject.Type,
+            _ => null,
+        };
+        if (declaration == null ||
+            typeSyntax == null ||
+            typeSyntax.Tokens.Span.Length == 0)
+        {
+            throw new InvalidOperationException(
+                "The declaration name no longer matches the current document.");
+        }
+
+        var type = CSharpSyntaxFactory.ParseTypeName(
+            syntacticDocument.Text.ToString(typeSyntax.Tokens.Span));
+        var name = syntacticDocument.Text.ToString(context.HostSpan);
+        return semanticModel.CreateCSharpDeclarationNameCompletionProjection(
+            declaration,
+            type,
+            name,
             context.RelativePosition);
     }
 

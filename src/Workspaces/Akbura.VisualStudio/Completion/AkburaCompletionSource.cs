@@ -516,8 +516,9 @@ internal sealed class AkburaCompletionSource :
                     sessionState.BeginRequest(
                         snapshot.Version.VersionNumber,
                         csharpContext) ||
-                    csharpContext.Kind ==
-                        AkburaCSharpCompletionContextKind.Type &&
+                    (csharpContext.Kind is
+                        AkburaCSharpCompletionContextKind.Type or
+                        AkburaCSharpCompletionContextKind.DeclarationName) &&
                     trigger.Reason == CompletionTriggerReason.Insertion &&
                     trigger.Character == ' ';
                 var semanticContext = GetSemanticContext(

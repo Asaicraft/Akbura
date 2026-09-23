@@ -432,6 +432,26 @@ public sealed class WorkspaceSyntacticDocumentTests
         AkburaCSharpCompletionContextKind.Type,
         "IUserSer")]
     [InlineData(
+        "param IList<StreamGeometry> |",
+        AkburaCSharpCompletionContextKind.DeclarationName,
+        "")]
+    [InlineData(
+        "param IList<StreamGeometry> G|",
+        AkburaCSharpCompletionContextKind.DeclarationName,
+        "G")]
+    [InlineData(
+        "param IList<StreamGeometry> Ge|",
+        AkburaCSharpCompletionContextKind.DeclarationName,
+        "Ge")]
+    [InlineData(
+        "state string Ti|",
+        AkburaCSharpCompletionContextKind.DeclarationName,
+        "Ti")]
+    [InlineData(
+        "inject IService se|",
+        AkburaCSharpCompletionContextKind.DeclarationName,
+        "se")]
+    [InlineData(
         "state int maximum = Math.M|;",
         AkburaCSharpCompletionContextKind.Expression,
         "Math.M")]
@@ -530,10 +550,64 @@ public sealed class WorkspaceSyntacticDocumentTests
             document.Text.ToString(context.HostSpan));
     }
 
+    [Fact]
+    public void SyntacticDocument_DeclarationNameContextSurvivesIncrementalTyping()
+    {
+        var text = SourceText.From(
+            "param IList<StreamGeometry> ");
+        var document = AkburaSyntacticDocument.Parse(
+            text,
+            "Component.akbura");
+        var position = text.Length;
+        var expectedName = string.Empty;
+
+        AssertContext(document);
+        foreach (var character in "Geometries")
+        {
+            text = text.WithChanges(new TextChange(
+                new TextSpan(position, 0),
+                character.ToString()));
+            position++;
+            expectedName += character;
+            document = document.WithText(text);
+
+            AssertContext(document);
+            var full = AkburaSyntacticDocument.Parse(
+                text,
+                "Component.akbura");
+            Assert.True(full.TryGetCSharpCompletionContext(
+                position,
+                out var fullContext));
+            Assert.Equal(
+                fullContext.HostSpan,
+                GetContext(document).HostSpan);
+        }
+
+        void AssertContext(AkburaSyntacticDocument current)
+        {
+            var context = GetContext(current);
+            Assert.Equal(
+                AkburaCSharpCompletionContextKind.DeclarationName,
+                context.Kind);
+            Assert.Equal(
+                expectedName,
+                current.Text.ToString(context.HostSpan));
+        }
+
+        AkburaCSharpCompletionContext GetContext(AkburaSyntacticDocument current)
+        {
+            Assert.True(current.TryGetCSharpCompletionContext(
+                position,
+                out var context));
+            return context;
+        }
+    }
+
     [Theory]
     [InlineData("state co|unt = 0;")]
     [InlineData("param Ti|tle = \"\";")]
     [InlineData("param Ti|tle;")]
+    [InlineData("param string Title;|")]
     [InlineData("<Button Text=\"DateTime.No|\"/>")]
     [InlineData("<Button Content=${Binding Path=Us|}/>")]
     [InlineData("<But|")]

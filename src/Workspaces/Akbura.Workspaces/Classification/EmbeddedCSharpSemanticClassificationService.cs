@@ -494,6 +494,12 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
 
             switch (node)
             {
+                case StateDeclarationSyntax declaration
+                    when declaration.Initializer.FullSpan.OverlapsWith(requestedSpan):
+                    references = semanticModel.GetCSharpSymbolReferences(
+                        declaration);
+                    break;
+
                 case CSharpExpressionSyntax condition when condition.Parent is
                     MarkupIfStatementSyntax or MarkupElseIfClauseSyntax or MarkupCodeIfStatementSyntax or MarkupForeachKeyClauseSyntax:
                     references = semanticModel.GetCSharpSymbolReferences(condition);

@@ -24,6 +24,72 @@ internal partial class AkburaSemanticModel
     private const string CSharpReferenceProbeMethodName = "__AkburaSemanticProbe";
     private const string MarkupInlineReferenceProbeMethodName = "__AkburaMarkupInlineReferenceProbe";
 
+    public ImmutableArray<CSharpSymbolReference> GetCSharpSymbolReferences(StateDeclarationSyntax declaration)
+    {
+        if (declaration == null)
+        {
+            throw new ArgumentNullException(nameof(declaration));
+        }
+
+        ValidateSyntaxTreeOwnership(declaration);
+        if (GetDeclaredSymbol(declaration) is not IStateSymbol state ||
+            !EmbeddedCSharpSyntaxFacts.TryGetExpression(
+                state.InitializerExpression,
+                out var expression,
+                out var hostSpan))
+        {
+            return [];
+        }
+
+        var targetType = state.UseHook == null &&
+            state.HasExplicitType &&
+            state.BindingKind == StateBindingKind.None
+                ? state.Type.Symbol as ITypeSymbol
+                : null;
+        var binder = BindingSession.GetCSharpProbeBinder(
+            declaration,
+            BinderUsage.Expression);
+        var compilationUnit = new CSharpProbeBuilder(binder)
+            .CreateReturnExpressionProbe(
+                declaration,
+                expression,
+                targetType);
+        var semanticModel = CreateReferenceProbeSemanticModel(
+            compilationUnit,
+            out var syntaxTree);
+        var probeExpression = CSharpProbeBuilder.GetReturnProbeExpression(
+            syntaxTree.GetCompilationUnitRoot());
+        if (probeExpression == null)
+        {
+            return [];
+        }
+
+        var akburaSymbolsByName = new Dictionary<string, AkburaSymbol>(
+            StringComparer.Ordinal);
+        var akburaSymbolsByCommandTypeName = new Dictionary<string, AkburaSymbol>(
+            StringComparer.Ordinal);
+        AddCSharpProbeRootSymbolMappings(
+            akburaSymbolsByName,
+            akburaSymbolsByCommandTypeName);
+
+        var sourcePositionOffset = hostSpan.Start - expression.FullSpan.Start;
+        var references = CollectCSharpSymbolReferences(
+            semanticModel,
+            [
+                new CSharpReferenceTarget(
+                    expression,
+                    probeExpression,
+                    sourcePositionOffset),
+            ],
+            akburaSymbolsByName,
+            akburaSymbolsByCommandTypeName);
+        return AddUseHookReference(
+            state.UseHook,
+            expression,
+            sourcePositionOffset,
+            references);
+    }
+
     public ImmutableArray<CSharpSymbolReference> GetCSharpSymbolReferences(CSharpStatementSyntax statementSyntax)
     {
         if (statementSyntax == null)
@@ -109,14 +175,26 @@ internal partial class AkburaSemanticModel
         int sourcePositionOffset,
         ImmutableArray<CSharpSymbolReference> references)
     {
-        if (GetSymbolInfo(statementSyntax).Symbol is not
-                IUseHookSymbol hook ||
-            statement is not
-            CSharp.ExpressionStatementSyntax
-            {
-                Expression:
-                    CSharp.InvocationExpressionSyntax invocation
-            } ||
+        if (statement is not CSharp.ExpressionStatementSyntax { Expression: { } expression })
+        {
+            return references;
+        }
+
+        return AddUseHookReference(
+            GetSymbolInfo(statementSyntax).Symbol as IUseHookSymbol,
+            expression,
+            sourcePositionOffset,
+            references);
+    }
+
+    private static ImmutableArray<CSharpSymbolReference> AddUseHookReference(
+        IUseHookSymbol? hook,
+        CSharp.ExpressionSyntax expression,
+        int sourcePositionOffset,
+        ImmutableArray<CSharpSymbolReference> references)
+    {
+        if (hook == null ||
+            expression is not CSharp.InvocationExpressionSyntax invocation ||
             !TryGetInvocationName(
                 invocation.Expression,
                 out var name))

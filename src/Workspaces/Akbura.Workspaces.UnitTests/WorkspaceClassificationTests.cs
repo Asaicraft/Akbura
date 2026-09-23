@@ -974,6 +974,81 @@ public sealed class WorkspaceClassificationTests
                     AkburaClassificationKind.Identifier);
     }
 
+    [Theory]
+    [InlineData("useStaticResource", "\n", "    ")]
+    [InlineData("selectBrush", "\r\n", "\t")]
+    public void SemanticClassification_StateHookInitializerClassifiesCompleteExpression(
+        string hookName,
+        string newLine,
+        string indent)
+    {
+        var source =
+            "state IBrush active = " + hookName + "<" + newLine +
+            indent + "IBrush>(" + newLine +
+            indent + "\"AccentBrush\"," + newLine +
+            indent + "Brushes.Teal);" + newLine + newLine +
+            "<Border/>";
+        using var workspace = CreateSemanticWorkspace();
+        workspace.OpenOrChangeDocumentContext(
+            new Uri(Path.GetFullPath("GlobalUsings.akbura")),
+            SourceText.From(
+                "global using Akbura.Hooks;" + newLine +
+                "global using Avalonia.Controls;" + newLine +
+                "global using Avalonia.Media;"));
+
+        var text = SourceText.From(source);
+        var context = workspace.OpenOrChangeDocumentContext(
+            new Uri(Path.GetFullPath("Counter.akbura")),
+            text);
+        var classifications = workspace.LanguageServices.Classification
+            .GetClassifications(
+                context,
+                new TextSpan(0, text.Length));
+        var hookStart = source.IndexOf(hookName, StringComparison.Ordinal);
+        var genericTypeStart = source.IndexOf(
+            "IBrush",
+            hookStart + hookName.Length,
+            StringComparison.Ordinal);
+        var brushesStart = source.IndexOf("Brushes", StringComparison.Ordinal);
+        var tealStart = source.IndexOf("Teal", StringComparison.Ordinal);
+        var keyStart = source.IndexOf("\"AccentBrush\"", StringComparison.Ordinal);
+        var hookOnly = workspace.LanguageServices.Classification
+            .GetClassifications(
+                context,
+                new TextSpan(hookStart, hookName.Length));
+
+        AssertOnlyClassification(
+            classifications,
+            hookStart,
+            hookName.Length,
+            AkburaClassificationKind.MethodName);
+        AssertOnlyClassification(
+            hookOnly,
+            hookStart,
+            hookName.Length,
+            AkburaClassificationKind.MethodName);
+        AssertOnlyClassification(
+            classifications,
+            genericTypeStart,
+            "IBrush".Length,
+            AkburaClassificationKind.InterfaceName);
+        AssertOnlyClassification(
+            classifications,
+            brushesStart,
+            "Brushes".Length,
+            AkburaClassificationKind.ClassName);
+        AssertOnlyClassification(
+            classifications,
+            tealStart,
+            "Teal".Length,
+            AkburaClassificationKind.PropertyName);
+        AssertOnlyClassification(
+            classifications,
+            keyStart,
+            "\"AccentBrush\"".Length,
+            AkburaClassificationKind.String);
+    }
+
     [Fact]
     public void SemanticClassification_DataTypeRefinesOnlyQuotedTypeContent()
     {
@@ -1388,6 +1463,48 @@ public sealed class WorkspaceClassificationTests
                 }
             }
 
+            namespace Akbura.CompilerAnotations
+            {
+                [System.AttributeUsage(System.AttributeTargets.Method)]
+                public sealed class UseHookAttribute : System.Attribute
+                {
+                }
+
+                [System.AttributeUsage(System.AttributeTargets.Parameter)]
+                public sealed class SelfAttribute : System.Attribute
+                {
+                }
+            }
+
+            namespace Akbura.ComponentTree
+            {
+                public readonly struct State<T>
+                {
+                }
+            }
+
+            namespace Akbura.Hooks
+            {
+                public static class ResourceHooks
+                {
+                    [Akbura.CompilerAnotations.UseHook]
+                    public static Akbura.ComponentTree.State<T>
+                        useStaticResource<T>(
+                            [Akbura.CompilerAnotations.Self]
+                            this Akbura.AkburaControl control,
+                            object key,
+                            T fallback = default!) => default;
+
+                    [Akbura.CompilerAnotations.UseHook]
+                    public static Akbura.ComponentTree.State<T>
+                        selectBrush<T>(
+                            [Akbura.CompilerAnotations.Self]
+                            this Akbura.AkburaControl control,
+                            object key,
+                            T fallback = default!) => default;
+                }
+            }
+
             namespace Avalonia
             {
                 public readonly struct Thickness
@@ -1410,6 +1527,15 @@ public sealed class WorkspaceClassificationTests
 
             namespace Avalonia.Media
             {
+                public interface IBrush
+                {
+                }
+
+                public static class Brushes
+                {
+                    public static IBrush Teal { get; } = default!;
+                }
+
                 public readonly struct Color
                 {
                 }

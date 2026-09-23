@@ -146,6 +146,48 @@ public sealed class CompletionPerformancePolicyTests
             AkburaRoslynCompletionTriggerPolicy
                 .IsSupportedInsertionCharacter(character));
     }
+
+    [Fact]
+    public void SessionPolicy_CancelledFirstRequestAllowsNextCharacter()
+    {
+        var policy = new AkburaRoslynCompletionSessionPolicy();
+        var first = CreateExpressionContext(hostPosition: 1);
+        var second = CreateExpressionContext(hostPosition: 2);
+        var third = CreateExpressionContext(hostPosition: 3);
+
+        Assert.False(policy.BeginRequest(1, first));
+
+        // The first request is cancelled before it can publish a result.
+        Assert.True(policy.BeginRequest(2, second));
+
+        policy.SetAllowNonTrigger(2, second, value: false);
+        Assert.False(policy.BeginRequest(3, third));
+    }
+
+    [Fact]
+    public void SessionPolicy_IncompleteResultKeepsContinuationEnabled()
+    {
+        var policy = new AkburaRoslynCompletionSessionPolicy();
+        var first = CreateExpressionContext(hostPosition: 1);
+        var second = CreateExpressionContext(hostPosition: 2);
+
+        Assert.False(policy.BeginRequest(1, first));
+        policy.SetAllowNonTrigger(1, first, value: true);
+
+        Assert.True(policy.BeginRequest(2, second));
+    }
+
+    private static AkburaCSharpCompletionContext CreateExpressionContext(
+        int hostPosition)
+    {
+        return new AkburaCSharpCompletionContext(
+            AkburaCSharpCompletionContextKind.Expression,
+            Akbura.Language.Syntax.SyntaxKind.CSharpExpressionSyntax,
+            new TextSpan(0, 10),
+            new TextSpan(0, 10),
+            hostPosition);
+    }
+
     [Theory]
     [InlineData("FB", "FB", "Exact")]
     [InlineData("FBeta", "FB", "Prefix")]

@@ -241,7 +241,7 @@ internal sealed class AkburaCompletionSource :
 
     private readonly ConditionalWeakTable<
         IAsyncCompletionSession,
-        CompletionSessionState> _sessionStates = new();
+        AkburaRoslynCompletionSessionPolicy> _sessionStates = new();
 
     private int _completionSnapshotVersion = -1;
 
@@ -511,13 +511,28 @@ internal sealed class AkburaCompletionSource :
             {
                 var sessionState = _sessionStates.GetValue(
                     session,
-                    static _ => new CompletionSessionState());
+                    static _ => new AkburaRoslynCompletionSessionPolicy());
+                var allowNonTrigger =
+                    sessionState.BeginRequest(
+                        snapshot.Version.VersionNumber,
+                        csharpContext) ||
+                    csharpContext.Kind ==
+                        AkburaCSharpCompletionContextKind.Type &&
+                    trigger.Reason == CompletionTriggerReason.Insertion &&
+                    trigger.Character == ' ';
                 var semanticContext = GetSemanticContext(
                     syntacticDocument,
                     snapshot,
                     position,
                     syntaxContext,
                     requestToken);
+                var isHookCompletion = !isAkcssRegion &&
+                    AkburaHookCompletionFacts.TryGetStateInitializerContext(
+                        syntacticDocument,
+                        csharpContext,
+                        position,
+                        out _,
+                        requestToken);
                 var supplementalResult = isAkcssRegion
                     ? akcssContext.Kind is
                         AkcssCompletionContextKind.PropertyValue or
@@ -530,7 +545,8 @@ internal sealed class AkburaCompletionSource :
                             requestToken)
                         : default
                     : csharpContext.Kind ==
-                        AkburaCSharpCompletionContextKind.UsingDirectiveName
+                            AkburaCSharpCompletionContextKind.UsingDirectiveName ||
+                        isHookCompletion
                         ? _completionService.GetCompletions(
                             syntacticDocument,
                             semanticContext,
@@ -551,15 +567,6 @@ internal sealed class AkburaCompletionSource :
                     "C# semantic context",
                     stageTimer.Elapsed);
 #endif
-
-                var allowNonTrigger =
-                    sessionState.BeginRequest(
-                        snapshot.Version.VersionNumber,
-                        csharpContext) ||
-                    csharpContext.Kind ==
-                        AkburaCSharpCompletionContextKind.Type &&
-                    trigger.Reason == CompletionTriggerReason.Insertion &&
-                    trigger.Character == ' ';
 
                 AkburaWorkspaceDiagnostics.Write(
                     AkburaWorkspaceDiagnostics.Category.Completion,
@@ -606,6 +613,7 @@ internal sealed class AkburaCompletionSource :
                     {
                         var isIncomplete =
                             csharpResult.Selection.IsIncomplete ||
+                            supplementalResult.IsIncomplete ||
                             csharpContext.Kind ==
                                 AkburaCSharpCompletionContextKind
                                     .UsingDirectiveName;
@@ -1251,57 +1259,6 @@ internal sealed class AkburaCompletionSource :
             OnBufferChanged;
         _textView.Closed -= OnTextViewClosed;
         _completionRequests.Dispose();
-    }
-
-    private sealed class CompletionSessionState
-    {
-        private readonly object _gate = new();
-        private int _snapshotVersion = -1;
-        private AkburaCSharpCompletionContextKind _contextKind;
-        private Akbura.Language.Syntax.SyntaxKind _ownerKind;
-        private int _ownerStart = -1;
-        private int _hostStart = -1;
-        private bool _allowNonTrigger;
-
-        public bool BeginRequest(int snapshotVersion, AkburaCSharpCompletionContext context)
-        {
-            lock (_gate)
-            {
-                if (snapshotVersion < _snapshotVersion ||
-                    snapshotVersion > _snapshotVersion + 1 ||
-                    context.Kind != _contextKind ||
-                    context.OwnerKind != _ownerKind ||
-                    context.OwnerSpan.Start != _ownerStart ||
-                    context.HostSpan.Start != _hostStart)
-                {
-                    _allowNonTrigger = false;
-                }
-
-                _snapshotVersion = snapshotVersion;
-                _contextKind = context.Kind;
-                _ownerKind = context.OwnerKind;
-                _ownerStart = context.OwnerSpan.Start;
-                _hostStart = context.HostSpan.Start;
-                return _allowNonTrigger;
-            }
-        }
-
-        public void SetAllowNonTrigger(int snapshotVersion, AkburaCSharpCompletionContext context, bool value)
-        {
-            lock (_gate)
-            {
-                if (snapshotVersion != _snapshotVersion ||
-                    context.Kind != _contextKind ||
-                    context.OwnerKind != _ownerKind ||
-                    context.OwnerSpan.Start != _ownerStart ||
-                    context.HostSpan.Start != _hostStart)
-                {
-                    return;
-                }
-
-                _allowNonTrigger = value;
-            }
-        }
     }
 
     private static bool ShouldParticipate(AkburaEditorDocumentKind documentKind, CompletionTrigger trigger, SnapshotPoint triggerLocation)

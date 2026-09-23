@@ -285,6 +285,224 @@ public sealed class WorkspaceCompletionTests
     }
 
     [Fact]
+    public void Completion_StateInitializerOffersVisibleStateHook()
+    {
+        const string source = """
+            namespace Gallery;
+
+            using Akbura.Hooks;
+            using Avalonia.Controls;
+
+            state object brush = useStatic;
+
+            <StackPanel/>
+            """;
+        var position = source.IndexOf(
+            "useStatic",
+            StringComparison.Ordinal) + "useStatic".Length;
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                var item = Assert.Single(
+                    result.Items,
+                    static candidate =>
+                        candidate.DisplayText == "useStaticResource");
+                Assert.Equal(AkburaCompletionKind.Hook, item.Kind);
+                Assert.Equal("useStaticResource", item.InsertText);
+                Assert.Equal(
+                    "<T>(object key, T fallback = default) → State<T>",
+                    item.Suffix);
+                Assert.DoesNotContain("AkburaControl", item.Suffix);
+                Assert.Equal(
+                    "useStatic",
+                    syntacticDocument.Text.ToString(result.ApplicableSpan));
+            });
+    }
+
+    [Fact]
+    public void Completion_StateInitializerOffersHookFromCurrentNamespace()
+    {
+        const string source = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            state int value = useCust;
+
+            <StackPanel/>
+            """;
+        var position = source.IndexOf(
+            "useCust",
+            StringComparison.Ordinal) + "useCust".Length;
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.Contains(
+                    result.Items,
+                    static candidate =>
+                        candidate.DisplayText == "useCustomState" &&
+                        candidate.Kind == AkburaCompletionKind.Hook);
+            });
+    }
+
+    [Fact]
+    public void Completion_StateInitializerOffersHookFromReferencedAssembly()
+    {
+        const string source = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+            using ReferencedHooks;
+
+            state int value = useRef;
+
+            <StackPanel/>
+            """;
+        var position = source.IndexOf(
+            "useRef",
+            StringComparison.Ordinal) + "useRef".Length;
+
+        WithWorkspace(
+            source,
+            stylesSource: null,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.Contains(
+                    result.Items,
+                    static candidate =>
+                        candidate.DisplayText == "useReferencedState" &&
+                        candidate.Kind == AkburaCompletionKind.Hook);
+            },
+            additionalReference: CreateReferencedHookReference());
+    }
+
+    [Fact]
+    public void Completion_StateInitializerUsesProjectGlobalHookImport()
+    {
+        const string source = """
+            namespace Gallery;
+
+            using Avalonia.Controls;
+
+            state object value = useStatic;
+
+            <StackPanel/>
+            """;
+        var position = source.IndexOf(
+            "useStatic",
+            StringComparison.Ordinal) + "useStatic".Length;
+
+        WithWorkspace(
+            source,
+            stylesSource: null,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.Contains(
+                    result.Items,
+                    static candidate =>
+                        candidate.DisplayText == "useStaticResource" &&
+                        candidate.Kind == AkburaCompletionKind.Hook);
+            },
+            globalUsingsSource: "global using Akbura.Hooks;");
+    }
+
+    [Fact]
+    public void Completion_StateInitializerExcludesRenderHook()
+    {
+        const string source = """
+            namespace Gallery;
+
+            using Akbura.Hooks;
+            using Avalonia.Controls;
+
+            state object value = useRender;
+
+            <StackPanel/>
+            """;
+        var position = source.IndexOf(
+            "useRender",
+            StringComparison.Ordinal) + "useRender".Length;
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.DoesNotContain(
+                    result.Items,
+                    static candidate =>
+                        candidate.DisplayText == "useRenderOnly");
+            });
+    }
+
+    [Fact]
+    public void Completion_NestedStateExpressionDoesNotOfferHook()
+    {
+        const string source = """
+            namespace Gallery;
+
+            using Akbura.Hooks;
+            using Avalonia.Controls;
+
+            state object value = Wrap(useStatic);
+
+            <StackPanel/>
+            """;
+        var position = source.IndexOf(
+            "useStatic",
+            StringComparison.Ordinal) + "useStatic".Length;
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.DoesNotContain(
+                    result.Items,
+                    static candidate =>
+                        candidate.Kind == AkburaCompletionKind.Hook);
+            });
+    }
+
+    [Fact]
     public void Completion_AkcssOffersTopLevelKeywordsWithoutSemanticContext()
     {
         const string source = "@u";
@@ -3230,7 +3448,7 @@ public sealed class WorkspaceCompletionTests
         }
     }
 
-    private static void WithWorkspace(string source, string? stylesSource, Action<AkburaWorkspace, AkburaDocumentContext, AkburaSyntacticDocument> assertion, string? globalUsingsSource = null)
+    private static void WithWorkspace(string source, string? stylesSource, Action<AkburaWorkspace, AkburaDocumentContext, AkburaSyntacticDocument> assertion, string? globalUsingsSource = null, MetadataReference? additionalReference = null)
     {
         var directory = Path.Combine(
             Path.GetTempPath(),
@@ -3240,12 +3458,18 @@ public sealed class WorkspaceCompletionTests
 
         try
         {
+            var compilation = CreateCompilation();
+            if (additionalReference != null)
+            {
+                compilation = compilation.AddReferences(additionalReference);
+            }
+
             var projectContext = new ProjectContext(
                 ProjectId.CreateNewId(),
                 projectFilePath: string.Empty,
                 projectDirectory: directory,
                 rootNamespace: string.Empty,
-                CreateCompilation(),
+                compilation,
                 ImmutableArray<ProjectReference>.Empty);
             using var workspace = new AkburaWorkspace(projectContext);
             workspace.OpenOrChangeDocumentContext(
@@ -6293,6 +6517,56 @@ public sealed class WorkspaceCompletionTests
                 }
             }
 
+            namespace Akbura.CompilerAnotations
+            {
+                [System.AttributeUsage(System.AttributeTargets.Method)]
+                public sealed class UseHookAttribute : System.Attribute
+                {
+                }
+
+                [System.AttributeUsage(System.AttributeTargets.Parameter)]
+                public sealed class SelfAttribute : System.Attribute
+                {
+                }
+            }
+
+            namespace Akbura.ComponentTree
+            {
+                public readonly struct State<T>
+                {
+                }
+            }
+
+            namespace Akbura.Hooks
+            {
+                public static class ResourceHooks
+                {
+                    [Akbura.CompilerAnotations.UseHook]
+                    public static Akbura.ComponentTree.State<T>
+                        useStaticResource<T>(
+                            [Akbura.CompilerAnotations.Self]
+                            this Akbura.AkburaControl control,
+                            object key,
+                            T fallback = default!) => default;
+
+                    [Akbura.CompilerAnotations.UseHook]
+                    public static Akbura.ComponentTree.State<T>
+                        useStaticResource<T>(
+                            [Akbura.CompilerAnotations.Self]
+                            this Akbura.AkburaControl control,
+                            object key,
+                            T fallback,
+                            bool required) => default;
+
+                    [Akbura.CompilerAnotations.UseHook]
+                    public static void useRenderOnly(
+                        [Akbura.CompilerAnotations.Self]
+                        this Akbura.AkburaControl control)
+                    {
+                    }
+                }
+            }
+
             namespace Akbura.Markup
             {
                 [System.AttributeUsage(
@@ -6384,6 +6658,13 @@ public sealed class WorkspaceCompletionTests
 
             namespace Gallery
             {
+                public static class CustomHooks
+                {
+                    [Akbura.CompilerAnotations.UseHook]
+                    public static Akbura.ComponentTree.State<int>
+                        useCustomState() => default;
+                }
+
                 public class ViewModelBase
                 {
                     public string Inherited { get; } = "";
@@ -6530,6 +6811,62 @@ public sealed class WorkspaceCompletionTests
             emitResult.Success,
             string.Join(Environment.NewLine, emitResult.Diagnostics));
         return MetadataReference.CreateFromFile(assemblyPath);
+    }
+
+    private static PortableExecutableReference CreateReferencedHookReference()
+    {
+        const string source = """
+            namespace Akbura.CompilerAnotations
+            {
+                [System.AttributeUsage(System.AttributeTargets.Method)]
+                public sealed class UseHookAttribute : System.Attribute
+                {
+                }
+
+                [System.AttributeUsage(System.AttributeTargets.Parameter)]
+                public sealed class SelfAttribute : System.Attribute
+                {
+                }
+            }
+
+            namespace Akbura.ComponentTree
+            {
+                public readonly struct State<T>
+                {
+                }
+            }
+
+            namespace Akbura
+            {
+                public class AkburaControl
+                {
+                }
+            }
+
+            namespace ReferencedHooks
+            {
+                public static class StateHooks
+                {
+                    [Akbura.CompilerAnotations.UseHook]
+                    public static Akbura.ComponentTree.State<int>
+                        useReferencedState(
+                            [Akbura.CompilerAnotations.Self]
+                            this Akbura.AkburaControl control) => default;
+                }
+            }
+            """;
+        var compilation = CSharpCompilation.Create(
+            "ReferencedHooks",
+            [CSharpSyntaxTree.ParseText(source)],
+            CreatePlatformReferences(),
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var emitResult = compilation.Emit(stream);
+        Assert.True(
+            emitResult.Success,
+            string.Join(Environment.NewLine, emitResult.Diagnostics));
+        return MetadataReference.CreateFromImage(stream.ToArray());
     }
 
     private static ResourceDescription CreateEmbeddedSourceResource(string name, string content)

@@ -1,4 +1,5 @@
 using Akbura.Language;
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
@@ -82,10 +83,11 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                 cancellationToken);
         }
 
-        if (document.TryGetCSharpCompletionContext(
-                position,
-                out var csharpContext,
-                cancellationToken) &&
+        var hasCSharpContext = document.TryGetCSharpCompletionContext(
+            position,
+            out var csharpContext,
+            cancellationToken);
+        if (hasCSharpContext &&
             csharpContext.Kind ==
                 AkburaCSharpCompletionContextKind.UsingDirectiveName)
         {
@@ -108,6 +110,20 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             return CreateResourceKeyResult(
                 semanticContext,
                 resourceKeyContext,
+                cancellationToken);
+        }
+
+        if (hasCSharpContext &&
+            AkburaHookCompletionFacts.TryGetStateInitializerContext(
+                document,
+                csharpContext,
+                position,
+                out var hookContext,
+                cancellationToken))
+        {
+            return CreateStateHookResult(
+                semanticContext,
+                hookContext,
                 cancellationToken);
         }
 
@@ -1379,6 +1395,149 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                 StringComparison.OrdinalIgnoreCase);
     }
 
+    private static AkburaCompletionResult CreateStateHookResult(
+        AkburaDocumentContext? semanticContext,
+        AkburaHookCompletionContext context,
+        CancellationToken cancellationToken)
+    {
+        if (semanticContext == null ||
+            semanticContext.Document.SyntaxTree.Kind == SyntaxTreeKind.Akcss)
+        {
+            return new AkburaCompletionResult(
+                context.ApplicableSpan,
+                ImmutableArray<AkburaCompletionItem>.Empty,
+                isIncomplete: true);
+        }
+
+        var semanticModel = semanticContext.Project.Compilation.GetSemanticModel(
+            semanticContext.Document.SyntaxTree);
+        var declaration = semanticModel.SyntaxTree
+            .GetRootSyntax()
+            .DescendantNodes()
+            .OfType<StateDeclarationSyntax>()
+            .FirstOrDefault(candidate =>
+                candidate.FullSpan == context.StateDeclarationSpan);
+        if (declaration == null)
+        {
+            return new AkburaCompletionResult(
+                context.ApplicableSpan,
+                ImmutableArray<AkburaCompletionItem>.Empty,
+                isIncomplete: true);
+        }
+
+        var cache = CompletionCaches.GetValue(
+            semanticModel,
+            static _ => new SemanticModelCompletionCache());
+        var catalog = cache.GetOrCreateStateHooks(
+            () => CreateStateHookCatalog(
+                semanticModel,
+                declaration,
+                cancellationToken),
+            cancellationToken);
+        var matches = catalog
+            .Where(item => MatchesPrefix(item.DisplayText, context.Prefix))
+            .OrderBy(item => item.SortText, StringComparer.Ordinal)
+            .ToImmutableArray();
+        return new AkburaCompletionResult(
+            context.ApplicableSpan,
+            matches.Take(MaximumCompletionItems).ToImmutableArray(),
+            isIncomplete: matches.Length > MaximumCompletionItems);
+    }
+
+    private static ImmutableArray<AkburaCompletionItem> CreateStateHookCatalog(
+        AkburaSemanticModel semanticModel,
+        StateDeclarationSyntax declaration,
+        CancellationToken cancellationToken)
+    {
+        var selected = new Dictionary<string, UseHookCompletionCandidate>(
+            StringComparer.Ordinal);
+        var candidates = semanticModel.LookupVisibleStateHooks(
+            declaration,
+            string.Empty,
+            cancellationToken);
+        foreach (var candidate in candidates)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!selected.TryGetValue(candidate.Method.Name, out var current) ||
+                IsBetterHookOverload(candidate, current))
+            {
+                selected[candidate.Method.Name] = candidate;
+            }
+        }
+
+        return selected.Values
+            .Select(CreateStateHookItem)
+            .OrderBy(item => item.SortText, StringComparer.Ordinal)
+            .ToImmutableArray();
+    }
+
+    private static bool IsBetterHookOverload(
+        UseHookCompletionCandidate candidate,
+        UseHookCompletionCandidate current)
+    {
+        var candidateCount = GetVisibleHookParameters(candidate).Length;
+        var currentCount = GetVisibleHookParameters(current).Length;
+        if (candidateCount != currentCount)
+        {
+            return candidateCount < currentCount;
+        }
+
+        return string.CompareOrdinal(
+            candidate.Method.ToDisplayString(),
+            current.Method.ToDisplayString()) < 0;
+    }
+
+    private static AkburaCompletionItem CreateStateHookItem(
+        UseHookCompletionCandidate candidate)
+    {
+        var method = candidate.Method;
+        var suffix = FormatStateHookSuffix(candidate);
+        var description = $"{method.Name}{suffix}{Environment.NewLine}" +
+            $"Declared in {method.ContainingType.ToDisplayString()}";
+        return new AkburaCompletionItem(
+            method.Name,
+            method.Name,
+            AkburaCompletionKind.Hook,
+            description,
+            descriptionFactory: null,
+            suffix: suffix,
+            priority: 10);
+    }
+
+    private static string FormatStateHookSuffix(
+        UseHookCompletionCandidate candidate)
+    {
+        var method = candidate.Method;
+        var typeParameters = method.TypeParameters.Length == 0
+            ? string.Empty
+            : $"<{string.Join(", ", method.TypeParameters.Select(parameter => parameter.Name))}>";
+        var parameters = string.Join(", ", GetVisibleHookParameters(candidate)
+            .Select(FormatHookParameter));
+        return $"{typeParameters}({parameters}) → " +
+            method.ReturnType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+    }
+
+    private static ImmutableArray<IParameterSymbol> GetVisibleHookParameters(
+        UseHookCompletionCandidate candidate)
+    {
+        return candidate.Method.Parameters
+            .Where(parameter => !SymbolEqualityComparer.Default.Equals(
+                parameter,
+                candidate.SelfParameter))
+            .ToImmutableArray();
+    }
+
+    private static string FormatHookParameter(IParameterSymbol parameter)
+    {
+        var prefix = parameter.IsParams ? "params " : string.Empty;
+        var suffix = parameter.IsOptional ? " = default" : string.Empty;
+        return prefix +
+            parameter.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat) +
+            " " +
+            parameter.Name +
+            suffix;
+    }
+
     private static int GetComponentPriority(MarkupComponentLookupCandidate candidate)
     {
         if (candidate.IsAkburaComponent)
@@ -1524,6 +1683,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
     {
         private ImmutableDictionary<CompletionMemberCatalogKey, ImmutableArray<CompletionMemberCandidate>> _catalogs =
             ImmutableDictionary<CompletionMemberCatalogKey, ImmutableArray<CompletionMemberCandidate>>.Empty;
+        private ImmutableArray<AkburaCompletionItem> _stateHooks;
 
         public ImmutableArray<CompletionMemberCandidate> GetOrCreate(string componentName, bool propertyElements, Func<ImmutableArray<CompletionMemberCandidate>> factory, CancellationToken cancellationToken)
         {
@@ -1546,6 +1706,24 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                 ref _catalogs,
                 key,
                 created);
+        }
+
+        public ImmutableArray<AkburaCompletionItem> GetOrCreateStateHooks(
+            Func<ImmutableArray<AkburaCompletionItem>> factory,
+            CancellationToken cancellationToken)
+        {
+            var cached = _stateHooks;
+            if (!cached.IsDefault)
+            {
+                return cached;
+            }
+
+            var created = factory();
+            cancellationToken.ThrowIfCancellationRequested();
+            ImmutableInterlocked.InterlockedInitialize(
+                ref _stateHooks,
+                created);
+            return _stateHooks;
         }
 
         private readonly record struct CompletionMemberCatalogKey(

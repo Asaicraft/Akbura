@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 
@@ -116,6 +117,34 @@ internal sealed class UseHookBinder : Binder
                 invocation: null,
                 stateType: null,
                 ImmutableArray.Create(nestedDiagnostic));
+    }
+
+    internal ImmutableArray<UseHookCompletionCandidate> GetVisibleStateHookMethods(
+        string namePrefix,
+        CancellationToken cancellationToken)
+    {
+        using var builder = ImmutableArrayBuilder<UseHookCompletionCandidate>.Rent();
+        var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        foreach (var hookType in GetVisibleHookTypes(namePrefix, exactName: false))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            foreach (var member in hookType.GetMembers())
+            {
+                if (member is not IMethodSymbol method ||
+                    !method.Name.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase) ||
+                    !HasAttribute(method, UseHookAttributeMetadataName) ||
+                    !TryValidateHookMethod(method, out var selfParameter, out _) ||
+                    !TryValidateContext(method, UseHookContext.StateInitializer, out _) ||
+                    !seen.Add(method))
+                {
+                    continue;
+                }
+
+                builder.Add(new UseHookCompletionCandidate(method, selfParameter));
+            }
+        }
+
+        return builder.ToImmutable();
     }
 
     private bool TryBindInvocation(
@@ -374,7 +403,12 @@ internal sealed class UseHookBinder : Binder
         return hasAttributedMethod;
     }
 
-    private ImmutableArray<INamedTypeSymbol> GetVisibleHookTypes(string methodName)
+    private ImmutableArray<INamedTypeSymbol> GetVisibleHookTypes(string methodName) =>
+        GetVisibleHookTypes(methodName, exactName: true);
+
+    private ImmutableArray<INamedTypeSymbol> GetVisibleHookTypes(
+        string methodName,
+        bool exactName)
     {
         using var builder = ImmutableArrayBuilder<INamedTypeSymbol>.Rent();
         var seen = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
@@ -382,11 +416,11 @@ internal sealed class UseHookBinder : Binder
         var currentNamespace = SemanticModel.GetAkburaNamespaceText(
             SemanticModel.SyntaxTree.GetRoot(),
             SemanticModel.SyntaxTree);
-        AddNamespaceHookTypes(currentNamespace, methodName, seen, builder);
+        AddNamespaceHookTypes(currentNamespace, methodName, exactName, seen, builder);
 
         foreach (var usingDirective in SemanticModel.GetCSharpUsingDirectives())
         {
-            AddUsingHookTypes(usingDirective, methodName, seen, builder);
+            AddUsingHookTypes(usingDirective, methodName, exactName, seen, builder);
         }
 
         foreach (var syntaxTree in Compilation.CSharpCompilation.SyntaxTrees)
@@ -395,7 +429,7 @@ internal sealed class UseHookBinder : Binder
             {
                 if (usingDirective.GlobalKeyword.RawKind != 0)
                 {
-                    AddUsingHookTypes(usingDirective, methodName, seen, builder);
+                    AddUsingHookTypes(usingDirective, methodName, exactName, seen, builder);
                 }
             }
         }
@@ -406,6 +440,7 @@ internal sealed class UseHookBinder : Binder
     private void AddUsingHookTypes(
         CSharp.UsingDirectiveSyntax usingDirective,
         string methodName,
+        bool exactName,
         HashSet<INamedTypeSymbol> seen,
         ImmutableArrayBuilder<INamedTypeSymbol> builder)
     {
@@ -420,18 +455,19 @@ internal sealed class UseHookBinder : Binder
             var type = Compilation.CSharpCompilation.GetTypeByMetadataName(name);
             if (type != null)
             {
-                AddTypeIfItContainsHook(type, methodName, seen, builder);
+                AddTypeIfItContainsHook(type, methodName, exactName, seen, builder);
             }
 
             return;
         }
 
-        AddNamespaceHookTypes(name, methodName, seen, builder);
+        AddNamespaceHookTypes(name, methodName, exactName, seen, builder);
     }
 
     private static void AddNamespaceHookTypes(
         INamespaceSymbol? namespaceSymbol,
         string methodName,
+        bool exactName,
         HashSet<INamedTypeSymbol> seen,
         ImmutableArrayBuilder<INamedTypeSymbol> builder)
     {
@@ -442,19 +478,24 @@ internal sealed class UseHookBinder : Binder
 
         foreach (var type in namespaceSymbol.GetTypeMembers())
         {
-            AddTypeIfItContainsHook(type, methodName, seen, builder);
+            AddTypeIfItContainsHook(type, methodName, exactName, seen, builder);
         }
     }
 
     private static void AddTypeIfItContainsHook(
         INamedTypeSymbol type,
         string methodName,
+        bool exactName,
         HashSet<INamedTypeSymbol> seen,
         ImmutableArrayBuilder<INamedTypeSymbol> builder)
     {
-        foreach (var member in type.GetMembers(methodName))
+        var members = exactName
+            ? type.GetMembers(methodName)
+            : type.GetMembers();
+        foreach (var member in members)
         {
             if (member is IMethodSymbol method &&
+                (exactName || method.Name.StartsWith(methodName, StringComparison.OrdinalIgnoreCase)) &&
                 HasAttribute(method, UseHookAttributeMetadataName))
             {
                 if (seen.Add(type))
@@ -468,13 +509,14 @@ internal sealed class UseHookBinder : Binder
 
         foreach (var nestedType in type.GetTypeMembers())
         {
-            AddTypeIfItContainsHook(nestedType, methodName, seen, builder);
+            AddTypeIfItContainsHook(nestedType, methodName, exactName, seen, builder);
         }
     }
 
     private void AddNamespaceHookTypes(
         string namespaceName,
         string methodName,
+        bool exactName,
         HashSet<INamedTypeSymbol> seen,
         ImmutableArrayBuilder<INamedTypeSymbol> builder)
     {
@@ -482,11 +524,13 @@ internal sealed class UseHookBinder : Binder
         AddNamespaceHookTypes(
             ResolveNamespace(csharpCompilation.GlobalNamespace, namespaceName),
             methodName,
+            exactName,
             seen,
             builder);
         AddNamespaceHookTypes(
             ResolveNamespace(csharpCompilation.Assembly.GlobalNamespace, namespaceName),
             methodName,
+            exactName,
             seen,
             builder);
 
@@ -506,6 +550,7 @@ internal sealed class UseHookBinder : Binder
             AddNamespaceHookTypes(
                 ResolveNamespace(globalNamespace, namespaceName),
                 methodName,
+                exactName,
                 seen,
                 builder);
         }
@@ -861,6 +906,21 @@ internal sealed class UseHookBinder : Binder
         bool InjectSelf,
         bool RewritePropertyArguments,
         bool RewriteStateArguments = false);
+}
+
+internal readonly struct UseHookCompletionCandidate
+{
+    public UseHookCompletionCandidate(
+        IMethodSymbol method,
+        IParameterSymbol? selfParameter)
+    {
+        Method = method;
+        SelfParameter = selfParameter;
+    }
+
+    public IMethodSymbol Method { get; }
+
+    public IParameterSymbol? SelfParameter { get; }
 }
 
 internal readonly struct UseHookInitializerBinding

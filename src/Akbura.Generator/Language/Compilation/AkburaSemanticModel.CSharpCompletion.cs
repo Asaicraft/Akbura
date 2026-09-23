@@ -1,11 +1,29 @@
 using Akbura.Language.Binder;
 using Akbura.Language.Syntax;
+using System.Collections.Immutable;
+using System.Threading;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Akbura.Language;
 
 internal abstract partial class AkburaSemanticModel
 {
+    internal ImmutableArray<UseHookCompletionCandidate> LookupVisibleStateHooks(
+        StateDeclarationSyntax declaration,
+        string namePrefix,
+        CancellationToken cancellationToken)
+    {
+        if (declaration == null)
+        {
+            throw new ArgumentNullException(nameof(declaration));
+        }
+
+        ValidateSyntaxTreeOwnership(declaration);
+        return BindingSession
+            .GetUseHookBinder(declaration, BinderUsage.Expression)
+            .GetVisibleStateHookMethods(namePrefix, cancellationToken);
+    }
+
     internal CSharpProbeProjection CreateCSharpCompletionProjection(CSharpExpressionSyntax expressionSyntax, int relativePosition)
     {
         if (expressionSyntax == null)

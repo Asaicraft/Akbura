@@ -1151,6 +1151,14 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             return [];
         }
 
+        var resolvedType = target.ComponentType ??
+            target.AkburaComponent?.ComponentType;
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.Completion,
+            $"Member catalog: tag='{componentName}', " +
+            $"resolvedType='{resolvedType?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}', " +
+            $"isStatic={resolvedType?.IsStatic}.");
+
         var items = new Dictionary<string, AkburaCompletionItem>(
             StringComparer.Ordinal);
         var ownerName = GetSimpleName(componentName);

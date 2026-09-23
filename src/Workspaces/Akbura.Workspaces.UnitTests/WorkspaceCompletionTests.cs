@@ -1334,6 +1334,54 @@ public sealed class WorkspaceCompletionTests
             });
     }
 
+    [Theory]
+    [InlineData("""
+        namespace Gallery;
+
+        <Path D| />
+        """)]
+    [InlineData("""
+        namespace Gallery;
+
+        using Avalonia.Controls;
+        using Avalonia.Media;
+
+        param StreamGeometry[] Geometries;
+
+        <StackPanel>
+            $foreach (var geometry in Geometries)
+            {
+                <Path Da| />
+            }
+        </StackPanel>
+        """)]
+    public void Completion_PathUsesInstantiableShapeInsteadOfStaticSystemType(
+        string sourceWithCaret)
+    {
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            stylesSource: null,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.Contains(
+                    result.Items,
+                    static item => item.DisplayText == "Data");
+            },
+            globalUsingsSource:
+                "using Avalonia.Controls.Shapes;",
+            additionalCSharpSource:
+                "global using System.IO;");
+    }
+
     [Fact]
     public void Completion_ComponentRequestsMemberCompletionAfterInsert()
     {
@@ -3448,7 +3496,7 @@ public sealed class WorkspaceCompletionTests
         }
     }
 
-    private static void WithWorkspace(string source, string? stylesSource, Action<AkburaWorkspace, AkburaDocumentContext, AkburaSyntacticDocument> assertion, string? globalUsingsSource = null, MetadataReference? additionalReference = null)
+    private static void WithWorkspace(string source, string? stylesSource, Action<AkburaWorkspace, AkburaDocumentContext, AkburaSyntacticDocument> assertion, string? globalUsingsSource = null, MetadataReference? additionalReference = null, string? additionalCSharpSource = null)
     {
         var directory = Path.Combine(
             Path.GetTempPath(),
@@ -3462,6 +3510,13 @@ public sealed class WorkspaceCompletionTests
             if (additionalReference != null)
             {
                 compilation = compilation.AddReferences(additionalReference);
+            }
+
+            if (additionalCSharpSource != null)
+            {
+                compilation = compilation.AddSyntaxTrees(
+                    CSharpSyntaxTree.ParseText(
+                        additionalCSharpSource));
             }
 
             var projectContext = new ProjectContext(
@@ -6394,6 +6449,19 @@ public sealed class WorkspaceCompletionTests
                 public class AvaloniaList<T> :
                     System.Collections.Generic.List<T>
                 {
+                }
+            }
+
+            namespace Avalonia.Controls.Shapes
+            {
+                public sealed class Path :
+                    Avalonia.Controls.Control
+                {
+                    public Avalonia.Media.StreamGeometry? Data
+                    {
+                        get;
+                        set;
+                    }
                 }
             }
 

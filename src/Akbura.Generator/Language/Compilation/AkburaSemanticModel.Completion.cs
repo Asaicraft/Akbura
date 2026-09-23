@@ -300,23 +300,24 @@ internal partial class AkburaSemanticModel
         }
 
         var name = componentName.Trim();
-        foreach (var metadataName in
-                 GetAkburaComponentCandidateMetadataNames(name))
+        foreach (var metadataName in GetAkburaComponentCandidateMetadataNames(name))
         {
             var akburaComponent = FindLocalAkburaComponent(metadataName) ??
                 Compilation
                     .GetReferencedComponentSymbols(metadataName)
                     .FirstOrDefault();
+            if (akburaComponent == null)
+            {
+                continue;
+            }
+
             var componentType = Compilation.CSharpProbeCompilation
                 .GetTypeByMetadataName(metadataName);
-            if (akburaComponent != null || componentType != null)
-            {
-                component = CreateMarkupComponentLookupSymbol(
-                    name,
-                    componentType ?? akburaComponent?.ComponentType,
-                    akburaComponent);
-                return true;
-            }
+            component = CreateMarkupComponentLookupSymbol(
+                name,
+                componentType ?? akburaComponent.ComponentType,
+                akburaComponent);
+            return true;
         }
 
         CSharpBindingResult binding;

@@ -360,6 +360,83 @@ public sealed class CompletionPerformancePolicyTests
     }
 
     [Fact]
+    public void Selector_ForVisualStudioReturnsFullRawSetPastAutomaticLimit()
+    {
+        var span = new TextSpan(0, 1);
+        var rawItems = Enumerable
+            .Range(0, 300)
+            .Select(index => CreateItem(
+                $"Native{index:D3}",
+                span))
+            .Append(CreateItem("Brushes", span))
+            .ToArray();
+        var list = CreateList(span, rawItems);
+
+        var selection =
+            AkburaRoslynCompletionItemSelector.SelectForVisualStudio(
+                list,
+                SourceText.From("N"),
+                position: 1,
+                CancellationToken.None);
+
+        Assert.Equal(301, selection.Items.Length);
+        Assert.Equal(301, selection.RawItemCount);
+        Assert.Equal("N", selection.Prefix);
+        Assert.False(selection.IsIncomplete);
+        Assert.Equal("Native000", selection.Items[0].DisplayText);
+        Assert.Equal("Brushes", selection.Items[^1].DisplayText);
+    }
+
+    [Theory]
+    [InlineData("B")]
+    [InlineData("Br")]
+    [InlineData("Bru")]
+    [InlineData("Brus")]
+    public void Selector_ForVisualStudioKeepsBrushesAvailableWhilePrefixChanges(
+        string prefix)
+    {
+        var span = new TextSpan(0, 1);
+        var list = CreateList(
+            span,
+            CreateItem("NativeLibrary", span),
+            CreateItem("Brushes", span));
+        var selection =
+            AkburaRoslynCompletionItemSelector.SelectForVisualStudio(
+                list,
+                SourceText.From("N"),
+                position: 1,
+                CancellationToken.None);
+
+        var matches = selection.Items.Where(item =>
+            AkburaRoslynCompletionItemSelector.GetMatchKind(
+                item.FilterText,
+                prefix) != CompletionMatchKind.None);
+
+        Assert.Contains(
+            matches,
+            static item => item.DisplayText == "Brushes");
+    }
+
+    [Fact]
+    public void Selector_ForVisualStudioObservesCancellation()
+    {
+        var span = new TextSpan(0, 0);
+        var list = CreateList(
+            span,
+            CreateItem("Item", span));
+        using var source = new CancellationTokenSource();
+        source.Cancel();
+
+        Assert.Throws<OperationCanceledException>(
+            () => AkburaRoslynCompletionItemSelector
+                .SelectForVisualStudio(
+                    list,
+                    SourceText.From(string.Empty),
+                    position: 0,
+                    source.Token));
+    }
+
+    [Fact]
     public void Selector_ObservesCancellation()
     {
         var span = new TextSpan(0, 0);

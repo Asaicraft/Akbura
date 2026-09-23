@@ -110,6 +110,43 @@ internal static class AkburaRoslynCompletionItemSelector
         }
     }
 
+    public static AkburaRoslynCompletionSelection SelectForVisualStudio(
+        CompletionList list,
+        SourceText text,
+        int position,
+        CancellationToken cancellationToken)
+    {
+        if (list == null)
+        {
+            throw new ArgumentNullException(nameof(list));
+        }
+
+        if (text == null)
+        {
+            throw new ArgumentNullException(nameof(text));
+        }
+
+        var rawItems = list.ItemsList;
+        var rawItemCount = rawItems.Count;
+        using var selected =
+            ImmutableArrayBuilder<CompletionItem>.Rent(
+                rawItemCount);
+        for (var index = 0; index < rawItemCount; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            selected.Add(rawItems[index]);
+        }
+
+        return new AkburaRoslynCompletionSelection(
+            selected.ToImmutable(),
+            GetPrefix(
+                list.Span,
+                text,
+                position),
+            rawItemCount,
+            isIncomplete: false);
+    }
+
     internal static CompletionMatchKind GetMatchKind(
         string candidate,
         string prefix)

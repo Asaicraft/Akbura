@@ -164,12 +164,15 @@ internal sealed class AkburaRoslynCompletionService
 
         cancellationToken.ThrowIfCancellationRequested();
         var selection =
-            AkburaRoslynCompletionItemSelector.Select(
+            AkburaRoslynCompletionItemSelector.SelectForVisualStudio(
                 completionList,
                 sourceText,
                 projection.ProjectedPosition,
-                isExplicit,
                 cancellationToken);
+        var rawHasBrushes = completionList.ItemsList.Any(
+            static item => item.DisplayText == "Brushes");
+        var selectedHasBrushes = selection.Items.Any(
+            static item => item.DisplayText == "Brushes");
 
         AkburaWorkspaceDiagnostics.Write(
             AkburaWorkspaceDiagnostics.Category.Completion,
@@ -177,7 +180,9 @@ internal sealed class AkburaRoslynCompletionService
             $"{selection.RawItemCount} raw items, " +
             $"selected {selection.Items.Length}, " +
             $"prefix='{selection.Prefix}', " +
-            $"incomplete={selection.IsIncomplete}.");
+            $"incomplete={selection.IsIncomplete}, " +
+            $"rawHasBrushes={rawHasBrushes}, " +
+            $"selectedHasBrushes={selectedHasBrushes}.");
 
         var state = new AkburaRoslynCompletionSessionState(
             projected,

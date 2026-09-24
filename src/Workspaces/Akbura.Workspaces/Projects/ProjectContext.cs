@@ -119,34 +119,35 @@ public sealed record ProjectContext
         MetadataReference reference,
         string assemblyName)
     {
+        if (reference is CompilationReference compilationReference)
+        {
+            return string.Equals(
+                compilationReference.Compilation.AssemblyName,
+                assemblyName,
+                StringComparison.OrdinalIgnoreCase);
+        }
+
         if (TryGetReferencedAssembly(
                 compilation,
                 reference,
-                out var referencedAssembly) &&
-            string.Equals(
+                out var referencedAssembly))
+        {
+            return string.Equals(
                 referencedAssembly.Identity.Name,
                 assemblyName,
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
+                StringComparison.OrdinalIgnoreCase);
         }
 
         if (reference is PortableExecutableReference portableReference &&
-            TryGetAssemblyName(portableReference, out var metadataName) &&
-            string.Equals(
+            TryGetAssemblyName(portableReference, out var metadataName))
+        {
+            return string.Equals(
                 metadataName,
                 assemblyName,
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
+                StringComparison.OrdinalIgnoreCase);
         }
 
-        var display = reference.Display;
-        return !string.IsNullOrWhiteSpace(display) &&
-            string.Equals(
-                Path.GetFileNameWithoutExtension(display),
-                assemblyName,
-                StringComparison.OrdinalIgnoreCase);
+        return false;
     }
 
     private static bool TryGetReferencedAssembly(

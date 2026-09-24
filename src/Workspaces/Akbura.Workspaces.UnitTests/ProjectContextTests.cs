@@ -123,6 +123,80 @@ public sealed class ProjectContextTests
     }
 
     [Fact]
+    public void Constructor_PreservesViewModelsCompilationReference()
+    {
+        const string viewModelMetadataName =
+            "PurityDashboard.ViewModels.MainViewModel";
+        var platformReference = MetadataReference.CreateFromFile(
+            typeof(object).Assembly.Location);
+        var viewModelsCompilation = CSharpCompilation.Create(
+            "PurityDashboard.ViewModels",
+            [
+                CSharpSyntaxTree.ParseText(
+                    """
+                    namespace PurityDashboard.ViewModels;
+
+                    public sealed class MainViewModel
+                    {
+                    }
+                    """),
+            ],
+            [platformReference],
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var viewModelsReference =
+            viewModelsCompilation.ToMetadataReference();
+        var uiCompilation = CSharpCompilation.Create(
+            "PurityDashboard",
+            references:
+            [
+                platformReference,
+                viewModelsReference,
+            ],
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+
+        Assert.Equal(
+            "PurityDashboard.ViewModels",
+            viewModelsReference.Display);
+        Assert.NotNull(
+            uiCompilation.GetTypeByMetadataName(
+                viewModelMetadataName));
+
+        var context = CreateContext(uiCompilation);
+
+        Assert.Contains(
+            viewModelsReference,
+            context.CSharpCompilation.References);
+        Assert.NotNull(
+            context.CSharpCompilation.GetTypeByMetadataName(
+                viewModelMetadataName));
+    }
+
+    [Fact]
+    public void Constructor_PreservesDifferentAssemblyWhenFileNameMatchesCurrentAssembly()
+    {
+        const string assemblyName = "PurityDashboard";
+        var platformReference = MetadataReference.CreateFromFile(
+            typeof(object).Assembly.Location);
+        var viewModelsReference = CreateReference(
+            "PurityDashboard.ViewModels",
+            "1.0.0.0",
+            filePath: assemblyName + ".dll");
+        var compilation = CreateCompilation(
+            assemblyName,
+            "1.0.0.0",
+            platformReference,
+            viewModelsReference);
+
+        var context = CreateContext(compilation);
+
+        Assert.Contains(
+            viewModelsReference,
+            context.CSharpCompilation.References);
+    }
+
+    [Fact]
     public void SemanticDiagnostics_DoNotBindAgainstCurrentProjectOutput()
     {
         const string assemblyName = "CurrentProject";

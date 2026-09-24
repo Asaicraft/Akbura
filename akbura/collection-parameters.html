@@ -302,15 +302,27 @@ Reassigning the exact same source on a later component update is a no-op: it doe
 not clear, enumerate or subscribe again. Assigning the backing to itself is also a
 no-op; it does not accidentally clear the list or discard its existing connection.</p>
 <h2 id="static-resource-source">Static resource source<a class="header-anchor" href="javascript:;" onclick="location.hash='#static-resource-source'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p><code>Numbers</code> must resolve to an object assignable to <code>IList&lt;int&gt;</code>, for example an
-<code>ObservableCollection&lt;int&gt;</code> in application resources:</p>
+<p><code>Numbers</code> may resolve either to an <code>IList&lt;int&gt;</code> implementation or to a
+non-generic enumerable such as <code>ArrayList</code>. Akbura validates every item and
+copies the references into the component-owned typed backing collection:</p>
 <pre><code class="language-akbura">&lt;ItemsPanel Data=${StaticResource Numbers} /&gt;
 </code></pre>
 <p>Static resource lookup and collection observation are separate. Replacing the
 resource entry is not a dynamic resource update, but <code>INotifyCollectionChanged</code>
-events from the resolved collection continue to update the owned list.</p>
+events from the resolved collection continue to update the owned list. Use
+<code>DynamicResource</code> when replacing the resource entry itself must reconnect the
+parameter.</p>
+<p>A plain <code>ArrayList</code> has no change notifications, so it is snapshotted once. If
+application code mutates that same source instance, refresh it explicitly:</p>
+<pre><code class="language-csharp">ItemsPanel.DataProperty.RefreshSource(itemsPanel);
+</code></pre>
+<p>The public <code>Data</code> property remains <code>IList&lt;int&gt;</code>; assigning an untyped source
+from C# uses the descriptor API instead of weakening that property:</p>
+<pre><code class="language-csharp">ItemsPanel.DataProperty.SetSource(itemsPanel, legacyArrayList);
+</code></pre>
 <h2 id="datacontext-binding">DataContext binding<a class="header-anchor" href="javascript:;" onclick="location.hash='#datacontext-binding'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Here <code>Items</code> is an <code>IList&lt;int&gt;</code>-compatible property on the inherited DataContext:</p>
+<p>Here <code>Items</code> may be an <code>IList&lt;int&gt;</code>, <code>System.Collections.IList</code>, or <code>ArrayList</code>
+property on the inherited DataContext:</p>
 <pre><code class="language-akbura">&lt;ItemsPanel Data=${Binding Items} /&gt;
 </code></pre>
 <p>The Avalonia binding delivers a source reference to the parameter setter. If the

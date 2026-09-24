@@ -2970,8 +2970,9 @@ no-op; it does not accidentally clear the list or discard its existing connectio
 
 ## Static resource source
 
-`Numbers` must resolve to an object assignable to `IList<int>`, for example an
-`ObservableCollection<int>` in application resources:
+`Numbers` may resolve either to an `IList<int>` implementation or to a
+non-generic enumerable such as `ArrayList`. Akbura validates every item and
+copies the references into the component-owned typed backing collection:
 
 ```akbura
 <ItemsPanel Data=${StaticResource Numbers} />
@@ -2979,11 +2980,28 @@ no-op; it does not accidentally clear the list or discard its existing connectio
 
 Static resource lookup and collection observation are separate. Replacing the
 resource entry is not a dynamic resource update, but `INotifyCollectionChanged`
-events from the resolved collection continue to update the owned list.
+events from the resolved collection continue to update the owned list. Use
+`DynamicResource` when replacing the resource entry itself must reconnect the
+parameter.
+
+A plain `ArrayList` has no change notifications, so it is snapshotted once. If
+application code mutates that same source instance, refresh it explicitly:
+
+```csharp
+ItemsPanel.DataProperty.RefreshSource(itemsPanel);
+```
+
+The public `Data` property remains `IList<int>`; assigning an untyped source
+from C# uses the descriptor API instead of weakening that property:
+
+```csharp
+ItemsPanel.DataProperty.SetSource(itemsPanel, legacyArrayList);
+```
 
 ## DataContext binding
 
-Here `Items` is an `IList<int>`-compatible property on the inherited DataContext:
+Here `Items` may be an `IList<int>`, `System.Collections.IList`, or `ArrayList`
+property on the inherited DataContext:
 
 ```akbura
 <ItemsPanel Data=${Binding Items} />

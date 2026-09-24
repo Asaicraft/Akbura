@@ -211,5 +211,6 @@ internal readonly struct AvaloniaPropertyWriteTarget
     public bool IsValid =>
         !string.IsNullOrEmpty(TargetExpression) &&
         TargetProperty.Kind is MarkupTargetPropertyKind.StaticMember or
-            MarkupTargetPropertyKind.GeneratedParameter;
+            MarkupTargetPropertyKind.GeneratedParameter or
+            MarkupTargetPropertyKind.GeneratedCollectionParameterSource;
 }

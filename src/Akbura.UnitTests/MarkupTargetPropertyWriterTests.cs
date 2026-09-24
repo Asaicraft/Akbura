@@ -101,6 +101,26 @@ public sealed class MarkupTargetPropertyWriterTests
         Assert.EndsWith(".@classProperty.AvaloniaProperty", codeWriter.GetText().ToString());
     }
 
+    [Fact]
+    public void Write_GeneratedCollectionParameterSource_UsesDescriptorSourceProperty()
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            <Border />
+            """;
+        var fixture = AkcssActivatorPlannerTests.CreateFixture(component);
+        var targetType = fixture.CSharpCompilation.GetSpecialType(SpecialType.System_Object);
+        var plan = MarkupTargetPropertyPlan.CreateGeneratedCollectionParameterSource(targetType, "items");
+        using var codeWriter = new CodeWriter();
+        var writer = new MarkupTargetPropertyWriter(codeWriter);
+
+        writer.Write(plan);
+
+        Assert.EndsWith(".itemsProperty.SourceProperty", codeWriter.GetText().ToString());
+    }
+
     private static AkcssActivatorPlannerTests.PlannerFixture CreateFixture()
     {
         const string component =

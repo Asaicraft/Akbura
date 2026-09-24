@@ -18,6 +18,7 @@ public sealed class CollectionParameterBinding<T> : IDisposable
 {
     private readonly Action _changed;
     private readonly Action _verifyAccess;
+    private readonly string _parameterName;
     private object? _source;
     private ListAccess? _sourceList;
     private SourceLease? _lease;
@@ -31,11 +32,14 @@ public sealed class CollectionParameterBinding<T> : IDisposable
     private bool _repairQueued;
 
     public CollectionParameterBinding(ObservableCollection<T> items, Action changed,
-        Action? verifyAccess = null)
+        Action? verifyAccess = null, string? parameterName = null)
     {
         Items = items ?? throw new ArgumentNullException(nameof(items));
         _changed = changed ?? throw new ArgumentNullException(nameof(changed));
         _verifyAccess = verifyAccess ?? (() => { });
+        _parameterName = string.IsNullOrWhiteSpace(parameterName)
+            ? typeof(T).Name + " collection parameter"
+            : parameterName!;
         Items.CollectionChanged += OnItemsChanged;
     }
 
@@ -341,13 +345,39 @@ public sealed class CollectionParameterBinding<T> : IDisposable
         throw new ArgumentException($"Collection item '{value?.GetType().FullName ?? "null"}' is not compatible with '{typeof(T)}'.");
     }
 
-    private static T[] Snapshot(object? source)
+    private T[] Snapshot(object? source)
     {
         if (source == null) return Array.Empty<T>();
         if (source is not IEnumerable sequence)
-            throw new ArgumentException("A collection parameter source must be enumerable.", nameof(source));
+        {
+            throw new ArgumentException(
+                $"Cannot assign collection source to parameter '{_parameterName}'.{Environment.NewLine}" +
+                $"Source type: {source.GetType().FullName}.{Environment.NewLine}" +
+                "Expected an enumerable source.",
+                nameof(source));
+        }
         var values = new List<T>();
-        foreach (var value in sequence) values.Add(Cast(value));
+        foreach (var value in sequence)
+        {
+            var index = values.Count;
+            if (value is T typed)
+            {
+                values.Add(typed);
+                continue;
+            }
+            if (value == null && default(T) is null)
+            {
+                values.Add(default!);
+                continue;
+            }
+            throw new ArgumentException(
+                $"Cannot assign collection source to parameter '{_parameterName}'.{Environment.NewLine}" +
+                $"Source type: {source.GetType().FullName}.{Environment.NewLine}" +
+                $"Item index: {index}.{Environment.NewLine}" +
+                $"Expected item type: {typeof(T).FullName}.{Environment.NewLine}" +
+                $"Actual item type: {value?.GetType().FullName ?? "null"}.",
+                nameof(source));
+        }
         return values.ToArray();
     }
 

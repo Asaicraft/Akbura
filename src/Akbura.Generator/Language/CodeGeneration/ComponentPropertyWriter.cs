@@ -88,6 +88,11 @@ internal readonly ref struct ComponentPropertyWriter
             return false;
         }
 
+        if (plan.Destination.AssignsCollectionSource)
+        {
+            return false;
+        }
+
         var destination = plan.Destination;
         if (destination.Kind == PropertyWriteKind.ClrProperty &&
             destination.ClrProperty?.GetMethod == null)

@@ -76,6 +76,43 @@ public sealed class CollectionParameterBindingTests
     }
 
     [Fact]
+    public void InvalidUntypedSource_ReportsParameterSourceTypeAndItemIndexTransactionally()
+    {
+        var items = new ObservableCollection<int>();
+        using var binding = new CollectionParameterBinding<int>(
+            items,
+            () => { },
+            parameterName: "Icon.Geometries");
+        var original = new ArrayList { 1, 2 };
+        binding.SetSource(original);
+
+        var error = Assert.Throws<ArgumentException>(() =>
+            binding.SetSource(new ArrayList { 3, "bad", 4 }));
+
+        Assert.Contains("Icon.Geometries", error.Message, StringComparison.Ordinal);
+        Assert.Contains("System.Collections.ArrayList", error.Message, StringComparison.Ordinal);
+        Assert.Contains("Item index: 1", error.Message, StringComparison.Ordinal);
+        Assert.Contains("Expected item type: System.Int32", error.Message, StringComparison.Ordinal);
+        Assert.Contains("Actual item type: System.String", error.Message, StringComparison.Ordinal);
+        Assert.Same(original, binding.Source);
+        Assert.Equal(new[] { 1, 2 }, items);
+    }
+
+    [Fact]
+    public void ThrowingEnumerable_DoesNotReplaceThePreviousSourceOrBacking()
+    {
+        var items = new ObservableCollection<int>();
+        using var binding = new CollectionParameterBinding<int>(items, () => { });
+        var original = new ArrayList { 1, 2 };
+        binding.SetSource(original);
+
+        Assert.Throws<InvalidOperationException>(() => binding.SetSource(new ThrowingEnumerable()));
+
+        Assert.Same(original, binding.Source);
+        Assert.Equal(new[] { 1, 2 }, items);
+    }
+
+    [Fact]
     public void GenericOnlyNotifier_AppliesRangeDeltasWithoutEnumeratingAgain()
     {
         var source = new TestList<int>([1, 2, 3, 4]);
@@ -281,6 +318,15 @@ public sealed class CollectionParameterBindingTests
         return result;
     }
     private sealed record EqualItem(int Value);
+
+    private sealed class ThrowingEnumerable : IEnumerable
+    {
+        public IEnumerator GetEnumerator()
+        {
+            yield return 3;
+            throw new InvalidOperationException("Enumeration failed.");
+        }
+    }
 
     // Deliberately implements only generic IList<T>, not nongeneric IList and
     // not ObservableCollection<T>. This catches concrete-type subscription bugs.

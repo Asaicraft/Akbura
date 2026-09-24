@@ -1468,7 +1468,10 @@ internal static partial class ComponentPlanner
                             elementId,
                             scopeId,
                             i,
-                            PropertyWritePlan.Create(property, targetType),
+                            PropertyWritePlan.Create(
+                                property,
+                                targetType,
+                                propertyOperation.AssignsCollectionSource),
                             propertyOperation));
                         _pendingFirstUpdateActions.Add(PendingFirstUpdateActionPlan.CreateProperty(index));
                         break;

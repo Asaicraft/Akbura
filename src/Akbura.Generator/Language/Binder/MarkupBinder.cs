@@ -900,6 +900,12 @@ internal sealed partial class MarkupBinder : Binder
         var literalConversionStatus = MarkupLiteralConversionStatus.Unsupported;
         var assignmentElement = AkburaSemanticModel.GetContainingMarkupElement(markupAttribute);
         var assignmentContract = SemanticModel.GetMarkupPropertyAssignmentContract(property, assignmentElement);
+        var assignsCollectionSource = property?.Parameter is { } parameter &&
+            ObservableListParameterShape.TryCreate(
+                parameter,
+                SemanticModel.Compilation.CSharpCompilation,
+                out _,
+                out _);
         var targetType = GetExpectedValueType(property);
         if (property?.Command == null && !assignmentContract.AssignBinding &&
             assignmentContract.ContextualValueType is { } contextualType &&
@@ -1004,6 +1010,15 @@ internal sealed partial class MarkupBinder : Binder
                 dynamicExpression = expression;
                 valueKind = MarkupAttributeValueKind.DynamicExpression;
                 valueBinding = SemanticModel.BindMarkupAttributeExpression(markupAttribute, expression, targetType);
+                if (assignsCollectionSource &&
+                    !HasImplicitConversion(valueBinding, targetType) &&
+                    IsEnumerableSource(valueBinding.Conversion.SourceType ?? valueBinding.TypeSymbol))
+                {
+                    valueBinding = SemanticModel.BindMarkupAttributeExpression(
+                        markupAttribute,
+                        expression,
+                        targetType: null);
+                }
                 valueType = valueBinding.TypeSymbol == null ? default : new CSharpSymbolDefinition(valueBinding.TypeSymbol);
                 valueOperation = valueBinding.OperationDefinition;
                 valueConversion = valueBinding.Conversion;
@@ -1016,7 +1031,8 @@ internal sealed partial class MarkupBinder : Binder
             markupExtensionBinding = SemanticModel.BindMarkupExtensionAttributeValue(
                 markupAttribute,
                 markupExtensionValueSyntax.Extension,
-                property);
+                property,
+                assignsCollectionSource);
             valueType = markupExtensionBinding.ResultType;
             valueConversion = markupExtensionBinding.Conversion;
             convertedValue = markupExtensionBinding.Value;
@@ -1045,7 +1061,7 @@ internal sealed partial class MarkupBinder : Binder
                 using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
                 AddAssignmentContractDiagnostics(markupAttribute, property.Name, assignmentContract,
                     literalValue != null, diagnosticsBuilder);
-                if (valueKind == MarkupAttributeValueKind.DynamicExpression)
+                if (valueKind == MarkupAttributeValueKind.DynamicExpression && !assignsCollectionSource)
                 {
                     AddAssignmentValueDiagnostics(markupAttribute, property.Name, assignmentContract,
                         valueBinding.Conversion.SourceType ?? valueType.Symbol as CSharpTypeSymbol,
@@ -1097,16 +1113,28 @@ internal sealed partial class MarkupBinder : Binder
                             valueBinding,
                             diagnosticsBuilder);
 
-                        SemanticModel.AddMarkupAttributeValueDiagnostics(
-                            markupAttribute,
-                            property,
-                            valueBinding,
-                            diagnosticsBuilder);
+                        if (!assignsCollectionSource)
+                        {
+                            SemanticModel.AddMarkupAttributeValueDiagnostics(
+                                markupAttribute,
+                                property,
+                                valueBinding,
+                                diagnosticsBuilder);
+                        }
                     }
                 }
                 else if (valueKind == MarkupAttributeValueKind.MarkupExtension)
                 {
                     diagnosticsBuilder.AddRange(markupExtensionBinding.Diagnostics);
+                    if (assignsCollectionSource &&
+                        IsUnsupportedTwoWayCollectionSource(markupExtensionBinding.Value, targetType))
+                    {
+                        diagnosticsBuilder.Add(AkburaSemanticModel.CreateMarkupExtensionDiagnostic(
+                            markupAttribute,
+                            markupExtensionBinding.Value!.RawText,
+                            $"TwoWay binding is not supported when collection parameter '{property.Name}' " +
+                            "receives a non-generic source. Use OneWay or OneTime."));
+                    }
                 }
 
                 if (property.Command is { } commandSymbol)
@@ -1167,9 +1195,57 @@ internal sealed partial class MarkupBinder : Binder
             valueSyntax,
             literalValue,
             convertedValue,
+            assignsCollectionSource,
             diagnostics,
             property == null || valueKind == MarkupAttributeValueKind.Error || diagnostics.Length > 0);
     }
+
+    private bool HasImplicitConversion(CSharpBindingResult binding, CSharpTypeSymbol? targetType)
+    {
+        if (targetType == null) return true;
+        if (binding.Conversion.TargetType != null) return binding.Conversion.IsImplicit;
+        return binding.TypeSymbol != null &&
+            SemanticModel.Compilation.CSharpCompilation
+                .ClassifyConversion(binding.TypeSymbol, targetType)
+                .IsImplicit;
+    }
+
+    private bool IsEnumerableSource(CSharpTypeSymbol? sourceType)
+    {
+        var enumerable = SemanticModel.Compilation.CSharpCompilation
+            .GetTypeByMetadataName("System.Collections.IEnumerable");
+        return sourceType != null && enumerable != null &&
+            SemanticModel.Compilation.CSharpCompilation
+                .ClassifyConversion(sourceType, enumerable)
+                .IsImplicit;
+    }
+
+    private bool IsUnsupportedTwoWayCollectionSource(
+        MarkupExtensionValue? extension,
+        CSharpTypeSymbol? targetType)
+    {
+        if (extension?.Binding?.ResultType.Symbol is not CSharpTypeSymbol sourceType ||
+            targetType == null ||
+            !IsEnumerableSource(sourceType) ||
+            SemanticModel.Compilation.CSharpCompilation
+                .ClassifyConversion(sourceType, targetType)
+                .IsImplicit)
+        {
+            return false;
+        }
+
+        foreach (var property in extension.Properties)
+        {
+            if (!string.Equals(property.Name, "Mode", StringComparison.Ordinal)) continue;
+            return IsTwoWayBindingMode(property.ConvertedValue?.ToString()) ||
+                IsTwoWayBindingMode(property.Value.Trim());
+        }
+
+        return false;
+    }
+
+    private static bool IsTwoWayBindingMode(string? value) =>
+        value is "TwoWay" or "BindingMode.TwoWay" or "Avalonia.Data.BindingMode.TwoWay";
 
     private BoundNode BindMarkupRoutedEvent(
         MarkupAttributeSyntax markupAttribute,

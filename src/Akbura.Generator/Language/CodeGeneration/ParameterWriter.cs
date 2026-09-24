@@ -58,17 +58,50 @@ internal readonly ref partial struct ParameterWriter
             plan.GeneratedName);
         _writer.WriteLine("(");
         _writer.CurrentIndent += _writer.TabSize;
+        WriteHotReloadPropertyLookup(
+            plan,
+            previousManifestExpression,
+            sourceProperty: false);
+        if (plan.Kind == ComponentParameterKind.Collection && plan.Collection.ObservesChanges)
+        {
+            _writer.WriteLine(",");
+            WriteHotReloadPropertyLookup(
+                plan,
+                previousManifestExpression,
+                sourceProperty: true);
+        }
+        _writer.WriteLine(");");
+        _writer.CurrentIndent -= _writer.TabSize * 2;
+    }
+
+    private void WriteHotReloadPropertyLookup(
+        in ComponentParameterPlan plan,
+        string previousManifestExpression,
+        bool sourceProperty)
+    {
         _writer.WriteLine(
             "global::Akbura.HotReload.AkburaHotReloadRuntime.FindProperty<");
         _writer.CurrentIndent += _writer.TabSize;
-        WriteHotReloadPropertyType(plan);
-        _writer.WriteLine(">(");
+        if (sourceProperty)
+        {
+            _writer.Write("global::Avalonia.DirectProperty<");
+            _writer.Write(_ownerTypeName);
+            _writer.WriteLine(", object?>>");
+        }
+        else
+        {
+            WriteHotReloadPropertyType(plan);
+            _writer.WriteLine(">");
+        }
+        _writer.WriteLine("(");
         _writer.CurrentIndent += _writer.TabSize;
         _writer.Write(previousManifestExpression);
         _writer.WriteLine(",");
-        _writer.WriteStringLiteral(plan.HotReloadKey);
-        _writer.WriteLine("));");
-        _writer.CurrentIndent -= _writer.TabSize * 4;
+        _writer.WriteStringLiteral(sourceProperty
+            ? plan.HotReloadKey + ":source"
+            : plan.HotReloadKey);
+        _writer.Write(")");
+        _writer.CurrentIndent -= _writer.TabSize * 2;
     }
 
     private void WriteValue(in ComponentParameterPlan plan)
@@ -466,7 +499,8 @@ internal readonly ref partial struct ParameterWriter
         GeneratedMemberNameWriter.WriteParameterFactory(
             _writer,
             plan.GeneratedName);
-        _writer.WriteLine("(null);");
+        _writer.Write(plan.Collection.ObservesChanges ? "(null, null)" : "(null)");
+        _writer.WriteLine(";");
         _writer.CurrentIndent -= _writer.TabSize;
     }
 
@@ -489,7 +523,18 @@ internal readonly ref partial struct ParameterWriter
         _writer.Write(_ownerTypeName);
         _writer.Write(", ");
         WriteCollectionPropertyType(plan);
-        _writer.WriteLine(">? __previous)");
+        _writer.Write(">? __previous");
+        if (plan.Collection.ObservesChanges)
+        {
+            _writer.WriteLine(",");
+            _writer.Write("global::Avalonia.DirectProperty<");
+            _writer.Write(_ownerTypeName);
+            _writer.WriteLine(", object?>? __previousSource)");
+        }
+        else
+        {
+            _writer.WriteLine(")");
+        }
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
@@ -520,6 +565,10 @@ internal readonly ref partial struct ParameterWriter
         if (recreate)
         {
             _writer.WriteLine("__previous,");
+            if (plan.Collection.ObservesChanges)
+            {
+                _writer.WriteLine("__previousSource,");
+            }
         }
 
         _writer.WriteStringLiteral(plan.Name);
@@ -532,7 +581,16 @@ internal readonly ref partial struct ParameterWriter
             _writer.WriteLine(",");
             _writer.Write("static (__owner, __value) => __owner.");
             _valueWriter.WriteIdentifier(plan.Name);
-            _writer.Write(" = __value");
+            _writer.WriteLine(" = __value,");
+            _writer.Write("static __owner => __owner.");
+            WriteCollectionSourceGetterName(plan);
+            _writer.WriteLine("(),");
+            _writer.Write("static (__owner, __source) => __owner.");
+            WriteCollectionSourceSetterName(plan);
+            _writer.WriteLine("(__source),");
+            _writer.Write("static __owner => __owner.");
+            WriteCollectionSourceRefresherName(plan);
+            _writer.Write("()");
         }
         _writer.WriteLine(");");
         _writer.CurrentIndent -= _writer.TabSize;

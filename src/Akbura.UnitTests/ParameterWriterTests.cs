@@ -188,6 +188,21 @@ public sealed class ParameterWriterTests
             StringComparison.Ordinal);
 
         Assert.Contains(
+            "global::Avalonia.DirectProperty<global::Demo.PlannerView, object?>? __previousSource",
+            output,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "ApplyCollectionParameterSource(__GetCollectionBinding_" + generatedName + "(), __source);",
+            output,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "static __owner => __owner.__GetCollectionSource_" + generatedName + "()",
+            output,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
             "public void __AkburaAddCollection_Content(" +
             "global::Avalonia.Controls.Control __value)",
             output,

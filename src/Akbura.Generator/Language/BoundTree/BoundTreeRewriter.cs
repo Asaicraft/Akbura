@@ -296,7 +296,8 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             node.ValueKind,
             node.ValueSyntax,
             node.LiteralValue,
-            node.ConvertedValue);
+            node.ConvertedValue,
+            node.AssignsCollectionSource);
     }
 
     public override BoundNode? VisitMarkupCommandBinding(BoundMarkupCommandBinding node)

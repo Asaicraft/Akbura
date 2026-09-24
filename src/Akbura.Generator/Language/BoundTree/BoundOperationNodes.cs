@@ -76,6 +76,7 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
         MarkupAttributeValueSyntax? valueSyntax,
         string? literalValue,
         object? convertedValue,
+        bool assignsCollectionSource,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default,
         bool hasErrors = false)
         : base(
@@ -99,6 +100,7 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
         ValueSyntax = valueSyntax;
         LiteralValue = literalValue;
         ConvertedValue = convertedValue;
+        AssignsCollectionSource = assignsCollectionSource;
     }
 
     public IPropertySymbol? Property { get; }
@@ -121,6 +123,8 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
 
     public object? ConvertedValue { get; }
 
+    public bool AssignsCollectionSource { get; }
+
     public BoundMarkupPropertySetter Update(
         IMarkupComponentSymbol? containingComponent,
         IPropertySymbol? property,
@@ -132,7 +136,8 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
         MarkupAttributeValueKind valueKind,
         MarkupAttributeValueSyntax? valueSyntax,
         string? literalValue,
-        object? convertedValue)
+        object? convertedValue,
+        bool assignsCollectionSource)
     {
         if (ReferenceEquals(containingComponent, ContainingComponent) &&
             ReferenceEquals(property, Property) &&
@@ -144,7 +149,8 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
             valueKind == ValueKind &&
             ReferenceEquals(valueSyntax, ValueSyntax) &&
             literalValue == LiteralValue &&
-            Equals(convertedValue, ConvertedValue))
+            Equals(convertedValue, ConvertedValue) &&
+            assignsCollectionSource == AssignsCollectionSource)
         {
             return this;
         }
@@ -163,6 +169,7 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
             valueSyntax,
             literalValue,
             convertedValue,
+            assignsCollectionSource,
             Diagnostics,
             HasErrors);
     }

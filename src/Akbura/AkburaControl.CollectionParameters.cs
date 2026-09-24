@@ -51,9 +51,26 @@ public abstract partial class AkburaControl
         }
         void OnDetached(object? sender, LogicalTreeAttachmentEventArgs args) => binding!.Suspend();
 
-        binding = new CollectionParameterBinding<T>(items, Notify, VerifyAccess);
+        binding = new CollectionParameterBinding<T>(
+            items,
+            Notify,
+            VerifyAccess,
+            GetType().Name + "." + property.Name);
         AttachedToLogicalTree += OnAttached;
         DetachedFromLogicalTree += OnDetached;
         return binding;
+    }
+
+    /// <summary>Applies marker semantics before updating a generated collection source binding.</summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    protected static void ApplyCollectionParameterSource<T>(
+        CollectionParameterBinding<T> binding,
+        object? source)
+    {
+        ArgumentNullException.ThrowIfNull(binding);
+        if (ReferenceEquals(source, Avalonia.Data.BindingOperations.DoNothing)) return;
+        if (ReferenceEquals(source, AvaloniaProperty.UnsetValue)) source = null;
+        binding.SetSource(source);
     }
 }

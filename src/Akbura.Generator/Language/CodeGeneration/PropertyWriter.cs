@@ -35,7 +35,8 @@ internal readonly struct PropertyWritePlan
         MarkupTargetPropertyPlan targetProperty,
         IMethodSymbol? attachedSetter,
         ITypeSymbol? receiverType,
-        string? memberName)
+        string? memberName,
+        bool assignsCollectionSource = false)
     {
         Kind = kind;
         ClrProperty = clrProperty;
@@ -43,6 +44,7 @@ internal readonly struct PropertyWritePlan
         AttachedSetter = attachedSetter;
         ReceiverType = receiverType;
         MemberName = memberName;
+        AssignsCollectionSource = assignsCollectionSource;
         var assignmentMember = (RoslynSymbol?)clrProperty ?? attachedSetter;
         AssignBinding = assignmentMember != null &&
             Akbura.Language.Binder.MarkupPropertyMetadataReader.HasAssignBinding(assignmentMember);
@@ -69,9 +71,12 @@ internal readonly struct PropertyWritePlan
 
     public bool AssignBinding { get; }
 
+    public bool AssignsCollectionSource { get; }
+
     public bool HasAvaloniaPropertyTarget =>
         TargetProperty.Kind is MarkupTargetPropertyKind.StaticMember or
-            MarkupTargetPropertyKind.GeneratedParameter;
+            MarkupTargetPropertyKind.GeneratedParameter or
+            MarkupTargetPropertyKind.GeneratedCollectionParameterSource;
 
     public static PropertyWritePlan Create(AkburaPropertySymbol property)
     {
@@ -80,13 +85,14 @@ internal readonly struct PropertyWritePlan
 
     public static PropertyWritePlan Create(
         AkburaPropertySymbol property,
-        ITypeSymbol targetType)
+        ITypeSymbol targetType,
+        bool assignsCollectionSource = false)
     {
         Debug.Assert(targetType != null);
 
         return targetType == null
             ? default
-            : CreateCore(property, targetType);
+            : CreateCore(property, targetType, assignsCollectionSource);
     }
 
     public static PropertyWritePlan Create(RoslynPropertySymbol property)
@@ -109,7 +115,8 @@ internal readonly struct PropertyWritePlan
 
     private static PropertyWritePlan CreateCore(
         AkburaPropertySymbol property,
-        ITypeSymbol? targetType)
+        ITypeSymbol? targetType,
+        bool assignsCollectionSource = false)
     {
         Debug.Assert(property != null);
 
@@ -123,7 +130,8 @@ internal readonly struct PropertyWritePlan
             PropertyAccessKind.ClrProperty => CreateClrProperty(property),
             PropertyAccessKind.AvaloniaProperty => CreateAvaloniaProperty(property),
             PropertyAccessKind.AttachedAccessor => CreateAttachedAccessor(property),
-            PropertyAccessKind.Parameter when targetType != null => CreateComponentParameter(property, targetType),
+            PropertyAccessKind.Parameter when targetType != null =>
+                CreateComponentParameter(property, targetType, assignsCollectionSource),
             PropertyAccessKind.Parameter or PropertyAccessKind.Command => CreateDirectMember(property),
             _ => default,
         };
@@ -191,7 +199,8 @@ internal readonly struct PropertyWritePlan
 
     private static PropertyWritePlan CreateComponentParameter(
         AkburaPropertySymbol property,
-        ITypeSymbol targetType)
+        ITypeSymbol targetType,
+        bool assignsCollectionSource)
     {
         if (string.IsNullOrEmpty(property.Name))
         {
@@ -201,10 +210,13 @@ internal readonly struct PropertyWritePlan
         return new PropertyWritePlan(
             PropertyWriteKind.ComponentParameter,
             clrProperty: null,
-            MarkupTargetPropertyPlan.CreateGeneratedParameter(targetType, property.Name),
+            assignsCollectionSource
+                ? MarkupTargetPropertyPlan.CreateGeneratedCollectionParameterSource(targetType, property.Name)
+                : MarkupTargetPropertyPlan.CreateGeneratedParameter(targetType, property.Name),
             attachedSetter: null,
             targetType,
-            property.Name);
+            property.Name,
+            assignsCollectionSource);
     }
 
     private static PropertyWritePlan CreateDirectMember(AkburaPropertySymbol property)
@@ -255,6 +267,11 @@ internal readonly ref struct PropertyWriter
         {
             Debug.Fail("An invalid property write reached code generation.");
             return PropertyWriteEnd.None;
+        }
+
+        if (plan.AssignsCollectionSource)
+        {
+            return WriteCollectionSource(plan, targetExpression);
         }
 
         return plan.Kind switch
@@ -352,5 +369,22 @@ internal readonly ref struct PropertyWriter
         _writer.Write(" = ");
 
         return PropertyWriteEnd.Assignment;
+    }
+
+    private PropertyWriteEnd WriteCollectionSource(
+        in PropertyWritePlan plan,
+        string targetExpression)
+    {
+        Debug.Assert(plan.ReceiverType != null);
+        Debug.Assert(!string.IsNullOrEmpty(plan.MemberName));
+
+        _valueWriter.WriteTypeName(plan.ReceiverType);
+        _writer.Write(".");
+        _valueWriter.WriteIdentifier(plan.MemberName!);
+        _writer.Write("Property.SetSource((");
+        _valueWriter.WriteTypeName(plan.ReceiverType);
+        _writer.Write(")").Write(targetExpression).Write(", ");
+
+        return PropertyWriteEnd.Invocation;
     }
 }

@@ -18,4 +18,6 @@ internal interface IMarkupPropertySetterOperation : IPropertySetterOperation, IM
     string? LiteralValue { get; }
 
     object? ConvertedValue { get; }
+
+    bool AssignsCollectionSource { get; }
 }

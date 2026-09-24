@@ -1,5 +1,6 @@
 using Akbura.Language;
 using Akbura.Language.CodeGeneration;
+using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.TestUtilities.Documentation;
@@ -132,6 +133,231 @@ public sealed class CollectionParameterCompilationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task StaticResource_ArrayList_UsesUntypedSourceInputAndKeepsTypedBacking(bool structural)
+    {
+        var assembly = Compile("<ItemsPanel Data=${StaticResource LegacyNumbers} />", Doc("Declaring a collection parameter"), structural);
+        await OnUi(() =>
+        {
+            var source = new ArrayList { 2, 4 };
+            var app = Application.Current!;
+            var hadValue = app.Resources.TryGetValue("LegacyNumbers", out var old);
+            app.Resources["LegacyNumbers"] = source;
+            var parent = New(assembly, "PlannerView");
+            var window = new Window { Content = parent };
+            try
+            {
+                window.Show();
+                Drain();
+                var child = Assert.IsAssignableFrom<AkburaControl>(parent.Child);
+                var backing = Assert.IsAssignableFrom<IList<int>>(Get(child, "Data"));
+                Assert.NotSame(source, backing);
+                AssertRows(child, [2, 4]);
+            }
+            finally
+            {
+                window.Close();
+                if (hadValue) app.Resources["LegacyNumbers"] = old;
+                else app.Resources.Remove("LegacyNumbers");
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CustomMarkupExtension_ArrayList_UsesTheSameUntypedSourceInput(bool structural)
+    {
+        var assembly = Compile("<ItemsPanel Data=${LegacyNumbers} />", Doc("Declaring a collection parameter"), structural);
+        await OnUi(() =>
+        {
+            var parent = New(assembly, "PlannerView");
+            var window = new Window { Content = parent };
+            try
+            {
+                window.Show();
+                Drain();
+                var child = Assert.IsAssignableFrom<AkburaControl>(parent.Child);
+                Assert.Equal(new[] { 11, 13 }, Assert.IsAssignableFrom<IList<int>>(Get(child, "Data")));
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ArrayListExpression_UsesCollectionSourceAssignmentWithoutConversionDiagnostic(bool structural)
+    {
+        var assembly = Compile("<ItemsPanel Data={LegacyNumbers} />", Doc("Declaring a collection parameter"), structural);
+        await OnUi(() =>
+        {
+            var parent = New(assembly, "PlannerView");
+            var window = new Window { Content = parent };
+            try
+            {
+                window.Show();
+                Drain();
+                var child = Assert.IsAssignableFrom<AkburaControl>(parent.Child);
+                var backing = Assert.IsAssignableFrom<IList<int>>(Get(child, "Data"));
+                var source = Assert.IsType<ArrayList>(Get(parent, "LegacyNumbers"));
+                Assert.NotSame(source, backing);
+                Assert.Equal(new[] { 7, 8 }, backing);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Binding_ArrayListSource_AcceptsInitialValueAndReplacement(bool structural)
+    {
+        var assembly = Compile("<ItemsPanel Data=${Binding LegacyItems} />", Doc("Declaring a collection parameter"), structural);
+        await OnUi(() =>
+        {
+            var model = new CollectionParameterTestViewModel
+            {
+                LegacyItems = new ArrayList { 1, 3 },
+            };
+            var parent = New(assembly, "PlannerView");
+            parent.DataContext = model;
+            var window = new Window { Content = parent };
+            try
+            {
+                window.Show();
+                Drain();
+                var child = Assert.IsAssignableFrom<AkburaControl>(parent.Child);
+                var backing = Assert.IsAssignableFrom<IList<int>>(Get(child, "Data"));
+                Assert.Equal(new[] { 1, 3 }, backing);
+                model.LegacyItems = new ArrayList { 5, 7, 9 };
+                Drain();
+                Assert.Same(backing, Get(child, "Data"));
+                Assert.Equal(new[] { 5, 7, 9 }, backing);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void TwoWayBindingToKnownArrayListSource_HasClearDiagnostic()
+    {
+        const string parentSource =
+            "using Avalonia.Controls; " +
+            "<Border x.DataType=\"LegacyCollectionModel\">" +
+            "<ItemsPanel Data=${Binding LegacyItems, Mode=TwoWay} />" +
+            "</Border>";
+        var fixture = AkcssActivatorPlannerTests.CreateFixture(parentSource, Owners);
+        var child = AkburaSyntaxTree.ParseText(Doc("Declaring a collection parameter"), "ItemsPanel.akbura");
+        var compilation = new AkburaCompilation(
+            fixture.CSharpCompilation,
+            [fixture.ComponentTree, child],
+            rootNamespace: "Demo");
+        var semanticModel = compilation.GetSemanticModel(fixture.ComponentTree);
+        var dataAttribute = Assert.Single(
+            fixture.ComponentTree.GetRoot().DescendantNodes().OfType<MarkupPlainAttributeSyntax>(),
+            attribute => attribute.Name.ToFullString().Trim() == "Data");
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(dataAttribute));
+        var extension = Assert.IsType<MarkupExtensionValue>(operation.ConvertedValue);
+        Assert.True(operation.AssignsCollectionSource);
+        Assert.Equal(
+            "System.Collections.ArrayList",
+            extension.Binding?.ResultType.Symbol?.ToDisplayString());
+        Assert.Equal("TwoWay", Assert.Single(extension.Properties, property => property.Name == "Mode").Value);
+        var sourceType = Assert.IsAssignableFrom<ITypeSymbol>(extension.Binding!.ResultType.Symbol);
+        var targetType = Assert.IsAssignableFrom<ITypeSymbol>(operation.Property!.Type.Symbol);
+        Assert.False(fixture.CSharpCompilation.ClassifyConversion(sourceType, targetType).IsImplicit);
+        var enumerableType = fixture.CSharpCompilation.GetTypeByMetadataName("System.Collections.IEnumerable")!;
+        Assert.True(fixture.CSharpCompilation.ClassifyConversion(sourceType, enumerableType).IsImplicit);
+
+        var diagnostics = semanticModel
+            .GetSemanticDiagnostics(fixture.ComponentTree.GetRoot());
+
+        var diagnostic = Assert.Single(diagnostics, diagnostic =>
+            diagnostic.Message.Contains("TwoWay binding is not supported", StringComparison.Ordinal));
+        Assert.Contains("Data", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("OneWay or OneTime", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DynamicResource_ArrayListReplacement_PreservesOwnedBacking(bool structural)
+    {
+        var assembly = Compile("<ItemsPanel Data=${DynamicResource LegacyNumbers} />", Doc("Declaring a collection parameter"), structural);
+        await OnUi(() =>
+        {
+            var first = new ArrayList { 1, 2 };
+            var second = new ArrayList { 6, 8 };
+            var app = Application.Current!;
+            var hadValue = app.Resources.TryGetValue("LegacyNumbers", out var old);
+            app.Resources["LegacyNumbers"] = first;
+            var parent = New(assembly, "PlannerView");
+            var window = new Window { Content = parent };
+            try
+            {
+                window.Show();
+                Drain();
+                var child = Assert.IsAssignableFrom<AkburaControl>(parent.Child);
+                var backing = Assert.IsAssignableFrom<IList<int>>(Get(child, "Data"));
+                Assert.Equal(new[] { 1, 2 }, backing);
+                app.Resources["LegacyNumbers"] = second;
+                Drain();
+                Assert.Same(backing, Get(child, "Data"));
+                Assert.Equal(new[] { 6, 8 }, backing);
+            }
+            finally
+            {
+                window.Close();
+                if (hadValue) app.Resources["LegacyNumbers"] = old;
+                else app.Resources.Remove("LegacyNumbers");
+            }
+        });
+    }
+
+    [Fact]
+    public async Task DescriptorSourceApi_RefreshesArrayListAndHandlesBindingMarkers()
+    {
+        var assembly = Compile("<ItemsPanel />", Doc("Declaring a collection parameter"), structural: false);
+        await OnUi(() =>
+        {
+            var owner = New(assembly, "ItemsPanel");
+            var backing = Assert.IsAssignableFrom<IList<int>>(Get(owner, "Data"));
+            var descriptor = owner.GetType().GetField("DataProperty")!.GetValue(null)!;
+            var setSource = descriptor.GetType().GetMethod("SetSource")!;
+            var refreshSource = descriptor.GetType().GetMethod("RefreshSource")!;
+            var sourceProperty = Assert.IsAssignableFrom<AvaloniaProperty>(
+                descriptor.GetType().GetProperty("SourceProperty")!.GetValue(descriptor));
+            var source = new ArrayList { 1 };
+
+            setSource.Invoke(descriptor, [owner, source]);
+            Assert.Equal(new[] { 1 }, backing);
+            Assert.Same(source, owner.GetValue(sourceProperty));
+            source.Add(2);
+            Assert.Equal(new[] { 1 }, backing);
+            refreshSource.Invoke(descriptor, [owner]);
+            Assert.Equal(new[] { 1, 2 }, backing);
+            setSource.Invoke(descriptor, [owner, Avalonia.Data.BindingOperations.DoNothing]);
+            Assert.Same(source, owner.GetValue(sourceProperty));
+            Assert.Equal(new[] { 1, 2 }, backing);
+            setSource.Invoke(descriptor, [owner, AvaloniaProperty.UnsetValue]);
+            Assert.Null(owner.GetValue(sourceProperty));
+            Assert.Empty(backing);
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task DocumentedDataContextBinding_ReconnectsWithoutOverwritingViewModelReference(bool structural)
     {
         var assembly = Compile(Doc("DataContext binding"), Doc("Declaring a collection parameter"), structural);
@@ -226,9 +452,11 @@ public sealed class CollectionParameterCompilationTests
                 owner.GetType().GetField("DataProperty")!.GetValue(null));
             var factory = Assert.Single(owner.GetType().GetMethods(BindingFlags.Static | BindingFlags.NonPublic),
                 method => method.Name.StartsWith("__AkburaCreateParameter_Data_", StringComparison.Ordinal));
+            var sourceProperty = descriptor.GetType().GetProperty("SourceProperty")!.GetValue(descriptor);
             var recreated = Assert.IsAssignableFrom<Akbura.ComponentTree.Parameter>(
-                factory.Invoke(null, [descriptor.AvaloniaProperty]));
+                factory.Invoke(null, [descriptor.AvaloniaProperty, sourceProperty]));
             Assert.Same(descriptor.AvaloniaProperty, recreated.AvaloniaProperty);
+            Assert.Same(sourceProperty, recreated.GetType().GetProperty("SourceProperty")!.GetValue(recreated));
             Assert.Same(backing, Get(owner, "Data"));
             source.Add(2);
             Assert.Equal(new[] { 1, 2 }, Assert.IsAssignableFrom<IList<int>>(backing));
@@ -326,10 +554,19 @@ public sealed class CollectionParameterCompilationTests
         public partial class PlannerView : AkburaControl
         {
             public PlannerView() : base(AkburaEngine.Empty) { }
+            public System.Collections.ArrayList LegacyNumbers { get; } = new() { 7, 8 };
         }
         public partial class ItemsPanel : AkburaControl
         {
             public ItemsPanel() : base(AkburaEngine.Empty) { }
+        }
+        public sealed class LegacyNumbersExtension
+        {
+            public System.Collections.ArrayList ProvideValue(System.IServiceProvider services) => new() { 11, 13 };
+        }
+        public sealed class LegacyCollectionModel
+        {
+            public System.Collections.ArrayList LegacyItems { get; } = new();
         }
         """;
 }
@@ -338,10 +575,16 @@ public sealed class CollectionParameterCompilationTests
 public sealed class CollectionParameterTestViewModel : System.ComponentModel.INotifyPropertyChanged
 {
     private IList<int> _items = new ObservableCollection<int>();
+    private ArrayList _legacyItems = new();
     public IList<int> Items
     {
         get => _items;
         set { _items = value; PropertyChanged?.Invoke(this, new(nameof(Items))); }
+    }
+    public ArrayList LegacyItems
+    {
+        get => _legacyItems;
+        set { _legacyItems = value; PropertyChanged?.Invoke(this, new(nameof(LegacyItems))); }
     }
     public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
 }

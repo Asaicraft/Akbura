@@ -71,35 +71,43 @@ internal partial class AkburaSemanticModel
         return text;
     }
 
-    internal MarkupExtensionBindingResult BindMarkupExtensionAttributeValue(MarkupAttributeSyntax markupAttribute, MarkupExtensionSyntax extensionSyntax, Symbols.IPropertySymbol? property)
+    internal MarkupExtensionBindingResult BindMarkupExtensionAttributeValue(
+        MarkupAttributeSyntax markupAttribute,
+        MarkupExtensionSyntax extensionSyntax,
+        Symbols.IPropertySymbol? property,
+        bool assignsCollectionSource = false)
     {
         using var diagnosticsBuilder =
             ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
 
         var allowAvaloniaSpecialResults =
             SupportsAvaloniaSpecialMarkupExtensionResults(property);
+        var targetType = assignsCollectionSource
+            ? Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Object)
+            : property?.Type.Symbol as ITypeSymbol;
 
         var result = BindMarkupExtensionSyntax(
             markupAttribute,
             extensionSyntax,
-            property?.Type.Symbol as ITypeSymbol,
+            targetType,
             diagnosticsBuilder,
             allowAvaloniaSpecialResults);
 
-        if (property?.Type.Symbol is ITypeSymbol targetType &&
+        if (!assignsCollectionSource &&
+            property?.Type.Symbol is ITypeSymbol propertyType &&
             result.Value?.ProvideValueMethod.Symbol
                 is IMethodSymbol provideValueMethod &&
             result.Value.Binding == null &&
             !CanMarkupExtensionResultConvertToTarget(
                 provideValueMethod.ReturnType,
-                targetType,
+                propertyType,
                 allowAvaloniaSpecialResults))
         {
             AddMarkupAttributeCannotConvertDiagnostic(
                 markupAttribute,
                 property,
                 provideValueMethod.ReturnType,
-                targetType,
+                propertyType,
                 diagnosticsBuilder);
         }
 
@@ -4248,6 +4256,14 @@ internal partial class AkburaSemanticModel
             syntax,
             expressionText,
             message);
+    }
+
+    internal static AkburaSemanticDiagnostic CreateMarkupExtensionDiagnostic(
+        AkburaSyntax syntax,
+        string expressionText,
+        string message)
+    {
+        return CreateMarkupExtensionErrorDiagnostic(syntax, expressionText, message);
     }
 
     private static bool IsUpdateDependentMarkupExtension(MarkupExtensionSyntax extensionSyntax)

@@ -13,6 +13,7 @@ internal enum MarkupTargetPropertyKind : byte
     ClrProperty,
     AttachedSetter,
     GeneratedParameter,
+    GeneratedCollectionParameterSource,
 }
 
 internal readonly struct MarkupTargetPropertyPlan
@@ -54,6 +55,19 @@ internal readonly struct MarkupTargetPropertyPlan
 
         return new MarkupTargetPropertyPlan(
             MarkupTargetPropertyKind.GeneratedParameter,
+            targetType,
+            name);
+    }
+
+    public static MarkupTargetPropertyPlan CreateGeneratedCollectionParameterSource(
+        ITypeSymbol targetType,
+        string name)
+    {
+        Debug.Assert(targetType != null);
+        Debug.Assert(!string.IsNullOrEmpty(name));
+
+        return new MarkupTargetPropertyPlan(
+            MarkupTargetPropertyKind.GeneratedCollectionParameterSource,
             targetType,
             name);
     }
@@ -117,6 +131,12 @@ internal readonly ref struct MarkupTargetPropertyWriter
                 _writer.Write(".");
                 WriteGeneratedParameterName(plan.Text!);
                 _writer.Write("Property.AvaloniaProperty");
+                return;
+            case MarkupTargetPropertyKind.GeneratedCollectionParameterSource:
+                _valueWriter.WriteTypeName((ITypeSymbol)plan.Symbol!);
+                _writer.Write(".");
+                WriteGeneratedParameterName(plan.Text!);
+                _writer.Write("Property.SourceProperty");
                 return;
             case MarkupTargetPropertyKind.Expression:
                 _writer.Write(plan.Text!);

@@ -144,6 +144,13 @@ internal readonly ref struct ComponentHotReloadWriter
             WriteDescriptorName(parameter.Name);
             _writer.WriteLine(".AvaloniaProperty),");
             _writer.CurrentIndent -= _writer.TabSize;
+            if (parameter.Kind == ComponentParameterKind.Collection && parameter.Collection.ObservesChanges)
+            {
+                WriteRegistrationStart(parameter.HotReloadKey + ":source");
+                WriteDescriptorName(parameter.Name);
+                _writer.WriteLine(".SourceProperty),");
+                _writer.CurrentIndent -= _writer.TabSize;
+            }
         }
     }
 
@@ -235,8 +242,14 @@ internal readonly ref struct ComponentHotReloadWriter
     {
         for (var i = 0; i < plan.Parameters.Length; i++)
         {
-            _writer.WriteStringLiteral(plan.Parameters.ItemRef(i).HotReloadKey);
+            ref readonly var parameter = ref plan.Parameters.ItemRef(i);
+            _writer.WriteStringLiteral(parameter.HotReloadKey);
             _writer.WriteLine(",");
+            if (parameter.Kind == ComponentParameterKind.Collection && parameter.Collection.ObservesChanges)
+            {
+                _writer.WriteStringLiteral(parameter.HotReloadKey + ":source");
+                _writer.WriteLine(",");
+            }
         }
 
         for (var i = 0; i < plan.Services.Length; i++)

@@ -15,6 +15,15 @@ internal readonly ref partial struct ParameterWriter
         _writer.Write(">");
     }
 
+    private void WriteCollectionSourceGetterName(in ComponentParameterPlan plan) =>
+        _writer.Write("__GetCollectionSource_").Write(plan.GeneratedName);
+
+    private void WriteCollectionSourceSetterName(in ComponentParameterPlan plan) =>
+        _writer.Write("__SetCollectionSource_").Write(plan.GeneratedName);
+
+    private void WriteCollectionSourceRefresherName(in ComponentParameterPlan plan) =>
+        _writer.Write("__RefreshCollectionSource_").Write(plan.GeneratedName);
+
     private void WriteCollectionBindingMembers(in ComponentParameterPlan plan)
     {
         _writer.Write("private ");
@@ -57,6 +66,32 @@ internal readonly ref partial struct ParameterWriter
         _writer.WriteLine("return __binding;");
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");
+        _writer.WriteLine();
+        _writer.WriteHiddenApiAttributes();
+        _writer.Write("private object? ");
+        WriteCollectionSourceGetterName(plan);
+        _writer.Write("() => ");
+        WriteCollectionBindingName(plan, getter: true);
+        _writer.WriteLine("().Source;");
+        _writer.WriteLine();
+        _writer.WriteHiddenApiAttributes();
+        _writer.Write("private void ");
+        WriteCollectionSourceSetterName(plan);
+        _writer.WriteLine("(object? __source)");
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.Write("ApplyCollectionParameterSource(");
+        WriteCollectionBindingName(plan, getter: true);
+        _writer.WriteLine("(), __source);");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
+        _writer.WriteLine();
+        _writer.WriteHiddenApiAttributes();
+        _writer.Write("private void ");
+        WriteCollectionSourceRefresherName(plan);
+        _writer.Write("() => ");
+        WriteCollectionBindingName(plan, getter: true);
+        _writer.WriteLine("().Refresh();");
     }
 
     private void WriteObservableCollectionProperty(in ComponentParameterPlan plan)

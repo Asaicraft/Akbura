@@ -21,6 +21,14 @@ Language support for `.akbura` and `.akcss` files in Visual Studio.
 The extension keeps its stable VSIX identity so installed copies receive future
 updates from the same Marketplace listing.
 
+## What's new in 12.0.4.6
+
+- Added completion for state hooks and improved declaration-name completion.
+- Preserved valid completion candidates while semantic snapshots update.
+- Fixed markup type discovery and sibling project-reference resolution.
+- Added support for non-generic collection parameter sources.
+- Fixed automatic closing of braces when an opening brace is typed on a new line.
+
 ## What's new in 12.0.4.5
 
 - Stabilized `${Binding ...}` completion while semantic snapshots lag behind typing.

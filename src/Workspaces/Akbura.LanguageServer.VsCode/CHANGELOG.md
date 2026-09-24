@@ -1,5 +1,12 @@
 # Change Log
 
+## 12.0.7
+
+- Added completion for state hooks and improved declaration-name completion.
+- Preserved valid completion candidates while Visual Studio semantic snapshots update.
+- Fixed markup type discovery and sibling project-reference resolution.
+- Added support for non-generic collection parameter sources.
+
 ## 12.0.6
 
 - Stabilized `${Binding ...}` completion while semantic snapshots lag behind typing.

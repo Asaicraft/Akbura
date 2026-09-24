@@ -22,7 +22,7 @@ updating MVVM examples.
 | Package family | Version at the baseline | Rule |
 | --- | --- | --- |
 | Avalonia packages | `12.0.4` | Use one compatible `AvaloniaVersion`; do not take a newer upstream value without validating Akbura. |
-| Akbura and Akbura.Diagnostics | `12.0.4-alpha.9` | Use one `AkburaVersion`, stamped from the local CI package or release tag. |
+| Akbura and Akbura.Diagnostics | `12.0.4-alpha.10` | Use one `AkburaVersion`, stamped from the local CI package or release tag. |
 | CommunityToolkit.Mvvm | `8.4.2` | Direct dependency of the ViewModels producer in CommunityToolkit variants; its generators run before the UI project compiles. |
 | ReactiveUI.Avalonia | `12.0.3` | UI-project dependency in ReactiveUI variants. |
 | ReactiveUI | `23.2.28` | Direct dependency of the ViewModels producer in ReactiveUI variants. |

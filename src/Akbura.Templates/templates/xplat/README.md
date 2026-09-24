@@ -17,7 +17,7 @@ The composition root owns one `MainViewModel` and assigns it to both the shell's
 | `--cpm` / `-cpm` | `true` | `true`, `false` |
 | `--remove-view-locator` / `-rvl` | `false` | `true`, `false` |
 | `--avalonia-version` / `-av` | `12.0.4` | compatible Avalonia version |
-| `--akbura-version` / `-akv` | `12.0.4-alpha.9` | compatible Akbura version |
+| `--akbura-version` / `-akv` | `12.0.4-alpha.10` | compatible Akbura version |
 
 For `TabbedPage`, the shell declares `using PageList = Avalonia.Collections.AvaloniaList<Avalonia.Controls.Page>;`. This alias supplies one concrete mutable `AvaloniaList<Page>` value to the native `IEnumerable<Page>` property; its children are real `ContentPage` objects, not generated wrapper controls or a custom `PageList` type.
 

@@ -109,7 +109,7 @@ dotnet new akbura.xplat -n DemoMobile `
 | `-page`, `--main-view-page-type` | `None`, `ContentPage`, `TabbedPage`, `DrawerPage`, `NavigationPage` | Not available | `None` |
 
 At the recorded source baseline, the defaults were Avalonia `12.0.4` and
-Akbura `12.0.4-alpha.9`. Release automation stamps all application templates
+Akbura `12.0.4-alpha.10`. Release automation stamps all application templates
 with the versions actually packed. Inspect `dotnet new akbura.mvvm --help` or
 `dotnet new akbura.xplat --help` for defaults of the installed package.
 

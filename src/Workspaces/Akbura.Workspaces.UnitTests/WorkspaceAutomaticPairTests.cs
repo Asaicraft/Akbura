@@ -8,6 +8,7 @@ public sealed class WorkspaceAutomaticPairTests
     [InlineData("|", '<', ">", "MarkupText")]
     [InlineData("<StackPanel>\n    |\n</StackPanel>", '<', ">", "MarkupText")]
     [InlineData("<StackPanel>\n    |\n</StackPanel>", '{', "}", "MarkupText")]
+    [InlineData("<StackPanel>\r\n        |\r\n</StackPanel>", '{', "}", "MarkupText")]
     [InlineData("<Button Content=|/>", '"', "\"", "MarkupStartTag")]
     [InlineData("<Button Content=|/>", '{', "}", "MarkupStartTag")]
     [InlineData("<Button Content=$|/>", '{', "}", "MarkupExtension")]

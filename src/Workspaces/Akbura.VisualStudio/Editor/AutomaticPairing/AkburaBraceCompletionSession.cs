@@ -24,9 +24,12 @@ internal sealed class AkburaBraceCompletionSession :
         SubjectBuffer = openingPoint.Snapshot.TextBuffer;
         OpeningBrace = openingBrace;
         ClosingBrace = closingBrace;
+        // Visual Studio may insert a newline, indentation, and the opening brace
+        // in one edit after creating the session. Track to the end of that edit
+        // so Start() resolves the opening brace immediately before this point.
         _openingPoint = openingPoint.Snapshot.CreateTrackingPoint(
             openingPoint.Position,
-            PointTrackingMode.Negative);
+            PointTrackingMode.Positive);
         _closingPoint = openingPoint.Snapshot.CreateTrackingPoint(
             openingPoint.Position,
             PointTrackingMode.Positive);

@@ -261,57 +261,102 @@ Akbura									</span>
 
 				<div class="content">
 					<h1 id="commands">Commands<a class="header-anchor" href="javascript:;" onclick="location.hash='#commands'" aria-label="Permalink">&ZeroWidthSpace;</a></h1>
-<p>Akbura commands are typed operations declared by a child component and supplied by its parent. The generated command object exposes asynchronous execution together with observable execution state. Implementing a custom command class is not required.</p>
-<h2 id="declare-and-supply-a-command">Declare and supply a command<a class="header-anchor" href="javascript:;" onclick="location.hash='#declare-and-supply-a-command'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>The child declares the contract and invokes it:</p>
-<pre><code class="language-akbura">using Avalonia.Controls;
+<p>Akbura commands are typed operations declared by a component and supplied by its parent. They can also be invoked from ordinary Avalonia <code>ICommand</code> properties without writing a command class or calling a factory in markup.</p>
+<h2 id="declare-a-command-contract">Declare a command contract<a class="header-anchor" href="javascript:;" onclick="location.hash='#declare-a-command-contract'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>This complete child component declares the operation that its parent must supply. The inline handler assigned to <code>Button.Command</code> is adapted to <code>ICommand</code> and runs only when Avalonia executes the button command:</p>
+<pre><code class="language-akbura">using System.Collections.Generic;
+using Avalonia.Controls;
+using Avalonia.Media;
 
 namespace Demo;
 
+param bool IsActive = false;
+param IList&lt;StreamGeometry&gt; Geometries;
 command void NavigateTo(NavButton button);
 
-&lt;Button Command={NavigateTo}&gt;
+&lt;Button Command={async () =&gt; await NavigateTo.Execute(this)}&gt;
     Navigate
 &lt;/Button&gt;
 </code></pre>
-<p>The parent supplies a handler through the native <code>NavigateTo</code> command attribute:</p>
+<p><code>this</code> is the current <code>Demo.NavButton</code>. It is not the inner <code>Button</code> or a temporary compiler object.</p>
+<p>The parent supplies the declared command handlers:</p>
 <pre><code class="language-akbura">using System;
+using System.Threading.Tasks;
 using Avalonia.Controls;
+using Avalonia.Media;
 
 namespace Demo;
 
 &lt;StackPanel&gt;
-    &lt;NavButton NavigateTo={button =&gt; button.IsActive = true} /&gt;
-    &lt;NavButton NavigateTo={() =&gt; Console.WriteLine(&quot;Navigate&quot;)} /&gt;
-    &lt;NavButton NavigateTo={async button =&gt; {
-        await LoadPageAsync(button);
-    }‎} /&gt;
+    &lt;NavButton
+        Geometries={Array.Empty&lt;StreamGeometry&gt;()}
+        NavigateTo={button =&gt; {
+            button.IsActive = true;
+        }‎} /&gt;
+
+    &lt;NavButton
+        Geometries={Array.Empty&lt;StreamGeometry&gt;()}
+        NavigateTo={() =&gt; {
+            Console.WriteLine(&quot;Navigate without using the argument&quot;);
+        }‎} /&gt;
+
+    &lt;NavButton
+        Geometries={Array.Empty&lt;StreamGeometry&gt;()}
+        NavigateTo={async button =&gt; {
+            await Task.Yield();
+            button.IsActive = true;
+        }‎} /&gt;
 &lt;/StackPanel&gt;
 </code></pre>
-<p>A zero-argument lambda may intentionally ignore the declared command arguments. Akbura adapts compatible synchronous and asynchronous handlers to the generated command property.</p>
-<h2 id="handler-forms">Handler forms<a class="header-anchor" href="javascript:;" onclick="location.hash='#handler-forms'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Native command attributes accept compatible lambdas, method groups, typed delegate values, <code>Task</code>/<code>ValueTask</code> handlers, and compatible <code>IAkburaCommand</code> instances:</p>
-<pre><code class="language-akbura">using System;
-using System.Threading.Tasks;
-
-Func&lt;NavButton, Task&gt; navigateAsync = NavigateAsync;
-Func&lt;NavButton, ValueTask&gt; navigateValueTask = NavigateValueAsync;
-
-&lt;StackPanel&gt;
-    &lt;NavButton NavigateTo={NavigateAsync} /&gt;
-    &lt;NavButton NavigateTo={navigateAsync} /&gt;
-    &lt;NavButton NavigateTo={navigateValueTask} /&gt;
+<p>A zero-argument lambda may intentionally ignore the declared command arguments. Native command attributes also accept compatible method groups, typed delegates, <code>Task</code>/<code>ValueTask</code> handlers, and compatible <code>IAkburaCommand</code> instances.</p>
+<h2 id="adapt-a-handler-to-an-ordinary-icommand-property">Adapt a handler to an ordinary ICommand property<a class="header-anchor" href="javascript:;" onclick="location.hash='#adapt-a-handler-to-an-ordinary-icommand-property'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Any supported writable property whose exact contract is <code>System.Windows.Input.ICommand</code> or <code>ICommand?</code> can receive a callable:</p>
+<pre><code class="language-akbura">&lt;StackPanel&gt;
+    &lt;Button Command={() =&gt; Save()}&gt;Save&lt;/Button&gt;
+    &lt;Button Command={Save}&gt;Save with a method group&lt;/Button&gt;
+    &lt;Button Command={async () =&gt; await SaveAsync()}&gt;Save asynchronously&lt;/Button&gt;
+    &lt;Button Command={(Document document) =&gt; Open(document)}
+            CommandParameter={selectedDocument}&gt;
+        Open
+    &lt;/Button&gt;
 &lt;/StackPanel&gt;
 </code></pre>
-<p>Passing an existing compatible <code>IAkburaCommand</code> preserves its identity. A native typed command attribute is different from an arbitrary Avalonia <code>ICommand</code> property: do not assume that every <code>ICommand</code> preserves the declared argument and result contract.</p>
-<h2 id="execute-and-return-values">Execute and return values<a class="header-anchor" href="javascript:;" onclick="location.hash='#execute-and-return-values'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Commands execute through an awaitable <code>Execute</code> method:</p>
+<p>This works for Avalonia properties, CLR properties, and Akbura component parameters. It is based on the property type, not on the name <code>Command</code> or on <code>Button</code>.</p>
+<p>Supported callables have zero or one parameter and include <code>Action</code>, <code>Func&lt;T&gt;</code>, <code>Func&lt;Task&gt;</code>, <code>Func&lt;Task&lt;T&gt;&gt;</code>, <code>Func&lt;ValueTask&gt;</code>, <code>Func&lt;ValueTask&lt;T&gt;&gt;</code>, their one-parameter forms, compatible method groups, lambdas, and anonymous methods. A result is evaluated when the command runs. At the ordinary <code>ICommand</code> boundary Akbura awaits one <code>Task</code> or <code>ValueTask</code> layer and discards the logical result.</p>
+<p>An invocation that already produces a value is not reinterpreted as a delayed handler. For example, <code>Command={GetExistingCommand()}</code> evaluates the factory during property assignment, while <code>Command={SaveAsync()}</code> remains a type error. Use <code>Command={SaveAsync}</code> or <code>Command={() =&gt; SaveAsync()}</code> for a delayed async handler.</p>
+<p>Properties with a more specific contract, such as a concrete <code>MyCommand</code> or an <code>IMyCommand : ICommand</code> interface with additional members, are not adapted unless the assigned value already has a normal supported conversion to that type.</p>
+<h2 id="command-parameters">Command parameters<a class="header-anchor" href="javascript:;" onclick="location.hash='#command-parameters'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>A parameterless handler ignores <code>CommandParameter</code>, including <code>null</code>. One implicitly typed parameter is <code>object?</code>:</p>
+<pre><code class="language-akbura">&lt;Button Command={parameter =&gt; Log(parameter)}
+        CommandParameter={currentValue} /&gt;
+</code></pre>
+<p>An explicit parameter or a typed delegate selects <code>T</code>:</p>
+<pre><code class="language-akbura">&lt;Button Command={(NavButton button) =&gt; Select(button)}
+        CommandParameter={this} /&gt;
+</code></pre>
+<p><code>CanExecute(parameter)</code> returns <code>false</code> when the value is incompatible with <code>T</code>. Calling <code>Execute</code> directly with an incompatible value throws <code>ArgumentException</code> without invoking the handler. <code>null</code> is accepted for reference types and <code>Nullable&lt;T&gt;</code>, but not for a non-nullable value type. Akbura does not parse strings, use <code>Convert.ChangeType</code>, or dynamically invoke the handler. An <code>object[]</code> command parameter is one value; it is not expanded into multiple arguments.</p>
+<h2 id="pass-a-ready-command-directly">Pass a ready command directly<a class="header-anchor" href="javascript:;" onclick="location.hash='#pass-a-ready-command-directly'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Values already assignable to <code>ICommand</code> keep their identity and behavior:</p>
+<pre><code class="language-akbura">&lt;StackPanel&gt;
+    &lt;Button Command={viewModel.SaveCommand} /&gt;
+    &lt;Button Command={GetExistingCommand()} /&gt;
+    &lt;Button Command=${Binding SaveCommand} /&gt;
+    &lt;Button Command={null} /&gt;
+&lt;/StackPanel&gt;
+</code></pre>
+<p>An Akbura command can also be passed directly:</p>
+<pre><code class="language-akbura">&lt;Button Command={NavigateTo} CommandParameter={this}&gt;
+    Navigate
+&lt;/Button&gt;
+</code></pre>
+<p>In this form <code>ReferenceEquals(button.Command, NavigateTo)</code> is true. The <code>CommandParameter</code> is passed to the declared command's typed runtime bridge.</p>
+<p>Use the inline adapter when you need to compose behavior, for example <code>async () =&gt; await NavigateTo.Execute(this)</code>. Use direct assignment when the existing command's identity, subscriptions, and business <code>CanExecute</code> behavior must be preserved.</p>
+<h2 id="execute-and-logical-results">Execute and logical results<a class="header-anchor" href="javascript:;" onclick="location.hash='#execute-and-logical-results'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Declared commands expose an awaitable <code>Execute</code> method:</p>
 <pre><code class="language-akbura">command int Calculate(int value);
 
 var result = await Calculate.Execute(42);
 </code></pre>
-<p>Commands with one or more arguments expose a typed runtime interface. A parameterless command currently uses the non-generic <code>IAkburaCommand</code> interface, whose <code>Execute(params object[] args)</code> returns <code>ValueTask&lt;object?&gt;</code>. Cast or pattern-match its result when a parameterless command declares a logical result.</p>
-<h2 id="async-handlers-and-logical-results">Async handlers and logical results<a class="header-anchor" href="javascript:;" onclick="location.hash='#async-handlers-and-logical-results'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>Declare the logical result, not the handler's transport type:</p>
 <pre><code class="language-akbura">command UserViewModel Load(int id);
 
@@ -319,26 +364,21 @@ var result = await Calculate.Execute(42);
     return await repository.LoadAsync(id);
 }‎} /&gt;
 </code></pre>
-<p>The command already executes asynchronously. <code>command Task&lt;UserViewModel&gt; Load(int id);</code> therefore means that the <code>Task&lt;UserViewModel&gt;</code> itself is the logical value. Akbura reports an informational diagnostic for outer <code>Task</code>, <code>Task&lt;T&gt;</code>, <code>ValueTask</code>, and <code>ValueTask&lt;T&gt;</code> result types and suggests <code>void</code> or <code>T</code>. The original task-as-result behavior remains valid when intentional.</p>
+<p><code>command Task&lt;UserViewModel&gt; Load(int id);</code> means that the <code>Task&lt;UserViewModel&gt;</code> itself is the logical value. Akbura reports an informational diagnostic for outer <code>Task</code>, <code>Task&lt;T&gt;</code>, <code>ValueTask</code>, and <code>ValueTask&lt;T&gt;</code> result types and suggests <code>void</code> or <code>T</code>; the task-as-result contract remains valid when intentional.</p>
+<p>Commands with one or more arguments expose a typed runtime interface. A parameterless command currently uses the non-generic <code>IAkburaCommand</code> interface, whose <code>Execute(params object[] args)</code> returns <code>ValueTask&lt;object?&gt;</code>.</p>
 <h2 id="execution-state">Execution state<a class="header-anchor" href="javascript:;" onclick="location.hash='#execution-state'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Every command exposes:</p>
+<p>A declared Akbura command exposes:</p>
 <ul>
-<li><code>IObservable&lt;bool&gt; IsExecuting</code>, which reports whether one or more executions are running;</li>
-<li><code>IObservable&lt;bool&gt; CanExecute</code>, which reports current availability;</li>
-<li><code>Execute</code>, which runs the handler asynchronously.</li>
+<li><code>IObservable&lt;bool&gt; IsExecuting</code>;</li>
+<li><code>IObservable&lt;bool&gt; CanExecute</code>;</li>
+<li>an awaitable <code>Execute</code> method.</li>
 </ul>
-<p>Subscribe with an <code>IObserver&lt;bool&gt;</code> and dispose the returned subscription when its owner is disposed. Factory-created commands initially report <code>false</code> for <code>IsExecuting</code> and <code>true</code> for <code>CanExecute</code>. Their running state changes only on the execution-count transitions from zero to one and from one to zero.</p>
-<p>A direct <code>Execute</code> call is not rejected merely because <code>CanExecute</code> currently reports <code>false</code>; concurrent executions are counted. Handler exceptions flow through the awaited result, and state is restored in <code>finally</code>. The factory does not promise queuing, mutual exclusion, automatic cancellation, or exception swallowing.</p>
-<h2 id="command-targets">Command targets<a class="header-anchor" href="javascript:;" onclick="location.hash='#command-targets'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Keep these targets separate:</p>
-<ul>
-<li><code>NavigateTo={...}</code> on an Akbura component supplies a native declared command handler;</li>
-<li>Avalonia <code>Button.Command</code> is an ordinary <code>ICommand</code> property;</li>
-<li><code>Button.Click={...}</code> binds a routed event handler.</li>
-</ul>
-<p>Use the form required by the target property. Native command handler adaptation does not redefine every Avalonia <code>ICommand</code> property or routed event.</p>
+<p>The compiler-owned adapter used for an ordinary <code>ICommand</code> property exposes the standard <code>ICommand.CanExecute</code> and <code>CanExecuteChanged</code> contract. It reports <code>false</code> while one or more executions are running and returns to <code>true</code> after completion. A retained control keeps the same adapter during rerender and Hot Reload, including its busy state; future executions use the latest captured handler, while an operation already in progress keeps the callback with which it started.</p>
+<p>The inline adapter has its own execution availability. It does not automatically inherit a business <code>CanExecute</code> policy from code called inside the lambda. Directly assign the ready command when that policy must be preserved.</p>
+<p>Neither command path promises a queue, mutual exclusion, automatic cancellation, background execution, or exception swallowing. A direct awaited <code>IAkburaCommand.Execute</code> exposes exceptions to its caller. The ordinary <code>ICommand.Execute</code> entry point follows the platform's void command invocation model.</p>
 <h2 id="ide-support">IDE support<a class="header-anchor" href="javascript:;" onclick="location.hash='#ide-support'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Typing <code>NavigateTo.</code> offers <code>Execute</code>, <code>CanExecute</code>, and <code>IsExecuting</code>. Completion resolve and signature help display the actual generated runtime signature. Hover on <code>NavigateTo</code> displays the source declaration, for example <code>command void NavigateTo(NavButton button)</code>, and navigation returns to that declaration rather than to a temporary C# probe.</p>
+<p>Typing <code>NavigateTo.</code> offers <code>Execute</code>, <code>CanExecute</code>, and <code>IsExecuting</code>. Completion inside a parent native handler uses the declared command parameter type. Inside an ordinary <code>ICommand</code> handler, an implicit parameter is <code>object?</code>; an explicitly typed parameter uses that type.</p>
+<p>Completion resolve and signature help display the generated runtime signature. Hover on <code>NavigateTo</code> displays the source declaration, and navigation returns to that declaration rather than to a temporary C# probe.</p>
 
 				</div>
 
@@ -383,33 +423,33 @@ var result = await Calculate.Execute(42);
 							</h5>
 							<ul class="text-slate-700 text-sm leading-6">
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#declare-and-supply-a-command'" data-id="declare-and-supply-a-command" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Declare and supply a command
+										<span v-hash="'#declare-a-command-contract'" data-id="declare-a-command-contract" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Declare a command contract
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#handler-forms'" data-id="handler-forms" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Handler forms
+										<span v-hash="'#adapt-a-handler-to-an-ordinary-icommand-property'" data-id="adapt-a-handler-to-an-ordinary-icommand-property" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Adapt a handler to an ordinary ICommand property
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#execute-and-return-values'" data-id="execute-and-return-values" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Execute and return values
+										<span v-hash="'#command-parameters'" data-id="command-parameters" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Command parameters
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#async-handlers-and-logical-results'" data-id="async-handlers-and-logical-results" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Async handlers and logical results
+										<span v-hash="'#pass-a-ready-command-directly'" data-id="pass-a-ready-command-directly" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Pass a ready command directly
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#execute-and-logical-results'" data-id="execute-and-logical-results" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Execute and logical results
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
 										<span v-hash="'#execution-state'" data-id="execution-state" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
 											Execution state
-										</span>
-									</li>
-									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#command-targets'" data-id="command-targets" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Command targets
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">

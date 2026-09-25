@@ -978,14 +978,16 @@ contract.</p>
 <p>See <a href="/akbura/hooks">Composable Hooks</a> for derived state, refs, timers, throttle,
 async loading, external subscriptions and reducers built from these primitives.</p>
 <h2 id="commands">Commands<a class="header-anchor" href="javascript:;" onclick="location.hash='#commands'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Commands let a child declare a typed operation while its parent supplies a lambda, delegate, method group, or compatible command:</p>
+<p>Commands let a child declare a typed operation while its parent supplies a lambda, delegate, method group, or compatible command. The child can adapt a callable directly to an ordinary Avalonia <code>ICommand</code> property:</p>
 <pre><code class="language-akbura">// NavButton.akbura
 command void NavigateTo(NavButton button);
 
-// Parent markup
-&lt;NavButton NavigateTo={button =&gt; button.IsActive = true} /&gt;
+&lt;Button Command={async () =&gt; await NavigateTo.Execute(this)}&gt;
+    Navigate
+&lt;/Button&gt;
 </code></pre>
-<p>Command facades provide awaitable <code>Execute</code> plus observable <code>CanExecute</code> and <code>IsExecuting</code> state. See <a href="/akbura/commands">Commands</a> for results, async handlers, method groups, execution state, IDE support, and the difference between native commands, <code>Button.Command</code>, and routed events.</p>
+<p>The parent supplies the contract with <code>&lt;NavButton NavigateTo={button =&gt; button.IsActive = true} /&gt;</code>. A ready command can instead use <code>Command={NavigateTo} CommandParameter={this}</code> and keeps its identity.</p>
+<p>Command facades provide awaitable <code>Execute</code> plus observable <code>CanExecute</code> and <code>IsExecuting</code> state. Ordinary <code>ICommand</code> adapters support zero- or one-parameter synchronous, <code>Task</code>, and <code>ValueTask</code> handlers. See <a href="/akbura/commands">Commands</a> for parameter validation, discarded <code>ICommand</code> results, execution state, IDE support, and direct ready-command assignment.</p>
 <h2 id="akcss">AKCSS<a class="header-anchor" href="javascript:;" onclick="location.hash='#akcss'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>AKCSS is Akbura's typed styling language:</p>
 <pre><code class="language-akbura">@akcss {

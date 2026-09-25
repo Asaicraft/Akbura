@@ -248,7 +248,7 @@ Akbura									</span>
 									</a>
 								</li>
 								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/#commands" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+									<a href="https://asaicraft.github.io/Akbura/akbura/commands" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
 										Commands
 									</a>
 								</li>
@@ -978,17 +978,14 @@ contract.</p>
 <p>See <a href="/akbura/hooks">Composable Hooks</a> for derived state, refs, timers, throttle,
 async loading, external subscriptions and reducers built from these primitives.</p>
 <h2 id="commands">Commands<a class="header-anchor" href="javascript:;" onclick="location.hash='#commands'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Commands expose typed operations with reactive execution state:</p>
-<pre><code class="language-akbura">command int Refresh(int userId);
+<p>Commands let a child declare a typed operation while its parent supplies a lambda, delegate, method group, or compatible command:</p>
+<pre><code class="language-akbura">// NavButton.akbura
+command void NavigateTo(NavButton button);
 
-&lt;Button Click={async () =&gt; {
-    var result = await Refresh.Execute(42);
-    Console.WriteLine(result);
-}‎}&gt;
-    Refresh
-&lt;/Button&gt;
+// Parent markup
+&lt;NavButton NavigateTo={button =&gt; button.IsActive = true} /&gt;
 </code></pre>
-<p>Command facades provide <code>Execute</code>, <code>CanExecute</code>, and <code>IsExecuting</code>.</p>
+<p>Command facades provide awaitable <code>Execute</code> plus observable <code>CanExecute</code> and <code>IsExecuting</code> state. See <a href="/akbura/commands">Commands</a> for results, async handlers, method groups, execution state, IDE support, and the difference between native commands, <code>Button.Command</code>, and routed events.</p>
 <h2 id="akcss">AKCSS<a class="header-anchor" href="javascript:;" onclick="location.hash='#akcss'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>AKCSS is Akbura's typed styling language:</p>
 <pre><code class="language-akbura">@akcss {

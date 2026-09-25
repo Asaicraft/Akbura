@@ -18,7 +18,7 @@ Language
  - [Markup Extensions](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
  - [Effects and Hooks](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
  - [Composable Hooks](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/hooks.md)
- - [Commands](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
+ - [Commands](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/commands.md): commands.md
  - [AKCSS](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
 
 Project
@@ -28,6 +28,7 @@ Project
 
 Akbura
  - [Composable Hooks](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/hooks.md)
+ - [Commands](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/commands.md): commands.md
  - [Using Components in AXAML](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/axaml-integration.md): Using Akbura Components in AXAML
  - [Editor Completion](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/editor-completion.md)
  - [XML, XAML and AXAML differences](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/xml-xaml-axaml.md): Differences between XML, XAML and AXAML

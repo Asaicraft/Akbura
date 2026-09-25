@@ -50,6 +50,58 @@ Install Akbura into an existing Avalonia project:
 dotnet add package Akbura --version 12.0.4-alpha.10
 :::
 
+Then add `.UseAkbura()` to the existing `AppBuilder` chain in `Program.cs`,
+before starting the application:
+
+```csharp
+using Akbura.Engine;
+using Avalonia;
+
+public static AppBuilder BuildAvaloniaApp()
+    => AppBuilder.Configure<App>()
+        .UsePlatformDetect()
+        .UseAkbura();
+```
+
+Keep the other configuration calls your application already uses.
+`UseAkbura` initializes the shared Akbura engine after Avalonia's platform
+services are set up. Call it once in the application builder chain.
+
+The parameterless overload uses the default settings with no service providers.
+To configure the engine, use
+`UseAkbura(Action<AkburaEngineExtensions.AkburaEngineBuilder> withAkburaEngineBuilder)`.
+The callback receives a builder with the following options:
+
+| Method | Parameter and behavior |
+| --- | --- |
+| `WithMaxUpdatesPerBatch(int maxUpdatesPerBatch)` | Limits the consecutive update passes one component can run in a single synchronous batch, protecting against infinite update loops. Defaults to `100` (`AkburaEngine.DefaultMaxUpdatesPerBatch`). Values below `1` throw `ArgumentOutOfRangeException`. |
+| `WithServiceProvider(IServiceProvider serviceProvider)` | Adds a standard .NET service provider for component `inject` declarations. |
+| `WithServiceProvider(IAkburaServiceProvider serviceProvider)` | Adds a custom Akbura service provider that can use contextual injection information. |
+| `WithServiceProviders<T>(T serviceProviders)` | Adds multiple standard .NET service providers, where `T` implements `IEnumerable<IServiceProvider>`. |
+| `WithServiceProviders(ReadOnlySpan<IServiceProvider> serviceProviders)` | Adds a span of standard .NET service providers. |
+| `WithServiceProviders(ReadOnlySpan<IAkburaServiceProvider> serviceProviders)` | Adds a span of custom Akbura service providers. |
+
+For example, if `services` is your application's existing `IServiceProvider`,
+configure it together with an update limit:
+
+```csharp
+AppBuilder.Configure<App>()
+    .UsePlatformDetect()
+    .UseAkbura(akbura =>
+    {
+        akbura
+            .WithServiceProvider(services)
+            .WithMaxUpdatesPerBatch(200);
+    });
+```
+
+These configuration methods return the builder for chaining. `UseAkbura` calls
+`Build()` automatically after the callback. Providers are queried in registration
+order; standard .NET providers continue to the next provider when they return
+`null`, while custom Akbura providers must explicitly forward to `NextProvider`.
+See [Dependency Injection](/akbura/dependency-injection) for service registration,
+lifetimes, and custom providers.
+
 If the template package is installed, create a component from the project
 directory:
 

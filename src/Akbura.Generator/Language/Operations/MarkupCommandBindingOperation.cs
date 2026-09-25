@@ -13,7 +13,7 @@ internal sealed class MarkupCommandBindingOperation : IMarkupCommandBindingOpera
         MarkupAttributeSyntax syntax,
         IMarkupComponentSymbol? containingComponent,
         IPropertySymbol property,
-        ICommandSymbol command,
+        ICommandSymbol? command,
         MarkupAttributeBindingKind bindingKind,
         MarkupAttributeValueKind valueKind,
         MarkupAttributeValueSyntax? valueSyntax,
@@ -27,12 +27,22 @@ internal sealed class MarkupCommandBindingOperation : IMarkupCommandBindingOpera
         CSharpSymbolDefinition handlerResultType,
         CSharpOperationDefinition handlerOperation,
         bool hasErrors,
-        ICSharpOperation? handlerOperationTree = null)
+        ICSharpOperation? handlerOperationTree = null,
+        MarkupCommandTargetKind targetKind = MarkupCommandTargetKind.DeclaredCommand,
+        ImmutableArray<CSharpSymbolDefinition> parameterTypes = default,
+        CSharpSymbolDefinition returnType = default,
+        CSharpSymbolDefinition resultType = default)
     {
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
         ContainingComponent = containingComponent;
         Property = property ?? throw new ArgumentNullException(nameof(property));
-        Command = command ?? throw new ArgumentNullException(nameof(command));
+        Command = command;
+        TargetKind = targetKind;
+        ParameterTypes = parameterTypes.IsDefault
+            ? command?.Parameters.Select(static parameter => parameter.Type).ToImmutableArray() ?? []
+            : parameterTypes;
+        ReturnType = returnType.IsDefault && command != null ? command.ReturnType : returnType;
+        ResultType = resultType.IsDefault && command != null ? command.ResultType : resultType;
         BindingKind = bindingKind;
         ValueKind = valueKind;
         ValueSyntax = valueSyntax;
@@ -65,9 +75,9 @@ internal sealed class MarkupCommandBindingOperation : IMarkupCommandBindingOpera
 
     public ImmutableArray<IOperation> Children { get; }
 
-    public ISymbol? TargetSymbol => Command;
+    public ISymbol? TargetSymbol => Command is not null ? Command : Property;
 
-    public ISymbol? TypeSymbol => Command;
+    public ISymbol? TypeSymbol => Command is not null ? Command : Property;
 
     public CSharpOperationDefinition CSharpDefinition => HandlerOperation;
 
@@ -81,13 +91,17 @@ internal sealed class MarkupCommandBindingOperation : IMarkupCommandBindingOpera
 
     public IPropertySymbol Property { get; }
 
-    public ICommandSymbol Command { get; }
+    public ICommandSymbol? Command { get; }
 
-    public ImmutableArray<ICommandParameterSymbol> Parameters => Command.Parameters;
+    public MarkupCommandTargetKind TargetKind { get; }
 
-    public CSharpSymbolDefinition ReturnType => Command.ReturnType;
+    public ImmutableArray<ICommandParameterSymbol> Parameters => Command?.Parameters ?? [];
 
-    public CSharpSymbolDefinition ResultType => Command.ResultType;
+    public ImmutableArray<CSharpSymbolDefinition> ParameterTypes { get; }
+
+    public CSharpSymbolDefinition ReturnType { get; }
+
+    public CSharpSymbolDefinition ResultType { get; }
 
     public MarkupAttributeBindingKind BindingKind { get; }
 
@@ -145,7 +159,7 @@ internal sealed class MarkupCommandBindingOperation : IMarkupCommandBindingOpera
 
     public string ToDisplayString()
     {
-        return $"{Command.Name}={ValueSyntax?.ToFullString() ?? string.Empty}";
+        return $"{Command?.Name ?? Property.Name}={ValueSyntax?.ToFullString() ?? string.Empty}";
     }
 
     public override string ToString()

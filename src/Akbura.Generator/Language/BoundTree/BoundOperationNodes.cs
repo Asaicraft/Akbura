@@ -194,7 +194,7 @@ internal sealed class BoundMarkupCommandBinding : BoundMarkupAttribute
         BinderType binder,
         IMarkupComponentSymbol? containingComponent,
         IPropertySymbol property,
-        ICommandSymbol command,
+        ICommandSymbol? command,
         MarkupAttributeBindingKind bindingKind,
         MarkupAttributeValueKind valueKind,
         MarkupAttributeValueSyntax? valueSyntax,
@@ -208,18 +208,28 @@ internal sealed class BoundMarkupCommandBinding : BoundMarkupAttribute
         CSharpSymbolDefinition handlerResultType,
         CSharpOperationDefinition handlerOperation,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default,
-        bool hasErrors = false)
+        bool hasErrors = false,
+        MarkupCommandTargetKind targetKind = MarkupCommandTargetKind.DeclaredCommand,
+        ImmutableArray<CSharpSymbolDefinition> parameterTypes = default,
+        CSharpSymbolDefinition returnType = default,
+        CSharpSymbolDefinition resultType = default)
         : base(
             BoundKind.MarkupCommandBinding,
             syntax,
             binder,
-            AkburaSymbolInfo.Success(command),
+            AkburaSymbolInfo.Success(command is not null ? command : property),
             containingComponent,
             diagnostics,
             hasErrors: hasErrors)
     {
         Property = property ?? throw new ArgumentNullException(nameof(property));
-        Command = command ?? throw new ArgumentNullException(nameof(command));
+        Command = command;
+        TargetKind = targetKind;
+        ParameterTypes = parameterTypes.IsDefault
+            ? command?.Parameters.Select(static parameter => parameter.Type).ToImmutableArray() ?? []
+            : parameterTypes;
+        ReturnType = returnType.IsDefault && command != null ? command.ReturnType : returnType;
+        ResultType = resultType.IsDefault && command != null ? command.ResultType : resultType;
         BindingKind = bindingKind;
         ValueKind = valueKind;
         ValueSyntax = valueSyntax;
@@ -236,7 +246,15 @@ internal sealed class BoundMarkupCommandBinding : BoundMarkupAttribute
 
     public IPropertySymbol Property { get; }
 
-    public ICommandSymbol Command { get; }
+    public ICommandSymbol? Command { get; }
+
+    public MarkupCommandTargetKind TargetKind { get; }
+
+    public ImmutableArray<CSharpSymbolDefinition> ParameterTypes { get; }
+
+    public CSharpSymbolDefinition ReturnType { get; }
+
+    public CSharpSymbolDefinition ResultType { get; }
 
     public MarkupAttributeBindingKind BindingKind { get; }
 
@@ -265,7 +283,7 @@ internal sealed class BoundMarkupCommandBinding : BoundMarkupAttribute
     public BoundMarkupCommandBinding Update(
         IMarkupComponentSymbol? containingComponent,
         IPropertySymbol property,
-        ICommandSymbol command,
+        ICommandSymbol? command,
         MarkupAttributeBindingKind bindingKind,
         MarkupAttributeValueKind valueKind,
         MarkupAttributeValueSyntax? valueSyntax,
@@ -277,7 +295,11 @@ internal sealed class BoundMarkupCommandBinding : BoundMarkupAttribute
         bool containsAwait,
         CSharpSymbolDefinition handlerType,
         CSharpSymbolDefinition handlerResultType,
-        CSharpOperationDefinition handlerOperation)
+        CSharpOperationDefinition handlerOperation,
+        MarkupCommandTargetKind targetKind,
+        ImmutableArray<CSharpSymbolDefinition> parameterTypes,
+        CSharpSymbolDefinition returnType,
+        CSharpSymbolDefinition resultType)
     {
         if (ReferenceEquals(containingComponent, ContainingComponent) &&
             ReferenceEquals(property, Property) &&
@@ -293,7 +315,11 @@ internal sealed class BoundMarkupCommandBinding : BoundMarkupAttribute
             containsAwait == ContainsAwait &&
             handlerType.Equals(HandlerType) &&
             handlerResultType.Equals(HandlerResultType) &&
-            handlerOperation.Equals(HandlerOperation))
+            handlerOperation.Equals(HandlerOperation) &&
+            targetKind == TargetKind &&
+            parameterTypes.SequenceEqual(ParameterTypes) &&
+            returnType.Equals(ReturnType) &&
+            resultType.Equals(ResultType))
         {
             return this;
         }
@@ -317,7 +343,11 @@ internal sealed class BoundMarkupCommandBinding : BoundMarkupAttribute
             handlerResultType,
             handlerOperation,
             Diagnostics,
-            HasErrors);
+            HasErrors,
+            targetKind,
+            parameterTypes,
+            returnType,
+            resultType);
     }
 
     public override void Accept(BoundTreeVisitor visitor) => visitor.VisitMarkupCommandBinding(this);

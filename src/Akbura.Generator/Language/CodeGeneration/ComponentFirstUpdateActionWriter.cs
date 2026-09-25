@@ -188,7 +188,7 @@ internal readonly ref struct ComponentFirstUpdateActionWriter
         using var mapping = _mappings.WriteStart(plan.Syntax);
         var propertyWriter = new PropertyWriter(_writer);
         var end = propertyWriter.WriteStart(plan.Destination, targetExpression);
-        new ComponentCommandBindingWriter(_writer).WriteValue(plan);
+        new ComponentCommandBindingWriter(_writer).WriteValue(plan, targetExpression);
         propertyWriter.WriteEnd(end);
         _writer.WriteLine();
     }
@@ -268,7 +268,7 @@ internal readonly ref struct ComponentFirstUpdateActionWriter
             ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(
                 plan.Syntax));
         _writer.WriteLine(",");
-        new ComponentCommandBindingWriter(_writer).WriteValue(plan);
+        new ComponentCommandBindingWriter(_writer).WriteValue(plan, targetExpression);
         _writer.WriteLine(");");
         _writer.CurrentIndent -= _writer.TabSize;
         return true;

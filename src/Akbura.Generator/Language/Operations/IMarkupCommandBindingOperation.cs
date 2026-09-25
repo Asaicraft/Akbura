@@ -9,9 +9,13 @@ internal interface IMarkupCommandBindingOperation : IMarkupAttributeOperation
 {
     IPropertySymbol Property { get; }
 
-    ICommandSymbol Command { get; }
+    ICommandSymbol? Command { get; }
+
+    MarkupCommandTargetKind TargetKind { get; }
 
     ImmutableArray<ICommandParameterSymbol> Parameters { get; }
+
+    ImmutableArray<CSharpSymbolDefinition> ParameterTypes { get; }
 
     CSharpSymbolDefinition ReturnType { get; }
 

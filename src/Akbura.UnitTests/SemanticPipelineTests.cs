@@ -1,4 +1,4 @@
-﻿using Akbura.Language;
+using Akbura.Language;
 using Akbura.Language.Binder;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Operations;
@@ -8815,12 +8815,13 @@ public class SemanticPipelineTests
 
         var operation = Assert.IsAssignableFrom<IMarkupCommandBindingOperation>(
             semanticModel.GetOperation(attribute));
+        var command = Assert.IsAssignableFrom<ICommandSymbol>(operation.Command);
 
         Assert.Equal(Akbura.Language.Operations.OperationKind.MarkupCommandBinding, operation.Kind);
-        Assert.Equal("Click", operation.Command.Name);
-        Assert.Same(operation.Command, operation.TargetSymbol);
+        Assert.Equal("Click", command.Name);
+        Assert.Same(command, operation.TargetSymbol);
         Assert.True(operation.Property.IsCommand);
-        Assert.Same(operation.Command, operation.Property.Command);
+        Assert.Same(command, operation.Property.Command);
         Assert.Equal("Int32", operation.ReturnType.Name);
         Assert.Equal("Int32", operation.ResultType.Name);
         Assert.Equal("a", Assert.Single(operation.Parameters).Name);
@@ -9011,12 +9012,13 @@ public class SemanticPipelineTests
 
         var operation = Assert.IsAssignableFrom<IMarkupCommandBindingOperation>(
             semanticModel.GetOperation(attribute));
+        var command = Assert.IsAssignableFrom<ICommandSymbol>(operation.Command);
         var diagnostic = Assert.Single(
             semanticModel.GetSemanticDiagnostics(attribute),
             diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupCommandBindingNotAllowed);
 
         Assert.True(operation.HasErrors);
-        Assert.Equal("Click", operation.Command.Name);
+        Assert.Equal("Click", command.Name);
         Assert.Contains("Click", diagnostic.Message);
     }
 

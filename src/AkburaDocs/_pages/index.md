@@ -587,17 +587,20 @@ async loading, external subscriptions and reducers built from these primitives.
 
 ## Commands
 
-Commands let a child declare a typed operation while its parent supplies a lambda, delegate, method group, or compatible command:
+Commands let a child declare a typed operation while its parent supplies a lambda, delegate, method group, or compatible command. The child can adapt a callable directly to an ordinary Avalonia `ICommand` property:
 
 ```akbura
 // NavButton.akbura
 command void NavigateTo(NavButton button);
 
-// Parent markup
-<NavButton NavigateTo={button => button.IsActive = true} />
+<Button Command={async () => await NavigateTo.Execute(this)}>
+    Navigate
+</Button>
 ```
 
-Command facades provide awaitable `Execute` plus observable `CanExecute` and `IsExecuting` state. See [Commands](/akbura/commands) for results, async handlers, method groups, execution state, IDE support, and the difference between native commands, `Button.Command`, and routed events.
+The parent supplies the contract with `<NavButton NavigateTo={button => button.IsActive = true} />`. A ready command can instead use `Command={NavigateTo} CommandParameter={this}` and keeps its identity.
+
+Command facades provide awaitable `Execute` plus observable `CanExecute` and `IsExecuting` state. Ordinary `ICommand` adapters support zero- or one-parameter synchronous, `Task`, and `ValueTask` handlers. See [Commands](/akbura/commands) for parameter validation, discarded `ICommand` results, execution state, IDE support, and direct ready-command assignment.
 
 ## AKCSS
 

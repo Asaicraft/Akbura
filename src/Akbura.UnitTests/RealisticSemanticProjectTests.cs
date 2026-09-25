@@ -739,10 +739,11 @@ public sealed class RealisticSemanticProjectTests
             semanticModel.GetSymbolInfo(attribute).Symbol);
         var operation = Assert.IsAssignableFrom<IMarkupCommandBindingOperation>(
             semanticModel.GetOperation(attribute));
+        var command = Assert.IsAssignableFrom<ICommandSymbol>(operation.Command);
 
         Assert.True(property.IsCommand);
         Assert.Equal(expectedCommandName, property.Command!.Name);
-        Assert.Equal(expectedCommandName, operation.Command.Name);
+        Assert.Equal(expectedCommandName, command.Name);
         Assert.Equal(expectedResultType, operation.ResultType.Name);
         Assert.Equal(MarkupCommandHandlerKind.Lambda, operation.HandlerKind);
         Assert.Equal(MarkupCommandArgumentMode.ReceivesCommandArgument, operation.ArgumentMode);

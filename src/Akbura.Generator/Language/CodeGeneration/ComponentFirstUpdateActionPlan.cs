@@ -1,6 +1,7 @@
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using Akbura.Language.Binder;
+using Akbura.Language.Operations;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Immutable;
@@ -165,7 +166,8 @@ internal readonly struct ComponentCommandBindingPlan
         ITypeSymbol? handlerResultType = null,
         ComponentCommandAwaitableKind awaitableKind = ComponentCommandAwaitableKind.None,
         bool isCommandReference = true,
-        ITypeSymbol? awaitableResultType = null)
+        ITypeSymbol? awaitableResultType = null,
+        MarkupCommandTargetKind targetKind = MarkupCommandTargetKind.DeclaredCommand)
     {
         Destination = destination;
         CommandName = commandName ?? throw new ArgumentNullException(nameof(commandName));
@@ -184,6 +186,7 @@ internal readonly struct ComponentCommandBindingPlan
         AwaitableKind = awaitableKind;
         IsCommandReference = isCommandReference;
         AwaitableResultType = awaitableResultType;
+        TargetKind = targetKind;
     }
 
     public PropertyWritePlan Destination { get; }
@@ -219,6 +222,10 @@ internal readonly struct ComponentCommandBindingPlan
     public bool IsCommandReference { get; }
 
     public ITypeSymbol? AwaitableResultType { get; }
+
+    public MarkupCommandTargetKind TargetKind { get; }
+
+    public bool IsICommandAdapter => TargetKind == MarkupCommandTargetKind.ICommandProperty;
 
     public bool IsValid => Destination.IsValid && !string.IsNullOrEmpty(CommandName);
 }

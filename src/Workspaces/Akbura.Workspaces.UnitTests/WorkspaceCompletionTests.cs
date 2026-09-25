@@ -4427,6 +4427,51 @@ public sealed class WorkspaceCompletionTests
             });
     }
 
+    [Fact]
+    public void SemanticModel_CompletedICommandHandler_HasNoErrors()
+    {
+        const string source = """
+            namespace Gallery;
+            using Avalonia.Controls;
+
+            command void NavigateTo(Control button);
+
+            <Button Command={async () => await NavigateTo.Execute(this)} />
+            """;
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, _) =>
+            {
+                var diagnostics = workspace.LanguageServices.Diagnostics.GetDiagnostics(
+                    semanticContext,
+                    new TextSpan(0, semanticContext.Document.Text.Length));
+
+                Assert.DoesNotContain(
+                    diagnostics,
+                    static diagnostic => diagnostic.Severity == Language.Syntax.AkburaDiagnosticSeverity.Error);
+            });
+    }
+
+    [Theory]
+    [InlineData("<Button Command={parameter => parameter.|} />", "ToString")]
+    [InlineData("<Button Command={(string parameter) => parameter.|} />", "Length")]
+    public void ProjectedCSharpService_ICommandHandlerParameter_UsesExpectedType(string markupWithCaret, string expectedMember)
+    {
+        var sourceWithCaret =
+            "namespace Gallery;\r\n" +
+            "using Avalonia.Controls;\r\n\r\n" +
+            markupWithCaret;
+
+        WithCSharpProjection(
+            sourceWithCaret,
+            (semanticContext, context, projection, _) =>
+            {
+                Assert.Equal(AkburaCSharpCompletionContextKind.Expression, context.Kind);
+                AssertCompletionContains(semanticContext, projection, expectedMember);
+            });
+    }
+
     [Theory]
     [InlineData(
         "command void NavigateTo(Avalonia.Controls.Control button);",
@@ -4509,9 +4554,24 @@ public sealed class WorkspaceCompletionTests
                         position);
 
                 Assert.NotNull(signatureHelp);
-                var signature = Assert.Single(signatureHelp.Signatures);
+                Assert.Equal(3, signatureHelp.Signatures.Length);
+                var signature = Assert.Single(
+                    signatureHelp.Signatures,
+                    static signature => signature.Label.Contains(
+                        "ValueTask<int> Execute(Control value1, string value2)",
+                        StringComparison.Ordinal));
                 Assert.Contains("ValueTask<int> Execute(Control value1, string value2)", signature.Label, StringComparison.Ordinal);
                 Assert.Contains("Executes the command asynchronously", signature.Documentation, StringComparison.Ordinal);
+                Assert.Contains(
+                    signatureHelp.Signatures,
+                    static signature => signature.Label.Contains(
+                        "ValueTask<object?> Execute(object[] args)",
+                        StringComparison.Ordinal));
+                Assert.Contains(
+                    signatureHelp.Signatures,
+                    static signature => signature.Label.Contains(
+                        "void Execute(object? parameter)",
+                        StringComparison.Ordinal));
                 Assert.Equal(1, signatureHelp.ActiveParameter);
             });
     }
@@ -6554,6 +6614,9 @@ public sealed class WorkspaceCompletionTests
 
                 public sealed class Button : Control
                 {
+                    public System.Windows.Input.ICommand? Command { get; set; }
+
+                    public object? CommandParameter { get; set; }
                 }
 
                 public class Page : Control
@@ -6868,6 +6931,25 @@ public sealed class WorkspaceCompletionTests
             {
                 public class AkburaControl : Avalonia.Controls.Control
                 {
+                }
+
+                public interface IAkburaCommand : System.Windows.Input.ICommand
+                {
+                    System.IObservable<bool> IsExecuting { get; }
+
+                    new System.IObservable<bool> CanExecute { get; }
+
+                    System.Threading.Tasks.ValueTask<object?> Execute(params object[] args);
+                }
+
+                public interface IAkburaCommand<T1, TReturn> : IAkburaCommand
+                {
+                    System.Threading.Tasks.ValueTask<TReturn> Execute(T1 value1);
+                }
+
+                public interface IAkburaCommand<T1, T2, TReturn> : IAkburaCommand
+                {
+                    System.Threading.Tasks.ValueTask<TReturn> Execute(T1 value1, T2 value2);
                 }
             }
 

@@ -1,5 +1,6 @@
 using Akbura.Language.Binder;
 using Akbura.Language.Syntax;
+using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
 using System.Threading;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -83,6 +84,13 @@ internal abstract partial class AkburaSemanticModel
                 {
                     expectedType = contentModel.DictionaryShape.KeyType;
                 }
+                else if (TryGetMarkupCommandHandlerTargetType(
+                    attribute,
+                    expression,
+                    out var commandHandlerType))
+                {
+                    expectedType = commandHandlerType;
+                }
 
                 break;
             }
@@ -94,6 +102,105 @@ internal abstract partial class AkburaSemanticModel
                 expression,
                 relativePosition,
                 expectedType);
+    }
+
+    private bool TryGetMarkupCommandHandlerTargetType(MarkupAttributeSyntax attribute, CSharp.ExpressionSyntax expression, out ITypeSymbol? targetType)
+    {
+        targetType = null;
+        if (expression is not (CSharp.LambdaExpressionSyntax or CSharp.AnonymousMethodExpressionSyntax))
+        {
+            return false;
+        }
+
+        var parameterCount = expression switch
+        {
+            CSharp.ParenthesizedLambdaExpressionSyntax lambda => lambda.ParameterList.Parameters.Count,
+            CSharp.SimpleLambdaExpressionSyntax => 1,
+            CSharp.AnonymousMethodExpressionSyntax method => method.ParameterList?.Parameters.Count ?? 0,
+            _ => 0,
+        };
+        var parameterTypes = ImmutableArray<ITypeSymbol>.Empty;
+        var attributeSymbol = GetSymbolInfo(attribute).Symbol;
+        if (attributeSymbol is Symbols.IPropertySymbol { Command: { } command })
+        {
+            parameterTypes = parameterCount == command.Parameters.Length
+                ? command.Parameters.Select(static parameter => parameter.Type.Symbol)
+                    .OfType<ITypeSymbol>()
+                    .ToImmutableArray()
+                : CreateObjectParameterTypes(parameterCount);
+        }
+        else if (IsICommandProperty(attributeSymbol))
+        {
+            var handler = AnalyzeMarkupICommandHandler(attribute, expression);
+            parameterTypes = handler.ParameterTypes
+                .Select(static parameter => parameter.Symbol)
+                .OfType<ITypeSymbol>()
+                .ToImmutableArray();
+            if (parameterTypes.Length != parameterCount)
+            {
+                parameterTypes = CreateObjectParameterTypes(parameterCount);
+            }
+        }
+        else
+        {
+            return false;
+        }
+
+        var isAsync = expression switch
+        {
+            CSharp.LambdaExpressionSyntax lambda => lambda.AsyncKeyword.RawKind != 0,
+            CSharp.AnonymousMethodExpressionSyntax method => method.AsyncKeyword.RawKind != 0,
+            _ => false,
+        };
+        var hasBlockBody = expression switch
+        {
+            CSharp.LambdaExpressionSyntax { Body: CSharp.BlockSyntax } => true,
+            CSharp.AnonymousMethodExpressionSyntax => true,
+            _ => false,
+        };
+        targetType = CreateMarkupHandlerDelegateType(parameterTypes, isAsync, hasBlockBody);
+        return targetType != null;
+    }
+
+    private ImmutableArray<ITypeSymbol> CreateObjectParameterTypes(int count)
+    {
+        if (count == 0)
+        {
+            return [];
+        }
+
+        var objectType = Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Object);
+        return Enumerable.Repeat<ITypeSymbol>(objectType, count).ToImmutableArray();
+    }
+
+    private ITypeSymbol? CreateMarkupHandlerDelegateType(ImmutableArray<ITypeSymbol> parameterTypes, bool isAsync, bool hasBlockBody)
+    {
+        if (hasBlockBody && !isAsync)
+        {
+            var metadataName = parameterTypes.Length == 0
+                ? "System.Action"
+                : "System.Action`" + parameterTypes.Length;
+            var action = Compilation.CSharpCompilation.GetTypeByMetadataName(metadataName);
+            return parameterTypes.Length == 0 || action == null
+                ? action
+                : action.Construct(parameterTypes.ToArray());
+        }
+
+        var resultType = Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Object);
+        if (isAsync)
+        {
+            var task = Compilation.CSharpCompilation.GetTypeByMetadataName("System.Threading.Tasks.Task`1");
+            if (task == null)
+            {
+                return null;
+            }
+
+            resultType = task.Construct(resultType);
+        }
+
+        var func = Compilation.CSharpCompilation.GetTypeByMetadataName(
+            "System.Func`" + (parameterTypes.Length + 1));
+        return func?.Construct([.. parameterTypes, resultType]);
     }
 
     internal CSharpProbeProjection CreateCSharpCompletionProjection(CSharpStatementSyntax statementSyntax, int relativePosition)

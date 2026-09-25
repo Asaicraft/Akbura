@@ -109,11 +109,7 @@ internal partial class AkburaSemanticModel
         using var statementsBuilder = ImmutableArrayBuilder<CSharp.StatementSyntax>.Rent();
         var akburaSymbolsByName = new Dictionary<string, AkburaSymbol>(StringComparer.Ordinal);
         var akburaSymbolsByCommandTypeName = new Dictionary<string, AkburaSymbol>(StringComparer.Ordinal);
-        foreach (var local in CreateCSharpProbeMembersBefore(
-            statementSyntax,
-            classMembersBuilder,
-            akburaSymbolsByName,
-            akburaSymbolsByCommandTypeName))
+        foreach (var local in CreateCSharpProbeMembersBefore(statementSyntax, classMembersBuilder, akburaSymbolsByName, akburaSymbolsByCommandTypeName))
         {
             statementsBuilder.Add(local);
         }
@@ -401,7 +397,8 @@ internal partial class AkburaSemanticModel
     {
         var attributeSymbol = GetSymbolInfo(markupAttribute).Symbol;
         var isHandler = attributeSymbol is IRoutedEventSymbol ||
-            attributeSymbol is Symbols.IPropertySymbol { Command: not null };
+            attributeSymbol is Symbols.IPropertySymbol { Command: not null } ||
+            IsICommandProperty(attributeSymbol);
         ImmutableArray<string> parameterNames;
         bool isAsync;
         SyntaxNode referenceNode;
@@ -427,6 +424,7 @@ internal partial class AkburaSemanticModel
         var method = CreateMarkupInlineReferenceProbeMethod(
             markupAttribute,
             attributeSymbol,
+            expression,
             referenceNode,
             probeScope.LocalStatements,
             parameterNames,
@@ -559,11 +557,7 @@ internal partial class AkburaSemanticModel
 
         foreach (var target in targets)
         {
-            foreach (var name in
-                     target.ProbeNode
-                         .DescendantNodesAndSelf()
-                         .OfType<
-                             CSharp.SimpleNameSyntax>())
+            foreach (var name in target.ProbeNode.DescendantNodesAndSelf().OfType<CSharp.SimpleNameSyntax>())
             {
                 if (IsVarTypeName(name))
                 {
@@ -671,6 +665,7 @@ internal partial class AkburaSemanticModel
     private CSharp.MethodDeclarationSyntax CreateMarkupInlineReferenceProbeMethod(
         MarkupAttributeSyntax markupAttribute,
         AkburaSymbol? attributeSymbol,
+        CSharp.ExpressionSyntax handlerExpression,
         SyntaxNode referenceNode,
         ImmutableArray<CSharp.StatementSyntax> localStatements,
         ImmutableArray<string> parameterNames,
@@ -692,6 +687,7 @@ internal partial class AkburaSemanticModel
             .WithParameterList(CreateMarkupInlineReferenceProbeParameterList(
                 markupAttribute,
                 attributeSymbol,
+                handlerExpression,
                 parameterNames));
 
         if (referenceNode is CSharp.BlockSyntax block)
@@ -714,6 +710,7 @@ internal partial class AkburaSemanticModel
     private CSharp.ParameterListSyntax CreateMarkupInlineReferenceProbeParameterList(
         MarkupAttributeSyntax markupAttribute,
         AkburaSymbol? attributeSymbol,
+        CSharp.ExpressionSyntax handlerExpression,
         ImmutableArray<string> parameterNames)
     {
         if (attributeSymbol is IRoutedEventSymbol routedEvent)
@@ -723,10 +720,33 @@ internal partial class AkburaSemanticModel
 
         if (attributeSymbol is Symbols.IPropertySymbol { Command: { } command })
         {
-            return CreateCommandHandlerProbeParameterList(command, parameterNames);
+            return CreateCommandHandlerProbeParameterList(
+                command.Parameters.Select(static parameter => parameter.Type).ToImmutableArray(),
+                parameterNames);
+        }
+
+        if (IsICommandProperty(attributeSymbol))
+        {
+            var handler = AnalyzeMarkupICommandHandler(markupAttribute, handlerExpression);
+            return CreateCommandHandlerProbeParameterList(handler.ParameterTypes, parameterNames);
         }
 
         return CSharpSyntaxFactory.ParameterList();
+    }
+
+    private bool IsICommandProperty(AkburaSymbol? symbol)
+    {
+        return symbol is Symbols.IPropertySymbol { Command: null, Type.Symbol: INamedTypeSymbol type } &&
+            IsSystemWindowsInputICommand(type);
+    }
+
+    internal bool IsSystemWindowsInputICommand(ITypeSymbol? type)
+    {
+        var contract = Compilation.CSharpCompilation.GetTypeByMetadataName(
+            "System.Windows.Input.ICommand");
+        return type != null &&
+            contract != null &&
+            SymbolEqualityComparer.Default.Equals(type, contract);
     }
 
     private static SyntaxNode GetMarkupHandlerReferenceNode(
@@ -1354,8 +1374,7 @@ internal partial class AkburaSemanticModel
             // on an enclosing foreach or method belongs to another symbol.
             var declaration = reference.GetSyntax();
 
-            foreach (var annotation in declaration.GetAnnotations(
-                         CSharpProbeBinder.ProjectedSymbolAnnotationKind))
+            foreach (var annotation in declaration.GetAnnotations(CSharpProbeBinder.ProjectedSymbolAnnotationKind))
             {
                 if (!CSharpProbeSymbolOrigin.TryParse(annotation.Data, out var origin) ||
                     origin.Kind != candidate.Kind ||

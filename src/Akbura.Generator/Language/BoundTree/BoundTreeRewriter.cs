@@ -304,10 +304,15 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
     {
         var containingComponent = (IMarkupComponentSymbol?)VisitSymbol(node.ContainingComponent);
         var property = (Akbura.Language.Symbols.IPropertySymbol)VisitSymbol(node.Property)!;
-        var command = (ICommandSymbol)VisitSymbol(node.Command)!;
+        var command = (ICommandSymbol?)VisitSymbol(node.Command);
         var handlerType = VisitCSharpSymbolDefinition(node.HandlerType);
         var handlerResultType = VisitCSharpSymbolDefinition(node.HandlerResultType);
         var handlerOperation = VisitCSharpOperationDefinition(node.HandlerOperation);
+        var parameterTypes = node.ParameterTypes
+            .Select(VisitCSharpSymbolDefinition)
+            .ToImmutableArray();
+        var returnType = VisitCSharpSymbolDefinition(node.ReturnType);
+        var resultType = VisitCSharpSymbolDefinition(node.ResultType);
 
         return node.Update(
             containingComponent,
@@ -324,7 +329,11 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             node.ContainsAwait,
             handlerType,
             handlerResultType,
-            handlerOperation);
+            handlerOperation,
+            node.TargetKind,
+            parameterTypes,
+            returnType,
+            resultType);
     }
 
     public override BoundNode? VisitMarkupRoutedEventBinding(BoundMarkupRoutedEventBinding node)

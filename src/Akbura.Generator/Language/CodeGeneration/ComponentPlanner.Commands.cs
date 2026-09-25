@@ -13,6 +13,11 @@ internal static partial class ComponentPlanner
     {
         private static bool IsDirectCommandReference(IMarkupCommandBindingOperation operation)
         {
+            if (operation.TargetKind == MarkupCommandTargetKind.ICommandProperty)
+            {
+                return false;
+            }
+
             if (operation.HandlerKind != MarkupCommandHandlerKind.DirectReference)
             {
                 return false;
@@ -107,13 +112,15 @@ internal static partial class ComponentPlanner
 
         private ITypeSymbol? GetCommandHandlerReturnType(IMarkupCommandBindingOperation operation) =>
             GetCommandCallable(operation)?.ReturnType ?? operation.HandlerOperation.Type ??
+            operation.ReturnType.Symbol as ITypeSymbol ??
             operation.HandlerResultType.Symbol as ITypeSymbol;
 
         private ComponentCommandAwaitableKind GetCommandAwaitableKind(IMarkupCommandBindingOperation operation)
         {
             var type = GetCommandHandlerReturnType(operation);
             // An explicitly compatible Task result is a command value, not an implicit async handler.
-            if (type != null && operation.ResultType.Symbol is ITypeSymbol target &&
+            if (operation.TargetKind == MarkupCommandTargetKind.DeclaredCommand &&
+                type != null && operation.ResultType.Symbol is ITypeSymbol target &&
                 _compilation.ClassifyConversion(type, target).IsImplicit)
             {
                 return ComponentCommandAwaitableKind.None;

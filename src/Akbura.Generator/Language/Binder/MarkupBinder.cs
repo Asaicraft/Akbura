@@ -177,9 +177,7 @@ internal sealed partial class MarkupBinder : Binder
 
     private MarkupNameScope? GetNameScope()
     {
-        for (var current = ScopeDesignator;
-             current != null;
-             current = current.Parent)
+        for (var current = ScopeDesignator; current != null; current = current.Parent)
         {
             if (current.Kind == AkburaSyntaxKind.MarkupRootSyntax)
             {
@@ -1039,6 +1037,7 @@ internal sealed partial class MarkupBinder : Binder
         }
 
         var commandHandler = default(AkburaSemanticModel.MarkupCommandHandlerAnalysis);
+        var adaptsICommandHandler = false;
         if (property?.Command is { } propertyCommand)
         {
             commandHandler = SemanticModel.AnalyzeMarkupCommandHandler(
@@ -1047,6 +1046,17 @@ internal sealed partial class MarkupBinder : Binder
                 dynamicExpression,
                 valueType,
                 valueOperation);
+        }
+        else if (bindingKind == MarkupAttributeBindingKind.None &&
+            valueKind == MarkupAttributeValueKind.DynamicExpression &&
+            targetType != null &&
+            SemanticModel.IsSystemWindowsInputICommand(targetType) &&
+            !HasImplicitConversion(valueBinding, targetType))
+        {
+            commandHandler = SemanticModel.AnalyzeMarkupICommandHandler(
+                markupAttribute,
+                dynamicExpression);
+            adaptsICommandHandler = commandHandler.Kind != MarkupCommandHandlerKind.Error;
         }
 
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics;
@@ -1106,7 +1116,7 @@ internal sealed partial class MarkupBinder : Binder
 
                 if (valueSyntax != null && valueKind == MarkupAttributeValueKind.DynamicExpression)
                 {
-                    if (property.Command == null)
+                    if (property.Command == null && !adaptsICommandHandler)
                     {
                         SemanticModel.AddMarkupExpressionDiagnostics(
                             markupAttribute,
@@ -1146,6 +1156,13 @@ internal sealed partial class MarkupBinder : Binder
                         commandHandler,
                         diagnosticsBuilder);
                 }
+                else if (adaptsICommandHandler)
+                {
+                    SemanticModel.AddMarkupICommandHandlerSignatureDiagnostics(
+                        markupAttribute,
+                        commandHandler,
+                        diagnosticsBuilder);
+                }
 
                 SemanticModel.AddMarkupExpressionDiagnostics(
                     markupAttribute,
@@ -1179,6 +1196,34 @@ internal sealed partial class MarkupBinder : Binder
                 commandHandler.Operation,
                 diagnostics,
                 valueKind == MarkupAttributeValueKind.Error || diagnostics.Length > 0);
+        }
+
+        if (property != null && adaptsICommandHandler)
+        {
+            return new BoundMarkupCommandBinding(
+                markupAttribute,
+                this,
+                containingComponent,
+                property,
+                command: null,
+                bindingKind,
+                valueKind,
+                valueSyntax,
+                commandHandler.Kind,
+                commandHandler.ArgumentMode,
+                commandHandler.ResultMode,
+                commandHandler.ParameterCount,
+                commandHandler.IsAsync,
+                commandHandler.ContainsAwait,
+                commandHandler.Type,
+                commandHandler.ResultType,
+                commandHandler.Operation,
+                diagnostics,
+                valueKind == MarkupAttributeValueKind.Error || diagnostics.Length > 0,
+                MarkupCommandTargetKind.ICommandProperty,
+                commandHandler.ParameterTypes,
+                commandHandler.ReturnType,
+                commandHandler.ResultType);
         }
 
         return new BoundMarkupPropertySetter(

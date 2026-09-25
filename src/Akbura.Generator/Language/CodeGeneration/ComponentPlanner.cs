@@ -1642,15 +1642,18 @@ internal static partial class ComponentPlanner
                 return;
             }
 
-            using var parameters = ImmutableArrayBuilder<ITypeSymbol>.Rent(operation.Parameters.Length);
-            foreach (var parameter in operation.Parameters)
+            using var parameters = ImmutableArrayBuilder<ITypeSymbol>.Rent(operation.ParameterTypes.Length);
+            foreach (var parameter in operation.ParameterTypes)
             {
-                parameters.Add((ITypeSymbol)parameter.Type.Symbol!);
+                if (parameter.Symbol is ITypeSymbol parameterType)
+                {
+                    parameters.Add(parameterType);
+                }
             }
 
             var plan = new ComponentCommandBindingPlan(
                 PropertyWritePlan.Create(operation.Property, targetType),
-                operation.Command.Name,
+                operation.Command?.Name ?? operation.Property.Name,
                 operation.Syntax,
                 handler,
                 GetCommandHandlerKind(operation),
@@ -1665,7 +1668,8 @@ internal static partial class ComponentPlanner
                 operation.HandlerResultType.Symbol as ITypeSymbol,
                 GetCommandAwaitableKind(operation),
                 IsDirectCommandReference(operation),
-                GetCommandAwaitableResultType(operation));
+                GetCommandAwaitableResultType(operation),
+                operation.TargetKind);
             if (!plan.IsValid)
             {
                 return;

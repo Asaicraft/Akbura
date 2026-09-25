@@ -77,15 +77,19 @@ useEffect(() =>
 
 ## Commands
 
-A child component declares a typed command and a parent supplies a compatible lambda, delegate, method group, or existing `IAkburaCommand`; no custom command class is required:
+A child component declares a typed command and a parent supplies a compatible lambda, delegate, method group, or existing `IAkburaCommand`. The child can invoke that contract from an ordinary Avalonia `ICommand` property without a manual command factory:
 
 ```akbura
 command void NavigateTo(NavButton button);
 
-<NavButton NavigateTo={button => button.IsActive = true} />
+<Button Command={async () => await NavigateTo.Execute(this)}>
+    Navigate
+</Button>
 ```
 
-Commands expose awaitable `Execute` and observable `CanExecute`/`IsExecuting` state. See the [Commands guide](https://asaicraft.github.io/Akbura/akbura/commands) for async handlers, results, execution behavior, and IDE support.
+The parent can use `<NavButton NavigateTo={button => button.IsActive = true} />`. A ready command can instead be passed directly with `Command={NavigateTo} CommandParameter={this}`, preserving its identity and `CanExecute` behavior.
+
+Commands expose awaitable `Execute` and observable `CanExecute`/`IsExecuting` state. Ordinary `ICommand` handlers support synchronous, `Task`, and `ValueTask` callables with zero or one parameter. See the [Commands guide](https://asaicraft.github.io/Akbura/akbura/commands) for parameter validation, result behavior, direct assignment, execution state, and IDE support.
 
 For installation, language syntax, state, commands, hooks, and AKCSS, see the **[Akbura documentation](https://asaicraft.github.io/Akbura/)**.
 

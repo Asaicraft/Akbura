@@ -124,9 +124,7 @@ internal sealed partial class CSharpProbeBinder
         var diagnostics = BindingDiagnosticBag.GetInstance();
         try
         {
-            for (var binder = Next;
-                 binder != null;
-                 binder = binder.Next)
+            for (var binder = Next; binder != null; binder = binder.Next)
             {
                 var scopeDesignator = binder.ScopeDesignator;
                 if (scopeDesignator == null)
@@ -134,9 +132,7 @@ internal sealed partial class CSharpProbeBinder
                     continue;
                 }
 
-                foreach (var candidate in
-                         binder.GetDeclaredSymbolsForScope(
-                             scopeDesignator))
+                foreach (var candidate in binder.GetDeclaredSymbolsForScope(scopeDesignator))
                 {
                     if (candidate.Name == "index" && CSharpProbeBuilder.GetContainingMarkupForeach(scope) != null)
                     {
@@ -207,8 +203,7 @@ internal sealed partial class CSharpProbeBinder
             return;
         }
 
-        foreach (var member in
-                 SemanticModel.SyntaxTree.GetRoot().Members)
+        foreach (var member in SemanticModel.SyntaxTree.GetRoot().Members)
         {
             if (member is CSharpStatementSyntax statement &&
                 TryCreateComponentMethodProbe(
@@ -547,17 +542,28 @@ internal sealed partial class CSharpProbeBinder
         ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax> memberDeclarations,
         ICommandSymbol command)
     {
-        var commandTypeName = "__AkburaCommand_" + ToCSharpIdentifier(command.Name);
-        var commandType = CSharpSyntaxFactory.IdentifierName(commandTypeName);
-        memberDeclarations.Add(CSharpSyntaxFactory.ClassDeclaration(commandTypeName)
-            .WithModifiers(CSharpSyntaxFactory.TokenList(
-                CSharpSyntaxFactory.Token(CSharpSyntaxKind.PrivateKeyword),
-                CSharpSyntaxFactory.Token(CSharpSyntaxKind.SealedKeyword)))
-            .WithMembers(CSharpSyntaxFactory.List(CreateCommandProbeTypeMembers(command))));
         memberDeclarations.Add(CreateProbeField(
-            commandType,
+            CreateCommandRuntimeTypeSyntax(command),
             command.Name,
             command));
+    }
+
+    private static CSharp.TypeSyntax CreateCommandRuntimeTypeSyntax(ICommandSymbol command)
+    {
+        if (command.Parameters.IsDefaultOrEmpty)
+        {
+            return CSharpSyntaxFactory.ParseTypeName("global::Akbura.IAkburaCommand");
+        }
+
+        var arguments = command.Parameters
+            .OrderBy(static parameter => parameter.Ordinal)
+            .Select(static parameter => parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
+            .Append(command.ResultType.Symbol is ITypeSymbol resultType &&
+                resultType.SpecialType != SpecialType.System_Void
+                    ? resultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                    : "object");
+        return CSharpSyntaxFactory.ParseTypeName(
+            "global::Akbura.IAkburaCommand<" + string.Join(", ", arguments) + ">");
     }
 
     internal static ImmutableArray<CSharp.MemberDeclarationSyntax> CreateCommandProbeTypeMembers(ICommandSymbol command)

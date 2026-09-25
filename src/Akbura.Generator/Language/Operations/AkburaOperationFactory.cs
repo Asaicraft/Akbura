@@ -391,7 +391,11 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             CreateCSharpOperationTree(
                 boundNode.Syntax,
                 boundNode.HandlerOperation,
-                CreateCSharpOperationSymbolMapper(boundNode.Syntax, containingAkcssSymbol: null)));
+                CreateCSharpOperationSymbolMapper(boundNode.Syntax, containingAkcssSymbol: null)),
+            boundNode.TargetKind,
+            boundNode.ParameterTypes,
+            boundNode.ReturnType,
+            boundNode.ResultType);
     }
 
     private MarkupRoutedEventBindingOperation CreateMarkupRoutedEventBindingOperation(

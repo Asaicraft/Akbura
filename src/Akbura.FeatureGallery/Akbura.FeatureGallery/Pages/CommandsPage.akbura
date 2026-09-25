@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Akbura.FeatureGallery.Pages.Page.akcss;
 using Akbura.Markup;
 
@@ -144,7 +144,7 @@ using Akbura.Markup;
                             ? "Running..."
                             : "Transform text"}
                         IsEnabled={canExecute}
-                        Click={async () =>
+                        Command={async () =>
                             await ExecuteAsync()} />
 
                     <TextBlock
@@ -287,7 +287,7 @@ using Akbura.Markup;
         <Border page-note>
 
             <TextBlock
-                Text="A native Akbura command attribute, an Avalonia Button.Command property and a routed Click event are different targets. Use the form required by the receiving component."
+                Text="Button.Command accepts a ready ICommand or a compatible inline handler. A routed Click event remains a separate event target."
                 page-note-text/>
 
         </Border>

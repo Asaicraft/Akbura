@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Akbura.Hooks;
 
 command string Transform(string value);
@@ -43,7 +43,7 @@ async Task ExecuteAsync()
 
         <Button Content={isExecuting ? "Running..." : "Transform text"}
                 IsEnabled={canExecute}
-                Click={async () => await ExecuteAsync()}
+                Command={async () => await ExecuteAsync()}
                 HorizontalAlignment="Left"/>
 
         <Grid ColumnDefinitions="Auto,*"

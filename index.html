@@ -531,6 +531,74 @@ dotnet new akbura.app -n MyApp --di Splat.Locator</p>
                     </div>
                 </div>
 </div>
+<p>Then add <code>.UseAkbura()</code> to the existing <code>AppBuilder</code> chain in <code>Program.cs</code>,
+before starting the application:</p>
+<pre><code class="language-csharp">using Akbura.Engine;
+using Avalonia;
+
+public static AppBuilder BuildAvaloniaApp()
+    =&gt; AppBuilder.Configure&lt;App&gt;()
+        .UsePlatformDetect()
+        .UseAkbura();
+</code></pre>
+<p>Keep the other configuration calls your application already uses.
+<code>UseAkbura</code> initializes the shared Akbura engine after Avalonia's platform
+services are set up. Call it once in the application builder chain.</p>
+<p>The parameterless overload uses the default settings with no service providers.
+To configure the engine, use
+<code>UseAkbura(Action&lt;AkburaEngineExtensions.AkburaEngineBuilder&gt; withAkburaEngineBuilder)</code>.
+The callback receives a builder with the following options:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Parameter and behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WithMaxUpdatesPerBatch(int maxUpdatesPerBatch)</code></td>
+<td>Limits the consecutive update passes one component can run in a single synchronous batch, protecting against infinite update loops. Defaults to <code>100</code> (<code>AkburaEngine.DefaultMaxUpdatesPerBatch</code>). Values below <code>1</code> throw <code>ArgumentOutOfRangeException</code>.</td>
+</tr>
+<tr>
+<td><code>WithServiceProvider(IServiceProvider serviceProvider)</code></td>
+<td>Adds a standard .NET service provider for component <code>inject</code> declarations.</td>
+</tr>
+<tr>
+<td><code>WithServiceProvider(IAkburaServiceProvider serviceProvider)</code></td>
+<td>Adds a custom Akbura service provider that can use contextual injection information.</td>
+</tr>
+<tr>
+<td><code>WithServiceProviders&lt;T&gt;(T serviceProviders)</code></td>
+<td>Adds multiple standard .NET service providers, where <code>T</code> implements <code>IEnumerable&lt;IServiceProvider&gt;</code>.</td>
+</tr>
+<tr>
+<td><code>WithServiceProviders(ReadOnlySpan&lt;IServiceProvider&gt; serviceProviders)</code></td>
+<td>Adds a span of standard .NET service providers.</td>
+</tr>
+<tr>
+<td><code>WithServiceProviders(ReadOnlySpan&lt;IAkburaServiceProvider&gt; serviceProviders)</code></td>
+<td>Adds a span of custom Akbura service providers.</td>
+</tr>
+</tbody>
+</table>
+<p>For example, if <code>services</code> is your application's existing <code>IServiceProvider</code>,
+configure it together with an update limit:</p>
+<pre><code class="language-csharp">AppBuilder.Configure&lt;App&gt;()
+    .UsePlatformDetect()
+    .UseAkbura(akbura =&gt;
+    {
+        akbura
+            .WithServiceProvider(services)
+            .WithMaxUpdatesPerBatch(200);
+    });
+</code></pre>
+<p>These configuration methods return the builder for chaining. <code>UseAkbura</code> calls
+<code>Build()</code> automatically after the callback. Providers are queried in registration
+order; standard .NET providers continue to the next provider when they return
+<code>null</code>, while custom Akbura providers must explicitly forward to <code>NextProvider</code>.
+See <a href="/akbura/dependency-injection">Dependency Injection</a> for service registration,
+lifetimes, and custom providers.</p>
 <p>If the template package is installed, create a component from the project
 directory:</p>
 <div class="sh mb-4"><div class="not-prose group relative overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer" onclick="shellCopy(this)">

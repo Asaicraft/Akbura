@@ -1,4 +1,4 @@
-state string url = "/overview";
+﻿state string url = "/overview";
 
 <DrawerPage Header="Akbura Feature Gallery"
             DrawerLength="260">
@@ -40,6 +40,10 @@ state string url = "/overview";
 
                             <Page Url="/overview">
                                 <OverviewPage/>
+                            </Page>
+
+                            <Page Url="/commands">
+                                <CommandsPage/>
                             </Page>
 
                             <Page Url="/data-templates">

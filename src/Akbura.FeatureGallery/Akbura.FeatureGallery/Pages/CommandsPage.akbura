@@ -1,0 +1,299 @@
+﻿using System.Threading.Tasks;
+using Akbura.FeatureGallery.Pages.Page.akcss;
+using Akbura.Markup;
+
+<StackPanel page
+            ${md}:page-desktop>
+
+    <StackPanel page-header>
+
+        <TextBlock Text="Commands"
+                   page-title
+                   ${md}:page-title-desktop/>
+
+        <TextBlock
+            Text="Declare a typed operation in a child component, supply its handler from the parent and execute it through an awaitable command object."
+            page-description
+            ${md}:page-description-desktop/>
+
+    </StackPanel>
+
+    <Grid page-flow-3
+          ${lg}:page-flow-3-desktop>
+
+        <Border page-card-compact>
+
+            <StackPanel gap-2>
+
+                <TextBlock Text="1"
+                           text-sm
+                           text-blue-400/>
+
+                <TextBlock Text="Declare"
+                           font-semibold
+                           text-slate-100/>
+
+                <TextBlock Text="command string Transform(string value);"
+                           page-code/>
+
+            </StackPanel>
+
+        </Border>
+
+        <TextBlock Text="→"
+                   page-flow-arrow
+                   ${lg}:page-flow-arrow-1-desktop
+                   text-xl
+                   text-slate-500
+                   self-center/>
+
+        <Border page-flow-second
+                ${lg}:page-flow-second-desktop
+                page-card-compact>
+
+            <StackPanel gap-2>
+
+                <TextBlock Text="2"
+                           text-sm
+                           text-blue-400/>
+
+                <TextBlock Text="Supply"
+                           font-semibold
+                           text-slate-100/>
+
+                <TextBlock Text="Transform={async value => ...}"
+                           page-code/>
+
+            </StackPanel>
+
+        </Border>
+
+        <TextBlock Text="→"
+                   page-flow-arrow
+                   ${lg}:page-flow-arrow-2-desktop
+                   text-xl
+                   text-slate-500
+                   self-center/>
+
+        <Border page-flow-third
+                ${lg}:page-flow-third-desktop
+                page-card-compact>
+
+            <StackPanel gap-2>
+
+                <TextBlock Text="3"
+                           text-sm
+                           text-blue-400/>
+
+                <TextBlock Text="Execute"
+                           font-semibold
+                           text-slate-100/>
+
+                <TextBlock Text="await Transform.Execute(value)"
+                           page-code/>
+
+            </StackPanel>
+
+        </Border>
+
+    </Grid>
+
+    <StackPanel page-section>
+
+        <StackPanel page-section-header>
+
+            <TextBlock Text="Try a typed command"
+                       page-section-title
+                       ${md}:page-section-title-desktop/>
+
+            <TextBlock
+                Text="The live example waits briefly so IsExecuting and CanExecute can be observed."
+                page-section-description/>
+
+        </StackPanel>
+
+        <FeatureView Path="Components/CommandDemo.akbura + Pages/CommandsPage.akbura">
+
+            <FeatureView.Code>
+                {"""
+                // Components/CommandDemo.akbura
+
+                using System.Threading.Tasks;
+                using Akbura.Hooks;
+
+                command string Transform(string value);
+
+                state string input = "Akbura commands";
+                state string result =
+                    "Run the command to see its result.";
+                state bool isExecuting =
+                    useObservable(Transform.IsExecuting, false);
+                state bool canExecute =
+                    useObservable(Transform.CanExecute, true);
+
+                async Task ExecuteAsync()
+                {
+                    result = await Transform.Execute(input);
+                }
+
+                <StackPanel gap-4>
+                    <TextBox bind:Text={input} />
+
+                    <Button
+                        Content={isExecuting
+                            ? "Running..."
+                            : "Transform text"}
+                        IsEnabled={canExecute}
+                        Click={async () =>
+                            await ExecuteAsync()} />
+
+                    <TextBlock
+                        Text={$"IsExecuting: {isExecuting}"} />
+                    <TextBlock
+                        Text={$"CanExecute: {canExecute}"} />
+                    <TextBlock Text={result} />
+                </StackPanel>
+
+                // Parent component
+
+                <CommandDemo Transform={async value =>
+                {
+                    await Task.Delay(700);
+                    return value.Trim().ToUpperInvariant();
+                }} />
+                """}
+            </FeatureView.Code>
+
+            <FeatureView.View>
+
+                <CommandDemo Transform={async value =>
+                {
+                    await Task.Delay(700);
+                    return value.Trim().ToUpperInvariant();
+                }}/>
+
+            </FeatureView.View>
+
+        </FeatureView>
+
+    </StackPanel>
+
+    <StackPanel page-section>
+
+        <TextBlock Text="Generated command API"
+                   page-section-title
+                   ${md}:page-section-title-desktop/>
+
+        <Grid page-grid-3
+              ${lg}:page-grid-3-desktop>
+
+            <Border page-card>
+
+                <StackPanel gap-3>
+
+                    <TextBlock Text="Execute"
+                               page-card-title/>
+
+                    <TextBlock Text="ValueTask&lt;string&gt;"
+                               page-code/>
+
+                    <TextBlock
+                        Text="Runs the supplied handler and returns its logical result asynchronously."
+                        page-card-description/>
+
+                </StackPanel>
+
+            </Border>
+
+            <Border page-cell-2
+                    ${lg}:page-cell-2-desktop
+                    page-card>
+
+                <StackPanel gap-3>
+
+                    <TextBlock Text="IsExecuting"
+                               page-card-title/>
+
+                    <TextBlock Text="IObservable&lt;bool&gt;"
+                               page-code/>
+
+                    <TextBlock
+                        Text="Publishes whether one or more command executions are currently running."
+                        page-card-description/>
+
+                </StackPanel>
+
+            </Border>
+
+            <Border page-cell-3
+                    ${lg}:page-cell-3-desktop
+                    page-card>
+
+                <StackPanel gap-3>
+
+                    <TextBlock Text="CanExecute"
+                               page-card-title/>
+
+                    <TextBlock Text="IObservable&lt;bool&gt;"
+                               page-code/>
+
+                    <TextBlock
+                        Text="Publishes command availability and can drive the enabled state of controls."
+                        page-card-description/>
+
+                </StackPanel>
+
+            </Border>
+
+        </Grid>
+
+    </StackPanel>
+
+    <StackPanel page-section>
+
+        <StackPanel page-section-header>
+
+            <TextBlock Text="Supported handler forms"
+                       page-section-title
+                       ${md}:page-section-title-desktop/>
+
+            <TextBlock
+                Text="A custom command class is not required. Akbura adapts compatible handlers to the declared contract."
+                page-section-description/>
+
+        </StackPanel>
+
+        <Border page-code-surface>
+
+            <TextBlock
+                Text={"""
+                <CommandDemo Transform={value =>
+                    value.ToUpperInvariant()} />
+
+                <CommandDemo Transform={async value =>
+                {
+                    await SaveAsync(value);
+                    return value;
+                }} />
+
+                <CommandDemo Transform={TransformValue} />
+
+                <CommandDemo Transform={transformDelegate} />
+                """}
+                page-code/>
+
+        </Border>
+
+        <Border page-note>
+
+            <TextBlock
+                Text="A native Akbura command attribute, an Avalonia Button.Command property and a routed Click event are different targets. Use the form required by the receiving component."
+                page-note-text/>
+
+        </Border>
+
+    </StackPanel>
+
+    <ViewThisPageInGithub/>
+
+</StackPanel>

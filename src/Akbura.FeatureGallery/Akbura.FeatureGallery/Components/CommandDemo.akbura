@@ -1,0 +1,91 @@
+﻿using System.Threading.Tasks;
+using Akbura.Hooks;
+
+command string Transform(string value);
+
+state string input = "Akbura commands";
+state string result = "Run the command to see its result.";
+state bool isExecuting =
+    useObservable(Transform.IsExecuting, false);
+state bool canExecute =
+    useObservable(Transform.CanExecute, true);
+
+async Task ExecuteAsync()
+{
+    result = await Transform.Execute(input);
+}
+
+<Border p-5
+        bg-slate-900
+        border-1
+        border-slate-700
+        rounded-xl>
+
+    <StackPanel gap-4>
+
+        <StackPanel gap-1>
+
+            <TextBlock Text="Typed command"
+                       text-xl
+                       font-semibold
+                       text-slate-100/>
+
+            <TextBlock
+                Text="The child declares the contract. Its parent supplies the handler."
+                text-sm
+                text-slate-400
+                whitespace-normal/>
+
+        </StackPanel>
+
+        <TextBox bind:Text={input}
+                 PlaceholderText="Text to transform"/>
+
+        <Button Content={isExecuting ? "Running..." : "Transform text"}
+                IsEnabled={canExecute}
+                Click={async () => await ExecuteAsync()}
+                HorizontalAlignment="Left"/>
+
+        <Grid ColumnDefinitions="Auto,*"
+              RowDefinitions="Auto,Auto"
+              gap-x-3
+              gap-y-2>
+
+            <TextBlock Text="IsExecuting"
+                       text-sm
+                       text-slate-500/>
+
+            <TextBlock col-1
+                       Text={isExecuting ? "true" : "false"}
+                       text-sm
+                       text-blue-400/>
+
+            <TextBlock row-1
+                       Text="CanExecute"
+                       text-sm
+                       text-slate-500/>
+
+            <TextBlock row-1
+                       col-1
+                       Text={canExecute ? "true" : "false"}
+                       text-sm
+                       text-blue-400/>
+
+        </Grid>
+
+        <Border p-3
+                bg-slate-950
+                rounded-lg>
+
+            <TextBlock Text={result}
+                       text-sm
+                       text-slate-200
+                       whitespace-normal/>
+
+        </Border>
+
+        <ViewThisComponentInGithub/>
+
+    </StackPanel>
+
+</Border>

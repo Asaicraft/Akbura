@@ -29,6 +29,7 @@ Project
 Akbura
  - [Composable Hooks](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/hooks.md)
  - [Commands](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/commands.md): commands.md
+ - [Parameters and Bindings](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/parameters.md): Parameters and Directional Bindings
  - [Using Components in AXAML](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/axaml-integration.md): Using Akbura Components in AXAML
  - [Editor Completion](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/editor-completion.md)
  - [XML, XAML and AXAML differences](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/xml-xaml-axaml.md): Differences between XML, XAML and AXAML

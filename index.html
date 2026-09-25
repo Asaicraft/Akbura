@@ -912,7 +912,11 @@ param string Title;
 param bind string Search = &quot;&quot;;
 param out TaskItem SelectedTask;
 </code></pre>
-<p>Parameters without default values are required. <code>bind</code> enables two-way flow, while <code>out</code> publishes a value to the parent.</p>
+<p>Parameters without default values are required. A default parameter accepts
+normal parent-to-child assignment, <code>bind</code> allows normal, two-way, and output
+forms, and <code>out</code> accepts only output binding from the child to the parent. Read
+<a href="/akbura/parameters">Parameters and directional bindings</a> for the full contract
+and parent/child examples.</p>
 <h2 id="binding">Binding<a class="header-anchor" href="javascript:;" onclick="location.hash='#binding'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>Akbura supports Avalonia bindings directly in markup:</p>
 <pre><code class="language-akbura">&lt;TextBlock Text=${Binding Title} /&gt;

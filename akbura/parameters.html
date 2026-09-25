@@ -9,7 +9,7 @@
     <base href="https://asaicraft.github.io/Akbura/" />
 
     <link rel="icon" type="image/svg+xml" href="img/logo.svg">
-    <title>Grid</title>
+    <title>Parameters and Directional Bindings</title>
 
     <script>
             if (location.search === "?dark") {
@@ -190,7 +190,7 @@ Akbura									</span>
 									</a>
 								</li>
 								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akbura/parameters" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+									<a href="https://asaicraft.github.io/Akbura/akbura/parameters" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
 										Parameters and Bindings
 									</a>
 								</li>
@@ -235,7 +235,7 @@ Akbura									</span>
 									</a>
 								</li>
 								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akbura/grid" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
+									<a href="https://asaicraft.github.io/Akbura/akbura/grid" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
 										Grid
 									</a>
 								</li>
@@ -258,183 +258,154 @@ Akbura									</span>
 				
 					<section class="not-prose mb-16 md:mb-12">
 						<h1 class="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-gray-50 sm:text-5xl md:text-6xl">
-							Grid
+							Parameters and Directional Bindings
 						</h1>
 					</section>
 
 				<div class="not-prose"></div>
 
 				<div class="content">
-					<p>Avalonia's <code>Grid</code> arranges child controls into rows and columns.</p>
-<p>In <code>.akbura</code> markup, the <code>RowDefinitions</code> and <code>ColumnDefinitions</code> properties support a compact literal syntax:</p>
-<pre><code class="language-akbura">&lt;Grid
-    ColumnDefinitions=&quot;*, 100, Auto&quot;
-    RowDefinitions=&quot;Auto 2* 48&quot;&gt;
-    // content
-&lt;/Grid&gt;
-</code></pre>
-<p>This syntax creates the corresponding Avalonia row and column definitions without requiring each definition to be declared separately.</p>
-<div class="info custom-block">
-            <p class="custom-block-title">INFO</p><p>Grid definition literals are available in <code>.akbura</code> markup attributes.</p>
-</div>
-<p>They are not currently supported as a special AKCSS assignment value.</p>
-<h2 id="grid-lengths">Grid lengths<a class="header-anchor" href="javascript:;" onclick="location.hash='#grid-lengths'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Each definition contains a Grid length.</p>
-<p>The following forms are supported:</p>
+					<h1 id="parameters-and-directional-bindings">Parameters and directional bindings<a class="header-anchor" href="javascript:;" onclick="location.hash='#parameters-and-directional-bindings'" aria-label="Permalink">&ZeroWidthSpace;</a></h1>
+<p>An Akbura component declares its public inputs and outputs with <code>param</code>. A
+parameter without a default value is required. Its modifier defines the
+directions that a parent is allowed to connect.</p>
 <table>
 <thead>
 <tr>
-<th>Syntax</th>
-<th>Meaning</th>
+<th>Declaration</th>
+<th>Direction</th>
+<th>Allowed parent attributes</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>Auto</code></td>
-<td>Size the row or column to its content</td>
+<td><code>param T Value;</code></td>
+<td>parent → child</td>
+<td><code>Value={source}</code></td>
 </tr>
 <tr>
-<td><code>100</code></td>
-<td>Use <code>100</code> device-independent pixels</td>
+<td><code>param bind T Value;</code></td>
+<td>parent ↔ child</td>
+<td><code>Value={source}</code>, <code>bind:Value={target}</code>, <code>out:Value={target}</code></td>
 </tr>
 <tr>
-<td><code>*</code></td>
-<td>Use one proportional star unit</td>
-</tr>
-<tr>
-<td><code>2*</code></td>
-<td>Use two proportional star units</td>
+<td><code>param out T Value;</code></td>
+<td>child → parent</td>
+<td><code>out:Value={target}</code></td>
 </tr>
 </tbody>
 </table>
-<p>For example:</p>
-<pre><code class="language-akbura">&lt;Grid ColumnDefinitions=&quot;Auto, *, 2*, 100&quot; /&gt;
-</code></pre>
-<p>This creates four columns:</p>
-<ol>
-<li>An automatically sized column.</li>
-<li>A column using one share of the available space.</li>
-<li>A column using two shares of the available space.</li>
-<li>A fixed-width column of <code>100</code> device-independent pixels.</li>
-</ol>
-<h2 id="separating-definitions">Separating definitions<a class="header-anchor" href="javascript:;" onclick="location.hash='#separating-definitions'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Definitions may be separated either by commas or by whitespace.</p>
-<p>Using commas:</p>
-<pre><code class="language-akbura">&lt;Grid ColumnDefinitions=&quot;*, 100, Auto&quot; /&gt;
-</code></pre>
-<p>Using whitespace:</p>
-<pre><code class="language-akbura">&lt;Grid RowDefinitions=&quot;Auto * 2* 48&quot; /&gt;
-</code></pre>
-<p>Use one separator style within the same value.</p>
-<p>When the value contains top-level commas, those commas delimit the definitions. Otherwise, the definitions are separated by whitespace.</p>
-<h2 id="minimum-and-maximum-sizes">Minimum and maximum sizes<a class="header-anchor" href="javascript:;" onclick="location.hash='#minimum-and-maximum-sizes'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Grid definitions may include minimum and maximum constraints.</p>
-<pre><code class="language-akbura">&lt;Grid
-    ColumnDefinitions=&quot;
-        min(100),
-        max(300),
-        min-max(100, 300),
-        min-max(100, *, 300),
-        min-max(0, Auto, 100)&quot; /&gt;
-</code></pre>
-<h3 id="minimum-size">Minimum size<a class="header-anchor" href="javascript:;" onclick="location.hash='#minimum-size'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
-<p>Use <code>min(...)</code> to create a star-sized definition with a minimum size:</p>
-<pre><code class="language-akbura">&lt;Grid ColumnDefinitions=&quot;min(100)&quot; /&gt;
-</code></pre>
-<p>This is equivalent to a <code>*</code> column whose minimum width is <code>100</code>.</p>
-<h3 id="maximum-size">Maximum size<a class="header-anchor" href="javascript:;" onclick="location.hash='#maximum-size'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
-<p>Use <code>max(...)</code> to create a star-sized definition with a maximum size:</p>
-<pre><code class="language-akbura">&lt;Grid ColumnDefinitions=&quot;max(300)&quot; /&gt;
-</code></pre>
-<p>This is equivalent to a <code>*</code> column whose maximum width is <code>300</code>.</p>
-<h3 id="minimum-and-maximum-size">Minimum and maximum size<a class="header-anchor" href="javascript:;" onclick="location.hash='#minimum-and-maximum-size'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
-<p>Use <code>min-max(...)</code> to specify both constraints:</p>
-<pre><code class="language-akbura">&lt;Grid ColumnDefinitions=&quot;min-max(100, 300)&quot; /&gt;
-</code></pre>
-<p>The two-argument form uses <code>*</code> as the Grid length.</p>
-<p>You may also provide the Grid length explicitly:</p>
-<pre><code class="language-akbura">&lt;Grid
-    ColumnDefinitions=&quot;
-        min-max(100, 2*, 300),
-        min-max(0, Auto, 100)&quot; /&gt;
-</code></pre>
-<p>Supported forms include:</p>
-<table>
-<thead>
-<tr>
-<th>Syntax</th>
-<th>Result</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>min(100)</code></td>
-<td><code>*</code> with a minimum of <code>100</code></td>
-</tr>
-<tr>
-<td><code>max(300)</code></td>
-<td><code>*</code> with a maximum of <code>300</code></td>
-</tr>
-<tr>
-<td><code>min-max(100, 300)</code></td>
-<td><code>*</code> constrained to <code>100...300</code></td>
-</tr>
-<tr>
-<td><code>min-max(100, *, 300)</code></td>
-<td><code>*</code> constrained to <code>100...300</code></td>
-</tr>
-<tr>
-<td><code>min-max(100, 2*, 300)</code></td>
-<td><code>2*</code> constrained to <code>100...300</code></td>
-</tr>
-<tr>
-<td><code>min-max(0, Auto, 100)</code></td>
-<td><code>Auto</code> constrained to <code>0...100</code></td>
-</tr>
-</tbody>
-</table>
-<h2 id="validation-rules">Validation rules<a class="header-anchor" href="javascript:;" onclick="location.hash='#validation-rules'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Grid definition values are validated by the Akbura compiler.</p>
-<p>The following rules apply:</p>
-<ul>
-<li>Pixel values must be non-negative.</li>
-<li>Minimum values must be non-negative.</li>
-<li>Maximum values must be non-negative.</li>
-<li>In <code>min-max(...)</code>, the minimum value cannot be greater than the maximum value.</li>
-</ul>
-<p>Invalid definitions produce a compiler diagnostic instead of being deferred until runtime.</p>
-<h2 id="complete-example">Complete example<a class="header-anchor" href="javascript:;" onclick="location.hash='#complete-example'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<pre><code class="language-akbura">&lt;Grid
-    ColumnDefinitions=&quot;Auto, min-max(120, *, 320), 2*&quot;
-    RowDefinitions=&quot;Auto * 48&quot;&gt;
+<p><code>bind</code> and <code>out</code> describe the connection between parent and child. They do not
+make an output parameter read-only inside the child: the child writes its output
+normally.</p>
+<h2 id="parent-to-child-parameters">Parent-to-child parameters<a class="header-anchor" href="javascript:;" onclick="location.hash='#parent-to-child-parameters'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Use an unmodified parameter when the parent supplies a value:</p>
+<pre><code class="language-akbura">// Greeting.akbura
+using Avalonia.Controls;
 
-    // Grid content
-&lt;/Grid&gt;
+namespace Demo;
+
+param string Name;
+param string Prefix = &quot;Hello&quot;;
+
+&lt;TextBlock Text={$&quot;{Prefix}, {Name}&quot;} /&gt;
 </code></pre>
-<p>This Grid contains:</p>
+<p>The parent uses ordinary attribute assignment:</p>
+<pre><code class="language-akbura">&lt;Greeting Name={userName} Prefix=&quot;Welcome&quot; /&gt;
+</code></pre>
+<h2 id="two-way-parameters">Two-way parameters<a class="header-anchor" href="javascript:;" onclick="location.hash='#two-way-parameters'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Declare <code>param bind</code> when both parent and child may update the value:</p>
+<pre><code class="language-akbura">// EditorField.akbura
+using Avalonia.Controls;
+
+namespace Demo;
+
+param bind string Text = &quot;&quot;;
+
+&lt;TextBox bind:Text={Text} /&gt;
+</code></pre>
+<p>Connect it to writable parent state with <code>bind:</code>:</p>
+<pre><code class="language-akbura">state string text = &quot;Initial&quot;;
+
+&lt;EditorField bind:Text={text} /&gt;
+&lt;TextBlock Text={text} /&gt;
+</code></pre>
+<p>The initial parent value reaches the child. Later child changes update <code>text</code>,
+and later parent changes update the child. A <code>param bind</code> may also be used as a
+one-way input with <code>Text={text}</code> or as an output-only connection with
+<code>out:Text={text}</code>.</p>
+<h2 id="output-parameters">Output parameters<a class="header-anchor" href="javascript:;" onclick="location.hash='#output-parameters'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Use <code>param out</code> for values owned by the child and published to a writable target
+in the parent:</p>
+<pre><code class="language-akbura">// EditorField.akbura
+using Avalonia.Controls;
+
+namespace Demo;
+
+param bind string Text = &quot;&quot;;
+param out string Submitted = &quot;&quot;;
+
+&lt;StackPanel&gt;
+    &lt;TextBox bind:Text={Text} /&gt;
+    &lt;Button Click={() =&gt; { Submitted = Text; }‎}&gt;Submit&lt;/Button&gt;
+&lt;/StackPanel&gt;
+</code></pre>
+<pre><code class="language-akbura">// ParentView.akbura
+using Avalonia.Controls;
+
+namespace Demo;
+
+state string text = &quot;Initial&quot;;
+state string submitted = &quot;&quot;;
+
+&lt;StackPanel&gt;
+    &lt;EditorField bind:Text={text} out:Submitted={submitted} /&gt;
+    &lt;TextBlock Text={submitted} /&gt;
+&lt;/StackPanel&gt;
+</code></pre>
+<p>The output connection starts observing when it is attached and publishes later
+child changes. It does not replace the parent's current target value merely by
+being attached. Changing <code>submitted</code> in the parent also does not write that
+value back to <code>EditorField.Submitted</code>.</p>
+<h2 id="directional-attributes-on-controls">Directional attributes on controls<a class="header-anchor" href="javascript:;" onclick="location.hash='#directional-attributes-on-controls'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>The same prefixes apply to ordinary markup properties:</p>
+<pre><code class="language-akbura">&lt;TextBox Text={initialText} /&gt;
+&lt;TextBox bind:Text={editableText} /&gt;
+&lt;TextBox out:Text={observedText} /&gt;
+</code></pre>
 <ul>
-<li><p>Three columns:</p>
-<ul>
-<li>an automatically sized column;</li>
-<li>a star-sized column constrained to <code>120...320</code>;</li>
-<li>a column receiving two proportional shares of the remaining space;</li>
+<li>Normal assignment requires a writable property.</li>
+<li><code>bind:</code> requires a readable and writable property plus the existing supported
+observation contract.</li>
+<li><code>out:</code> requires a readable property plus the existing supported observation
+contract.</li>
 </ul>
-</li>
-<li><p>Three rows:</p>
-<ul>
-<li>an automatically sized row;</li>
-<li>a row filling the remaining space;</li>
-<li>a fixed row with a height of <code>48</code>.</li>
-</ul>
-</li>
-</ul>
+<p>A public getter alone does not invent change notifications. If the compiler
+cannot observe the property, it reports the existing binding diagnostic instead
+of generating a connection that only appears reactive.</p>
+<h2 id="multiple-output-receivers">Multiple output receivers<a class="header-anchor" href="javascript:;" onclick="location.hash='#multiple-output-receivers'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Output readers do not compete with the one setter of a property. These forms are
+valid:</p>
+<pre><code class="language-akbura">&lt;TextBox Text={initialText} out:Text={firstObserver} /&gt;
+&lt;TextBox bind:Text={editableText} out:Text={auditText} /&gt;
+&lt;TextBox out:Text={firstObserver} out:Text={secondObserver} /&gt;
+</code></pre>
+<p>Two normal setters, or a normal setter combined with <code>bind:</code> for the same
+property, conflict:</p>
+<pre><code class="language-akbura">&lt;TextBox Text={first} Text={second} /&gt;
+&lt;TextBox Text={first} bind:Text={second} /&gt;
+</code></pre>
+<p>Completion follows the same rules: it keeps valid <code>out:</code> candidates available,
+does not suggest members lacking the required accessors, and inserts a new
+directional target as <code>bind:Text={}</code> or <code>out:Text={}</code> with the caret inside the
+braces.</p>
 
 				</div>
 
 				<div class="not-prose"></div>
 				
 					<div class="not-prose py-8">
-						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/src/AkburaDocs/_pages/akbura/grid.md" target="_blank" rel="noopener noreferrer">
+						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/src/AkburaDocs/_pages/akbura/parameters.md" target="_blank" rel="noopener noreferrer">
 							Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
 						</a>
 					</div>
@@ -442,18 +413,18 @@ Akbura									</span>
 					<div class="not-prose my-20">
 								<nav class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 sm:px-0">
 									<div class="-mt-px flex w-0 flex-1">
-											<a href="https://asaicraft.github.io/Akbura/#avalonia-styles" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+											<a href="https://asaicraft.github.io/Akbura/akbura/commands" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
 												<!-- Heroicon name: mini/arrow-long-left -->
 												<svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 													<path fill-rule="evenodd" d="M18 10a.75.75 0 01-.75.75H4.66l2.1 1.95a.75.75 0 11-1.02 1.1l-3.5-3.25a.75.75 0 010-1.1l3.5-3.25a.75.75 0 111.02 1.1l-2.1 1.95h12.59A.75.75 0 0118 10z" clip-rule="evenodd"></path>
 												</svg>
-												Avalonia Styles
+												Commands
 											</a>
 									</div>
 									<div class="hidden md:-mt-px md:flex"></div>
 									<div class="-mt-px flex w-0 flex-1 justify-end">
-											<a href="https://asaicraft.github.io/Akbura/akbura/items-control" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
-												ItemsControl
+											<a href="https://asaicraft.github.io/Akbura/akbura/axaml-integration" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												Using Components in AXAML
 												<!-- Heroicon name: mini/arrow-long-right -->
 												<svg class="ml-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 													<path fill-rule="evenodd" d="M2 10a.75.75 0 01.75-.75h12.59l-2.1-1.95a.75.75 0 111.02-1.1l3.5 3.25a.75.75 0 010 1.1l-3.5 3.25a.75.75 0 11-1.02-1.1l2.1-1.95H2.75A.75.75 0 012 10z" clip-rule="evenodd"></path>
@@ -472,48 +443,28 @@ Akbura									</span>
 							</h5>
 							<ul class="text-slate-700 text-sm leading-6">
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#grid-lengths'" data-id="grid-lengths" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Grid lengths
+										<span v-hash="'#parent-to-child-parameters'" data-id="parent-to-child-parameters" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Parent-to-child parameters
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#separating-definitions'" data-id="separating-definitions" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Separating definitions
+										<span v-hash="'#two-way-parameters'" data-id="two-way-parameters" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Two-way parameters
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#minimum-and-maximum-sizes'" data-id="minimum-and-maximum-sizes" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Minimum and maximum sizes
-										</span>
-											<ul class="ml-4">
-													<li data-id="minimum-size" class="text-gray-500 hover:text-gray-900">
-														<span v-hash="'#minimum-size'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
-															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
-															Minimum size
-														</span>
-													</li>
-													<li data-id="maximum-size" class="text-gray-500 hover:text-gray-900">
-														<span v-hash="'#maximum-size'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
-															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
-															Maximum size
-														</span>
-													</li>
-													<li data-id="minimum-and-maximum-size" class="text-gray-500 hover:text-gray-900">
-														<span v-hash="'#minimum-and-maximum-size'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
-															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
-															Minimum and maximum size
-														</span>
-													</li>
-											</ul>
-									</li>
-									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#validation-rules'" data-id="validation-rules" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Validation rules
+										<span v-hash="'#output-parameters'" data-id="output-parameters" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Output parameters
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#complete-example'" data-id="complete-example" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Complete example
+										<span v-hash="'#directional-attributes-on-controls'" data-id="directional-attributes-on-controls" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Directional attributes on controls
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#multiple-output-receivers'" data-id="multiple-output-receivers" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Multiple output receivers
 										</span>
 									</li>
 							</ul>

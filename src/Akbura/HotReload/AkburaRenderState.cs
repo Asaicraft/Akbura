@@ -306,7 +306,7 @@ public sealed partial class AkburaRenderState : IDisposable
 
     /// <summary>
     /// Applies an Avalonia binding previously accepted by
-    /// <see cref="ShouldApplyOwnedOperation"/>.
+    /// <see cref="ShouldApplyOwnedOperation(int, string, string)"/>.
     /// </summary>
     public void ApplyBindingOperation(
         int localId,
@@ -358,7 +358,7 @@ public sealed partial class AkburaRenderState : IDisposable
 
     /// <summary>
     /// Attaches an observable Avalonia property binding previously accepted by
-    /// <see cref="ShouldApplyOwnedOperation"/>.
+    /// <see cref="ShouldApplyOwnedOperation(int, string, string)"/>.
     /// </summary>
     public void ApplyObservableBindingOperation(
         int localId,
@@ -410,7 +410,7 @@ public sealed partial class AkburaRenderState : IDisposable
 
     /// <summary>
     /// Attaches a CLR event handler previously accepted by
-    /// <see cref="ShouldApplyOwnedOperation"/>.
+    /// <see cref="ShouldApplyOwnedOperation(int, string, string)"/>.
     /// </summary>
     public void ApplyClrEventOperation(
         int localId,
@@ -471,7 +471,7 @@ public sealed partial class AkburaRenderState : IDisposable
 
     /// <summary>
     /// Attaches an Avalonia routed-event handler previously accepted by
-    /// <see cref="ShouldApplyOwnedOperation"/>.
+    /// <see cref="ShouldApplyOwnedOperation(int, string, string)"/>.
     /// </summary>
     public void ApplyRoutedEventOperation(
         int localId,

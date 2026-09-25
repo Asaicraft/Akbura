@@ -1,4 +1,4 @@
-using Akbura.Language;
+﻿using Akbura.Language;
 using Akbura.Language.Operations;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
@@ -972,6 +972,35 @@ public sealed class WorkspaceClassificationTests
                 classification.Span == referenceSpan &&
                 classification.Kind ==
                     AkburaClassificationKind.Identifier);
+    }
+
+    [Theory]
+    [InlineData("command void NavigateTo();")]
+    [InlineData("command void NavigateTo(Avalonia.Controls.Control button);")]
+    public void SemanticClassification_CommandDeclarationNameIsMethod(string declaration)
+    {
+        var source =
+            "using Avalonia.Controls;\r\n\r\n" +
+            declaration + "\r\n\r\n" +
+            "<Border/>";
+        using var workspace = CreateSemanticWorkspace();
+        var text = SourceText.From(source);
+        var context = workspace.OpenOrChangeDocumentContext(
+            new Uri(Path.GetFullPath("NavButton.akbura")),
+            text);
+        var nameStart = source.IndexOf(
+            "NavigateTo",
+            StringComparison.Ordinal);
+        var classifications = workspace.LanguageServices.Classification
+            .GetClassifications(
+                context,
+                new TextSpan(0, text.Length));
+
+        AssertOnlyClassification(
+            classifications,
+            nameStart,
+            "NavigateTo".Length,
+            AkburaClassificationKind.MethodName);
     }
 
     [Theory]

@@ -3,7 +3,12 @@ using System.Windows.Input;
 
 namespace Akbura.Commands;
 
-/// <summary>Creates typed runtime commands from markup handlers without changing generated component shape.</summary>
+/// <summary>Creates typed runtime commands from synchronous, <see cref="Task"/>, and <see cref="ValueTask"/> handlers.</summary>
+/// <remarks>
+/// This factory is used by generated component code. Application code normally declares a
+/// <c>command</c> in an <c>.akbura</c> component and supplies a lambda, delegate, method group,
+/// or compatible <see cref="IAkburaCommand"/> through markup.
+/// </remarks>
 [EditorBrowsable(EditorBrowsableState.Never)]
 [Browsable(false)]
 public static class AkburaCommandFactory

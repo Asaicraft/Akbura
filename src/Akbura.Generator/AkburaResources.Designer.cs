@@ -275,6 +275,15 @@ namespace Akbura {
                 return ResourceManager.GetString("AKBURA_SEMANTIC_MarkupCommandHandlerSignatureMismatch", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Command result type '{0}' is awaitable. Commands already execute asynchronously; usually declare the logical result type '{1}' unless the awaitable itself is the intended value..
+        /// </summary>
+        internal static string AKBURA_SEMANTIC_CommandResultIsAwaitable {
+            get {
+                return ResourceManager.GetString("AKBURA_SEMANTIC_CommandResultIsAwaitable", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to Markup property &apos;{0}&apos; already has a setter on this element..

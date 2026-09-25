@@ -494,6 +494,14 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
 
             switch (node)
             {
+                case CommandDeclarationSyntax declaration:
+                    AddCommandDeclarationClassification(
+                        semanticModel,
+                        declaration,
+                        requestedSpan,
+                        builder);
+                    continue;
+
                 case StateDeclarationSyntax declaration
                     when declaration.Initializer.FullSpan.OverlapsWith(requestedSpan):
                     references = semanticModel.GetCSharpSymbolReferences(
@@ -551,6 +559,19 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
                 requestedSpan,
                 builder);
         }
+    }
+
+    private static void AddCommandDeclarationClassification(AkburaSemanticModel semanticModel, CommandDeclarationSyntax declaration, TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
+    {
+        if (!declaration.Name.Span.OverlapsWith(requestedSpan) ||
+            semanticModel.GetDeclaredSymbol(declaration) is not ICommandSymbol)
+        {
+            return;
+        }
+
+        builder.Add(new AkburaClassifiedSpan(
+            declaration.Name.Span,
+            AkburaClassificationKind.MethodName));
     }
 
     private static void AddReferences(ImmutableArray<CSharpSymbolReference> references, TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder)

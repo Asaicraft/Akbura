@@ -1,7 +1,9 @@
-using Akbura.Diagnostics;
+﻿using Akbura.Diagnostics;
 using Akbura.Language.Syntax;
 using Akbura.Workspaces.Diagnostics;
 using Akbura.Workspaces.Documents;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 
@@ -109,6 +111,44 @@ public sealed class CanonicalDiagnosticServiceTests
             Assert.Equal(text.Lines.GetLinePositionSpan(diagnostic.Span), canonical.LineSpan);
             Assert.True(canonical.Provenance.HasFlag(DiagnosticProvenance.Workspaces));
         }
+    }
+
+    [Fact]
+    public void WorkspaceDiagnosticsPublishesAwaitableCommandSuggestionAsInfoOnReturnType()
+    {
+        const string source = "command System.Threading.Tasks.Task<int> Load();";
+        var platformReferences = ((string?)AppContext.GetData(
+                "TRUSTED_PLATFORM_ASSEMBLIES"))?
+            .Split(Path.PathSeparator)
+            .Select(static path => MetadataReference.CreateFromFile(path))
+            .ToArray() ?? [];
+        var compilation = CSharpCompilation.Create(
+            "CommandDiagnostics",
+            references: platformReferences,
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        using var workspace = new AkburaWorkspace(new ProjectContext(
+            ProjectId.CreateNewId(),
+            projectFilePath: string.Empty,
+            projectDirectory: Environment.CurrentDirectory,
+            rootNamespace: string.Empty,
+            compilation,
+            ImmutableArray<ProjectReference>.Empty));
+        var text = SourceText.From(source);
+        var context = workspace.OpenOrChangeDocumentContext(
+            new Uri(Path.GetFullPath("Command.akbura")),
+            text);
+
+        var diagnostic = Assert.Single(
+            workspace.LanguageServices.Diagnostics.GetDiagnostics(
+                context,
+                new TextSpan(0, text.Length)),
+            static diagnostic => diagnostic.Code == "AKBURA_SEMANTIC_CommandResultIsAwaitable");
+
+        Assert.Equal(AkburaDiagnosticSeverity.Info, diagnostic.Severity);
+        Assert.Equal(
+            "System.Threading.Tasks.Task<int>",
+            text.ToString(diagnostic.Span));
     }
 
     [Fact]

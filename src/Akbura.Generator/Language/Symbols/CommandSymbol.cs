@@ -81,7 +81,18 @@ internal sealed class CommandSymbol : Symbol, ICommandSymbol
 
     public override string ToDisplayString()
     {
-        var returnType = ReturnType.IsDefault ? "unknown" : ReturnType.Name;
-        return $"command {returnType} {Name}";
+        var returnType = ReturnType.IsDefault
+            ? "unknown"
+            : ReturnType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+        var parameters = string.Join(
+            ", ",
+            Parameters
+                .OrderBy(static parameter => parameter.Ordinal)
+                .Select(static parameter =>
+                    (parameter.Type.IsDefault
+                        ? "unknown"
+                        : parameter.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)) +
+                    " " + parameter.Name));
+        return $"command {returnType} {Name}({parameters})";
     }
 }

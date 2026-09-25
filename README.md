@@ -75,6 +75,18 @@ useEffect(() =>
 </Button>
 ```
 
+## Commands
+
+A child component declares a typed command and a parent supplies a compatible lambda, delegate, method group, or existing `IAkburaCommand`; no custom command class is required:
+
+```akbura
+command void NavigateTo(NavButton button);
+
+<NavButton NavigateTo={button => button.IsActive = true} />
+```
+
+Commands expose awaitable `Execute` and observable `CanExecute`/`IsExecuting` state. See the [Commands guide](https://asaicraft.github.io/Akbura/akbura/commands) for async handlers, results, execution behavior, and IDE support.
+
 For installation, language syntax, state, commands, hooks, and AKCSS, see the **[Akbura documentation](https://asaicraft.github.io/Akbura/)**.
 
 ## Links

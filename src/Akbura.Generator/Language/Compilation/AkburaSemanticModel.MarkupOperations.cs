@@ -3986,63 +3986,11 @@ internal partial class AkburaSemanticModel
             .WithModifiers(CSharpSyntaxFactory.TokenList(
                 CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.PrivateKeyword),
                 CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.SealedKeyword)))
-            .WithMembers(CSharpSyntaxFactory.List(CreateCommandProbeTypeMembers(commandDeclaration, command)));
+            .WithMembers(CSharpSyntaxFactory.List(
+                CSharpProbeBinder.CreateCommandProbeTypeMembers(command)));
         var commandField = CreateProbeField(commandType, command.Name);
 
         return ImmutableArray.Create<CSharp.MemberDeclarationSyntax>(commandClass, commandField);
-    }
-
-    private ImmutableArray<CSharp.MemberDeclarationSyntax> CreateCommandProbeTypeMembers(CommandDeclarationSyntax commandDeclaration, ICommandSymbol command)
-    {
-        using var builder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
-
-        builder.Add(CSharpSyntaxFactory.PropertyDeclaration(
-                CSharpSyntaxFactory.ParseTypeName("global::System.IObservable<bool>"),
-                "IsExecuting")
-            .WithModifiers(CSharpSyntaxFactory.TokenList(
-                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.PublicKeyword)))
-            .WithExpressionBody(CSharpSyntaxFactory.ArrowExpressionClause(
-                CSharpSyntaxFactory.LiteralExpression(Microsoft.CodeAnalysis.CSharp.SyntaxKind.DefaultLiteralExpression)))
-            .WithSemicolonToken(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.SemicolonToken)));
-
-        builder.Add(CSharpSyntaxFactory.PropertyDeclaration(
-                CSharpSyntaxFactory.ParseTypeName("global::System.IObservable<bool>"),
-                "CanExecute")
-            .WithModifiers(CSharpSyntaxFactory.TokenList(
-                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.PublicKeyword)))
-            .WithExpressionBody(CSharpSyntaxFactory.ArrowExpressionClause(
-                CSharpSyntaxFactory.LiteralExpression(Microsoft.CodeAnalysis.CSharp.SyntaxKind.DefaultLiteralExpression)))
-            .WithSemicolonToken(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.SemicolonToken)));
-
-        var parameterList = GetCSharpParameterList(commandDeclaration.Parameters) ??
-            CSharpSyntaxFactory.ParameterList();
-        var execute = CSharpSyntaxFactory.MethodDeclaration(
-                GetCommandExecuteReturnTypeSyntax(command),
-                "Execute")
-            .WithModifiers(CSharpSyntaxFactory.TokenList(
-                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.PublicKeyword)))
-            .WithParameterList(parameterList)
-            .WithBody(CSharpSyntaxFactory.Block(CSharpSyntaxFactory.ThrowStatement(
-                CSharpSyntaxFactory.ObjectCreationExpression(
-                        CSharpSyntaxFactory.ParseTypeName("global::System.NotImplementedException"))
-                    .WithArgumentList(CSharpSyntaxFactory.ArgumentList()))));
-
-        builder.Add(execute);
-        return builder.ToImmutable();
-    }
-
-    private static CSharp.TypeSyntax GetCommandExecuteReturnTypeSyntax(ICommandSymbol command)
-    {
-        if (command.HasResult &&
-            !command.ResultType.IsDefault)
-        {
-            return CSharpSyntaxFactory.ParseTypeName(
-                "global::System.Threading.Tasks.ValueTask<" +
-                command.ResultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) +
-                ">");
-        }
-
-        return CSharpSyntaxFactory.ParseTypeName("global::System.Threading.Tasks.ValueTask");
     }
 
     private static string ToCSharpIdentifier(string value)

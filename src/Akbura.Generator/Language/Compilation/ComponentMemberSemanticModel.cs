@@ -1,4 +1,4 @@
-using Akbura.Language.Binder;
+﻿using Akbura.Language.Binder;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -485,6 +485,10 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                     returnTypeBinding,
                     diagnosticsBuilder,
                     allowVoid: true);
+                AddAwaitableCommandResultDiagnostic(
+                    commandDeclaration,
+                    returnType.Symbol as ITypeSymbol,
+                    diagnosticsBuilder);
                 diagnosticsBag.AddRange(diagnosticsBuilder.ToImmutable());
             }
             var diagnostics = SetSemanticDiagnostics(commandDeclaration, diagnosticsBag);
@@ -503,6 +507,57 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 symbolInfo,
                 diagnostics));
             return symbolInfo;
+        }
+
+        private void AddAwaitableCommandResultDiagnostic(CommandDeclarationSyntax declaration, ITypeSymbol? returnType, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnostics)
+        {
+            if (returnType is not INamedTypeSymbol namedType ||
+                namedType.TypeKind == TypeKind.Error ||
+                !TryGetAwaitableLogicalResult(namedType, out var logicalResult))
+            {
+                return;
+            }
+
+            diagnostics.Add(new AkburaSemanticDiagnostic(
+                declaration,
+                ErrorCodes.AKBURA_SEMANTIC_CommandResultIsAwaitable,
+                [
+                    namedType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+                    logicalResult,
+                ],
+                AkburaDiagnosticSeverity.Info,
+                new Microsoft.CodeAnalysis.Text.TextSpan(
+                    declaration.ReturnType.Span.Start,
+                    declaration.ReturnType.ToCSharp().Span.Length)));
+        }
+
+        private bool TryGetAwaitableLogicalResult(INamedTypeSymbol type, out string logicalResult)
+        {
+            var definition = type.OriginalDefinition;
+            var compilation = Compilation.CSharpCompilation;
+            var task = compilation.GetTypeByMetadataName("System.Threading.Tasks.Task");
+            var taskOfT = compilation.GetTypeByMetadataName("System.Threading.Tasks.Task`1");
+            var valueTask = compilation.GetTypeByMetadataName("System.Threading.Tasks.ValueTask");
+            var valueTaskOfT = compilation.GetTypeByMetadataName("System.Threading.Tasks.ValueTask`1");
+
+            if (SymbolEqualityComparer.Default.Equals(definition, task) ||
+                SymbolEqualityComparer.Default.Equals(definition, valueTask))
+            {
+                logicalResult = "void";
+                return true;
+            }
+
+            if ((SymbolEqualityComparer.Default.Equals(definition, taskOfT) ||
+                    SymbolEqualityComparer.Default.Equals(definition, valueTaskOfT)) &&
+                type.TypeArguments.Length == 1)
+            {
+                logicalResult = type.TypeArguments[0].ToDisplayString(
+                    SymbolDisplayFormat.MinimallyQualifiedFormat);
+                return true;
+            }
+
+            logicalResult = string.Empty;
+            return false;
         }
 
         private ImmutableArray<BoundNode> CreateBoundChildrenForComponent(AkburaDocumentSyntax document)

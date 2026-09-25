@@ -4374,6 +4374,248 @@ public sealed class WorkspaceCompletionTests
             });
     }
 
+    [Theory]
+    [InlineData("<Button Command={async () => await NavigateTo.|} />", true, '\0')]
+    [InlineData("<Button Command={async () => await NavigateTo.Ex|} />", true, '\0')]
+    [InlineData("<Button Command={async () => { await NavigateTo.|; }} />", true, '\0')]
+    [InlineData("<Button Command={async () => await NavigateTo.|} />", false, '.')]
+    public void ProjectedCSharpService_CommandMembersCompleteInsideMarkupLambda(string markupWithCaret, bool isExplicit, char triggerCharacter)
+    {
+        var sourceWithCaret =
+            "namespace Gallery;\r\n" +
+            "using Avalonia.Controls;\r\n\r\n" +
+            "command void NavigateTo(Avalonia.Controls.Control button);\r\n\r\n" +
+            markupWithCaret;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.ProjectedCSharp
+                    .GetCompletionsAsync(
+                        syntacticDocument,
+                        semanticContext,
+                        position,
+                        new AkburaProjectedCompletionTrigger(
+                            IsExplicit: isExplicit,
+                            IsIncomplete: false,
+                            Character: triggerCharacter))
+                    .GetAwaiter()
+                    .GetResult();
+
+                Assert.NotNull(result);
+                Assert.Contains(
+                    result.Value.Items,
+                    static item =>
+                        item.DisplayText == "Execute" &&
+                        item.Kind == AkburaProjectedCompletionKind.Method);
+                if (!sourceWithCaret.Contains(".Ex|", StringComparison.Ordinal))
+                {
+                    Assert.Contains(
+                        result.Value.Items,
+                        static item =>
+                            item.DisplayText == "CanExecute" &&
+                            item.Kind == AkburaProjectedCompletionKind.Property);
+                    Assert.Contains(
+                        result.Value.Items,
+                        static item =>
+                            item.DisplayText == "IsExecuting" &&
+                            item.Kind == AkburaProjectedCompletionKind.Property);
+                }
+            });
+    }
+
+    [Theory]
+    [InlineData(
+        "command void NavigateTo(Avalonia.Controls.Control button);",
+        "NavigateTo.Ex|",
+        "ValueTask<object>",
+        "Control value1")]
+    [InlineData(
+        "command string Load();",
+        "Load.Ex|",
+        "ValueTask<object?>",
+        "params object[] args")]
+    public void ProjectedCSharpService_CommandExecuteResolveUsesRuntimeSignatureAndDocumentation(string declaration, string expressionWithCaret, string expectedReturnType, string expectedParameter)
+    {
+        var sourceWithCaret =
+            "namespace Gallery;\r\n" +
+            "using Avalonia.Controls;\r\n\r\n" +
+            declaration + "\r\n" +
+            "var result = " + expressionWithCaret + ";\r\n\r\n" +
+            "<StackPanel/>";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var completion = workspace.LanguageServices.ProjectedCSharp
+                    .GetCompletionsAsync(
+                        syntacticDocument,
+                        semanticContext,
+                        position,
+                        new AkburaProjectedCompletionTrigger(
+                            IsExplicit: true,
+                            IsIncomplete: false,
+                            Character: '\0'))
+                    .GetAwaiter()
+                    .GetResult();
+                Assert.NotNull(completion);
+                var execute = Assert.Single(
+                    completion.Value.Items,
+                    static item => item.DisplayText == "Execute");
+
+                var resolution = workspace.LanguageServices.ProjectedCSharp
+                    .ResolveCompletionAsync(
+                        syntacticDocument,
+                        semanticContext,
+                        position,
+                        execute.ResolveKey)
+                    .GetAwaiter()
+                    .GetResult();
+
+                Assert.NotNull(resolution);
+                Assert.Contains(expectedReturnType, resolution.Documentation, StringComparison.Ordinal);
+                Assert.Contains(expectedParameter, resolution.Documentation, StringComparison.Ordinal);
+                Assert.Contains("Executes the command asynchronously", resolution.Documentation, StringComparison.Ordinal);
+                Assert.DoesNotContain("__AkburaCommand_", resolution.Documentation, StringComparison.Ordinal);
+            });
+    }
+
+    [Fact]
+    public void SignatureHelp_CommandExecuteUsesRuntimeParametersAndDocumentation()
+    {
+        const string sourceWithCaret =
+            "namespace Gallery;\r\n" +
+            "using Avalonia.Controls;\r\n\r\n" +
+            "command int NavigateTo(Control button, string route);\r\n" +
+            "var result = NavigateTo.Execute(default!, |);\r\n\r\n" +
+            "<StackPanel/>";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var signatureHelp = workspace.LanguageServices.SignatureHelp
+                    .GetSignatureHelp(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.NotNull(signatureHelp);
+                var signature = Assert.Single(signatureHelp.Signatures);
+                Assert.Contains("ValueTask<int> Execute(Control value1, string value2)", signature.Label, StringComparison.Ordinal);
+                Assert.Contains("Executes the command asynchronously", signature.Documentation, StringComparison.Ordinal);
+                Assert.Equal(1, signatureHelp.ActiveParameter);
+            });
+    }
+
+    [Theory]
+    [InlineData("command void Navi|gateTo(Control button);\r\n\r\n<StackPanel/>")]
+    [InlineData("command void NavigateTo(Control button);\r\n\r\n<Button Command={async () => await Navi|gateTo.Execute(default!)} />")]
+    public void QuickInfo_CommandUsesSourceContract(string sourceFragmentWithCaret)
+    {
+        var sourceWithCaret =
+            "namespace Gallery;\r\n" +
+            "using Avalonia.Controls;\r\n\r\n" +
+            sourceFragmentWithCaret;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, _) =>
+            {
+                var quickInfo = workspace.LanguageServices.QuickInfo
+                    .GetQuickInfo(semanticContext, position);
+
+                Assert.NotNull(quickInfo);
+                Assert.Equal(
+                    "command void NavigateTo(Control button)",
+                    quickInfo.Signature);
+                Assert.DoesNotContain("__AkburaCommand_", quickInfo.Signature, StringComparison.Ordinal);
+            });
+    }
+
+    [Theory]
+    [InlineData("var result = NavigateTo.|;")]
+    [InlineData("void Local() { var result = NavigateTo.|; }")]
+    [InlineData("var result = this.NavigateTo.|;")]
+    [InlineData("var command = NavigateTo;\r\nvar result = command.|;")]
+    public void ProjectedCSharpService_CommandMembersCompleteAcrossCSharpScopes(string statementWithCaret)
+    {
+        var sourceWithCaret =
+            "namespace Gallery;\r\n" +
+            "using Avalonia.Controls;\r\n\r\n" +
+            "command void NavigateTo(Control button);\r\n" +
+            statementWithCaret + "\r\n\r\n" +
+            "<StackPanel/>";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var completion = workspace.LanguageServices.ProjectedCSharp
+                    .GetCompletionsAsync(
+                        syntacticDocument,
+                        semanticContext,
+                        position,
+                        new AkburaProjectedCompletionTrigger(
+                            IsExplicit: true,
+                            IsIncomplete: false,
+                            Character: '\0'))
+                    .GetAwaiter()
+                    .GetResult();
+
+                Assert.NotNull(completion);
+                Assert.Contains(completion.Value.Items, static item => item.DisplayText == "Execute");
+                Assert.Contains(completion.Value.Items, static item => item.DisplayText == "CanExecute");
+                Assert.Contains(completion.Value.Items, static item => item.DisplayText == "IsExecuting");
+            });
+    }
+
+    [Fact]
+    public void ProjectedCSharpService_LocalSymbolShadowsCommandBySemanticIdentity()
+    {
+        const string sourceWithCaret =
+            "namespace Gallery;\r\n" +
+            "using Avalonia.Controls;\r\n\r\n" +
+            "command void NavigateTo(Control button);\r\n" +
+            "void Local() { string NavigateTo = string.Empty; var result = NavigateTo.|; }\r\n\r\n" +
+            "<StackPanel/>";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var completion = workspace.LanguageServices.ProjectedCSharp
+                    .GetCompletionsAsync(
+                        syntacticDocument,
+                        semanticContext,
+                        position,
+                        new AkburaProjectedCompletionTrigger(
+                            IsExplicit: true,
+                            IsIncomplete: false,
+                            Character: '\0'))
+                    .GetAwaiter()
+                    .GetResult();
+
+                Assert.NotNull(completion);
+                Assert.Contains(completion.Value.Items, static item => item.DisplayText == "Length");
+                Assert.DoesNotContain(completion.Value.Items, static item => item.DisplayText == "Execute");
+            });
+    }
+
     [Fact]
     public void CSharpProjection_UseEffectCallbackOffersComponentMembers()
     {

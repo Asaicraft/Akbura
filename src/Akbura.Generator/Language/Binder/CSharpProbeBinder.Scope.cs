@@ -19,6 +19,18 @@ namespace Akbura.Language.Binder;
 
 internal sealed partial class CSharpProbeBinder
 {
+    private static readonly Microsoft.CodeAnalysis.SyntaxTriviaList s_commandIsExecutingDocumentation =
+        CSharpSyntaxFactory.ParseLeadingTrivia(
+            "/// <summary>" + CommandSymbolDocumentation.IsExecuting + "</summary>\r\n");
+
+    private static readonly Microsoft.CodeAnalysis.SyntaxTriviaList s_commandCanExecuteDocumentation =
+        CSharpSyntaxFactory.ParseLeadingTrivia(
+            "/// <summary>" + CommandSymbolDocumentation.CanExecute + "</summary>\r\n");
+
+    private static readonly Microsoft.CodeAnalysis.SyntaxTriviaList s_commandExecuteDocumentation =
+        CSharpSyntaxFactory.ParseLeadingTrivia(
+            "/// <summary>" + CommandSymbolDocumentation.Execute + "</summary>\r\n");
+
     internal const string StateCompletionAnnotationKind =
         "AkburaCSharpCompletionState";
 
@@ -548,13 +560,14 @@ internal sealed partial class CSharpProbeBinder
             command));
     }
 
-    private static ImmutableArray<CSharp.MemberDeclarationSyntax> CreateCommandProbeTypeMembers(ICommandSymbol command)
+    internal static ImmutableArray<CSharp.MemberDeclarationSyntax> CreateCommandProbeTypeMembers(ICommandSymbol command)
     {
         using var builder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
 
         builder.Add(CSharpSyntaxFactory.PropertyDeclaration(
                 CSharpSyntaxFactory.ParseTypeName("global::System.IObservable<bool>"),
                 "IsExecuting")
+            .WithLeadingTrivia(s_commandIsExecutingDocumentation)
             .WithModifiers(CSharpSyntaxFactory.TokenList(CSharpSyntaxFactory.Token(CSharpSyntaxKind.PublicKeyword)))
             .WithExpressionBody(CSharpSyntaxFactory.ArrowExpressionClause(
                 CSharpSyntaxFactory.LiteralExpression(CSharpSyntaxKind.DefaultLiteralExpression)))
@@ -563,6 +576,7 @@ internal sealed partial class CSharpProbeBinder
         builder.Add(CSharpSyntaxFactory.PropertyDeclaration(
                 CSharpSyntaxFactory.ParseTypeName("global::System.IObservable<bool>"),
                 "CanExecute")
+            .WithLeadingTrivia(s_commandCanExecuteDocumentation)
             .WithModifiers(CSharpSyntaxFactory.TokenList(CSharpSyntaxFactory.Token(CSharpSyntaxKind.PublicKeyword)))
             .WithExpressionBody(CSharpSyntaxFactory.ArrowExpressionClause(
                 CSharpSyntaxFactory.LiteralExpression(CSharpSyntaxKind.DefaultLiteralExpression)))
@@ -571,6 +585,7 @@ internal sealed partial class CSharpProbeBinder
         builder.Add(CSharpSyntaxFactory.MethodDeclaration(
                 GetCommandExecuteReturnTypeSyntax(command),
                 "Execute")
+            .WithLeadingTrivia(s_commandExecuteDocumentation)
             .WithModifiers(CSharpSyntaxFactory.TokenList(CSharpSyntaxFactory.Token(CSharpSyntaxKind.PublicKeyword)))
             .WithParameterList(CreateCommandExecuteParameterList(command))
             .WithBody(CSharpSyntaxFactory.Block(CSharpSyntaxFactory.ThrowStatement(
@@ -585,7 +600,7 @@ internal sealed partial class CSharpProbeBinder
     {
         if (command.Parameters.IsDefaultOrEmpty)
         {
-            return CSharpSyntaxFactory.ParameterList();
+            return CSharpSyntaxFactory.ParseParameterList("(params object[] args)");
         }
 
         using var builder = ImmutableArrayBuilder<CSharp.ParameterSyntax>.Rent();
@@ -596,7 +611,7 @@ internal sealed partial class CSharpProbeBinder
                     typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
                 : CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(CSharpSyntaxKind.ObjectKeyword));
             builder.Add(CSharpSyntaxFactory.Parameter(
-                    CSharpSyntaxFactory.Identifier(parameter.Name))
+                    CSharpSyntaxFactory.Identifier("value" + (parameter.Ordinal + 1)))
                 .WithType(type));
         }
 
@@ -606,6 +621,12 @@ internal sealed partial class CSharpProbeBinder
 
     private static CSharp.TypeSyntax GetCommandExecuteReturnTypeSyntax(ICommandSymbol command)
     {
+        if (command.Parameters.IsDefaultOrEmpty)
+        {
+            return CSharpSyntaxFactory.ParseTypeName(
+                "global::System.Threading.Tasks.ValueTask<object?>");
+        }
+
         if (command.HasResult &&
             command.ResultType.Symbol is ITypeSymbol resultType)
         {
@@ -615,7 +636,8 @@ internal sealed partial class CSharpProbeBinder
                 ">");
         }
 
-        return CSharpSyntaxFactory.ParseTypeName("global::System.Threading.Tasks.ValueTask");
+        return CSharpSyntaxFactory.ParseTypeName(
+            "global::System.Threading.Tasks.ValueTask<object>");
     }
 
     private static CSharp.FieldDeclarationSyntax CreateProbeField(

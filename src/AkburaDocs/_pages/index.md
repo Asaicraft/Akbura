@@ -587,20 +587,17 @@ async loading, external subscriptions and reducers built from these primitives.
 
 ## Commands
 
-Commands expose typed operations with reactive execution state:
+Commands let a child declare a typed operation while its parent supplies a lambda, delegate, method group, or compatible command:
 
 ```akbura
-command int Refresh(int userId);
+// NavButton.akbura
+command void NavigateTo(NavButton button);
 
-<Button Click={async () => {
-    var result = await Refresh.Execute(42);
-    Console.WriteLine(result);
-}}>
-    Refresh
-</Button>
+// Parent markup
+<NavButton NavigateTo={button => button.IsActive = true} />
 ```
 
-Command facades provide `Execute`, `CanExecute`, and `IsExecuting`.
+Command facades provide awaitable `Execute` plus observable `CanExecute` and `IsExecuting` state. See [Commands](/akbura/commands) for results, async handlers, method groups, execution state, IDE support, and the difference between native commands, `Button.Command`, and routed events.
 
 ## AKCSS
 

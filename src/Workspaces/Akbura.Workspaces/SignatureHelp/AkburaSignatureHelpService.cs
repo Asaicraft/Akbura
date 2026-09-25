@@ -5,6 +5,8 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 using System.Text;
+using AkburaCommandDocumentation = Akbura.Language.Symbols.CommandSymbolDocumentation;
+using AkburaSymbolKind = Akbura.Language.Symbols.SymbolKind;
 
 namespace Akbura.Workspaces.SignatureHelp;
 
@@ -84,6 +86,11 @@ internal sealed class AkburaSignatureHelpService :
         using var signatures =
             ImmutableArrayBuilder<AkburaSignatureInformation>.Rent(
                 orderedMethods.Length);
+        var commandDocumentation = GetCommandDocumentation(
+            model,
+            argumentList,
+            projection,
+            cancellationToken);
         foreach (var method in orderedMethods)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -99,7 +106,7 @@ internal sealed class AkburaSignatureHelpService :
 
             signatures.Add(new AkburaSignatureInformation(
                 FormatMethod(method),
-                documentation: null,
+                GetDocumentation(method, cancellationToken) ?? commandDocumentation,
                 parameters.ToImmutable()));
         }
 
@@ -270,9 +277,63 @@ internal sealed class AkburaSignatureHelpService :
             ? method.ContainingType.ToDisplayString(
                 SymbolDisplayFormat.MinimallyQualifiedFormat)
             : method.Name;
-        return name + "(" +
+        var returnType = method.MethodKind == MethodKind.Constructor
+            ? string.Empty
+            : method.ReturnType.ToDisplayString(
+                SymbolDisplayFormat.MinimallyQualifiedFormat) + " ";
+        return returnType + name + "(" +
             string.Join(", ", method.Parameters.Select(FormatParameter)) +
             ")";
+    }
+
+    private static string? GetDocumentation(ISymbol symbol, CancellationToken cancellationToken)
+    {
+        var xml = symbol.GetDocumentationCommentXml(cancellationToken: cancellationToken) ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(xml))
+        {
+            return null;
+        }
+
+        var summaryStart = xml.IndexOf("<summary>", StringComparison.Ordinal);
+        var summaryEnd = xml.IndexOf("</summary>", StringComparison.Ordinal);
+        if (summaryStart < 0 || summaryEnd <= summaryStart)
+        {
+            return null;
+        }
+
+        summaryStart += "<summary>".Length;
+        return string.Join(
+            " ",
+            xml.Substring(summaryStart, summaryEnd - summaryStart)
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    private static string? GetCommandDocumentation(SemanticModel model, SyntaxNode argumentList, AkburaCSharpProjection projection, CancellationToken cancellationToken)
+    {
+        if (argumentList.Parent is not InvocationExpressionSyntax invocation ||
+            invocation.Expression is not MemberAccessExpressionSyntax access ||
+            !string.Equals(access.Name.Identifier.ValueText, "Execute", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var receiver = model.GetSymbolInfo(access.Expression, cancellationToken).Symbol;
+        if (receiver == null)
+        {
+            return null;
+        }
+
+        foreach (var reference in receiver.DeclaringSyntaxReferences)
+        {
+            var declaration = reference.GetSyntax(cancellationToken);
+            if (projection.TryGetSyntheticOrigin(declaration, out var origin) &&
+                origin.Kind == AkburaSymbolKind.Command)
+            {
+                return AkburaCommandDocumentation.Execute;
+            }
+        }
+
+        return null;
     }
 
     private static string FormatParameter(IParameterSymbol parameter)

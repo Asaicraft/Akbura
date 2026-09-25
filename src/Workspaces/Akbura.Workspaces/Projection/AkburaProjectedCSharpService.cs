@@ -16,6 +16,8 @@ using System.Text;
 using RoslynCompletionItem = Microsoft.CodeAnalysis.Completion.CompletionItem;
 using RoslynCompletionService = Microsoft.CodeAnalysis.Completion.CompletionService;
 using RoslynQuickInfoService = Microsoft.CodeAnalysis.QuickInfo.QuickInfoService;
+using AkburaCommandDocumentation = Akbura.Language.Symbols.CommandSymbolDocumentation;
+using AkburaSymbolKind = Akbura.Language.Symbols.SymbolKind;
 
 namespace Akbura.Workspaces.Projection;
 
@@ -209,6 +211,23 @@ internal sealed class AkburaProjectedCSharpService :
             ? string.Empty
             : string.Concat(description.TaggedParts.Select(
                 static part => part.Text));
+        var commandMember = await TryGetCommandMemberDocumentationAsync(
+                session,
+                item.DisplayText,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (commandMember is { } command)
+        {
+            documentation = documentation.Replace(
+                command.ReceiverTypeName + ".",
+                string.Empty);
+            if (!documentation.Contains(command.Documentation, StringComparison.Ordinal))
+            {
+                documentation = string.IsNullOrWhiteSpace(documentation)
+                    ? command.Documentation
+                    : documentation + Environment.NewLine + Environment.NewLine + command.Documentation;
+            }
+        }
         var change = new AkburaCompletionChange(
             mapped.Changes,
             mapped.NewHostPosition ?? position,
@@ -217,6 +236,58 @@ internal sealed class AkburaProjectedCSharpService :
             GetDetail(item),
             documentation,
             change);
+    }
+
+    private static async Task<(string Documentation, string ReceiverTypeName)?> TryGetCommandMemberDocumentationAsync(AkburaProjectedCSharpSession session, string memberName, CancellationToken cancellationToken)
+    {
+        var documentation = AkburaCommandDocumentation.GetMemberDocumentation(memberName);
+        if (documentation == null)
+        {
+            return null;
+        }
+
+        var root = await session.Document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+        var semanticModel = await session.Document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+        if (root == null || semanticModel == null)
+        {
+            return null;
+        }
+
+        var lookup = Math.Max(0, session.Projection.ProjectedPosition - 1);
+        var access = root.FindToken(lookup, findInsideTrivia: true)
+            .Parent?
+            .AncestorsAndSelf()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MemberAccessExpressionSyntax>()
+            .FirstOrDefault();
+        if (access == null)
+        {
+            return null;
+        }
+
+        var receiver = semanticModel.GetSymbolInfo(access.Expression, cancellationToken).Symbol;
+        var receiverTypeName = receiver switch
+        {
+            IFieldSymbol field => field.Type.Name,
+            ILocalSymbol local => local.Type.Name,
+            IPropertySymbol property => property.Type.Name,
+            _ => null,
+        };
+        if (receiver == null || string.IsNullOrEmpty(receiverTypeName))
+        {
+            return null;
+        }
+
+        foreach (var reference in receiver.DeclaringSyntaxReferences)
+        {
+            var declaration = await reference.GetSyntaxAsync(cancellationToken).ConfigureAwait(false);
+            if (session.Projection.TryGetSyntheticOrigin(declaration, out var origin) &&
+                origin.Kind == AkburaSymbolKind.Command)
+            {
+                return (documentation, receiverTypeName!);
+            }
+        }
+
+        return null;
     }
 
     public async Task<AkburaQuickInfo?> GetQuickInfoAsync(

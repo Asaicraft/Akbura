@@ -1,4 +1,4 @@
-using Akbura.Language.Symbols;
+﻿using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
@@ -31,6 +31,27 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
         cancellationToken.ThrowIfCancellationRequested();
         var semanticModel = context.Project.Compilation.GetSemanticModel(
             context.Document.SyntaxTree);
+        var root = context.Document.SyntaxTree.GetRootSyntax();
+        var lookup = position == root.FullSpan.End && position > 0
+            ? position - 1
+            : position;
+        var declaration = root
+            .FindToken(lookup)
+            .Parent?
+            .AncestorsAndSelf()
+            .OfType<CommandDeclarationSyntax>()
+            .FirstOrDefault();
+        if (declaration != null &&
+            declaration.Name.Span.Contains(position) &&
+            semanticModel.GetSymbolInfo(declaration).Symbol is ICommandSymbol command)
+        {
+            return new AkburaQuickInfo(
+                declaration.Name.Span,
+                AkburaQuickInfoKind.Symbol,
+                command.ToDisplayString(),
+                ["Akbura command"]);
+        }
+
         if (AkburaMarkupSemanticFacts.GetPropertyReference(semanticModel, position)
             is { } propertyReference)
         {

@@ -1,4 +1,4 @@
-using Akbura.Language;
+﻿using Akbura.Language;
 using Akbura.Language.Binder;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Operations;
@@ -1661,7 +1661,7 @@ public class SemanticPipelineTests
         Assert.Equal("a", parameter.Name);
         Assert.Equal("Int32", parameter.Type.Name);
         Assert.Equal("Int32 a", parameter.ToDisplayString());
-        Assert.Equal("command Int32 Click", symbol.ToDisplayString());
+        Assert.Equal("command int Click(int a)", symbol.ToDisplayString());
         Assert.True(semanticModel.GetSemanticDiagnostics(command).IsEmpty);
 
         var cachedSymbolInfo = semanticModel.GetSymbolInfo(command);
@@ -3575,6 +3575,82 @@ public class SemanticPipelineTests
 
         Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_DuplicateCommandParameter, diagnostic.Code);
         Assert.Contains("id", diagnostic.Message);
+    }
+
+    [Theory]
+    [InlineData("System.Threading.Tasks.Task<int>", "int")]
+    [InlineData("global::System.Threading.Tasks.ValueTask<string?>", "string?")]
+    [InlineData("System.Threading.Tasks.Task", "void")]
+    [InlineData("System.Threading.Tasks.ValueTask", "void")]
+    public void SemanticModel_AwaitableCommandResult_ProducesInfoDiagnostic(string returnType, string logicalResult)
+    {
+        var code = "command " + returnType + " Load();";
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var command = Assert.Single(syntaxTree.GetRoot().Members.OfType<CommandDeclarationSyntax>());
+
+        var diagnostic = Assert.Single(semanticModel.GetSemanticDiagnostics(command));
+
+        Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_CommandResultIsAwaitable, diagnostic.Code);
+        Assert.Equal(AkburaDiagnosticSeverity.Info, diagnostic.Severity);
+        Assert.Equal(returnType, syntaxTree.Text.ToString(diagnostic.Span));
+        Assert.Contains(logicalResult, diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("System.Collections.Generic.List<System.Threading.Tasks.Task<int>>")]
+    [InlineData("Demo.Task<int>")]
+    public void SemanticModel_NonBclOuterAwaitableCommandResult_DoesNotProduceDiagnostic(string returnType)
+    {
+        const string csharpCode = "namespace Demo { public sealed class Task<T> { } }";
+        var syntaxTree = AkburaSyntaxTree.ParseText("command " + returnType + " Load();");
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(csharpCode));
+        var command = Assert.IsType<CommandDeclarationSyntax>(syntaxTree.GetRoot().Members.Single());
+
+        Assert.DoesNotContain(
+            semanticModel.GetSemanticDiagnostics(command),
+            static diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_CommandResultIsAwaitable);
+    }
+
+    [Fact]
+    public void SemanticModel_AwaitableCommandAlias_ProducesInfoDiagnostic()
+    {
+        const string code =
+            "using AsyncResult = System.Threading.Tasks.Task<int>;\r\n" +
+            "command AsyncResult Load();";
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var command = Assert.Single(syntaxTree.GetRoot().Members.OfType<CommandDeclarationSyntax>());
+
+        var diagnostic = Assert.Single(
+            semanticModel.GetSemanticDiagnostics(command),
+            static diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_CommandResultIsAwaitable);
+
+        Assert.Equal(AkburaDiagnosticSeverity.Info, diagnostic.Severity);
+        Assert.Contains("int", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SemanticModel_AwaitableCommandDiagnosticDisappearsAfterResultTypeEdit()
+    {
+        var originalTree = AkburaSyntaxTree.ParseText(
+            "command System.Threading.Tasks.Task<int> Load();",
+            "Command.akbura");
+        var compilation = new AkburaCompilation(CreateCSharpCompilation(), [originalTree]);
+        var originalCommand = Assert.Single(originalTree.GetRoot().Members.OfType<CommandDeclarationSyntax>());
+        Assert.Contains(
+            compilation.GetSemanticModel(originalTree).GetSemanticDiagnostics(originalCommand),
+            static diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_CommandResultIsAwaitable);
+
+        var updatedTree = AkburaSyntaxTree.ParseText(
+            "command int Load();",
+            originalTree.FilePath);
+        var updatedCompilation = compilation.ReplaceSyntaxTree(originalTree, updatedTree);
+        var updatedCommand = Assert.Single(updatedTree.GetRoot().Members.OfType<CommandDeclarationSyntax>());
+
+        Assert.DoesNotContain(
+            updatedCompilation.GetSemanticModel(updatedTree).GetSemanticDiagnostics(updatedCommand),
+            static diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_CommandResultIsAwaitable);
     }
 
     [Fact]

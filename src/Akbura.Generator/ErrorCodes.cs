@@ -40,6 +40,7 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_ComponentBaseTypeInvalid = nameof(AKBURA_SEMANTIC_ComponentBaseTypeInvalid);
     public const string AKBURA_SEMANTIC_DuplicateComponentMember = nameof(AKBURA_SEMANTIC_DuplicateComponentMember);
     public const string AKBURA_SEMANTIC_DuplicateCommandParameter = nameof(AKBURA_SEMANTIC_DuplicateCommandParameter);
+    public const string AKBURA_SEMANTIC_CommandResultIsAwaitable = nameof(AKBURA_SEMANTIC_CommandResultIsAwaitable);
     public const string AKBURA_SEMANTIC_DuplicateAkcssSymbol = nameof(AKBURA_SEMANTIC_DuplicateAkcssSymbol);
     public const string AKBURA_SEMANTIC_InaccessibleMember = nameof(AKBURA_SEMANTIC_InaccessibleMember);
     public const string AKBURA_SEMANTIC_MarkupComponentNotFound = nameof(AKBURA_SEMANTIC_MarkupComponentNotFound);

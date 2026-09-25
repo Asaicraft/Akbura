@@ -8,6 +8,10 @@
         "link": "/akbura/hooks"
       },
       {
+        "text": "Commands",
+        "link": "/akbura/commands"
+      },
+      {
         "text": "Using Components in AXAML",
         "link": "/akbura/axaml-integration"
       },

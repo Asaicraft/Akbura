@@ -213,7 +213,7 @@ internal ref struct ImmutableArrayBuilder<T>
             array![index++] = value;
         }
 
-        /// <inheritdoc cref="ImmutableArrayBuilder{T}.AddRange"/>
+        /// <inheritdoc cref="ImmutableArrayBuilder{T}.AddRange(System.ReadOnlySpan{T})"/>
         public void AddRange(ReadOnlySpan<T> items)
         {
             EnsureCapacity(items.Length);

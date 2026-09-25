@@ -12,6 +12,10 @@
         "link": "/akbura/commands"
       },
       {
+        "text": "Parameters and Bindings",
+        "link": "/akbura/parameters"
+      },
+      {
         "text": "Using Components in AXAML",
         "link": "/akbura/axaml-integration"
       },

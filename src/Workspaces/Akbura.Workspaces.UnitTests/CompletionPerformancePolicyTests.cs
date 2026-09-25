@@ -7,6 +7,29 @@ namespace Akbura.Workspaces.UnitTests;
 public sealed class CompletionPerformancePolicyTests
 {
     [Fact]
+    public void DeclarationModifiersPublishBeforeDelayedRoslynCompletion()
+    {
+        Assert.True(
+            AkburaRoslynCompletionSessionPolicy
+                .ShouldPublishSupplementalBeforeRoslyn(
+                    AkburaCompletionContextKind.DeclarationModifier,
+                    hasSupplementalItems: true,
+                    roslynCompleted: false));
+        Assert.False(
+            AkburaRoslynCompletionSessionPolicy
+                .ShouldPublishSupplementalBeforeRoslyn(
+                    AkburaCompletionContextKind.DeclarationModifier,
+                    hasSupplementalItems: true,
+                    roslynCompleted: true));
+        Assert.False(
+            AkburaRoslynCompletionSessionPolicy
+                .ShouldPublishSupplementalBeforeRoslyn(
+                    AkburaCompletionContextKind.TopLevel,
+                    hasSupplementalItems: true,
+                    roslynCompleted: false));
+    }
+
+    [Fact]
     public void LatestRequest_CancelsPreviousRequest()
     {
         using var coordinator =
@@ -175,6 +198,54 @@ public sealed class CompletionPerformancePolicyTests
         policy.SetAllowNonTrigger(1, first, value: true);
 
         Assert.True(policy.BeginRequest(2, second));
+    }
+
+    [Fact]
+    public void SessionPolicy_ContinuesAcrossSyntheticAndParsedDeclarationTypeOwners()
+    {
+        var policy = new AkburaRoslynCompletionSessionPolicy();
+        var synthetic = new AkburaCSharpCompletionContext(
+            AkburaCSharpCompletionContextKind.Type,
+            Akbura.Language.Syntax.SyntaxKind.ParamDeclarationSyntax,
+            new TextSpan(0, 6),
+            new TextSpan(6, 0),
+            hostPosition: 6,
+            AkburaCSharpCompletionLogicalSlot.DeclarationType,
+            new TextSpan(0, 6));
+        var parsed = new AkburaCSharpCompletionContext(
+            AkburaCSharpCompletionContextKind.Type,
+            Akbura.Language.Syntax.SyntaxKind.CSharpTypeSyntax,
+            new TextSpan(6, 3),
+            new TextSpan(6, 3),
+            hostPosition: 9,
+            AkburaCSharpCompletionLogicalSlot.DeclarationType,
+            new TextSpan(0, 9));
+
+        Assert.False(policy.BeginRequest(1, synthetic));
+        Assert.True(policy.BeginRequest(2, parsed));
+    }
+
+    [Fact]
+    public void SessionPolicy_RejectsDeclarationNameAfterTypeSlot()
+    {
+        var policy = new AkburaRoslynCompletionSessionPolicy();
+        var type = new AkburaCSharpCompletionContext(
+            AkburaCSharpCompletionContextKind.Type,
+            Akbura.Language.Syntax.SyntaxKind.CSharpTypeSyntax,
+            new TextSpan(6, 3),
+            new TextSpan(6, 3),
+            hostPosition: 9,
+            AkburaCSharpCompletionLogicalSlot.DeclarationType,
+            new TextSpan(0, 9));
+        var name = new AkburaCSharpCompletionContext(
+            AkburaCSharpCompletionContextKind.DeclarationName,
+            Akbura.Language.Syntax.SyntaxKind.ParamDeclarationSyntax,
+            new TextSpan(0, 10),
+            new TextSpan(10, 0),
+            hostPosition: 10);
+
+        Assert.False(policy.BeginRequest(1, type));
+        Assert.False(policy.BeginRequest(2, name));
     }
 
     private static AkburaCSharpCompletionContext CreateExpressionContext(

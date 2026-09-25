@@ -36,6 +36,42 @@ public sealed class BindingCompletionProtocolTests
         Assert.DoesNotContain("NameName", fixture.ApplyToDocument(item), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task DirectionalAttributeEditReplacesOnlyTheMemberName()
+    {
+        const string sourceWithCaret = "namespace Gallery;\nusing Avalonia.Controls;\nstate string text = \"\";\n<TextBox bind:T|ext={text} />";
+        await using var fixture = new CompletionFixture(
+            sourceWithCaret.Replace("|", string.Empty, StringComparison.Ordinal),
+            sourceWithCaret);
+
+        var completion = await fixture.CompleteAsync();
+        var item = Assert.Single(completion.Items, static item => item.Label == "Text");
+
+        Assert.Equal("Text", fixture.GetEditedText(item));
+        Assert.Equal("Text", fixture.Apply(item));
+        Assert.Contains("bind:Text={text}", fixture.ApplyToDocument(item), StringComparison.Ordinal);
+        Assert.DoesNotContain("Textext", fixture.ApplyToDocument(item), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task EmptyDirectionalAttributeCreatesOneBareBindingTarget()
+    {
+        const string sourceWithCaret = "namespace Gallery;\nusing Avalonia.Controls;\nstate string text = \"\";\n<TextBox out:| />";
+        await using var fixture = new CompletionFixture(
+            sourceWithCaret.Replace("|", string.Empty, StringComparison.Ordinal),
+            sourceWithCaret);
+
+        var completion = await fixture.CompleteAsync();
+        var item = Assert.Single(completion.Items, static item => item.Label == "Text");
+
+        Assert.Equal(string.Empty, fixture.GetEditedText(item));
+        Assert.Equal(2, item.InsertTextFormat);
+        Assert.Equal("Text={$0\\}", fixture.Apply(item));
+        Assert.Contains("out:Text={}", fixture.ApplySnippetToDocument(item), StringComparison.Ordinal);
+        Assert.DoesNotContain("out:out:", fixture.ApplySnippetToDocument(item), StringComparison.Ordinal);
+        Assert.DoesNotContain("\"{}\"", fixture.ApplySnippetToDocument(item), StringComparison.Ordinal);
+    }
+
     private sealed class CompletionFixture : IAsyncDisposable
     {
         private readonly AkburaWorkspace _workspace;
@@ -113,6 +149,18 @@ public sealed class BindingCompletionProtocolTests
             return text.WithChanges(new TextChange(span, edit.NewText)).ToString();
         }
 
+        public string ApplySnippetToDocument(Protocol.CompletionItem item)
+        {
+            var edit = Assert.IsType<TextEdit>(item.TextEdit);
+            Assert.Equal(2, item.InsertTextFormat);
+            var insertedText = edit.NewText
+                .Replace("$0", string.Empty, StringComparison.Ordinal)
+                .Replace("\\}", "}", StringComparison.Ordinal);
+            var text = _context.OpenDocument!.Text;
+            var span = _services.PositionConverter.ToTextSpan(text, edit.Range);
+            return text.WithChanges(new TextChange(span, insertedText)).ToString();
+        }
+
         public ValueTask DisposeAsync()
         {
             _monitor.Dispose();
@@ -130,6 +178,7 @@ public sealed class BindingCompletionProtocolTests
                     public class Control { }
                     public sealed class Border : Control { public object? Tag { get; set; } }
                     public sealed class StackPanel : Control { }
+                    public sealed class TextBox : Control { public string? Text { get; set; } }
                 }
 
                 namespace Avalonia.Data

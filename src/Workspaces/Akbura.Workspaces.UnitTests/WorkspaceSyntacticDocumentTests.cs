@@ -230,6 +230,72 @@ public sealed class WorkspaceSyntacticDocumentTests
     }
 
     [Theory]
+    [InlineData("param |", "param int|")]
+    [InlineData("param bind |", "param bind int|")]
+    [InlineData("param out |", "param out int|")]
+    public void SyntacticDocument_PreservesLogicalDeclarationTypeSlot(string sourceWithCaret, string currentSourceWithCaret)
+    {
+        var sourcePosition = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(sourcePosition, 1);
+        var currentPosition = currentSourceWithCaret.IndexOf('|');
+        var currentSource = currentSourceWithCaret.Remove(currentPosition, 1);
+        var sourceDocument = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+        var currentDocument = AkburaSyntacticDocument.Parse(
+            SourceText.From(currentSource),
+            "Component.akbura");
+
+        Assert.True(sourceDocument.TryGetCSharpCompletionContext(
+            sourcePosition,
+            out var sourceContext));
+        Assert.True(currentDocument.TryGetCSharpCompletionContext(
+            currentPosition,
+            out var currentContext));
+        Assert.Equal(
+            AkburaCSharpCompletionContextKind.Type,
+            sourceContext.Kind);
+        Assert.Equal(
+            AkburaCSharpCompletionContextKind.Type,
+            currentContext.Kind);
+        Assert.Equal(
+            AkburaCSharpCompletionLogicalSlot.DeclarationType,
+            sourceContext.LogicalSlot);
+        Assert.Equal(
+            AkburaCSharpCompletionLogicalSlot.DeclarationType,
+            currentContext.LogicalSlot);
+        Assert.True(AkburaCSharpCompletionContextFacts
+            .HasSameLogicalSlot(sourceContext, currentContext));
+    }
+
+    [Fact]
+    public void SyntacticDocument_DoesNotMatchTypeSlotAfterMovingToDeclarationName()
+    {
+        const string sourceWithCaret = "param |";
+        const string currentSourceWithCaret = "param int |";
+        var sourcePosition = sourceWithCaret.IndexOf('|');
+        var currentPosition = currentSourceWithCaret.IndexOf('|');
+        var sourceDocument = AkburaSyntacticDocument.Parse(
+            SourceText.From(sourceWithCaret.Remove(sourcePosition, 1)),
+            "Component.akbura");
+        var currentDocument = AkburaSyntacticDocument.Parse(
+            SourceText.From(currentSourceWithCaret.Remove(currentPosition, 1)),
+            "Component.akbura");
+
+        Assert.True(sourceDocument.TryGetCSharpCompletionContext(
+            sourcePosition,
+            out var sourceContext));
+        Assert.True(currentDocument.TryGetCSharpCompletionContext(
+            currentPosition,
+            out var currentContext));
+        Assert.Equal(
+            AkburaCSharpCompletionContextKind.DeclarationName,
+            currentContext.Kind);
+        Assert.False(AkburaCSharpCompletionContextFacts
+            .HasSameLogicalSlot(sourceContext, currentContext));
+    }
+
+    [Theory]
     [InlineData("<Button>st|</Button>")]
     [InlineData("var st| = 0;")]
     [InlineData("var text = \"st|\";")]
@@ -757,6 +823,46 @@ public sealed class WorkspaceSyntacticDocumentTests
             context.Kind);
         Assert.Contains("Title", context.ExistingAttributeNames);
         Assert.Contains("Compact", context.ExistingAttributeNames);
+    }
+
+    [Fact]
+    public void SyntacticDocument_SeparatesDirectionalAttributeModeFilterAndRanges()
+    {
+        const string sourceWithCaret =
+            "<TextBox Text={other} bind:T|ext={text} out:Text={sink} />";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        var context = document.GetCompletionContext(position);
+
+        Assert.Equal(AkburaCompletionContextKind.AttributeName, context.Kind);
+        Assert.Equal(AkburaMarkupAttributeMode.Bind, context.AttributeMode);
+        Assert.Equal("T", context.Prefix);
+        Assert.Equal("bind:", document.Text.ToString(context.AttributePrefixSpan));
+        Assert.Equal("Text", document.Text.ToString(context.AttributeNameSpan));
+        Assert.Equal("bind:Text", document.Text.ToString(context.FullAttributeNameSpan));
+        Assert.Equal(context.AttributeNameSpan, context.ApplicableSpan);
+        Assert.True(context.HasAttributeEquals);
+        Assert.True(context.HasAttributeValue);
+        Assert.Equal("{text}", document.Text.ToString(context.AttributeValueSpan));
+        Assert.DoesNotContain(
+            context.ExistingAttributes,
+            static attribute =>
+                attribute.Mode == AkburaMarkupAttributeMode.Bind &&
+                attribute.Name == "Text");
+        Assert.Contains(
+            context.ExistingAttributes,
+            static attribute =>
+                attribute.Mode == AkburaMarkupAttributeMode.None &&
+                attribute.Name == "Text");
+        Assert.Contains(
+            context.ExistingAttributes,
+            static attribute =>
+                attribute.Mode == AkburaMarkupAttributeMode.Out &&
+                attribute.Name == "Text");
     }
 
     [Theory]

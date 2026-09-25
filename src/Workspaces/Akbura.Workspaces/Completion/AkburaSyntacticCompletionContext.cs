@@ -9,11 +9,11 @@ namespace Akbura.Workspaces.Completion;
 /// </summary>
 public readonly struct AkburaSyntacticCompletionContext
 {
-    internal AkburaSyntacticCompletionContext(AkburaCompletionContextKind kind, TextSpan applicableSpan, string prefix, string? componentName, string? parentComponentName, ImmutableArray<string> existingAttributeNames, string? attributeName = null) : this(kind, applicableSpan, prefix, componentName, parentComponentName, existingAttributeNames, attributeName, markupExtensionName: null, markupExtensionArgumentName: null, markupExtensionArgumentIndex: -1, completedPath: null, markupExtensionSpan: default)
+    internal AkburaSyntacticCompletionContext(AkburaCompletionContextKind kind, TextSpan applicableSpan, string prefix, string? componentName, string? parentComponentName, ImmutableArray<string> existingAttributeNames, string? attributeName = null, AkburaMarkupAttributeMode attributeMode = default, TextSpan attributePrefixSpan = default, TextSpan attributeNameSpan = default, TextSpan fullAttributeNameSpan = default, bool hasAttributeEquals = false, bool hasAttributeValue = false, TextSpan attributeValueSpan = default, ImmutableArray<AkburaMarkupAttributeIdentity> existingAttributes = default) : this(kind, applicableSpan, prefix, componentName, parentComponentName, existingAttributeNames, attributeName, markupExtensionName: null, markupExtensionArgumentName: null, markupExtensionArgumentIndex: -1, completedPath: null, markupExtensionSpan: default, attributeMode, attributePrefixSpan, attributeNameSpan, fullAttributeNameSpan, hasAttributeEquals, hasAttributeValue, attributeValueSpan, existingAttributes)
     {
     }
 
-    internal AkburaSyntacticCompletionContext(AkburaCompletionContextKind kind, TextSpan applicableSpan, string prefix, string? componentName, string? parentComponentName, ImmutableArray<string> existingAttributeNames, string? attributeName, string? markupExtensionName, string? markupExtensionArgumentName = null, int markupExtensionArgumentIndex = -1, string? completedPath = null, TextSpan markupExtensionSpan = default)
+    internal AkburaSyntacticCompletionContext(AkburaCompletionContextKind kind, TextSpan applicableSpan, string prefix, string? componentName, string? parentComponentName, ImmutableArray<string> existingAttributeNames, string? attributeName, string? markupExtensionName, string? markupExtensionArgumentName = null, int markupExtensionArgumentIndex = -1, string? completedPath = null, TextSpan markupExtensionSpan = default, AkburaMarkupAttributeMode attributeMode = default, TextSpan attributePrefixSpan = default, TextSpan attributeNameSpan = default, TextSpan fullAttributeNameSpan = default, bool hasAttributeEquals = false, bool hasAttributeValue = false, TextSpan attributeValueSpan = default, ImmutableArray<AkburaMarkupAttributeIdentity> existingAttributes = default)
     {
         Kind = kind;
         ApplicableSpan = applicableSpan;
@@ -26,9 +26,19 @@ public readonly struct AkburaSyntacticCompletionContext
         MarkupExtensionArgumentIndex = markupExtensionArgumentIndex;
         CompletedPath = completedPath;
         MarkupExtensionSpan = markupExtensionSpan;
+        AttributeMode = attributeMode;
+        AttributePrefixSpan = attributePrefixSpan;
+        AttributeNameSpan = attributeNameSpan;
+        FullAttributeNameSpan = fullAttributeNameSpan;
+        HasAttributeEquals = hasAttributeEquals;
+        HasAttributeValue = hasAttributeValue;
+        AttributeValueSpan = attributeValueSpan;
         ExistingAttributeNames = existingAttributeNames.IsDefault
             ? ImmutableArray<string>.Empty
             : existingAttributeNames;
+        ExistingAttributes = existingAttributes.IsDefault
+            ? ImmutableArray<AkburaMarkupAttributeIdentity>.Empty
+            : existingAttributes;
     }
 
     public AkburaCompletionContextKind Kind { get; }
@@ -53,7 +63,23 @@ public readonly struct AkburaSyntacticCompletionContext
 
     public TextSpan MarkupExtensionSpan { get; }
 
+    internal AkburaMarkupAttributeMode AttributeMode { get; }
+
+    internal TextSpan AttributePrefixSpan { get; }
+
+    internal TextSpan AttributeNameSpan { get; }
+
+    internal TextSpan FullAttributeNameSpan { get; }
+
+    internal bool HasAttributeEquals { get; }
+
+    internal bool HasAttributeValue { get; }
+
+    internal TextSpan AttributeValueSpan { get; }
+
     public ImmutableArray<string> ExistingAttributeNames { get; }
+
+    internal ImmutableArray<AkburaMarkupAttributeIdentity> ExistingAttributes { get; }
 
     public bool IsDefault => Kind == AkburaCompletionContextKind.None;
 }

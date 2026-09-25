@@ -320,13 +320,34 @@ public sealed partial class AkburaSyntacticDocument
                 return;
             }
 
+            var logicalOwner = kind ==
+                    AkburaCSharpCompletionContextKind.Type
+                ? owner switch
+                {
+                    CSharpTypeSyntax
+                    {
+                        Parent: StateDeclarationSyntax or
+                            ParamDeclarationSyntax or
+                            InjectDeclarationSyntax,
+                    } type => type.Parent,
+                    StateDeclarationSyntax or
+                        ParamDeclarationSyntax or
+                        InjectDeclarationSyntax => owner,
+                    _ => null,
+                }
+                : null;
             var candidate = new EmbeddedCSharpCandidate(
                 new AkburaEmbeddedCSharpContext(
                     kind,
                     owner.Kind,
                     owner.FullSpan,
                     hostSpan,
-                    position),
+                    position,
+                    logicalOwner == null
+                        ? AkburaCSharpCompletionLogicalSlot.None
+                        : AkburaCSharpCompletionLogicalSlot
+                            .DeclarationType,
+                    logicalOwner?.FullSpan ?? default),
                 priority);
             if (best == null ||
                 candidate.Priority < best.Value.Priority ||

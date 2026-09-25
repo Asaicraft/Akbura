@@ -140,6 +140,7 @@ internal partial class AkburaSemanticModel
                         SymbolLanguage.Markup,
                         target,
                         out var property) ||
+                    !property.CanRead &&
                     !property.CanWrite)
                 {
                     continue;

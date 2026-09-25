@@ -448,8 +448,7 @@ internal static class ComponentHotReloadIdentity
         return "property:" + identity;
     }
 
-    public static string CreatePropertySubscriptionSlot(
-        in PropertyObservationPlan observation)
+    public static string CreatePropertySubscriptionSlot(in PropertyObservationPlan observation, int sourceOrder)
     {
         var identity = observation.Kind switch
         {
@@ -460,7 +459,8 @@ internal static class ComponentHotReloadIdentity
             _ => GetSymbolIdentity(observation.Symbol),
         };
 
-        return "subscription:" + identity;
+        return "subscription:" + identity + ":" +
+            sourceOrder.ToString(CultureInfo.InvariantCulture);
     }
 
     public static string CreateRoutedEventSlot(

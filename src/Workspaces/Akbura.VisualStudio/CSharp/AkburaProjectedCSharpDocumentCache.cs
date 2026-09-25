@@ -56,8 +56,19 @@ internal sealed class AkburaProjectedCSharpDocumentCache : IDisposable
         {
             if (snapshotCache.Documents.TryGetValue(key, out task!))
             {
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.CompletionPerformance,
+                    $"Projection cache hit: " +
+                    $"snapshot={snapshot.Version.VersionNumber}, " +
+                    $"owner={context.OwnerKind}, kind={context.Kind}.");
                 return task;
             }
+
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.CompletionPerformance,
+                $"Projection cache miss: " +
+                $"snapshot={snapshot.Version.VersionNumber}, " +
+                $"owner={context.OwnerKind}, kind={context.Kind}.");
 
             try
             {
@@ -109,6 +120,9 @@ internal sealed class AkburaProjectedCSharpDocumentCache : IDisposable
             new ConditionalWeakTable<
                 ITextSnapshot,
                 ProjectionSnapshotCache>());
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.CompletionPerformance,
+            "Projection cache invalidated: reason=project-context-changed.");
     }
 
     private static void RemoveFailedOrEmptyEntry(

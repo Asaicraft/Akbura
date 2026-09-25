@@ -311,6 +311,27 @@ internal readonly partial struct Blender
                 return true;
             }
 
+            // A colon typed immediately after an identifier can change the
+            // complete attribute grammar and can reclassify bind/out from an
+            // identifier to a directional-prefix token.
+            if (lastTerminal.Kind == SyntaxKind.IdentifierToken &&
+                lastTerminal.GetTrailingTriviaWidth() == 0 &&
+                insertedCharacter == ':')
+            {
+                return true;
+            }
+
+            // A value typed after an existing equals token becomes part of the
+            // attribute node. Reusing the old value-less node would leave the
+            // new expression outside that attribute.
+            if (underlyingNode is GreenMarkupAttributeSyntax &&
+                lastTerminal.Kind == SyntaxKind.EqualsToken &&
+                lastTerminal.GetTrailingTriviaWidth() == 0 &&
+                insertedCharacter is '$' or '{' or '"' or '\'')
+            {
+                return true;
+            }
+
             if (lastTerminal.GetTrailingTriviaWidth() == 0 &&
                 CanCombineWithInsertedCharacter(
                     lastTerminal.Kind,

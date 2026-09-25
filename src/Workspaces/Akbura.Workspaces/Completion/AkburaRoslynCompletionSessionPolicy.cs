@@ -2,12 +2,18 @@ namespace Akbura.Workspaces.Completion;
 
 internal sealed class AkburaRoslynCompletionSessionPolicy
 {
+    internal static bool ShouldPublishSupplementalBeforeRoslyn(AkburaCompletionContextKind syntacticKind, bool hasSupplementalItems, bool roslynCompleted)
+    {
+        return syntacticKind ==
+                AkburaCompletionContextKind.DeclarationModifier &&
+            hasSupplementalItems &&
+            !roslynCompleted;
+    }
+
     private readonly object _gate = new();
     private int _snapshotVersion = -1;
-    private AkburaCSharpCompletionContextKind _contextKind;
-    private Akbura.Language.Syntax.SyntaxKind _ownerKind;
-    private int _ownerStart = -1;
-    private int _hostStart = -1;
+    private AkburaCSharpCompletionContext _context;
+    private bool _hasContext;
     private bool _allowNonTrigger;
     private bool _requestPending;
 
@@ -19,10 +25,9 @@ internal sealed class AkburaRoslynCompletionSessionPolicy
         {
             if (snapshotVersion < _snapshotVersion ||
                 snapshotVersion > _snapshotVersion + 1 ||
-                context.Kind != _contextKind ||
-                context.OwnerKind != _ownerKind ||
-                context.OwnerSpan.Start != _ownerStart ||
-                context.HostSpan.Start != _hostStart)
+                !_hasContext ||
+                !AkburaCSharpCompletionContextFacts
+                    .HasSameLogicalSlot(_context, context))
             {
                 _allowNonTrigger = false;
                 _requestPending = false;
@@ -30,10 +35,8 @@ internal sealed class AkburaRoslynCompletionSessionPolicy
 
             var allowNonTrigger = _allowNonTrigger || _requestPending;
             _snapshotVersion = snapshotVersion;
-            _contextKind = context.Kind;
-            _ownerKind = context.OwnerKind;
-            _ownerStart = context.OwnerSpan.Start;
-            _hostStart = context.HostSpan.Start;
+            _context = context;
+            _hasContext = true;
             _requestPending = true;
             return allowNonTrigger;
         }
@@ -47,10 +50,9 @@ internal sealed class AkburaRoslynCompletionSessionPolicy
         lock (_gate)
         {
             if (snapshotVersion != _snapshotVersion ||
-                context.Kind != _contextKind ||
-                context.OwnerKind != _ownerKind ||
-                context.OwnerSpan.Start != _ownerStart ||
-                context.HostSpan.Start != _hostStart)
+                !_hasContext ||
+                !AkburaCSharpCompletionContextFacts
+                    .HasSameLogicalSlot(_context, context))
             {
                 return;
             }

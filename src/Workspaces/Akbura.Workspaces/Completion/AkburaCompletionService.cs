@@ -930,16 +930,26 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             semanticModel,
             context,
             cancellationToken);
-        var utilities = GetTailwindUtilityItems(
-            semanticModel,
-            context,
-            cancellationToken);
+        var utilities = context.AttributeMode ==
+                AkburaMarkupAttributeMode.None
+            ? GetTailwindUtilityItems(
+                semanticModel,
+                context,
+                cancellationToken)
+            : ImmutableArray<AkburaCompletionItem>.Empty;
+        var dictionaryKeys = context.AttributeMode ==
+                AkburaMarkupAttributeMode.None
+            ? GetDictionaryKeyItems(
+                semanticModel,
+                context,
+                position)
+            : ImmutableArray<AkburaCompletionItem>.Empty;
 
         return OrderCompletionItems(
             members
                 .Concat(attachedProperties)
                 .Concat(utilities)
-                .Concat(GetDictionaryKeyItems(semanticModel, context, position)),
+                .Concat(dictionaryKeys),
             context.Prefix);
     }
 
@@ -950,16 +960,19 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             return [];
         }
 
-        var existing = new HashSet<string>(
-            context.ExistingAttributeNames,
-            StringComparer.Ordinal);
         using var items =
             ImmutableArrayBuilder<AkburaCompletionItem>.Rent();
 
         foreach (var candidate in semanticModel.LookupMarkupAttachedPropertiesForCompletion(context.ComponentName!, cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (existing.Contains(candidate.DisplayName) ||
+            if (!IsEligibleAttributeProperty(
+                    candidate.Property.CanRead,
+                    candidate.Property.CanWrite,
+                    context.AttributeMode) ||
+                HasConflictingExistingAttribute(
+                    context,
+                    candidate.DisplayName) ||
                 !MatchesPrefix(
                     candidate.DisplayName,
                     context.Prefix))
@@ -968,10 +981,15 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             }
 
             const int priority = 40;
+            var insertText = GetAttributeInsertText(
+                candidate.DisplayName,
+                context,
+                out var caretOffsetFromEnd,
+                out var triggerCompletionAfterInsert);
             items.Add(
                 new AkburaCompletionItem(
                     candidate.DisplayName,
-                    candidate.DisplayName + "=\"\"",
+                    insertText,
                     AkburaCompletionKind.Property,
                     candidate.TypeDisplay +
                         " " +
@@ -988,7 +1006,9 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                         candidate.TypeDisplay +
                         " (attached)",
                     priority: priority,
-                    caretOffsetFromEnd: 1));
+                    caretOffsetFromEnd: caretOffsetFromEnd,
+                    triggerCompletionAfterInsert:
+                        triggerCompletionAfterInsert));
         }
 
         return items.ToImmutable();
@@ -1100,9 +1120,6 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             return ImmutableArray<AkburaCompletionItem>.Empty;
         }
 
-        var existing = new HashSet<string>(
-            context.ExistingAttributeNames,
-            StringComparer.Ordinal);
         var cache = CompletionCaches.GetValue(
             semanticModel,
             static _ => new SemanticModelCompletionCache());
@@ -1118,11 +1135,19 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
 
         return catalog
             .Where(candidate =>
-                !existing.Contains(candidate.MemberName) &&
+                (propertyElements
+                    ? candidate.CanUsePropertyElement
+                    : candidate.IsEligible(context.AttributeMode)) &&
+                !HasConflictingExistingAttribute(
+                    context,
+                    candidate.MemberName) &&
                 MatchesPrefix(
                     candidate.Item.DisplayText,
                     context.Prefix))
-            .Select(static candidate => candidate.Item)
+            .Select(candidate => GetMemberItem(
+                candidate,
+                context,
+                propertyElements))
             .OrderBy(static item => item.SortText,
                 StringComparer.Ordinal)
             .ToImmutableArray();
@@ -1142,6 +1167,89 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                 .ToImmutableArray();
     }
 
+    private static AkburaCompletionItem GetMemberItem(CompletionMemberCandidate candidate, AkburaSyntacticCompletionContext context, bool propertyElements)
+    {
+        if (propertyElements)
+        {
+            return candidate.Item;
+        }
+
+        if (context.HasAttributeEquals)
+        {
+            return candidate.Item.WithInsertion(
+                candidate.Item.DisplayText,
+                caretOffsetFromEnd: 0,
+                triggerCompletionAfterInsert: false);
+        }
+
+        if (context.AttributeMode is
+            AkburaMarkupAttributeMode.Bind or
+            AkburaMarkupAttributeMode.Out)
+        {
+            return candidate.Item.WithInsertion(
+                candidate.Item.DisplayText + "={}",
+                caretOffsetFromEnd: 1,
+                triggerCompletionAfterInsert: true);
+        }
+
+        return candidate.Item;
+    }
+
+    private static string GetAttributeInsertText(string name, AkburaSyntacticCompletionContext context, out int caretOffsetFromEnd, out bool triggerCompletionAfterInsert)
+    {
+        if (context.HasAttributeEquals)
+        {
+            caretOffsetFromEnd = 0;
+            triggerCompletionAfterInsert = false;
+            return name;
+        }
+
+        if (context.AttributeMode is
+            AkburaMarkupAttributeMode.Bind or
+            AkburaMarkupAttributeMode.Out)
+        {
+            caretOffsetFromEnd = 1;
+            triggerCompletionAfterInsert = true;
+            return name + "={}";
+        }
+
+        caretOffsetFromEnd = 1;
+        triggerCompletionAfterInsert = false;
+        return name + "=\"\"";
+    }
+
+    private static bool IsEligibleAttributeProperty(bool canRead, bool canWrite, AkburaMarkupAttributeMode mode)
+    {
+        return mode switch
+        {
+            AkburaMarkupAttributeMode.Bind => canRead && canWrite,
+            AkburaMarkupAttributeMode.Out => canRead,
+            _ => canWrite,
+        };
+    }
+
+    private static bool HasConflictingExistingAttribute(AkburaSyntacticCompletionContext context, string memberName)
+    {
+        if (context.AttributeMode == AkburaMarkupAttributeMode.Out)
+        {
+            return false;
+        }
+
+        foreach (var attribute in context.ExistingAttributes)
+        {
+            if (attribute.Mode != AkburaMarkupAttributeMode.Out &&
+                string.Equals(
+                    attribute.Name,
+                    memberName,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static ImmutableArray<CompletionMemberCandidate> CreateMemberCatalog(AkburaSemanticModel semanticModel, string componentName, bool propertyElements, CancellationToken cancellationToken)
     {
         if (!semanticModel.TryResolveMarkupComponentForCompletion(
@@ -1159,21 +1267,23 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             $"resolvedType='{resolvedType?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}', " +
             $"isStatic={resolvedType?.IsStatic}.");
 
-        var items = new Dictionary<string, AkburaCompletionItem>(
+        var items = new Dictionary<string, CompletionMemberCandidate>(
             StringComparer.Ordinal);
         var ownerName = GetSimpleName(componentName);
 
         if (!propertyElements)
         {
-            items.Add(
+            AddMemberItem(
+                items,
+                ownerName,
                 "x.Name",
-                new AkburaCompletionItem(
-                    "x.Name",
-                    "x.Name=\"\"",
-                    AkburaCompletionKind.Property,
-                    "Names this element in the current Akbura component.",
-                    descriptionFactory: null,
-                    caretOffsetFromEnd: 1));
+                AkburaCompletionKind.Property,
+                "Names this element in the current Akbura component.",
+                propertyElements: false,
+                canSet: true,
+                canBind: false,
+                canOut: false,
+                canUsePropertyElement: false);
         }
 
         if (target.AkburaComponent != null)
@@ -1181,11 +1291,6 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             foreach (var parameter in target.AkburaComponent.Parameters)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!parameter.ReceivesValueFromParent)
-                {
-                    continue;
-                }
-
                 AddMemberItem(
                     items,
                     ownerName,
@@ -1193,7 +1298,12 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                     AkburaCompletionKind.Parameter,
                     parameter.Type.ToDisplayString(
                         SymbolDisplayFormat.MinimallyQualifiedFormat),
-                    propertyElements);
+                    propertyElements,
+                    canSet: parameter.ReceivesValueFromParent,
+                    canBind: parameter.IsTwoWayBinding,
+                    canOut: parameter.SendsValueToParent,
+                    canUsePropertyElement:
+                        parameter.ReceivesValueFromParent);
             }
 
             if (!propertyElements)
@@ -1206,7 +1316,11 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                         command.Name,
                         AkburaCompletionKind.Command,
                         command.ToDisplayString(),
-                        propertyElements: false);
+                        propertyElements: false,
+                        canSet: true,
+                        canBind: false,
+                        canOut: false,
+                        canUsePropertyElement: false);
                 }
             }
         }
@@ -1223,18 +1337,15 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         }
 
         return items.Values
-            .OrderBy(static item => item.SortText,
+            .OrderBy(static candidate => candidate.Item.SortText,
                 StringComparer.Ordinal)
-            .Select(item => new CompletionMemberCandidate(
-                GetMemberName(item.DisplayText, propertyElements),
-                item))
             .ToImmutableArray();
     }
 
     private static readonly HashSet<string> EmptyMemberNames =
         new(StringComparer.Ordinal);
 
-    private static void AddClrMembers(Dictionary<string, AkburaCompletionItem> items, string ownerName, INamedTypeSymbol componentType, HashSet<string> existing, bool propertyElements, CancellationToken cancellationToken)
+    private static void AddClrMembers(Dictionary<string, CompletionMemberCandidate> items, string ownerName, INamedTypeSymbol componentType, HashSet<string> existing, bool propertyElements, CancellationToken cancellationToken)
     {
         var visitedTypes = new HashSet<INamedTypeSymbol>(
             SymbolEqualityComparer.Default);
@@ -1265,7 +1376,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         }
     }
 
-    private static void AddClrMembersFromType(Dictionary<string, AkburaCompletionItem> items, string ownerName, INamedTypeSymbol type, HashSet<string> existing, bool propertyElements, CancellationToken cancellationToken)
+    private static void AddClrMembersFromType(Dictionary<string, CompletionMemberCandidate> items, string ownerName, INamedTypeSymbol type, HashSet<string> existing, bool propertyElements, CancellationToken cancellationToken)
     {
         foreach (var member in type.GetMembers())
         {
@@ -1285,7 +1396,17 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                         AkburaCompletionKind.Property,
                         property.Type.ToDisplayString(
                             SymbolDisplayFormat.MinimallyQualifiedFormat),
-                        propertyElements);
+                        propertyElements,
+                        canSet: property.SetMethod?.DeclaredAccessibility ==
+                            Accessibility.Public,
+                        canBind:
+                            property.GetMethod?.DeclaredAccessibility ==
+                                Accessibility.Public &&
+                            property.SetMethod?.DeclaredAccessibility ==
+                                Accessibility.Public,
+                        canOut: property.GetMethod?.DeclaredAccessibility ==
+                            Accessibility.Public,
+                        canUsePropertyElement: true);
                     break;
 
                 case IEventSymbol @event
@@ -1301,7 +1422,11 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                         AkburaCompletionKind.Event,
                         @event.Type.ToDisplayString(
                             SymbolDisplayFormat.MinimallyQualifiedFormat),
-                        propertyElements: false);
+                        propertyElements: false,
+                        canSet: true,
+                        canBind: false,
+                        canOut: false,
+                        canUsePropertyElement: false);
                     break;
 
                 case IFieldSymbol field
@@ -1314,6 +1439,19 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                     var propertyName = field.Name[..^"Property".Length];
                     if (!existing.Contains(propertyName))
                     {
+                        var clrProperty = type.GetMembers(propertyName)
+                            .OfType<RoslynPropertySymbol>()
+                            .FirstOrDefault(static property =>
+                                !property.IsStatic &&
+                                !property.IsIndexer &&
+                                property.DeclaredAccessibility ==
+                                    Accessibility.Public);
+                        var canRead = clrProperty == null ||
+                            clrProperty.GetMethod?.DeclaredAccessibility ==
+                                Accessibility.Public;
+                        var canWrite = clrProperty == null ||
+                            clrProperty.SetMethod?.DeclaredAccessibility ==
+                                Accessibility.Public;
                         AddMemberItem(
                             items,
                             ownerName,
@@ -1321,7 +1459,11 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                             AkburaCompletionKind.Property,
                             field.Type.ToDisplayString(
                                 SymbolDisplayFormat.MinimallyQualifiedFormat),
-                            propertyElements);
+                            propertyElements,
+                            canSet: canWrite,
+                            canBind: canRead && canWrite,
+                            canOut: canRead,
+                            canUsePropertyElement: true);
                     }
 
                     break;
@@ -1329,7 +1471,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         }
     }
 
-    private static void AddMemberItem(Dictionary<string, AkburaCompletionItem> items, string ownerName, string memberName, AkburaCompletionKind kind, string typeDisplay, bool propertyElements)
+    private static void AddMemberItem(Dictionary<string, CompletionMemberCandidate> items, string ownerName, string memberName, AkburaCompletionKind kind, string typeDisplay, bool propertyElements, bool canSet, bool canBind, bool canOut, bool canUsePropertyElement)
     {
         var displayName = propertyElements
             ? ownerName + "." + memberName
@@ -1361,9 +1503,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             }
         }
 
-        items.Add(
-            displayName,
-            new AkburaCompletionItem(
+        var item = new AkburaCompletionItem(
                 displayName,
                 insertText,
                 propertyElements
@@ -1377,7 +1517,16 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                 caretOffsetFromEnd:
                     caretOffsetFromEnd,
                 triggerCompletionAfterInsert:
-                    triggerCompletionAfterInsert));
+                    triggerCompletionAfterInsert);
+        items.Add(
+            displayName,
+            new CompletionMemberCandidate(
+                GetMemberName(displayName, propertyElements),
+                item,
+                canSet,
+                canBind,
+                canOut,
+                canUsePropertyElement));
     }
 
     private static bool IsSemanticCompletionContext(AkburaCompletionContextKind kind)
@@ -1676,15 +1825,37 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
 
     private readonly struct CompletionMemberCandidate
     {
-        public CompletionMemberCandidate(string memberName, AkburaCompletionItem item)
+        public CompletionMemberCandidate(string memberName, AkburaCompletionItem item, bool canSet, bool canBind, bool canOut, bool canUsePropertyElement)
         {
             MemberName = memberName;
             Item = item;
+            CanSet = canSet;
+            CanBind = canBind;
+            CanOut = canOut;
+            CanUsePropertyElement = canUsePropertyElement;
         }
 
         public string MemberName { get; }
 
         public AkburaCompletionItem Item { get; }
+
+        public bool CanSet { get; }
+
+        public bool CanBind { get; }
+
+        public bool CanOut { get; }
+
+        public bool CanUsePropertyElement { get; }
+
+        public bool IsEligible(AkburaMarkupAttributeMode mode)
+        {
+            return mode switch
+            {
+                AkburaMarkupAttributeMode.Bind => CanBind,
+                AkburaMarkupAttributeMode.Out => CanOut,
+                _ => CanSet,
+            };
+        }
     }
 
     private sealed class SemanticModelCompletionCache

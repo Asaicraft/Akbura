@@ -6,6 +6,7 @@ using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Utilities;
 using System.ComponentModel.Composition;
+using System.Reflection;
 
 namespace Akbura.VisualStudio.Completion;
 
@@ -53,7 +54,11 @@ internal sealed class AkburaCompletionSourceProvider :
 
         AkburaWorkspaceDiagnostics.Write(
             AkburaWorkspaceDiagnostics.Category.Completion,
-            "Source provider created.");
+            "Diagnostic session started: " +
+            "vsix=" + GetAssemblyBuildIdentity(
+                typeof(AkburaCompletionSourceProvider)) + "; " +
+            "compiler=" + GetAssemblyBuildIdentity(
+                typeof(Akbura.Language.AkburaSyntaxTree)) + ".");
     }
 
     public IAsyncCompletionSource GetOrCreate(ITextView textView)
@@ -110,5 +115,19 @@ internal sealed class AkburaCompletionSourceProvider :
                     _parserService,
                     new AkburaRoslynCompletionService(
                         _projectedDocumentService)));
+    }
+
+    private static string GetAssemblyBuildIdentity(Type markerType)
+    {
+        var assembly = markerType.Assembly;
+        var name = assembly.GetName();
+        var buildId = assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion;
+        return (name.Name ?? "<unknown>") + "@" +
+            (name.Version?.ToString() ?? "<unknown>") +
+            (string.IsNullOrWhiteSpace(buildId)
+                ? string.Empty
+                : ", buildId=" + buildId);
     }
 }

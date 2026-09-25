@@ -26,6 +26,8 @@ public sealed class WorkspaceCompletionTests
 
         param string Title;
         param bool Compact = false;
+        param bind string BoundText = "";
+        param out string Submitted = "";
         command void Save();
 
         <StackPanel/>
@@ -1440,6 +1442,293 @@ public sealed class WorkspaceCompletionTests
                     syntacticDocument.Text.ToString(
                         result.ApplicableSpan));
             });
+    }
+
+    [Theory]
+    [InlineData("bind:|", "Text", "Text={}", "")]
+    [InlineData("bind:Te|", "Text", "Text={}", "Te")]
+    [InlineData("out:|", "Text", "Text={}", "")]
+    [InlineData("out:Te|", "Text", "Text={}", "Te")]
+    public void Completion_DirectionalAttributeUsesBareMemberName(string attributeWithCaret, string expectedDisplayText, string expectedInsertText, string expectedApplicableText)
+    {
+        var sourceWithCaret = "namespace Gallery;\n\n" +
+            "using Avalonia.Controls;\n\n" +
+            "<TextBox " + attributeWithCaret + " />";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion.GetCompletions(
+                    syntacticDocument,
+                    semanticContext,
+                    position);
+                var item = Assert.Single(
+                    result.Items,
+                    candidate => candidate.DisplayText == expectedDisplayText);
+
+                Assert.Equal(expectedInsertText, item.InsertText);
+                Assert.Equal(1, item.CaretOffsetFromEnd);
+                Assert.True(item.TriggerCompletionAfterInsert);
+                Assert.Equal(
+                    expectedApplicableText,
+                    syntacticDocument.Text.ToString(result.ApplicableSpan));
+            });
+    }
+
+    [Theory]
+    [InlineData("bind:T|ext={text}", "bind:Text={text}")]
+    [InlineData("out:T|ext={text}", "out:Text={text}")]
+    public void Completion_DirectionalAttributeEditReplacesOnlyCompleteName(string attributeWithCaret, string expectedAttribute)
+    {
+        var sourceWithCaret = "namespace Gallery;\n\n" +
+            "using Avalonia.Controls;\n\n" +
+            "state string text = \"\";\n\n" +
+            "<TextBox " + attributeWithCaret + " />";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion.GetCompletions(
+                    syntacticDocument,
+                    semanticContext,
+                    position);
+                var item = Assert.Single(
+                    result.Items,
+                    static candidate => candidate.DisplayText == "Text");
+                var change = workspace.LanguageServices.Completion.GetCompletionChange(
+                    syntacticDocument,
+                    semanticContext,
+                    position,
+                    item);
+                var changed = syntacticDocument.Text.WithChanges(change.Changes).ToString();
+
+                Assert.Contains(expectedAttribute, changed, StringComparison.Ordinal);
+                Assert.DoesNotContain("Textext", changed, StringComparison.Ordinal);
+            });
+    }
+
+    [Theory]
+    [InlineData("Text={text} out:|", true)]
+    [InlineData("bind:Text={text} out:|", true)]
+    [InlineData("out:Text={text} out:|", true)]
+    [InlineData("Text={text} |", false)]
+    [InlineData("bind:Text={text} |", false)]
+    public void Completion_DirectionalAttributeHonorsSetterConflicts(string attributesWithCaret, bool expectsText)
+    {
+        var sourceWithCaret = "namespace Gallery;\n\n" +
+            "using Avalonia.Controls;\n\n" +
+            "state string text = \"\";\n\n" +
+            "<TextBox " + attributesWithCaret + " />";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion.GetCompletions(
+                    syntacticDocument,
+                    semanticContext,
+                    position);
+
+                Assert.Equal(
+                    expectsText,
+                    result.Items.Any(static candidate => candidate.DisplayText == "Text"));
+            });
+    }
+
+    [Theory]
+    [InlineData("<Card bind:| />", "BoundText", "Title", null, "Submitted")]
+    [InlineData("<Card out:| />", "Submitted", "Title", "BoundText", null)]
+    public void Completion_DirectionalSourceParametersUseDeclaredContract(string sourceMarkupWithCaret, string expected, string excluded, string? additionalExpected, string? additionalExcluded)
+    {
+        var sourceWithCaret = "namespace Gallery;\n\n" + sourceMarkupWithCaret;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion.GetCompletions(
+                    syntacticDocument,
+                    semanticContext,
+                    position);
+
+                Assert.Contains(result.Items, candidate => candidate.DisplayText == expected);
+                Assert.DoesNotContain(result.Items, candidate => candidate.DisplayText == excluded);
+                if (additionalExpected != null)
+                {
+                    Assert.Contains(result.Items, candidate => candidate.DisplayText == additionalExpected);
+                }
+
+                if (additionalExcluded != null)
+                {
+                    Assert.DoesNotContain(result.Items, candidate => candidate.DisplayText == additionalExcluded);
+                }
+            });
+    }
+
+    [Theory]
+    [InlineData("<TextBox bind:| />")]
+    [InlineData("<TextBox out:| />")]
+    public void Completion_DirectionalAttributeExcludesEventsCommandsAndUtilities(string markupWithCaret)
+    {
+        var sourceWithCaret = "namespace Gallery;\n\n" +
+            "using Avalonia.Controls;\n\n" + markupWithCaret;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion.GetCompletions(
+                    syntacticDocument,
+                    semanticContext,
+                    position);
+
+                Assert.DoesNotContain(result.Items, static candidate => candidate.DisplayText == "Loaded");
+                Assert.DoesNotContain(result.Items, static candidate => candidate.DisplayText == "Save");
+                Assert.DoesNotContain(result.Items, static candidate => candidate.Kind == AkburaCompletionKind.TailwindUtility);
+            });
+    }
+
+    [Theory]
+    [InlineData("|", "Text", "WriteOnly", "ReadOnly")]
+    [InlineData("bind:|", "Text", null, "ReadOnly")]
+    [InlineData("out:|", "Text", "ReadOnly", "WriteOnly")]
+    public void Completion_DirectionalPropertyAccessMatchesTheRequestedMode(string attributeWithCaret, string expected, string? additionalExpected, string excluded)
+    {
+        var sourceWithCaret = "namespace Gallery;\n\n" +
+            "using Avalonia.Controls;\n\n" +
+            "<TextBox " + attributeWithCaret + " />";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion.GetCompletions(
+                    syntacticDocument,
+                    semanticContext,
+                    position);
+
+                Assert.Contains(result.Items, candidate => candidate.DisplayText == expected);
+                if (additionalExpected != null)
+                {
+                    Assert.Contains(result.Items, candidate => candidate.DisplayText == additionalExpected);
+                }
+
+                Assert.DoesNotContain(result.Items, candidate => candidate.DisplayText == excluded);
+            });
+    }
+
+    [Fact]
+    public void Completion_UnsavedParameterDirectionChangeInvalidatesParentCatalog()
+    {
+        const string parentBindWithCaret = """
+            namespace Gallery;
+
+            <Child bind:| />
+            """;
+        const string parentOutWithCaret = """
+            namespace Gallery;
+
+            <Child out:| />
+            """;
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(WorkspaceCompletionTests),
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var projectId = ProjectId.CreateNewId("Application");
+            using var workspace = new AkburaWorkspace(new ProjectContext(
+                projectId,
+                Path.Combine(directory, "Application.csproj"),
+                directory,
+                "Gallery",
+                CreateCompilation(),
+                ImmutableArray<ProjectReference>.Empty));
+            var childUri = new Uri(Path.Combine(
+                directory,
+                "Child.akbura"));
+            var parentUri = new Uri(Path.Combine(
+                directory,
+                "Parent.akbura"));
+
+            workspace.OpenOrChangeDocumentContext(
+                childUri,
+                SourceText.From(
+                    "namespace Gallery;\n\n" +
+                    "param string Value;\n\n" +
+                    "<Avalonia.Controls.Border />"));
+
+            Assert.False(Complete(parentBindWithCaret));
+
+            workspace.OpenOrChangeDocumentContext(
+                childUri,
+                SourceText.From(
+                    "namespace Gallery;\n\n" +
+                    "param bind string Value;\n\n" +
+                    "<Avalonia.Controls.Border />"));
+
+            Assert.True(Complete(parentBindWithCaret));
+
+            workspace.OpenOrChangeDocumentContext(
+                childUri,
+                SourceText.From(
+                    "namespace Gallery;\n\n" +
+                    "param out string Value;\n\n" +
+                    "<Avalonia.Controls.Border />"));
+
+            Assert.False(Complete(parentBindWithCaret));
+            Assert.True(Complete(parentOutWithCaret));
+
+            workspace.OpenOrChangeDocumentContext(
+                childUri,
+                SourceText.From(
+                    "namespace Gallery;\n\n" +
+                    "param string Value;\n\n" +
+                    "<Avalonia.Controls.Border />"));
+
+            Assert.False(Complete(parentOutWithCaret));
+
+            bool Complete(string sourceWithCaret)
+            {
+                var position = sourceWithCaret.IndexOf('|');
+                var source = sourceWithCaret.Remove(position, 1);
+                var text = SourceText.From(source);
+                var semanticContext =
+                    workspace.OpenOrChangeDocumentContext(
+                        parentUri,
+                        text);
+                var document = AkburaSyntacticDocument.Parse(
+                    text,
+                    parentUri.LocalPath);
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        document,
+                        semanticContext,
+                        position);
+                return result.Items.Any(
+                    static item => item.DisplayText == "Value");
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
     }
 
     [Fact]
@@ -6617,6 +6906,18 @@ public sealed class WorkspaceCompletionTests
                     public System.Windows.Input.ICommand? Command { get; set; }
 
                     public object? CommandParameter { get; set; }
+                }
+
+                public sealed class TextBox : Control
+                {
+                    public string Text { get; set; } = string.Empty;
+
+                    public string ReadOnly { get; } = string.Empty;
+
+                    public string WriteOnly
+                    {
+                        set { }
+                    }
                 }
 
                 public class Page : Control

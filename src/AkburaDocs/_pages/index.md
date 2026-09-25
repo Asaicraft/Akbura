@@ -459,7 +459,11 @@ param bind string Search = "";
 param out TaskItem SelectedTask;
 ```
 
-Parameters without default values are required. `bind` enables two-way flow, while `out` publishes a value to the parent.
+Parameters without default values are required. A default parameter accepts
+normal parent-to-child assignment, `bind` allows normal, two-way, and output
+forms, and `out` accepts only output binding from the child to the parent. Read
+[Parameters and directional bindings](/akbura/parameters) for the full contract
+and parent/child examples.
 
 ## Binding
 

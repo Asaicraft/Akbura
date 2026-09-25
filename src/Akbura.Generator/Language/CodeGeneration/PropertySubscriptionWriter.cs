@@ -202,7 +202,8 @@ internal readonly ref struct PropertySubscriptionWriter
         in ComponentPropertySubscriptionPlan subscription, bool refreshClosure)
     {
         var slot = ComponentHotReloadIdentity.CreatePropertySubscriptionSlot(
-            subscription.Observation);
+            subscription.Observation,
+            subscription.SourceOrder);
         WriteStructuralSubscriptionStart(element.RuntimeStorageId, slot, subscription, refreshClosure);
 
         _writer.Write(
@@ -301,7 +302,8 @@ internal readonly ref struct PropertySubscriptionWriter
         OpenBlock();
 
         var slot = ComponentHotReloadIdentity.CreatePropertySubscriptionSlot(
-            subscription.Observation);
+            subscription.Observation,
+            subscription.SourceOrder);
         WriteStructuralSubscriptionStart(element.RuntimeStorageId, slot, subscription, refreshClosure);
 
         _writer.Write(

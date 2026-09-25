@@ -6,9 +6,11 @@ using Microsoft.VisualStudio.Imaging;
 using Microsoft.VisualStudio.Imaging.Interop;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion.Data;
+using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Adornments;
 using Microsoft.VisualStudio.Text.Editor;
+using Microsoft.VisualStudio.Threading;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -243,6 +245,10 @@ internal sealed class AkburaCompletionSource :
         IAsyncCompletionSession,
         AkburaRoslynCompletionSessionPolicy> _sessionStates = new();
 
+    private readonly object _declarationCompletionGate = new();
+
+    private DeclarationCompletionWork? _declarationCompletion;
+
     private int _completionSnapshotVersion = -1;
 
     private int _disposeState;
@@ -410,9 +416,39 @@ internal sealed class AkburaCompletionSource :
         }
 
         const int maximumLength = 80;
-        var sanitized = value!
-            .Replace('\r', ' ')
-            .Replace('\n', ' ');
+        var builder = new System.Text.StringBuilder(value!.Length);
+        foreach (var character in value)
+        {
+            switch (character)
+            {
+                case '\0':
+                    builder.Append("\\0");
+                    break;
+                case '\r':
+                    builder.Append("\\r");
+                    break;
+                case '\n':
+                    builder.Append("\\n");
+                    break;
+                case '\t':
+                    builder.Append("\\t");
+                    break;
+                default:
+                    if (char.IsControl(character))
+                    {
+                        builder.Append("\\u");
+                        builder.Append(((int)character).ToString("X4"));
+                    }
+                    else
+                    {
+                        builder.Append(character);
+                    }
+
+                    break;
+            }
+        }
+
+        var sanitized = builder.ToString();
         return sanitized.Length <= maximumLength
             ? sanitized
             : sanitized[..maximumLength] + "…";
@@ -431,6 +467,7 @@ internal sealed class AkburaCompletionSource :
         var totalTimer = Stopwatch.StartNew();
         var stageTimer = Stopwatch.StartNew();
         var outcome = "completed";
+        var activeStage = "start";
         var roslynStatus = "not-requested";
         var preflight = "not-requested";
         var truncated = false;
@@ -451,6 +488,9 @@ internal sealed class AkburaCompletionSource :
                 $"position={position}, " +
                 $"snapshot={snapshot.Version.VersionNumber}.");
 
+#if DEBUG
+            activeStage = "syntax-document";
+#endif
             var syntacticDocument =
                 await _parserService
                     .GetSyntacticDocumentAsync(snapshot)
@@ -464,6 +504,7 @@ internal sealed class AkburaCompletionSource :
             EnsureCurrent(request, snapshot);
 
 #if DEBUG
+            activeStage = "syntax-context";
             stageTimer.Restart();
 #endif
             var isAkcss = _documentKind ==
@@ -502,6 +543,7 @@ internal sealed class AkburaCompletionSource :
                 $"prefix='{FormatCompletionValue(isAkcssRegion ? akcssContext.Prefix : syntaxContext.Prefix)}'.");
 
 #if DEBUG
+            activeStage = "csharp-semantic-context";
             stageTimer.Restart();
 #endif
             if (syntacticDocument.TryGetCSharpCompletionContext(
@@ -582,17 +624,56 @@ internal sealed class AkburaCompletionSource :
                 EnsureCurrent(request, snapshot);
 
 #if DEBUG
+                activeStage = "roslyn-completion";
+                roslynStatus = "requested";
                 stageTimer.Restart();
 #endif
-                var csharpResult = await _roslynCompletionService
-                    .GetCompletionsAsync(
+                var declarationWork = syntaxContext.Kind ==
+                        AkburaCompletionContextKind.DeclarationModifier
+                    ? GetOrCreateDeclarationCompletionWork(
+                        snapshot,
+                        position,
+                        syntacticDocument,
+                        semanticContext,
+                        csharpContext,
+                        trigger,
+                        allowNonTrigger)
+                    : null;
+                var csharpCompletionTask = declarationWork?.Task ??
+                    _roslynCompletionService.GetCompletionsAsync(
                         snapshot,
                         syntacticDocument,
                         semanticContext,
                         csharpContext,
                         trigger,
                         allowNonTrigger,
-                        requestToken)
+                        requestToken);
+                if (AkburaRoslynCompletionSessionPolicy
+                    .ShouldPublishSupplementalBeforeRoslyn(
+                        syntaxContext.Kind,
+                        hasSupplementalItems: !supplementalResult.IsEmpty,
+                        roslynCompleted: csharpCompletionTask.IsCompleted))
+                {
+                    ScheduleDeclarationCompletionRefresh(
+                        declarationWork!,
+                        session);
+                    sessionState.SetAllowNonTrigger(
+                        snapshot.Version.VersionNumber,
+                        csharpContext,
+                        value: true);
+#if DEBUG
+                    activeStage = "publication";
+                    roslynStatus = "background-requested";
+#endif
+                    return CreateCoreCompletionContext(
+                        snapshot,
+                        supplementalResult,
+                        isIncomplete: true,
+                        syntaxContext,
+                        requestToken);
+                }
+
+                var csharpResult = await csharpCompletionTask
                     .ConfigureAwait(false);
 #if DEBUG
                 roslynStatus = csharpResult.Kind.ToString();
@@ -605,6 +686,7 @@ internal sealed class AkburaCompletionSource :
                 EnsureCurrent(request, snapshot);
 
 #if DEBUG
+                activeStage = "mapping";
                 stageTimer.Restart();
 #endif
                 CompletionContext completionContext;
@@ -688,6 +770,7 @@ internal sealed class AkburaCompletionSource :
                 AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
                     "Map completion items",
                     stageTimer.Elapsed);
+                activeStage = "publication";
 #endif
 
                 return completionContext;
@@ -708,6 +791,7 @@ internal sealed class AkburaCompletionSource :
             }
 
 #if DEBUG
+            activeStage = "semantic-context";
             stageTimer.Restart();
 #endif
             var documentContext = GetSemanticContext(
@@ -725,6 +809,7 @@ internal sealed class AkburaCompletionSource :
             EnsureCurrent(request, snapshot);
 
 #if DEBUG
+            activeStage = "core-completion";
             stageTimer.Restart();
 #endif
             var result =
@@ -745,12 +830,19 @@ internal sealed class AkburaCompletionSource :
                 $"{result.Items.Length} items.");
 
             EnsureCurrent(request, snapshot);
-            return CreateCoreCompletionContext(
+#if DEBUG
+            activeStage = "mapping";
+#endif
+            var coreCompletionContext = CreateCoreCompletionContext(
                 snapshot,
                 result,
                 result.IsIncomplete,
                 syntaxContext,
                 requestToken);
+#if DEBUG
+            activeStage = "publication";
+#endif
+            return coreCompletionContext;
         }
         catch (OperationCanceledException)
         {
@@ -774,6 +866,7 @@ internal sealed class AkburaCompletionSource :
                 $"Completion request: " +
                 $"snapshot={snapshot.Version.VersionNumber}, " +
                 $"outcome={outcome}, " +
+                $"activeStage={activeStage}, " +
                 $"roslyn={roslynStatus}, " +
                 $"preflight={preflight}, " +
                 $"truncated={truncated}, " +
@@ -1214,6 +1307,111 @@ internal sealed class AkburaCompletionSource :
             isIncomplete: true);
     }
 
+    private DeclarationCompletionWork GetOrCreateDeclarationCompletionWork(ITextSnapshot snapshot, int position, AkburaSyntacticDocument syntacticDocument, AkburaDocumentContext? semanticContext, AkburaCSharpCompletionContext csharpContext, CompletionTrigger trigger, bool allowNonTrigger)
+    {
+        lock (_declarationCompletionGate)
+        {
+            if (_declarationCompletion is { } existing &&
+                ReferenceEquals(existing.Snapshot, snapshot) &&
+                existing.Position == position)
+            {
+                return existing;
+            }
+
+            _declarationCompletion?.Cancel();
+            var cancellation = new CancellationTokenSource();
+            var task = _roslynCompletionService.GetCompletionsAsync(
+                snapshot,
+                syntacticDocument,
+                semanticContext,
+                csharpContext,
+                trigger,
+                allowNonTrigger,
+                cancellation.Token);
+            _declarationCompletion = new DeclarationCompletionWork(
+                snapshot,
+                position,
+                task,
+                cancellation);
+            return _declarationCompletion;
+        }
+    }
+
+    private void ScheduleDeclarationCompletionRefresh(DeclarationCompletionWork work, IAsyncCompletionSession session)
+    {
+        if (!work.TryScheduleRefresh())
+        {
+            return;
+        }
+
+#pragma warning disable VSSDK007, VSTHRD003 // Detached refresh owns errors; the shared Roslyn task does not capture the UI context.
+        Microsoft.VisualStudio.Shell.ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
+        {
+            try
+            {
+                await work.Task.ConfigureAwait(false);
+                await Microsoft.VisualStudio.Shell.ThreadHelper
+                    .JoinableTaskFactory
+                    .SwitchToMainThreadAsync();
+
+                if (_textView.IsClosed ||
+                    !IsCurrentDeclarationCompletionWork(work) ||
+                    !ReferenceEquals(
+                        work.Snapshot,
+                        _buffer.CurrentSnapshot) ||
+                    _textView.Caret.Position.BufferPosition.Position !=
+                        work.Position)
+                {
+                    return;
+                }
+
+                var trigger = new CompletionTrigger(
+                    CompletionTriggerReason.Invoke,
+                    work.Snapshot,
+                    '\0');
+                var location = new SnapshotPoint(
+                    work.Snapshot,
+                    work.Position);
+                session.OpenOrUpdate(
+                    trigger,
+                    location,
+                    CancellationToken.None);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception error)
+            {
+                AkburaWorkspaceDiagnostics.Write(
+                    AkburaWorkspaceDiagnostics.Category.Completion,
+                    "Declaration completion refresh failed: " + error);
+            }
+        }).FileAndForget("Akbura/Completion/RefreshDeclarationTypes");
+#pragma warning restore VSSDK007, VSTHRD003
+    }
+
+    private bool IsCurrentDeclarationCompletionWork(DeclarationCompletionWork work)
+    {
+        lock (_declarationCompletionGate)
+        {
+            return ReferenceEquals(
+                _declarationCompletion,
+                work);
+        }
+    }
+
+    private void CancelDeclarationCompletion()
+    {
+        DeclarationCompletionWork? work;
+        lock (_declarationCompletionGate)
+        {
+            work = _declarationCompletion;
+            _declarationCompletion = null;
+        }
+
+        work?.Cancel();
+    }
+
     private void EnsureCurrent(AkburaLatestRequest request, ITextSnapshot snapshot)
     {
         var cancellationToken = request.Token;
@@ -1234,6 +1432,7 @@ internal sealed class AkburaCompletionSource :
 
     private void OnBufferChanged(object? sender, TextContentChangedEventArgs eventArgs)
     {
+        CancelDeclarationCompletion();
         if (Volatile.Read(
                 ref _completionSnapshotVersion) !=
             eventArgs.After.Version.VersionNumber)
@@ -1259,6 +1458,7 @@ internal sealed class AkburaCompletionSource :
         _buffer.Changed -=
             OnBufferChanged;
         _textView.Closed -= OnTextViewClosed;
+        CancelDeclarationCompletion();
         _completionRequests.Dispose();
     }
 
@@ -1505,6 +1705,56 @@ internal sealed class AkburaCompletionSource :
             AkburaCompletionKind.Hook => HookFilters,
             _ => PropertyFilters,
         };
+    }
+
+    private sealed class DeclarationCompletionWork
+    {
+        private CancellationTokenSource? _cancellation;
+
+        private int _refreshScheduled;
+
+        public DeclarationCompletionWork(ITextSnapshot snapshot, int position, Task<AkburaRoslynCompletionResult> task, CancellationTokenSource cancellation)
+        {
+            Snapshot = snapshot ??
+                throw new ArgumentNullException(nameof(snapshot));
+            Position = position;
+            Task = task ??
+                throw new ArgumentNullException(nameof(task));
+            _cancellation = cancellation ??
+                throw new ArgumentNullException(nameof(cancellation));
+        }
+
+        public ITextSnapshot Snapshot { get; }
+
+        public int Position { get; }
+
+        public Task<AkburaRoslynCompletionResult> Task { get; }
+
+        public bool TryScheduleRefresh() =>
+            Interlocked.Exchange(ref _refreshScheduled, 1) == 0;
+
+        public void Cancel()
+        {
+            var cancellation = Interlocked.Exchange(
+                ref _cancellation,
+                null);
+            if (cancellation == null)
+            {
+                return;
+            }
+
+            try
+            {
+                cancellation.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            finally
+            {
+                cancellation.Dispose();
+            }
+        }
     }
 
 }

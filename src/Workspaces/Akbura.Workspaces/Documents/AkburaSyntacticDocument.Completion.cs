@@ -152,18 +152,27 @@ public sealed partial class AkburaSyntacticDocument
                 ImmutableArray<string>.Empty);
         }
 
-        var attributeSpan = GetApplicableAttributeNameSpan(
+        var attributeContext = GetMarkupAttributeNameCompletionContext(
+            startTag,
             position,
             Math.Max(
                 startTag.Name.Span.End,
                 startTag.LessToken.Span.End));
         return new AkburaSyntacticCompletionContext(
             AkburaCompletionContextKind.AttributeName,
-            attributeSpan,
-            Text.ToString(attributeSpan),
+            attributeContext.NameSpan,
+            attributeContext.FilterText,
             componentName,
             parentComponentName: GetParentElementName(element),
-            GetExistingAttributeNames(startTag));
+            attributeContext.ExistingAttributeNames,
+            attributeMode: attributeContext.Mode,
+            attributePrefixSpan: attributeContext.PrefixSpan,
+            attributeNameSpan: attributeContext.NameSpan,
+            fullAttributeNameSpan: attributeContext.FullNameSpan,
+            hasAttributeEquals: attributeContext.HasEquals,
+            hasAttributeValue: attributeContext.HasValue,
+            attributeValueSpan: attributeContext.ValueSpan,
+            existingAttributes: attributeContext.ExistingAttributes);
     }
 
     /// <summary>
@@ -359,22 +368,238 @@ public sealed partial class AkburaSyntacticDocument
         return TextSpan.FromBounds(start, position);
     }
 
-    private TextSpan GetApplicableAttributeNameSpan(int position, int minimumStart)
+    private MarkupAttributeNameCompletionContext GetMarkupAttributeNameCompletionContext(MarkupStartTagSyntax startTag, int position, int minimumStart)
     {
-        var span = GetApplicableNameSpan(
-            position,
-            minimumStart);
-        if (span.Length > 0 &&
-            Text[span.Start] == ':' &&
-            span.Start > minimumStart &&
-            Text[span.Start - 1] == '}')
+        var fullNameStart = position;
+        while (fullNameStart > minimumStart &&
+               IsCompletionNameCharacter(Text[fullNameStart - 1]))
         {
-            return TextSpan.FromBounds(
-                span.Start + 1,
-                span.End);
+            fullNameStart--;
         }
 
-        return span;
+        var fullNameEnd = position;
+        while (fullNameEnd < Text.Length &&
+               IsCompletionNameCharacter(Text[fullNameEnd]))
+        {
+            fullNameEnd++;
+        }
+
+        var fullNameSpan = TextSpan.FromBounds(
+            fullNameStart,
+            fullNameEnd);
+        var fullNameText = Text.ToString(fullNameSpan);
+        var mode = AkburaMarkupAttributeMode.None;
+        var prefixLength = 0;
+        if (fullNameText.StartsWith("bind:", StringComparison.Ordinal))
+        {
+            mode = AkburaMarkupAttributeMode.Bind;
+            prefixLength = "bind:".Length;
+        }
+        else if (fullNameText.StartsWith("out:", StringComparison.Ordinal))
+        {
+            mode = AkburaMarkupAttributeMode.Out;
+            prefixLength = "out:".Length;
+        }
+
+        var prefixSpan = prefixLength == 0
+            ? default
+            : new TextSpan(fullNameSpan.Start, prefixLength);
+        var nameStart = fullNameSpan.Start + prefixLength;
+        if (prefixLength == 0 &&
+            fullNameSpan.Length > 0 &&
+            Text[fullNameSpan.Start] == ':' &&
+            fullNameSpan.Start > minimumStart &&
+            Text[fullNameSpan.Start - 1] == '}')
+        {
+            nameStart++;
+        }
+
+        var nameSpan = TextSpan.FromBounds(nameStart, fullNameSpan.End);
+        var filterEnd = Math.Max(
+            nameSpan.Start,
+            Math.Min(position, nameSpan.End));
+        var filterText = Text.ToString(TextSpan.FromBounds(
+            nameSpan.Start,
+            filterEnd));
+        MarkupAttributeSyntax? editingAttribute = null;
+        var hasEquals = false;
+        var hasValue = false;
+        var valueSpan = default(TextSpan);
+
+        foreach (var attribute in startTag.Attributes)
+        {
+            if (fullNameSpan.Length == 0 ||
+                !TryGetMarkupAttributeIdentity(
+                    attribute,
+                    out var identity) ||
+                !IsSameEditedAttribute(
+                    identity.FullNameSpan,
+                    fullNameSpan,
+                    position))
+            {
+                continue;
+            }
+
+            editingAttribute = attribute;
+            if (TryGetMarkupAttributeAssignment(
+                    attribute,
+                    out var equalsToken,
+                    out var value))
+            {
+                hasEquals = equalsToken.RawKind != 0 &&
+                    !equalsToken.IsMissing;
+                hasValue = value != null;
+                valueSpan = value?.Span ?? default;
+            }
+
+            break;
+        }
+
+        using var existingNames = ImmutableArrayBuilder<string>.Rent();
+        using var existingAttributes =
+            ImmutableArrayBuilder<AkburaMarkupAttributeIdentity>.Rent();
+        foreach (var attribute in startTag.Attributes)
+        {
+            if (ReferenceEquals(attribute, editingAttribute) ||
+                !TryGetMarkupAttributeIdentity(
+                    attribute,
+                    out var identity) ||
+                identity.Name.Length == 0)
+            {
+                continue;
+            }
+
+            existingAttributes.Add(identity);
+            existingNames.Add(identity.Mode switch
+            {
+                AkburaMarkupAttributeMode.Bind => "bind:" + identity.Name,
+                AkburaMarkupAttributeMode.Out => "out:" + identity.Name,
+                _ => identity.Name,
+            });
+        }
+
+        return new MarkupAttributeNameCompletionContext(
+            mode,
+            prefixSpan,
+            nameSpan,
+            fullNameSpan,
+            filterText,
+            hasEquals,
+            hasValue,
+            valueSpan,
+            existingNames.ToImmutable(),
+            existingAttributes.ToImmutable());
+    }
+
+    private static bool IsSameEditedAttribute(TextSpan attributeNameSpan, TextSpan lexicalNameSpan, int position)
+    {
+        if (attributeNameSpan == lexicalNameSpan)
+        {
+            return true;
+        }
+
+        if (lexicalNameSpan.Length == 0)
+        {
+            return attributeNameSpan.Length == 0 &&
+                position == attributeNameSpan.Start;
+        }
+
+        return attributeNameSpan.OverlapsWith(lexicalNameSpan) ||
+            attributeNameSpan.Length == 0 &&
+            lexicalNameSpan.Start <= attributeNameSpan.Start &&
+            attributeNameSpan.Start <= lexicalNameSpan.End;
+    }
+
+    private static bool TryGetMarkupAttributeIdentity(MarkupAttributeSyntax attribute, out AkburaMarkupAttributeIdentity identity)
+    {
+        switch (attribute)
+        {
+            case MarkupPlainAttributeSyntax plain:
+                identity = new AkburaMarkupAttributeIdentity(
+                    plain.Name.ToFullString().Trim(),
+                    AkburaMarkupAttributeMode.None,
+                    plain.Name.Span);
+                return true;
+
+            case MarkupAttachedPropertyAttributeSyntax attached:
+                identity = new AkburaMarkupAttributeIdentity(
+                    attached.OwnerType.ToFullString().Trim() +
+                    "." +
+                    attached.Name.ToFullString().Trim(),
+                    AkburaMarkupAttributeMode.None,
+                    TextSpan.FromBounds(
+                        attached.OwnerType.Span.Start,
+                        attached.Name.Span.End));
+                return true;
+
+            case MarkupPrefixedAttributeSyntax prefixed:
+                var mode = prefixed.Prefix.Kind switch
+                {
+                    SyntaxKind.BindToken =>
+                        AkburaMarkupAttributeMode.Bind,
+                    SyntaxKind.OutToken =>
+                        AkburaMarkupAttributeMode.Out,
+                    _ => AkburaMarkupAttributeMode.None,
+                };
+                identity = new AkburaMarkupAttributeIdentity(
+                    prefixed.Name.ToFullString().Trim(),
+                    mode,
+                    TextSpan.FromBounds(
+                        prefixed.Prefix.Span.Start,
+                        prefixed.Name.IsMissing
+                            ? prefixed.Colon.Span.End
+                            : prefixed.Name.Span.End));
+                return true;
+
+            case IncompleteAttributeSyntax incomplete:
+                identity = new AkburaMarkupAttributeIdentity(
+                    incomplete.Name.ToFullString().Trim(),
+                    AkburaMarkupAttributeMode.None,
+                    incomplete.Name.Span);
+                return true;
+
+            case TailwindAttributeSyntax utility:
+                identity = new AkburaMarkupAttributeIdentity(
+                    utility.ToFullString().Trim(),
+                    AkburaMarkupAttributeMode.None,
+                    utility.Span);
+                return true;
+
+            default:
+                identity = default;
+                return false;
+        }
+    }
+
+    private static bool TryGetMarkupAttributeAssignment(MarkupAttributeSyntax attribute, out SyntaxToken equalsToken, out MarkupAttributeValueSyntax? value)
+    {
+        switch (attribute)
+        {
+            case MarkupPlainAttributeSyntax plain:
+                equalsToken = plain.EqualsToken;
+                value = plain.Value;
+                return true;
+
+            case MarkupAttachedPropertyAttributeSyntax attached:
+                equalsToken = attached.EqualsToken;
+                value = attached.Value;
+                return true;
+
+            case MarkupPrefixedAttributeSyntax prefixed:
+                equalsToken = prefixed.EqualsToken;
+                value = prefixed.Value;
+                return true;
+
+            case IncompleteAttributeSyntax incomplete:
+                equalsToken = incomplete.EqualsToken;
+                value = null;
+                return true;
+
+            default:
+                equalsToken = default;
+                value = null;
+                return false;
+        }
     }
 
     private bool TryGetMarkupExtensionTypeContext(AkburaSyntax root, int position, out AkburaSyntacticCompletionContext context)
@@ -788,6 +1013,43 @@ public sealed partial class AkburaSyntacticDocument
         // attributes, including incomplete attributes recovered as utilities.
         return startTag.CloseToken.IsMissing ||
             position < startTag.Span.End;
+    }
+
+    private readonly struct MarkupAttributeNameCompletionContext
+    {
+        public MarkupAttributeNameCompletionContext(AkburaMarkupAttributeMode mode, TextSpan prefixSpan, TextSpan nameSpan, TextSpan fullNameSpan, string filterText, bool hasEquals, bool hasValue, TextSpan valueSpan, ImmutableArray<string> existingAttributeNames, ImmutableArray<AkburaMarkupAttributeIdentity> existingAttributes)
+        {
+            Mode = mode;
+            PrefixSpan = prefixSpan;
+            NameSpan = nameSpan;
+            FullNameSpan = fullNameSpan;
+            FilterText = filterText;
+            HasEquals = hasEquals;
+            HasValue = hasValue;
+            ValueSpan = valueSpan;
+            ExistingAttributeNames = existingAttributeNames;
+            ExistingAttributes = existingAttributes;
+        }
+
+        public AkburaMarkupAttributeMode Mode { get; }
+
+        public TextSpan PrefixSpan { get; }
+
+        public TextSpan NameSpan { get; }
+
+        public TextSpan FullNameSpan { get; }
+
+        public string FilterText { get; }
+
+        public bool HasEquals { get; }
+
+        public bool HasValue { get; }
+
+        public TextSpan ValueSpan { get; }
+
+        public ImmutableArray<string> ExistingAttributeNames { get; }
+
+        public ImmutableArray<AkburaMarkupAttributeIdentity> ExistingAttributes { get; }
     }
 
     private bool IsInsideAttributeValue(MarkupStartTagSyntax startTag, int position)

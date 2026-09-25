@@ -432,6 +432,7 @@ internal sealed class AkburaCompletionCommitManager :
     private static bool IsMatchingSyntacticContext(ITextSnapshot sourceSnapshot, ITextSnapshot currentSnapshot, AkburaSyntacticCompletionContext source, AkburaSyntacticCompletionContext current)
     {
         if (source.Kind != current.Kind ||
+            source.AttributeMode != current.AttributeMode ||
             !string.Equals(
                 source.ComponentName,
                 current.ComponentName,
@@ -498,7 +499,19 @@ internal sealed class AkburaCompletionCommitManager :
             return false;
         }
 
-        if (source.OwnerKind != current.OwnerKind)
+        var isDeclarationTypeSlot =
+            source.LogicalSlot ==
+                AkburaCSharpCompletionLogicalSlot.DeclarationType &&
+            current.LogicalSlot ==
+                AkburaCSharpCompletionLogicalSlot.DeclarationType;
+        if (source.LogicalSlot != current.LogicalSlot)
+        {
+            reason = "logical-slot-changed";
+            return false;
+        }
+
+        if (!isDeclarationTypeSlot &&
+            source.OwnerKind != current.OwnerKind)
         {
             reason = "owner-kind-changed";
             return false;
@@ -507,14 +520,19 @@ internal sealed class AkburaCompletionCommitManager :
         if (!TryTranslateSpan(
                 sourceSnapshot,
                 currentSnapshot,
-                source.OwnerSpan,
+                isDeclarationTypeSlot
+                    ? source.LogicalOwnerSpan
+                    : source.OwnerSpan,
                 out var ownerSpan))
         {
             reason = "owner-span-translation-failed";
             return false;
         }
 
-        if (ownerSpan != current.OwnerSpan)
+        var currentOwnerSpan = isDeclarationTypeSlot
+            ? current.LogicalOwnerSpan
+            : current.OwnerSpan;
+        if (ownerSpan != currentOwnerSpan)
         {
             reason = "owner-changed";
             return false;
@@ -567,6 +585,8 @@ internal sealed class AkburaCompletionCommitManager :
             $"currentContextKind={current?.Kind.ToString() ?? "none"}, " +
             $"sourceOwnerKind={source.OwnerKind}, " +
             $"currentOwnerKind={current?.OwnerKind.ToString() ?? "none"}, " +
+            $"sourceLogicalSlot={source.LogicalSlot}, " +
+            $"currentLogicalSlot={current?.LogicalSlot.ToString() ?? "none"}, " +
             $"sourceOwnerSpan={source.OwnerSpan}, " +
             $"translatedOwnerSpan={(hasTranslatedOwner ? translatedOwner.ToString() : "unavailable")}, " +
             $"currentOwnerSpan={(current?.OwnerSpan.ToString() ?? "none")}, " +

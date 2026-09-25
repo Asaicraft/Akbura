@@ -125,4 +125,22 @@ public sealed class AkburaCompletionItem
             return _lazyDescription ?? description;
         }
     }
+
+    internal AkburaCompletionItem WithInsertion(string insertText, int caretOffsetFromEnd, bool triggerCompletionAfterInsert)
+    {
+        return new AkburaCompletionItem(
+            DisplayText,
+            insertText,
+            Kind,
+            _lazyDescription ?? string.Empty,
+            _descriptionFactory,
+            FilterText,
+            SortText,
+            Suffix,
+            Priority,
+            caretOffsetFromEnd,
+            triggerCompletionAfterInsert,
+            NamespaceImport,
+            ResolveKey);
+    }
 }

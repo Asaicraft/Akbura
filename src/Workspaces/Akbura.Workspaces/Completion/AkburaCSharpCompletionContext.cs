@@ -13,13 +13,20 @@ public readonly struct AkburaCSharpCompletionContext
         SyntaxKind ownerKind,
         TextSpan ownerSpan,
         TextSpan hostSpan,
-        int hostPosition)
+        int hostPosition,
+        AkburaCSharpCompletionLogicalSlot logicalSlot = default,
+        TextSpan logicalOwnerSpan = default)
     {
         Kind = kind;
         OwnerKind = ownerKind;
         OwnerSpan = ownerSpan;
         HostSpan = hostSpan;
         HostPosition = hostPosition;
+        LogicalSlot = logicalSlot;
+        LogicalOwnerSpan = logicalSlot ==
+                AkburaCSharpCompletionLogicalSlot.None
+            ? ownerSpan
+            : logicalOwnerSpan;
     }
 
     /// <summary>
@@ -45,6 +52,42 @@ public readonly struct AkburaCSharpCompletionContext
     internal SyntaxKind OwnerKind { get; }
 
     internal TextSpan OwnerSpan { get; }
+
+    internal AkburaCSharpCompletionLogicalSlot LogicalSlot { get; }
+
+    internal TextSpan LogicalOwnerSpan { get; }
+}
+
+internal enum AkburaCSharpCompletionLogicalSlot
+{
+    None = 0,
+    DeclarationType,
+}
+
+internal static class AkburaCSharpCompletionContextFacts
+{
+    public static bool HasSameLogicalSlot(AkburaCSharpCompletionContext first, AkburaCSharpCompletionContext second)
+    {
+        if (first.Kind != second.Kind)
+        {
+            return false;
+        }
+
+        if (first.LogicalSlot != AkburaCSharpCompletionLogicalSlot.None ||
+            second.LogicalSlot != AkburaCSharpCompletionLogicalSlot.None)
+        {
+            return first.LogicalSlot ==
+                    AkburaCSharpCompletionLogicalSlot.DeclarationType &&
+                second.LogicalSlot ==
+                    AkburaCSharpCompletionLogicalSlot.DeclarationType &&
+                first.LogicalOwnerSpan.Start ==
+                    second.LogicalOwnerSpan.Start;
+        }
+
+        return first.OwnerKind == second.OwnerKind &&
+            first.OwnerSpan.Start == second.OwnerSpan.Start &&
+            first.HostSpan.Start == second.HostSpan.Start;
+    }
 }
 
 /// <summary>

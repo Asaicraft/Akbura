@@ -2,6 +2,7 @@ using Akbura.Workspaces;
 using Akbura.VisualStudio.CSharp;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion.Data;
 using Microsoft.VisualStudio.Text;
+using System.Diagnostics;
 using RoslynCompletionItem =
     Microsoft.CodeAnalysis.Completion.CompletionItem;
 using RoslynCompletionList =
@@ -50,6 +51,12 @@ internal sealed class AkburaRoslynCompletionService
             completionContext.OwnerSpan,
             completionContext.HostSpan,
             completionContext.HostPosition);
+#if DEBUG
+        var stageTimer = Stopwatch.StartNew();
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.CompletionPerformance,
+            "Roslyn completion stage entered: activeStage=projected-document.");
+#endif
         var projected = await _projectedDocumentService
             .GetProjectedDocumentAsync(
                 snapshot,
@@ -58,6 +65,11 @@ internal sealed class AkburaRoslynCompletionService
                 embeddedContext,
                 cancellationToken)
             .ConfigureAwait(false);
+#if DEBUG
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
+            "Projected document",
+            stageTimer.Elapsed);
+#endif
         if (projected == null)
         {
             return AkburaRoslynCompletionResult.Unavailable;
@@ -66,8 +78,19 @@ internal sealed class AkburaRoslynCompletionService
         cancellationToken.ThrowIfCancellationRequested();
         var document = projected.RoslynDocument;
         var projection = projected.Projection;
+#if DEBUG
+        stageTimer.Restart();
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.CompletionPerformance,
+            "Roslyn completion stage entered: activeStage=workspace-document.");
+#endif
         var completionService =
             RoslynCompletionService.GetService(document);
+#if DEBUG
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
+            "Workspace document and completion service",
+            stageTimer.Elapsed);
+#endif
         if (completionService == null)
         {
             AkburaWorkspaceDiagnostics.Write(
@@ -83,6 +106,12 @@ internal sealed class AkburaRoslynCompletionService
                     isExplicit,
                     allowNonTrigger,
                     trigger.Character);
+#if DEBUG
+        stageTimer.Restart();
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.CompletionPerformance,
+            "Roslyn completion stage entered: activeStage=preflight.");
+#endif
         Microsoft.CodeAnalysis.Text.SourceText? sourceText = null;
         AkburaRoslynCompletionPreflight preflight;
         if (isExplicit)
@@ -142,10 +171,22 @@ internal sealed class AkburaRoslynCompletionService
                 preflight);
         }
 
+#if DEBUG
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
+            "Roslyn preflight",
+            stageTimer.Elapsed);
+#endif
+
         sourceText ??= await document
             .GetTextAsync(cancellationToken)
             .ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+#if DEBUG
+        stageTimer.Restart();
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.CompletionPerformance,
+            "Roslyn completion stage entered: activeStage=roslyn-completion.");
+#endif
         var completionList = await completionService
             .GetCompletionsAsync(
                 document,
@@ -153,6 +194,11 @@ internal sealed class AkburaRoslynCompletionService
                 roslynTrigger,
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
+#if DEBUG
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
+            "Roslyn completion request",
+            stageTimer.Elapsed);
+#endif
         if (completionList == null)
         {
             AkburaWorkspaceDiagnostics.Write(
@@ -163,12 +209,23 @@ internal sealed class AkburaRoslynCompletionService
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+#if DEBUG
+        stageTimer.Restart();
+        AkburaWorkspaceDiagnostics.Write(
+            AkburaWorkspaceDiagnostics.Category.CompletionPerformance,
+            "Roslyn completion stage entered: activeStage=filtering.");
+#endif
         var selection =
             AkburaRoslynCompletionItemSelector.SelectForVisualStudio(
                 completionList,
                 sourceText,
                 projection.ProjectedPosition,
                 cancellationToken);
+#if DEBUG
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
+            "Roslyn completion filtering",
+            stageTimer.Elapsed);
+#endif
         var rawHasBrushes = completionList.ItemsList.Any(
             static item => item.DisplayText == "Brushes");
         var selectedHasBrushes = selection.Items.Any(

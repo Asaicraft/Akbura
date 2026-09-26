@@ -5,11 +5,13 @@ namespace Akbura.Language.CodeGeneration;
 internal readonly ref struct ComponentMemberWriter
 {
     private readonly CodeWriter _writer;
+    private readonly BindingWriterEnvironment _bindingEnvironment;
     private readonly ComponentGenerationSourceMap _sourceMap;
     private readonly string _ownerTypeName;
 
     public ComponentMemberWriter(
         CodeWriter writer,
+        in BindingWriterEnvironment bindingEnvironment,
         ComponentGenerationSourceMap sourceMap,
         string ownerTypeName)
     {
@@ -18,6 +20,7 @@ internal readonly ref struct ComponentMemberWriter
         Debug.Assert(!string.IsNullOrEmpty(ownerTypeName));
 
         _writer = writer!;
+        _bindingEnvironment = bindingEnvironment;
         _sourceMap = sourceMap!;
         _ownerTypeName = ownerTypeName;
     }
@@ -144,6 +147,7 @@ internal readonly ref struct ComponentMemberWriter
         WriteSectionSeparator(ref wroteAny);
         var writer = new StateWriter(
             _writer,
+            in _bindingEnvironment,
             _sourceMap,
             _ownerTypeName);
 

@@ -1486,7 +1486,12 @@ internal sealed partial class Lexer : IDisposable
 			// The terminator must stay available as the next token, e.g. the
 			// closing '}' of an inline expression is a CloseBraceToken, not part
 			// of the CSharpRawToken.
-			if (character == terminator && paren == 0 && brace == 0 && bracket == 0)
+			var isTopLevelTerminator =
+				paren == 0 && brace == 0 && bracket == 0;
+			var isRecoverableStateSemicolon =
+				terminator == ';' && brace == 0;
+			if (character == terminator &&
+				(isTopLevelTerminator || isRecoverableStateSemicolon))
 			{
 				break;
 			}

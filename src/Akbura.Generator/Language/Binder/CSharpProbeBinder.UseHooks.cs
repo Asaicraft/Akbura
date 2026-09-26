@@ -200,7 +200,8 @@ internal sealed partial class CSharpProbeBinder
                     CSharpSyntaxFactory.ParseTypeName(type.ToDisplayString(
                         s_stateTypeDisplayFormat)),
                     state.Name,
-                    state));
+                    state,
+                    state.IsReadOnly));
             }
         }
         finally
@@ -247,10 +248,11 @@ internal sealed partial class CSharpProbeBinder
                     } parameterType &&
                     parameterType.ContainingNamespace.ToDisplayString() ==
                         "Akbura.ComponentTree" &&
-                    TryGetStateArgument(
-                        originalProbe.SemanticModel,
-                        argument.Expression,
-                        out var state))
+                     TryGetStateArgument(
+                         originalProbe.SemanticModel,
+                         argument.Expression,
+                         out var state) &&
+                     !state.IsReadOnly)
                 {
                     substitutions.Add(new UseHookStateArgument(index, state));
                 }

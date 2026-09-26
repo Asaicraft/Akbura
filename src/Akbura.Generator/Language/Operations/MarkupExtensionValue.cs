@@ -123,12 +123,14 @@ internal readonly struct MarkupBindingPathElement
         ImmutableArray<string> arguments = default,
         ImmutableArray<MarkupBindingPathArgument> boundArguments = default,
         int? level = null,
-        bool acceptsNull = false)
+        bool acceptsNull = false,
+        CSharpSymbolDefinition sourceType = default)
     {
         Kind = kind;
         Text = text ?? throw new ArgumentNullException(nameof(text));
         Symbol = symbol;
         Type = type;
+        SourceType = sourceType;
         Arguments = arguments.IsDefault
             ? ImmutableArray<string>.Empty
             : arguments;
@@ -146,6 +148,8 @@ internal readonly struct MarkupBindingPathElement
     public CSharpSymbolDefinition Symbol { get; }
 
     public CSharpSymbolDefinition Type { get; }
+
+    public CSharpSymbolDefinition SourceType { get; }
 
     public ImmutableArray<string> Arguments { get; }
 

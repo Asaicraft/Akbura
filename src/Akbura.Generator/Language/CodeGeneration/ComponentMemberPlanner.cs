@@ -77,9 +77,9 @@ internal static class ComponentMemberPlanner
         public ComponentMemberPlan Create()
         {
             LowerParameters();
-            LowerStates();
             LowerServices();
             LowerCommands();
+            LowerStates();
             LowerUserMembers();
 
             return new ComponentMemberPlan(
@@ -310,8 +310,102 @@ internal static class ComponentMemberPlanner
                 var factoryKind = ComponentStateFactoryKind.Value;
                 IMethodSymbol? hookMethod = null;
                 var stateArguments = ImmutableArray<UseHookStateArgument>.Empty;
+                var bindingRootKind = ComponentStateBindingRootKind.Component;
+                string? bindingRootName = null;
+                CSharp.ExpressionSyntax? bindingRootExpression = null;
+                ITypeSymbol? bindingSourceType = null;
+                var bindingPathElements = ImmutableArray<MarkupBindingPathElement>.Empty;
+                var bindingFullPathElementCount = 0;
+                var bindingDependencyStateGeneratedNames = ImmutableArray<string>.Empty;
+                var bindingPropertyDependencies =
+                    ImmutableArray<ComponentStateBindingPropertyDependencyPlan>.Empty;
+                string? bindingRootHotReloadIdentity = null;
 
-                if (_semanticModel.GetOperation(state.InitializerSyntax) is IUseHookOperation hook)
+                if (state.BindingKind != StateBindingKind.None)
+                {
+                    factoryKind = ComponentStateFactoryKind.State;
+                    if (state.CanReadBindingSource)
+                    {
+                        flags |= ComponentStateFlags.CanReadBindingSource;
+                    }
+
+                    if (state.InitializerType.Symbol is ITypeSymbol initializerType &&
+                        AkburaSemanticModel.TryGetIObservableElementType(initializerType, out _))
+                    {
+                        flags |= ComponentStateFlags.IsObservableSource;
+                    }
+
+                    var rootName = GetBindingRootIdentifier(initializer);
+                    using var dependencies = ImmutableArrayBuilder<string>.Rent();
+                    for (var stateIndex = 0; stateIndex < _states.Count; stateIndex++)
+                    {
+                        ref readonly var candidate = ref _states.WrittenSpan[stateIndex];
+                        if (string.Equals(candidate.Name, rootName, StringComparison.Ordinal))
+                        {
+                            bindingRootKind = ComponentStateBindingRootKind.State;
+                            bindingRootName = candidate.GeneratedName;
+                            bindingSourceType = candidate.ValueType;
+                            bindingRootHotReloadIdentity = candidate.HotReloadKey;
+                            dependencies.Add(candidate.GeneratedName);
+                        }
+                        else if (UsesStateInIndexer(initializer, candidate.Name))
+                        {
+                            dependencies.Add(candidate.GeneratedName);
+                        }
+                    }
+
+                    if (bindingRootKind == ComponentStateBindingRootKind.Component)
+                    {
+                        TryGetGeneratedBindingRoot(
+                            state,
+                            rootName,
+                            out bindingRootKind,
+                            out bindingRootName,
+                            out bindingSourceType,
+                            out bindingRootHotReloadIdentity);
+                    }
+
+                    if (bindingRootKind == ComponentStateBindingRootKind.Component &&
+                        TryGetStaticBindingRoot(
+                            state,
+                            initializer,
+                            out bindingRootExpression,
+                            out var staticRootType))
+                    {
+                        bindingRootKind = ComponentStateBindingRootKind.Static;
+                        bindingSourceType = staticRootType;
+                    }
+
+                    bindingDependencyStateGeneratedNames = dependencies.ToImmutable();
+                    using var propertyDependencies =
+                        ImmutableArrayBuilder<ComponentStateBindingPropertyDependencyPlan>.Rent();
+                    AddBindingPropertyDependencies(
+                        state,
+                        initializer,
+                        propertyDependencies);
+                    bindingPropertyDependencies = propertyDependencies.ToImmutable();
+                    bindingSourceType ??= _component.ComponentType ?? _objectType;
+                    var includeRootIdentifier = bindingRootKind == ComponentStateBindingRootKind.Component;
+                    bindingFullPathElementCount = CountStateBindingPathElements(
+                        initializer,
+                        includeRootIdentifier,
+                        bindingRootExpression);
+                    var pathExpression = state.BindingKind == StateBindingKind.In
+                        ? GetStateBindingOwnerExpression(initializer)
+                        : initializer;
+                    if (pathExpression != null)
+                    {
+                        bindingPathElements = CreateStateBindingPath(
+                            state,
+                            pathExpression,
+                            includeRootIdentifier,
+                            bindingRootExpression,
+                            bindingSourceType);
+                    }
+                }
+
+                if (state.BindingKind == StateBindingKind.None &&
+                    _semanticModel.GetOperation(state.InitializerSyntax) is IUseHookOperation hook)
                 {
                     initializer = hook.EffectiveInvocation;
                     hookMethod = hook.Method;
@@ -333,8 +427,558 @@ internal static class ComponentMemberPlanner
                     flags,
                     initializer,
                     state.DeclarationSyntax,
+                    bindingRootKind,
+                    bindingRootName,
+                    bindingRootExpression,
+                    bindingSourceType,
+                    state.InitializerType.Symbol as ITypeSymbol,
+                    bindingPathElements,
+                    bindingFullPathElementCount,
+                    bindingDependencyStateGeneratedNames,
+                    bindingPropertyDependencies,
+                    bindingRootHotReloadIdentity,
                     hookMethod,
                     stateArguments));
+            }
+        }
+
+        private ImmutableArray<MarkupBindingPathElement> CreateStateBindingPath(
+            IStateSymbol state,
+            CSharp.ExpressionSyntax expression,
+            bool includeRootIdentifier,
+            CSharp.ExpressionSyntax? bindingRootExpression,
+            ITypeSymbol sourceType)
+        {
+            using var elements = ImmutableArrayBuilder<MarkupBindingPathElement>.Rent();
+            AddStateBindingPathElements(
+                state,
+                expression,
+                includeRootIdentifier,
+                bindingRootExpression,
+                sourceType,
+                elements);
+            return elements.ToImmutable();
+        }
+
+        private bool TryGetGeneratedBindingRoot(
+            IStateSymbol state,
+            string? rootName,
+            out ComponentStateBindingRootKind kind,
+            out string? name,
+            out ITypeSymbol? sourceType,
+            out string? hotReloadIdentity)
+        {
+            kind = ComponentStateBindingRootKind.Component;
+            name = null;
+            sourceType = null;
+            hotReloadIdentity = null;
+            if (string.IsNullOrEmpty(rootName))
+            {
+                return false;
+            }
+
+            for (var index = 0; index < _parameters.Count; index++)
+            {
+                ref readonly var parameter = ref _parameters.WrittenSpan[index];
+                if (string.Equals(parameter.Name, rootName, StringComparison.Ordinal))
+                {
+                    kind = ComponentStateBindingRootKind.Parameter;
+                    name = parameter.Name;
+                    sourceType = parameter.Type;
+                    hotReloadIdentity = parameter.HotReloadKey;
+                    return true;
+                }
+            }
+
+            for (var index = 0; index < _services.Count; index++)
+            {
+                ref readonly var service = ref _services.WrittenSpan[index];
+                if (string.Equals(service.Name, rootName, StringComparison.Ordinal))
+                {
+                    kind = ComponentStateBindingRootKind.Service;
+                    name = service.Name;
+                    sourceType = service.ServiceType;
+                    hotReloadIdentity = service.HotReloadKey;
+                    return true;
+                }
+            }
+
+            for (var index = 0; index < _commands.Count; index++)
+            {
+                ref readonly var command = ref _commands.WrittenSpan[index];
+                if (string.Equals(command.Name, rootName, StringComparison.Ordinal))
+                {
+                    kind = ComponentStateBindingRootKind.Command;
+                    name = command.Name;
+                    sourceType = _semanticModel.BindCSharpExpression(
+                        Microsoft.CodeAnalysis.CSharp.SyntaxFactory.IdentifierName(rootName!),
+                        state.DeclarationSyntax).TypeSymbol;
+                    hotReloadIdentity = command.HotReloadKey;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void AddBindingPropertyDependencies(
+            IStateSymbol state,
+            CSharp.ExpressionSyntax expression,
+            ImmutableArrayBuilder<ComponentStateBindingPropertyDependencyPlan> dependencies)
+        {
+            foreach (var node in expression.DescendantNodesAndSelf())
+            {
+                if (node is not CSharp.ElementAccessExpressionSyntax elementAccess)
+                {
+                    continue;
+                }
+
+                foreach (var argument in elementAccess.ArgumentList.Arguments)
+                {
+                    foreach (var argumentNode in argument.Expression.DescendantNodesAndSelf())
+                    {
+                        if (argumentNode is CSharp.IdentifierNameSyntax identifier)
+                        {
+                            if (identifier.Parent is CSharp.MemberAccessExpressionSyntax memberAccess &&
+                                ReferenceEquals(memberAccess.Name, identifier))
+                            {
+                                continue;
+                            }
+
+                            TryAddBindingPropertyDependency(
+                                state,
+                                identifier,
+                                identifier.Identifier.ValueText,
+                                dependencies);
+                            continue;
+                        }
+
+                        if (argumentNode is CSharp.MemberAccessExpressionSyntax
+                            {
+                                Expression: CSharp.ThisExpressionSyntax or CSharp.BaseExpressionSyntax,
+                            } componentMember)
+                        {
+                            TryAddBindingPropertyDependency(
+                                state,
+                                componentMember,
+                                componentMember.Name.Identifier.ValueText,
+                                dependencies);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void TryAddBindingPropertyDependency(
+            IStateSymbol state,
+            CSharp.ExpressionSyntax expression,
+            string name,
+            ImmutableArrayBuilder<ComponentStateBindingPropertyDependencyPlan> dependencies)
+        {
+            for (var index = 0; index < _parameters.Count; index++)
+            {
+                ref readonly var parameter = ref _parameters.WrittenSpan[index];
+                if (string.Equals(parameter.Name, name, StringComparison.Ordinal))
+                {
+                    AddBindingPropertyDependency(
+                        dependencies,
+                        new ComponentStateBindingPropertyDependencyPlan(
+                            ComponentStateBindingPropertyDependencyKind.Parameter,
+                            parameter.Name,
+                            default,
+                            parameter.HotReloadKey));
+                    return;
+                }
+            }
+
+            for (var index = 0; index < _services.Count; index++)
+            {
+                ref readonly var service = ref _services.WrittenSpan[index];
+                if (string.Equals(service.Name, name, StringComparison.Ordinal))
+                {
+                    AddBindingPropertyDependency(
+                        dependencies,
+                        new ComponentStateBindingPropertyDependencyPlan(
+                            ComponentStateBindingPropertyDependencyKind.Service,
+                            service.Name,
+                            default,
+                            service.HotReloadKey));
+                    return;
+                }
+            }
+
+            for (var index = 0; index < _commands.Count; index++)
+            {
+                ref readonly var command = ref _commands.WrittenSpan[index];
+                if (string.Equals(command.Name, name, StringComparison.Ordinal))
+                {
+                    AddBindingPropertyDependency(
+                        dependencies,
+                        new ComponentStateBindingPropertyDependencyPlan(
+                            ComponentStateBindingPropertyDependencyKind.Command,
+                            command.Name,
+                            default,
+                            command.HotReloadKey));
+                    return;
+                }
+            }
+
+            var binding = _semanticModel.BindCSharpExpression(
+                expression,
+                state.DeclarationSyntax);
+            if (binding.Symbol is not Microsoft.CodeAnalysis.IPropertySymbol property ||
+                !TryGetAvaloniaProperty(property, out var avaloniaProperty))
+            {
+                return;
+            }
+
+            AddBindingPropertyDependency(
+                dependencies,
+                new ComponentStateBindingPropertyDependencyPlan(
+                    ComponentStateBindingPropertyDependencyKind.AvaloniaProperty,
+                    name: null,
+                    new CSharpSymbolDefinition(avaloniaProperty),
+                    ComponentHotReloadIdentity.CreateAvaloniaPropertyKey(
+                        avaloniaProperty)));
+        }
+
+        private static void AddBindingPropertyDependency(
+            ImmutableArrayBuilder<ComponentStateBindingPropertyDependencyPlan> dependencies,
+            in ComponentStateBindingPropertyDependencyPlan dependency)
+        {
+            for (var index = 0; index < dependencies.Count; index++)
+            {
+                ref readonly var candidate = ref dependencies.WrittenSpan[index];
+                if (candidate.Kind == dependency.Kind &&
+                    string.Equals(
+                        candidate.HotReloadIdentity,
+                        dependency.HotReloadIdentity,
+                        StringComparison.Ordinal))
+                {
+                    return;
+                }
+            }
+
+            dependencies.Add(dependency);
+        }
+
+        private static bool TryGetAvaloniaProperty(
+            Microsoft.CodeAnalysis.IPropertySymbol property,
+            out Microsoft.CodeAnalysis.ISymbol avaloniaProperty)
+        {
+            var propertyName = property.Name + "Property";
+            for (var type = property.ContainingType; type != null; type = type.BaseType)
+            {
+                foreach (var member in type.GetMembers(propertyName))
+                {
+                    var memberType = member switch
+                    {
+                        Microsoft.CodeAnalysis.IFieldSymbol { IsStatic: true } field =>
+                            field.Type,
+                        Microsoft.CodeAnalysis.IPropertySymbol { IsStatic: true } staticProperty =>
+                            staticProperty.Type,
+                        _ => null,
+                    };
+                    if (memberType != null && IsAvaloniaPropertyType(memberType))
+                    {
+                        avaloniaProperty = member;
+                        return true;
+                    }
+                }
+            }
+
+            avaloniaProperty = null!;
+            return false;
+        }
+
+        private static bool IsAvaloniaPropertyType(ITypeSymbol type)
+        {
+            for (var current = type as INamedTypeSymbol; current != null; current = current.BaseType)
+            {
+                if (current.Name == "AvaloniaProperty" &&
+                    current.ContainingNamespace.Name == "Avalonia" &&
+                    current.ContainingNamespace.ContainingNamespace.IsGlobalNamespace)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool TryGetStaticBindingRoot(
+            IStateSymbol state,
+            CSharp.ExpressionSyntax expression,
+            out CSharp.ExpressionSyntax? rootExpression,
+            out ITypeSymbol? sourceType)
+        {
+            while (expression is CSharp.ParenthesizedExpressionSyntax parenthesized)
+            {
+                expression = parenthesized.Expression;
+            }
+
+            var receiver = expression switch
+            {
+                CSharp.MemberAccessExpressionSyntax memberAccess => memberAccess.Expression,
+                CSharp.ElementAccessExpressionSyntax elementAccess => elementAccess.Expression,
+                _ => null,
+            };
+            if (receiver != null &&
+                TryGetStaticBindingRoot(
+                    state,
+                    receiver,
+                    out rootExpression,
+                    out sourceType))
+            {
+                return true;
+            }
+
+            var binding = _semanticModel.BindCSharpExpression(
+                expression,
+                state.DeclarationSyntax);
+            if (binding.Symbol is not Microsoft.CodeAnalysis.IPropertySymbol { IsStatic: true } and
+                not Microsoft.CodeAnalysis.IFieldSymbol { IsStatic: true } ||
+                binding.TypeSymbol == null)
+            {
+                rootExpression = null;
+                sourceType = null;
+                return false;
+            }
+
+            rootExpression = expression;
+            sourceType = binding.TypeSymbol;
+            return true;
+        }
+
+        private void AddStateBindingPathElements(
+            IStateSymbol state,
+            CSharp.ExpressionSyntax expression,
+            bool includeRootIdentifier,
+            CSharp.ExpressionSyntax? bindingRootExpression,
+            ITypeSymbol sourceType,
+            ImmutableArrayBuilder<MarkupBindingPathElement> elements)
+        {
+            if (ReferenceEquals(expression, bindingRootExpression))
+            {
+                return;
+            }
+
+            switch (expression)
+            {
+                case CSharp.ParenthesizedExpressionSyntax parenthesized:
+                    AddStateBindingPathElements(
+                        state,
+                        parenthesized.Expression,
+                        includeRootIdentifier,
+                        bindingRootExpression,
+                        sourceType,
+                        elements);
+                    return;
+
+                case CSharp.MemberAccessExpressionSyntax memberAccess:
+                    AddStateBindingPathElements(
+                        state,
+                        memberAccess.Expression,
+                        includeRootIdentifier,
+                        bindingRootExpression,
+                        sourceType,
+                        elements);
+                    AddStateBindingMember(
+                        state,
+                        memberAccess,
+                        memberAccess.Name.Identifier.ValueText,
+                        sourceType,
+                        elements);
+                    return;
+
+                case CSharp.ElementAccessExpressionSyntax elementAccess:
+                    AddStateBindingPathElements(
+                        state,
+                        elementAccess.Expression,
+                        includeRootIdentifier,
+                        bindingRootExpression,
+                        sourceType,
+                        elements);
+                    AddStateBindingIndexer(state, elementAccess, elements);
+                    return;
+
+                case CSharp.IdentifierNameSyntax identifier when includeRootIdentifier:
+                    AddStateBindingMember(
+                        state,
+                        identifier,
+                        identifier.Identifier.ValueText,
+                        sourceType,
+                        elements);
+                    return;
+            }
+        }
+
+        private void AddStateBindingMember(
+            IStateSymbol state,
+            CSharp.ExpressionSyntax expression,
+            string name,
+            ITypeSymbol sourceType,
+            ImmutableArrayBuilder<MarkupBindingPathElement> elements)
+        {
+            var binding = _semanticModel.BindCSharpExpression(
+                expression,
+                state.DeclarationSyntax);
+            var kind = binding.Symbol switch
+            {
+                Microsoft.CodeAnalysis.IPropertySymbol => MarkupBindingPathElementKind.Property,
+                Microsoft.CodeAnalysis.IFieldSymbol => MarkupBindingPathElementKind.Field,
+                _ => MarkupBindingPathElementKind.Unknown,
+            };
+            var elementSourceType = elements.Count == 0
+                ? new CSharpSymbolDefinition(binding.ReceiverType ?? sourceType)
+                : default;
+            elements.Add(new MarkupBindingPathElement(
+                kind,
+                name,
+                binding.Symbol == null
+                    ? default
+                    : new CSharpSymbolDefinition(binding.Symbol),
+                binding.TypeSymbol == null
+                    ? default
+                    : new CSharpSymbolDefinition(binding.TypeSymbol),
+                sourceType: elementSourceType));
+        }
+
+        private void AddStateBindingIndexer(
+            IStateSymbol state,
+            CSharp.ElementAccessExpressionSyntax elementAccess,
+            ImmutableArrayBuilder<MarkupBindingPathElement> elements)
+        {
+            var binding = _semanticModel.BindCSharpExpression(
+                elementAccess,
+                state.DeclarationSyntax);
+            using var arguments = ImmutableArrayBuilder<string>.Rent(
+                elementAccess.ArgumentList.Arguments.Count);
+            foreach (var argument in elementAccess.ArgumentList.Arguments)
+            {
+                arguments.Add(argument.Expression.ToString());
+            }
+
+            elements.Add(new MarkupBindingPathElement(
+                MarkupBindingPathElementKind.Indexer,
+                elementAccess.ArgumentList.ToString(),
+                binding.Symbol == null
+                    ? default
+                    : new CSharpSymbolDefinition(binding.Symbol),
+                binding.TypeSymbol == null
+                    ? default
+                    : new CSharpSymbolDefinition(binding.TypeSymbol),
+                arguments: arguments.ToImmutable()));
+        }
+
+        private static CSharp.ExpressionSyntax? GetStateBindingOwnerExpression(
+            CSharp.ExpressionSyntax expression)
+        {
+            while (expression is CSharp.ParenthesizedExpressionSyntax parenthesized)
+            {
+                expression = parenthesized.Expression;
+            }
+
+            return expression switch
+            {
+                CSharp.MemberAccessExpressionSyntax memberAccess => memberAccess.Expression,
+                CSharp.ElementAccessExpressionSyntax elementAccess => elementAccess.Expression,
+                _ => null,
+            };
+        }
+
+        private static int CountStateBindingPathElements(
+            CSharp.ExpressionSyntax expression,
+            bool includeRootIdentifier,
+            CSharp.ExpressionSyntax? bindingRootExpression)
+        {
+            if (ReferenceEquals(expression, bindingRootExpression))
+            {
+                return 0;
+            }
+
+            return expression switch
+            {
+                CSharp.ParenthesizedExpressionSyntax parenthesized =>
+                    CountStateBindingPathElements(
+                        parenthesized.Expression,
+                        includeRootIdentifier,
+                        bindingRootExpression),
+                CSharp.MemberAccessExpressionSyntax memberAccess =>
+                    CountStateBindingPathElements(
+                        memberAccess.Expression,
+                        includeRootIdentifier,
+                        bindingRootExpression) + 1,
+                CSharp.ElementAccessExpressionSyntax elementAccess =>
+                    CountStateBindingPathElements(
+                        elementAccess.Expression,
+                        includeRootIdentifier,
+                        bindingRootExpression) + 1,
+                CSharp.IdentifierNameSyntax when includeRootIdentifier => 1,
+                _ => 0,
+            };
+        }
+
+        private static bool UsesStateInIndexer(
+            CSharp.ExpressionSyntax expression,
+            string stateName)
+        {
+            foreach (var node in expression.DescendantNodesAndSelf())
+            {
+                if (node is not CSharp.ElementAccessExpressionSyntax elementAccess)
+                {
+                    continue;
+                }
+
+                foreach (var argument in elementAccess.ArgumentList.Arguments)
+                {
+                    foreach (var argumentNode in argument.Expression.DescendantNodesAndSelf())
+                    {
+                        if (argumentNode is not CSharp.IdentifierNameSyntax candidate)
+                        {
+                            continue;
+                        }
+
+                        if (candidate.Parent is CSharp.MemberAccessExpressionSyntax memberAccess &&
+                            ReferenceEquals(memberAccess.Name, candidate))
+                        {
+                            continue;
+                        }
+
+                        if (string.Equals(
+                            candidate.Identifier.ValueText,
+                            stateName,
+                            StringComparison.Ordinal))
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static string? GetBindingRootIdentifier(CSharp.ExpressionSyntax expression)
+        {
+            while (true)
+            {
+                switch (expression)
+                {
+                    case CSharp.ParenthesizedExpressionSyntax parenthesized:
+                        expression = parenthesized.Expression;
+                        continue;
+                    case CSharp.MemberAccessExpressionSyntax memberAccess:
+                        expression = memberAccess.Expression;
+                        continue;
+                    case CSharp.ElementAccessExpressionSyntax elementAccess:
+                        expression = elementAccess.Expression;
+                        continue;
+                    case CSharp.IdentifierNameSyntax identifier:
+                        return identifier.Identifier.ValueText;
+                    default:
+                        return null;
+                }
             }
         }
 

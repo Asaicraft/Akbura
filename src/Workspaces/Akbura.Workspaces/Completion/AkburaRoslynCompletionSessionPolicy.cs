@@ -4,8 +4,9 @@ internal sealed class AkburaRoslynCompletionSessionPolicy
 {
     internal static bool ShouldPublishSupplementalBeforeRoslyn(AkburaCompletionContextKind syntacticKind, bool hasSupplementalItems, bool roslynCompleted)
     {
-        return syntacticKind ==
-                AkburaCompletionContextKind.DeclarationModifier &&
+        return (syntacticKind is
+                AkburaCompletionContextKind.DeclarationModifier or
+                AkburaCompletionContextKind.StateBindingMode) &&
             hasSupplementalItems &&
             !roslynCompleted;
     }

@@ -166,6 +166,241 @@ public sealed class ComponentHotReloadIdentityTests
     }
 
     [Fact]
+    public void DirectionalStateIdentityTracksModeAndBindingPath()
+    {
+        const string csharp = """
+            using System.ComponentModel;
+
+            public sealed class ViewModel : INotifyPropertyChanged
+            {
+                public event PropertyChangedEventHandler? PropertyChanged;
+
+                public string Name { get; set; } = "";
+
+                public string Surname { get; set; } = "";
+            }
+            """;
+        var bindName = CreatePlan(
+            "state ViewModel vm = new();\nstate string value = bind vm.Name;",
+            csharp);
+        var outName = CreatePlan(
+            "state ViewModel vm = new();\nstate string value = out vm.Name;",
+            csharp);
+        var inName = CreatePlan(
+            "state ViewModel vm = new();\nstate string value = in vm.Name;",
+            csharp);
+        var bindSurname = CreatePlan(
+            "state ViewModel vm = new();\nstate string value = bind vm.Surname;",
+            csharp);
+
+        try
+        {
+            ref readonly var bind = ref bindName.States.ItemRef(1);
+            ref readonly var output = ref outName.States.ItemRef(1);
+            ref readonly var input = ref inName.States.ItemRef(1);
+            ref readonly var otherPath = ref bindSurname.States.ItemRef(1);
+
+            Assert.NotEqual(bind.HotReloadKey, output.HotReloadKey);
+            Assert.NotEqual(bind.HotReloadKey, input.HotReloadKey);
+            Assert.NotEqual(bind.HotReloadKey, otherPath.HotReloadKey);
+            Assert.NotEqual(bind.GeneratedName, output.GeneratedName);
+            Assert.NotEqual(bind.GeneratedName, otherPath.GeneratedName);
+        }
+        finally
+        {
+            bindName.ReturnToPool();
+            outName.ReturnToPool();
+            inName.ReturnToPool();
+            bindSurname.ReturnToPool();
+        }
+    }
+
+    [Fact]
+    public void DirectionalStateIdentityTracksRootStateIdentity()
+    {
+        const string csharp = """
+            using System.ComponentModel;
+
+            public sealed class FirstViewModel : INotifyPropertyChanged
+            {
+                public event PropertyChangedEventHandler? PropertyChanged;
+
+                public string Name { get; set; } = "";
+            }
+
+            public sealed class SecondViewModel : INotifyPropertyChanged
+            {
+                public event PropertyChangedEventHandler? PropertyChanged;
+
+                public string Name { get; set; } = "";
+            }
+            """;
+        var first = CreatePlan(
+            "state FirstViewModel vm = new();\nstate string value = bind vm.Name;",
+            csharp);
+        var second = CreatePlan(
+            "state SecondViewModel vm = new();\nstate string value = bind vm.Name;",
+            csharp);
+
+        try
+        {
+            ref readonly var firstRoot = ref first.States.ItemRef(0);
+            ref readonly var secondRoot = ref second.States.ItemRef(0);
+            ref readonly var firstDependent = ref first.States.ItemRef(1);
+            ref readonly var secondDependent = ref second.States.ItemRef(1);
+
+            Assert.NotEqual(firstRoot.HotReloadKey, secondRoot.HotReloadKey);
+            Assert.Equal(
+                firstDependent.Initializer.ToString(),
+                secondDependent.Initializer.ToString());
+            Assert.NotEqual(
+                firstDependent.HotReloadKey,
+                secondDependent.HotReloadKey);
+        }
+        finally
+        {
+            first.ReturnToPool();
+            second.ReturnToPool();
+        }
+    }
+
+    [Fact]
+    public void DirectionalStateIdentityTracksDynamicIndexStateIdentity()
+    {
+        const string csharp = """
+            using System.Collections.ObjectModel;
+            using System.ComponentModel;
+
+            public sealed class IndexedViewModel : INotifyPropertyChanged
+            {
+                public event PropertyChangedEventHandler? PropertyChanged;
+
+                public int FirstIndex { get; set; }
+
+                public int SecondIndex { get; set; }
+
+                public ObservableCollection<IndexedItem> Items { get; } = new();
+            }
+
+            public sealed class IndexedItem : INotifyPropertyChanged
+            {
+                public event PropertyChangedEventHandler? PropertyChanged;
+
+                public string Name { get; set; } = "";
+            }
+            """;
+        var first = CreatePlan(
+            """
+            state IndexedViewModel vm = new();
+            state int selectedIndex = bind vm.FirstIndex;
+            state string value = bind vm.Items[selectedIndex].Name;
+            """,
+            csharp);
+        var second = CreatePlan(
+            """
+            state IndexedViewModel vm = new();
+            state int selectedIndex = bind vm.SecondIndex;
+            state string value = bind vm.Items[selectedIndex].Name;
+            """,
+            csharp);
+
+        try
+        {
+            ref readonly var firstIndex = ref first.States.ItemRef(1);
+            ref readonly var secondIndex = ref second.States.ItemRef(1);
+            ref readonly var firstDependent = ref first.States.ItemRef(2);
+            ref readonly var secondDependent = ref second.States.ItemRef(2);
+
+            Assert.NotEqual(firstIndex.HotReloadKey, secondIndex.HotReloadKey);
+            Assert.Equal(
+                firstDependent.Initializer.ToString(),
+                secondDependent.Initializer.ToString());
+            Assert.NotEqual(
+                firstDependent.HotReloadKey,
+                secondDependent.HotReloadKey);
+        }
+        finally
+        {
+            first.ReturnToPool();
+            second.ReturnToPool();
+        }
+    }
+
+    [Fact]
+    public void DirectionalStateIdentityTracksGeneratedRootAndIndexDescriptors()
+    {
+        const string csharp = """
+            using System.Collections.Generic;
+
+            public sealed class IndexedItem
+            {
+                public string Name { get; set; } = "";
+            }
+
+            public sealed class FirstViewModel
+            {
+                public List<IndexedItem> Items { get; } = new();
+            }
+
+            public sealed class SecondViewModel
+            {
+                public List<IndexedItem> Items { get; } = new();
+            }
+            """;
+        var first = CreatePlan(
+            "param FirstViewModel Vm;\nparam int Index;\n" +
+            "state string value = out Vm.Items[Index].Name;",
+            csharp);
+        var changedRoot = CreatePlan(
+            "param SecondViewModel Vm;\nparam int Index;\n" +
+            "state string value = out Vm.Items[Index].Name;",
+            csharp);
+        var changedIndex = CreatePlan(
+            "param FirstViewModel Vm;\nparam short Index;\n" +
+            "state string value = out Vm.Items[Index].Name;",
+            csharp);
+
+        try
+        {
+            ref readonly var firstValue = ref first.States.ItemRef(0);
+            ref readonly var changedRootValue = ref changedRoot.States.ItemRef(0);
+            ref readonly var changedIndexValue = ref changedIndex.States.ItemRef(0);
+
+            Assert.Equal(
+                firstValue.Initializer.ToString(),
+                changedRootValue.Initializer.ToString());
+            Assert.Equal(
+                firstValue.Initializer.ToString(),
+                changedIndexValue.Initializer.ToString());
+            Assert.NotEqual(
+                firstValue.BindingRootHotReloadIdentity,
+                changedRootValue.BindingRootHotReloadIdentity);
+            Assert.NotEqual(
+                firstValue.HotReloadKey,
+                changedRootValue.HotReloadKey);
+
+            var firstDependency = Assert.Single(firstValue.BindingPropertyDependencies);
+            var changedDependency = Assert.Single(changedIndexValue.BindingPropertyDependencies);
+            Assert.Equal(
+                ComponentStateBindingPropertyDependencyKind.Parameter,
+                firstDependency.Kind);
+            Assert.Equal("Index", firstDependency.Name);
+            Assert.NotEqual(
+                firstDependency.HotReloadIdentity,
+                changedDependency.HotReloadIdentity);
+            Assert.NotEqual(
+                firstValue.HotReloadKey,
+                changedIndexValue.HotReloadKey);
+        }
+        finally
+        {
+            first.ReturnToPool();
+            changedRoot.ReturnToPool();
+            changedIndex.ReturnToPool();
+        }
+    }
+
+    [Fact]
     public void RenderSyntaxIdentity_IsCompactStableAndContentSensitive()
     {
         var compact = CreateStructuralPlan(

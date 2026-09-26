@@ -202,11 +202,36 @@ public sealed class ComponentMemberPlannerTests
             width =>
             {
                 Assert.Equal(1, width.Id);
-                Assert.Equal(ComponentStateFactoryKind.Value, width.FactoryKind);
+                Assert.Equal(ComponentStateFactoryKind.State, width.FactoryKind);
                 Assert.Equal(StateBindingKind.Out, width.BindingKind);
                 Assert.True(width.IsReadOnly);
                 Assert.False(width.UsesHook);
+                Assert.True(width.CanReadBindingSource);
             });
+    }
+
+    [Fact]
+    public void ObservableTypeHelper_RecognizesConstrainedTypeParameter()
+    {
+        var fixture = AkcssActivatorPlannerTests.CreateFixture(
+            "state int value = 0;",
+            """
+            namespace Demo;
+
+            public sealed class ObservableSource<T>
+                where T : System.IObservable<int>
+            {
+            }
+            """);
+        var sourceType = fixture.CSharpCompilation.GetTypeByMetadataName(
+            "Demo.ObservableSource`1");
+        Assert.NotNull(sourceType);
+        var typeParameter = Assert.Single(sourceType.TypeParameters);
+
+        Assert.True(AkburaSemanticModel.TryGetIObservableElementType(
+            typeParameter,
+            out var elementType));
+        Assert.Equal(SpecialType.System_Int32, elementType.SpecialType);
     }
 
     [Fact]

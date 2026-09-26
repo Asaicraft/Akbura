@@ -22,5 +22,7 @@ internal interface IStateSymbol : ISymbol
 
     bool IsReadOnly { get; }
 
+    bool CanReadBindingSource { get; }
+
     StateBindingKind BindingKind { get; }
 }

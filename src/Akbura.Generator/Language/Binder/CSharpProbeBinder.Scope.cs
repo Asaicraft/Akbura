@@ -398,12 +398,25 @@ internal sealed partial class CSharpProbeBinder
             case AkburaSymbolKind.State:
             {
                 var state = (IStateSymbol)symbol;
-                AddProbeLocal(
-                    localStatements,
-                    state.Name,
-                    state.Type,
-                    symbol,
-                    StateCompletionAnnotationKind);
+                if (state.IsReadOnly && state.Type.Symbol is ITypeSymbol stateType)
+                {
+                    memberDeclarations.Add(CreateProbeField(
+                        CSharpSyntaxFactory.ParseTypeName(stateType.ToDisplayString(
+                            SymbolDisplayFormat.FullyQualifiedFormat)),
+                        state.Name,
+                        state,
+                        isReadOnly: true,
+                        StateCompletionAnnotationKind));
+                }
+                else
+                {
+                    AddProbeLocal(
+                        localStatements,
+                        state.Name,
+                        state.Type,
+                        symbol,
+                        StateCompletionAnnotationKind);
+                }
                 break;
             }
 
@@ -649,10 +662,23 @@ internal sealed partial class CSharpProbeBinder
     private static CSharp.FieldDeclarationSyntax CreateProbeField(
         CSharp.TypeSyntax type,
         string name,
-        AkburaSymbol? sourceSymbol)
+        AkburaSymbol? sourceSymbol,
+        bool isReadOnly = false,
+        string? annotationKind = null)
     {
         var declarator = CSharpSyntaxFactory.VariableDeclarator(
-            CSharpSyntaxFactory.Identifier(name));
+                CSharpSyntaxFactory.Identifier(name))
+            .WithInitializer(CSharpSyntaxFactory.EqualsValueClause(
+                CSharpSyntaxFactory.PostfixUnaryExpression(
+                    CSharpSyntaxKind.SuppressNullableWarningExpression,
+                    CSharpSyntaxFactory.LiteralExpression(
+                        CSharpSyntaxKind.DefaultLiteralExpression))));
+        if (!string.IsNullOrEmpty(annotationKind))
+        {
+            declarator = declarator.WithAdditionalAnnotations(
+                new SyntaxAnnotation(annotationKind));
+        }
+
         if (sourceSymbol != null &&
             TryCreateProjectedSymbolAnnotation(
                 sourceSymbol,
@@ -662,11 +688,17 @@ internal sealed partial class CSharpProbeBinder
             declarator = declarator.WithAdditionalAnnotations(annotation);
         }
 
+        var modifiers = isReadOnly
+            ? CSharpSyntaxFactory.TokenList(
+                CSharpSyntaxFactory.Token(CSharpSyntaxKind.PrivateKeyword),
+                CSharpSyntaxFactory.Token(CSharpSyntaxKind.ReadOnlyKeyword))
+            : CSharpSyntaxFactory.TokenList(
+                CSharpSyntaxFactory.Token(CSharpSyntaxKind.PrivateKeyword));
         return CSharpSyntaxFactory.FieldDeclaration(
                 CSharpSyntaxFactory.VariableDeclaration(type)
                     .WithVariables(CSharpSyntaxFactory.SingletonSeparatedList(
                         declarator)))
-            .WithModifiers(CSharpSyntaxFactory.TokenList(CSharpSyntaxFactory.Token(CSharpSyntaxKind.PrivateKeyword)));
+            .WithModifiers(modifiers);
     }
 
     private static bool TryCreateProjectedSymbolAnnotation(

@@ -43,6 +43,11 @@ public sealed partial class AkburaSyntacticDocument
             return statementContext;
         }
 
+        if (TryGetStateBindingModeContext(root, position, out var stateBindingModeContext))
+        {
+            return stateBindingModeContext;
+        }
+
         if (TryGetDeclarationModifierContext(
                 root,
                 position,
@@ -800,6 +805,71 @@ public sealed partial class AkburaSyntacticDocument
                 AkburaCompletionContextKind.DeclarationModifier,
                 applicableSpan,
                 Text.ToString(applicableSpan),
+                componentName: null,
+                parentComponentName: null,
+                ImmutableArray<string>.Empty);
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryGetStateBindingModeContext(AkburaSyntax root, int position,
+        out AkburaSyntacticCompletionContext context)
+    {
+        context = default;
+        if (root is not AkburaDocumentSyntax document || IsInsideComment(root, position))
+        {
+            return false;
+        }
+
+        foreach (var declaration in document.Members.OfType<StateDeclarationSyntax>())
+        {
+            if (declaration.EqualsToken.IsMissing ||
+                position < declaration.EqualsToken.Span.End ||
+                position > declaration.Semicolon.Span.Start)
+            {
+                continue;
+            }
+
+            var start = position;
+            while (start > declaration.EqualsToken.Span.End &&
+                   char.IsLetter(Text[start - 1]))
+            {
+                start--;
+            }
+
+            if (!ContainsOnlyWhitespace(
+                    Text,
+                    declaration.EqualsToken.Span.End,
+                    start))
+            {
+                continue;
+            }
+
+            var prefixSpan = TextSpan.FromBounds(start, position);
+            var prefix = Text.ToString(prefixSpan);
+            if (prefix.Length != 0 &&
+                !"bind".StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+                !"out".StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+                !"in".StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var replacementEnd = position;
+            while (replacementEnd < declaration.Semicolon.Span.Start &&
+                   Text[replacementEnd] is ' ' or '\t')
+            {
+                replacementEnd++;
+            }
+
+            var span = TextSpan.FromBounds(start, replacementEnd);
+
+            context = new AkburaSyntacticCompletionContext(
+                AkburaCompletionContextKind.StateBindingMode,
+                span,
+                prefix,
                 componentName: null,
                 parentComponentName: null,
                 ImmutableArray<string>.Empty);

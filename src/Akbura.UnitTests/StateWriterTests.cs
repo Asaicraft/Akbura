@@ -28,9 +28,11 @@ public sealed class StateWriterTests
         {
             CurrentIndent = 4,
         };
+        var bindingEnvironment = fixture.BindingEnvironment;
 
         var writer = new StateWriter(
             codeWriter,
+            in bindingEnvironment,
             fixture.SourceMap,
             "global::Demo.PlannerView");
 
@@ -88,8 +90,10 @@ public sealed class StateWriterTests
             csharp);
         ref readonly var state = ref fixture.Plan.States.ItemRef(0);
         using var codeWriter = new CodeWriter("\r\n");
+        var bindingEnvironment = fixture.BindingEnvironment;
         var writer = new StateWriter(
             codeWriter,
+            in bindingEnvironment,
             fixture.SourceMap,
             "global::Demo.PlannerView");
 
@@ -99,7 +103,7 @@ public sealed class StateWriterTests
         var generatedName = state.GeneratedName;
         var propertyStart = output.IndexOf("private double width", StringComparison.Ordinal);
         var factoryStart = output.IndexOf(
-            "private double __CreateStateValue_" + generatedName,
+            "private global::Akbura.ComponentTree.State<double> __CreateState_" + generatedName,
             StringComparison.Ordinal);
 
         Assert.True(state.IsReadOnly);
@@ -111,6 +115,32 @@ public sealed class StateWriterTests
             property,
             StringComparison.Ordinal);
         Assert.DoesNotContain("set =>", property, StringComparison.Ordinal);
+        Assert.Contains(
+            "global::Akbura.ComponentTree.StateBindings.CreateOut<double>(",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "static __value => (double)__value!",
+            output,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "() => Width",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "new global::Avalonia.Data.CompiledBindingPathBuilder()",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            ".Property(global::Avalonia.Layout.Layoutable.WidthProperty, " +
+            "global::Avalonia.Markup.Xaml.MarkupExtensions.CompiledBindings." +
+            "PropertyInfoAccessorFactory.CreateAvaloniaPropertyAccessor, false)",
+            output,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "global::Akbura.ComponentTree.StatePathSegment",
+            output,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -160,8 +190,10 @@ public sealed class StateWriterTests
         {
             CurrentIndent = 4,
         };
+        var bindingEnvironment = fixture.BindingEnvironment;
         var writer = new StateWriter(
             codeWriter,
+            in bindingEnvironment,
             fixture.SourceMap,
             "global::Demo.PlannerView");
 
@@ -217,8 +249,10 @@ public sealed class StateWriterTests
         codeWriter.CurrentIndent = 4;
 
         ref readonly var state = ref fixture.Plan.States.ItemRef(0);
+        var bindingEnvironment = fixture.BindingEnvironment;
         var stateWriter = new StateWriter(
             codeWriter,
+            in bindingEnvironment,
             fixture.SourceMap,
             "global::Demo.PlannerView");
         stateWriter.Write(state);
@@ -251,10 +285,14 @@ public sealed class StateWriterTests
         var plan = ComponentMemberPlanner.Create(
             componentSymbol,
             semanticFixture.SemanticModel);
+        var probeCompilation = semanticFixture.SemanticModel.Compilation.CSharpProbeCompilation;
 
         return new WriterFixture(
             semanticFixture,
             plan,
+            BindingWriterEnvironment.Create(
+                probeCompilation,
+                probeCompilation.GetTypeByMetadataName(componentSymbol.MetadataName)),
             new ComponentGenerationSourceMap(
                 Assert.IsType<ComponentSyntaxTree>(semanticFixture.ComponentTree)));
     }
@@ -307,5 +345,6 @@ public sealed class StateWriterTests
     private readonly record struct WriterFixture(
         AkcssActivatorPlannerTests.PlannerFixture SemanticFixture,
         ComponentMemberPlan Plan,
+        BindingWriterEnvironment BindingEnvironment,
         ComponentGenerationSourceMap SourceMap);
 }

@@ -7,6 +7,7 @@ public sealed class State<T> : State
     private Action<T>? _subscribers;
     private T _value;
     private List<IDisposable>? _retainedSubscriptions;
+    private List<IStateResource>? _retainedResources;
 
     public State(T initialValue)
     {
@@ -19,6 +20,7 @@ public sealed class State<T> : State
     public T InitialValue
     {
         get;
+        private set;
     }
 
     public T Value
@@ -67,6 +69,44 @@ public sealed class State<T> : State
         ArgumentNullException.ThrowIfNull(subscription);
 
         (_retainedSubscriptions ??= []).Add(subscription);
+    }
+
+    internal void RetainResource(IStateResource resource)
+    {
+        ArgumentNullException.ThrowIfNull(resource);
+        (_retainedResources ??= []).Add(resource);
+    }
+
+    internal void InitializeValue(T value)
+    {
+        InitialValue = value;
+        _value = value;
+    }
+
+    internal override void SuspendResources()
+    {
+        if (_retainedResources == null)
+        {
+            return;
+        }
+
+        for (var index = 0; index < _retainedResources.Count; index++)
+        {
+            _retainedResources[index].Suspend();
+        }
+    }
+
+    internal override void ResumeResources()
+    {
+        if (_retainedResources == null)
+        {
+            return;
+        }
+
+        for (var index = 0; index < _retainedResources.Count; index++)
+        {
+            _retainedResources[index].Resume();
+        }
     }
 
     private void Unsubscribe(Action<T> subscriber)

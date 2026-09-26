@@ -23,8 +23,17 @@ public abstract class State
     {
         if (ReferenceEquals(_owner, owner))
         {
+            SuspendResources();
             _owner = null;
         }
+    }
+
+    internal virtual void SuspendResources()
+    {
+    }
+
+    internal virtual void ResumeResources()
+    {
     }
 
     public abstract Type ValueType

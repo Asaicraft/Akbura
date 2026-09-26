@@ -9,6 +9,30 @@ namespace Akbura.Workspaces.UnitTests;
 public sealed class WorkspaceQuickInfoTests
 {
     [Fact]
+    public void QuickInfo_DirectionalStateShowsModeTypeAndReadonlyStatus()
+    {
+        const string source =
+            "state double width = out Width;\r\n\r\n" +
+            "<Control />\r\n";
+        using var workspace = CreateWorkspace();
+        var context = workspace.OpenOrChangeDocumentContext(
+            new Uri(Path.GetFullPath("StateDemo.akbura")),
+            SourceText.From(source));
+        var position = source.IndexOf("width", StringComparison.Ordinal);
+
+        var quickInfo = workspace.LanguageServices.QuickInfo.GetQuickInfo(
+            context,
+            position);
+
+        Assert.NotNull(quickInfo);
+        Assert.Equal("state Double width", quickInfo!.Signature);
+        Assert.Contains("Declaration: state double width = out Width;", quickInfo.Details);
+        Assert.Contains("Mode: out (source → state)", quickInfo.Details);
+        Assert.Contains("Writable: no", quickInfo.Details);
+        Assert.Contains("Value type: double", quickInfo.Details);
+    }
+
+    [Fact]
     public void QuickInfo_NativeAkcssReferencesUseAlignedSemanticSymbols()
     {
         const string source = """

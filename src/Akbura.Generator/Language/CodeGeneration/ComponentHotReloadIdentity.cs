@@ -1,4 +1,5 @@
 using Akbura.Language.Syntax;
+using StateBindingKind = Akbura.Language.Symbols.StateBindingKind;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Akbura.Language.Operations;
@@ -70,13 +71,67 @@ internal static class ComponentHotReloadIdentity
         string name,
         ITypeSymbol type,
         ComponentStateFactoryKind factoryKind,
-        bool isComposable = false)
+        bool isComposable = false,
+        StateBindingKind bindingKind = StateBindingKind.None,
+        string? bindingPath = null,
+        ReadOnlySpan<string> bindingDependencies = default,
+        ComponentStateBindingRootKind bindingRootKind = ComponentStateBindingRootKind.Component,
+        string? bindingRootIdentity = null,
+        ITypeSymbol? bindingSourceType = null,
+        ReadOnlySpan<ComponentStateBindingPropertyDependencyPlan> bindingPropertyDependencies = default)
     {
-        return "state:" +
+        var identity = "state:" +
             name + ":" +
             GetTypeIdentity(type) + ":" +
             (isComposable ? "hook" :
-                factoryKind == ComponentStateFactoryKind.State ? "state" : "value");
+                factoryKind == ComponentStateFactoryKind.State ? "state" : "value") + ":" +
+            bindingKind + ":" +
+            bindingPath;
+        if (bindingKind == StateBindingKind.None)
+        {
+            return identity;
+        }
+
+        var builder = new StringBuilder(identity);
+        builder.Append(":root:");
+        builder.Append(bindingRootKind);
+        builder.Append(':');
+        builder.Append(bindingRootIdentity);
+        builder.Append(':');
+        builder.Append(bindingSourceType == null
+            ? "<unknown>"
+            : GetTypeIdentity(bindingSourceType));
+        for (var index = 0; index < bindingDependencies.Length; index++)
+        {
+            builder.Append(":dependency:");
+            builder.Append("State:");
+            builder.Append(bindingDependencies[index]);
+        }
+
+        for (var index = 0; index < bindingPropertyDependencies.Length; index++)
+        {
+            builder.Append(":dependency:");
+            builder.Append(bindingPropertyDependencies[index].Kind);
+            builder.Append(':');
+            builder.Append(bindingPropertyDependencies[index].HotReloadIdentity);
+        }
+
+        return builder.ToString();
+    }
+
+    public static string CreateAvaloniaPropertyKey(ISymbol property)
+    {
+        var propertyType = property switch
+        {
+            IFieldSymbol { IsStatic: true } field => field.Type,
+            IPropertySymbol { IsStatic: true } staticProperty => staticProperty.Type,
+            _ => null,
+        };
+
+        return "avalonia-property:" +
+            property.ContainingType?.ToDisplayString(s_typeFormat) + "." +
+            property.MetadataName + ":" +
+            (propertyType == null ? "<unknown>" : GetTypeIdentity(propertyType));
     }
 
     public static string CreateGeneratedName(string name, string identity)

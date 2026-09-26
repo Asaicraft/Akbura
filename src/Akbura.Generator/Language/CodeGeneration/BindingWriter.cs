@@ -4,6 +4,7 @@ using IAkburaComponentSymbol = Akbura.Language.Symbols.IAkburaComponentSymbol;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 
@@ -1187,6 +1188,22 @@ internal ref struct BindingWriter
         }
     }
 
+    public void WriteCompiledBindingPath(
+        ITypeSymbol sourceType,
+        ImmutableArray<MarkupBindingPathElement> pathElements)
+    {
+        Debug.Assert(sourceType != null);
+
+        _writer.Write("new ").Write(CompiledBindingPathBuilderType).Write("()");
+        WriteCompiledBindingPathElements(
+            sourceType,
+            pathElements,
+            start: 0,
+            default,
+            includeSetters: false);
+        _writer.Write(".Build()");
+    }
+
     private void WriteCompiledBindingPath(
         in BindingWritePlan plan,
         in MarkupExtensionWriteContext context)
@@ -1203,7 +1220,24 @@ internal ref struct BindingWriter
             WriteExplicitElementNamePath(plan, context);
         }
 
-        for (var i = plan.PathElementStart; i < pathElements.Length; i++)
+        WriteCompiledBindingPathElements(
+            currentType,
+            pathElements,
+            plan.PathElementStart,
+            context,
+            includeSetters: true);
+
+        _writer.Write(".Build()");
+    }
+
+    private void WriteCompiledBindingPathElements(
+        ITypeSymbol? currentType,
+        ImmutableArray<MarkupBindingPathElement> pathElements,
+        int start,
+        in MarkupExtensionWriteContext context,
+        bool includeSetters)
+    {
+        for (var i = start; i < pathElements.Length; i++)
         {
             var element = pathElements[i];
 
@@ -1215,7 +1249,11 @@ internal ref struct BindingWriter
 
                     Debug.Assert(property != null);
 
-                    WritePropertyPathElement(property!, element.AcceptsNull);
+                    WritePropertyPathElement(
+                        property!,
+                        element.AcceptsNull,
+                        element.SourceType.Symbol as ITypeSymbol,
+                        includeSetters);
 
                     currentType = property!.Type;
                     break;
@@ -1241,7 +1279,11 @@ internal ref struct BindingWriter
 
                     Debug.Assert(field != null);
 
-                    WriteFieldPathElement(field!, element.AcceptsNull);
+                    WriteFieldPathElement(
+                        field!,
+                        element.AcceptsNull,
+                        element.SourceType.Symbol as ITypeSymbol,
+                        includeSetters);
 
                     currentType = field!.Type;
                     break;
@@ -1260,7 +1302,11 @@ internal ref struct BindingWriter
 
                         Debug.Assert(indexer != null);
 
-                        WriteIndexerPathElement(element, indexer!, element.AcceptsNull);
+                        WriteIndexerPathElement(
+                            element,
+                            indexer!,
+                            element.AcceptsNull,
+                            includeSetters);
 
                         currentType = indexer!.Type;
                     }
@@ -1330,13 +1376,13 @@ internal ref struct BindingWriter
                     break;
             }
         }
-
-        _writer.Write(".Build()");
     }
 
     private void WritePropertyPathElement(
         IPropertySymbol property,
-        bool acceptsNull)
+        bool acceptsNull,
+        ITypeSymbol? sourceType,
+        bool includeSetter)
     {
         if (_environment.TryGetAvaloniaProperty(property, out var avaloniaProperty))
         {
@@ -1355,7 +1401,9 @@ internal ref struct BindingWriter
 
         WriteClrPropertyPathElement(
             property,
-            acceptsNull);
+            acceptsNull,
+            sourceType,
+            includeSetter);
     }
 
     private void WriteAttachedPropertyPathElement(
@@ -1375,9 +1423,11 @@ internal ref struct BindingWriter
 
     private void WriteClrPropertyPathElement(
         IPropertySymbol property,
-        bool acceptsNull)
+        bool acceptsNull,
+        ITypeSymbol? sourceTypeOverride,
+        bool includeSetter)
     {
-        var sourceType = property.ContainingType;
+        var sourceType = sourceTypeOverride ?? property.ContainingType;
 
         var valueType = property.Type;
 
@@ -1394,7 +1444,7 @@ internal ref struct BindingWriter
 
         _writer.Write(", ");
 
-        if (CanWritePropertySetter(property))
+        if (includeSetter && CanWritePropertySetter(property))
         {
             _writer.Write("static (__source, __value) => ((");
 
@@ -1428,9 +1478,11 @@ internal ref struct BindingWriter
 
     private void WriteFieldPathElement(
         IFieldSymbol field,
-        bool acceptsNull)
+        bool acceptsNull,
+        ITypeSymbol? sourceTypeOverride,
+        bool includeSetter)
     {
-        var sourceType = field.ContainingType;
+        var sourceType = sourceTypeOverride ?? field.ContainingType;
 
         var valueType = field.Type;
 
@@ -1447,7 +1499,7 @@ internal ref struct BindingWriter
 
         _writer.Write(", ");
 
-        if (CanWriteFieldSetter(field))
+        if (includeSetter && CanWriteFieldSetter(field))
         {
             _writer.Write("static (__source, __value) => ((");
 
@@ -1482,7 +1534,8 @@ internal ref struct BindingWriter
     private void WriteIndexerPathElement(
         in MarkupBindingPathElement element,
         IPropertySymbol indexer,
-        bool acceptsNull)
+        bool acceptsNull,
+        bool includeSetter)
     {
         var sourceType = indexer.ContainingType;
 
@@ -1511,7 +1564,7 @@ internal ref struct BindingWriter
 
         _writer.Write("], ");
 
-        if (CanWritePropertySetter(indexer))
+        if (includeSetter && CanWritePropertySetter(indexer))
         {
             if (argumentsAreConstant)
             {

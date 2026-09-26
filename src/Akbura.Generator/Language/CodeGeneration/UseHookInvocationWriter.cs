@@ -63,8 +63,14 @@ internal readonly ref struct UseHookInvocationWriter
                 var identity = ComponentHotReloadIdentity.CreateStateKey(
                     state.Name,
                     (ITypeSymbol)state.Type.Symbol!,
-                    isHook ? ComponentStateFactoryKind.State : ComponentStateFactoryKind.Value,
-                    isHook && !ComponentStatePlan.IsInitializerHook(state.UseHook!.Method));
+                    isHook || state.BindingKind != StateBindingKind.None
+                        ? ComponentStateFactoryKind.State
+                        : ComponentStateFactoryKind.Value,
+                    isHook && !ComponentStatePlan.IsInitializerHook(state.UseHook!.Method),
+                    state.BindingKind,
+                    state.BindingKind == StateBindingKind.None
+                        ? null
+                        : state.InitializerExpression.GetRawCSharpExpression()?.ToString());
                 var name = ComponentHotReloadIdentity.CreateGeneratedName(state.Name, identity);
                 var expression = SyntaxFactory.IdentifierName("__State_" + name)
                     .WithTriviaFrom(argument.Expression);

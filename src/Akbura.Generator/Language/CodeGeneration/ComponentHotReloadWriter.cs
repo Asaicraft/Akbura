@@ -358,8 +358,12 @@ internal readonly ref struct ComponentHotReloadWriter
         _writer.WriteLine(" __component)");
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine("var __previousStates = __component.__states;");
         _writer.WriteLine("__component.__states = default;");
         WritePrepareInvocation();
+        _writer.WriteLine(
+            "__component.ReconcileStateResourcesForHotReload(" +
+            "__previousStates, __component.__GetStates());");
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");
     }

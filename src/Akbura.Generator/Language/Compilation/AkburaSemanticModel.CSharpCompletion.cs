@@ -69,6 +69,20 @@ internal abstract partial class AkburaSemanticModel
         }
 
         Microsoft.CodeAnalysis.ITypeSymbol? expectedType = null;
+        if (expressionSyntax.Parent is StateInitializerSyntax
+            {
+                Parent: StateDeclarationSyntax state,
+            } initializer &&
+            initializer.Kind != SyntaxKind.BindableStateInitializer &&
+            GetDeclaredSymbol(state) is Symbols.IStateSymbol
+            {
+                HasExplicitType: true,
+                Type.Symbol: ITypeSymbol stateType,
+            })
+        {
+            expectedType = stateType;
+        }
+
         if (isMarkup)
         {
             for (var node = expressionSyntax.Parent; node != null; node = node.Parent)

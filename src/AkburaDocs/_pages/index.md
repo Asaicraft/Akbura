@@ -448,6 +448,9 @@ state string fullName = out vm.FullName;
 state string surname = in vm.Surname;
 ```
 
+Read [Reactive State](/akbura/state) for initialization, directional paths,
+observable sources, null handling, cleanup, Hot Reload, and editor behavior.
+
 ## Parameters
 
 Parameters define a component's public API:

@@ -95,6 +95,77 @@ public sealed class SemanticBindingCacheTests : SemanticArchitectureTestBase
         Assert.Same(newLastSymbol, newModel.GetSymbolInfo(newLast).Symbol);
     }
 
+    [Theory]
+    [InlineData("out", "IntValue", 2, "Int32", true)]
+    [InlineData("in", "TextValue", 1, "String", false)]
+    [InlineData("bind", "TextValue", 3, "String", false)]
+    public void SemanticBindingCache_DirectionalStateEditMatchesFreshSemanticSnapshot(
+        string mode,
+        string path,
+        int expectedKindValue,
+        string expectedType,
+        bool expectedReadOnly)
+    {
+        const string oldCode =
+            "state ViewModel vm = new ViewModel();\n" +
+            "state value = bind vm.IntValue;\n" +
+            "value = value;";
+        var newCode =
+            "state ViewModel vm = new ViewModel();\n" +
+            "state value = " + mode + " vm." + path + ";\n" +
+            "value = value;";
+        const string csharpCode =
+            "using System.ComponentModel;\n" +
+            "public sealed class ViewModel : INotifyPropertyChanged\n" +
+            "{\n" +
+            "    public event PropertyChangedEventHandler? PropertyChanged;\n" +
+            "    public int IntValue { get; set; }\n" +
+            "    public string TextValue { get; set; } = string.Empty;\n" +
+            "}";
+        var csharpCompilation = CreateCSharpCompilation()
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(csharpCode));
+        var oldTree = AkburaSyntaxTree.ParseText(oldCode, "StateDemo.akbura");
+        var oldCompilation = new AkburaCompilation(
+            csharpCompilation,
+            [oldTree],
+            ImmutableArray<AkcssSyntaxTree>.Empty,
+            rootNamespace: "Demo",
+            projectDirectory: Environment.CurrentDirectory);
+        var oldModel = oldCompilation.GetSemanticModel(oldTree);
+        var oldState = Assert.IsType<StateDeclarationSyntax>(oldTree.GetRoot().Members[1]);
+        var oldSymbol = Assert.IsAssignableFrom<IStateSymbol>(oldModel.GetSymbolInfo(oldState).Symbol);
+
+        var newTree = oldTree.WithChangedText(SourceText.From(newCode));
+        var newCompilation = oldCompilation.WithSyntaxTrees([newTree]);
+        var newModel = newCompilation.GetSemanticModel(newTree);
+        var newState = Assert.IsType<StateDeclarationSyntax>(newTree.GetRoot().Members[1]);
+        var newStatement = Assert.IsType<CSharpStatementSyntax>(newTree.GetRoot().Members[2]);
+        var newSymbol = Assert.IsAssignableFrom<IStateSymbol>(newModel.GetSymbolInfo(newState).Symbol);
+
+        var freshTree = AkburaSyntaxTree.ParseText(newCode, "StateDemo.akbura");
+        var freshCompilation = new AkburaCompilation(
+            csharpCompilation,
+            [freshTree],
+            ImmutableArray<AkcssSyntaxTree>.Empty,
+            rootNamespace: "Demo",
+            projectDirectory: Environment.CurrentDirectory);
+        var freshModel = freshCompilation.GetSemanticModel(freshTree);
+        var freshState = Assert.IsType<StateDeclarationSyntax>(freshTree.GetRoot().Members[1]);
+        var freshStatement = Assert.IsType<CSharpStatementSyntax>(freshTree.GetRoot().Members[2]);
+        var freshSymbol = Assert.IsAssignableFrom<IStateSymbol>(freshModel.GetSymbolInfo(freshState).Symbol);
+
+        Assert.NotSame(oldSymbol, newSymbol);
+        Assert.Equal((StateBindingKind)expectedKindValue, newSymbol.BindingKind);
+        Assert.Equal(expectedType, newSymbol.Type.Name);
+        Assert.Equal(expectedReadOnly, newSymbol.IsReadOnly);
+        Assert.Equal(freshSymbol.BindingKind, newSymbol.BindingKind);
+        Assert.Equal(freshSymbol.Type.ToDisplayString(), newSymbol.Type.ToDisplayString());
+        Assert.Equal(freshSymbol.IsReadOnly, newSymbol.IsReadOnly);
+        Assert.Equal(
+            freshModel.GetSemanticDiagnostics(freshStatement).Select(static diagnostic => diagnostic.Code),
+            newModel.GetSemanticDiagnostics(newStatement).Select(static diagnostic => diagnostic.Code));
+    }
+
 
     [Fact]
     public void SemanticBindingCache_ChangedComponentScopeDoesNotReuseUnchangedDeclaration()

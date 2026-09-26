@@ -52,6 +52,23 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                 "Declares an output parameter."),
         ];
 
+    private static readonly ImmutableArray<TopLevelCompletionDescriptor>
+        StateBindingModeItems =
+        [
+            new(
+                "bind",
+                "bind ",
+                "Creates a two-way source ↔ state connection."),
+            new(
+                "out",
+                "out ",
+                "Creates a source → read-only state connection."),
+            new(
+                "in",
+                "in ",
+                "Creates a state → target connection."),
+        ];
+
     private readonly AkcssCompletionService _akcssCompletionService =
         new();
 
@@ -113,6 +130,16 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                 cancellationToken);
         }
 
+        var syntaxContext = document.GetCompletionContext(
+            position,
+            cancellationToken);
+        if (syntaxContext.Kind == AkburaCompletionContextKind.StateBindingMode)
+        {
+            return CreateDescriptorResult(
+                syntaxContext,
+                StateBindingModeItems);
+        }
+
         if (hasCSharpContext &&
             AkburaHookCompletionFacts.TryGetStateInitializerContext(
                 document,
@@ -127,9 +154,6 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                 cancellationToken);
         }
 
-        var syntaxContext = document.GetCompletionContext(
-            position,
-            cancellationToken);
         if (syntaxContext.IsDefault)
         {
             return new AkburaCompletionResult(

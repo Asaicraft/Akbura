@@ -1,7 +1,8 @@
-﻿using Akbura.Language.Symbols;
+using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 using AkburaPropertySymbol = Akbura.Language.Symbols.IPropertySymbol;
 
@@ -50,6 +51,21 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
                 AkburaQuickInfoKind.Symbol,
                 command.ToDisplayString(),
                 ["Akbura command"]);
+        }
+
+        var stateDeclaration = root
+            .FindToken(lookup)
+            .Parent?
+            .AncestorsAndSelf()
+            .OfType<StateDeclarationSyntax>()
+            .FirstOrDefault();
+        if (stateDeclaration != null &&
+            stateDeclaration.Name.Span.Contains(position) &&
+            semanticModel.GetSymbolInfo(stateDeclaration).Symbol is IStateSymbol declaredState)
+        {
+            return CreateStateQuickInfo(
+                stateDeclaration.Name.Span,
+                declaredState);
         }
 
         if (AkburaMarkupSemanticFacts.GetPropertyReference(semanticModel, position)
@@ -135,7 +151,9 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
                     GetCSharpSignature(symbolReference.CSharpDefinition.Symbol);
                 if (signature != null)
                 {
-                    var details = symbolReference.CSharpDefinition.Symbol is { } projectedSymbol &&
+                    var details = symbolReference.AkburaSymbol is IStateSymbol referencedState
+                        ? GetStateDetails(referencedState)
+                        : symbolReference.CSharpDefinition.Symbol is { } projectedSymbol &&
                         Akbura.Workspaces.References.AkburaSymbolKeyFactory.TryGetProjectedLocalOrigin(projectedSymbol,
                             out var origin) && origin.Kind == Akbura.Language.Symbols.SymbolKind.MarkupLoopIndex
                         ? ImmutableArray.Create("Read-only zero-based index in the source sequence, before filtering or jumps.")
@@ -320,6 +338,33 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
         return symbol is ILocalSymbol local
             ? local.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat) + " " + local.Name
             : symbol?.ToDisplayString();
+    }
+
+    private static AkburaQuickInfo CreateStateQuickInfo(TextSpan span, IStateSymbol state)
+    {
+        return new AkburaQuickInfo(
+            span,
+            AkburaQuickInfoKind.Symbol,
+            state.ToDisplayString(),
+            GetStateDetails(state));
+    }
+
+    private static ImmutableArray<string> GetStateDetails(IStateSymbol state)
+    {
+        var mode = state.BindingKind switch
+        {
+            StateBindingKind.Bind => "bind (source ↔ state)",
+            StateBindingKind.Out => "out (source → state)",
+            StateBindingKind.In => "in (state → target)",
+            _ => "local",
+        };
+        return
+        [
+            "Declaration: " + state.DeclarationSyntax.ToFullString().Trim(),
+            "Mode: " + mode,
+            "Writable: " + (state.IsReadOnly ? "no" : "yes"),
+            "Value type: " + state.Type.ToDisplayString(),
+        ];
     }
 
     private static void AddDeclaredIn(

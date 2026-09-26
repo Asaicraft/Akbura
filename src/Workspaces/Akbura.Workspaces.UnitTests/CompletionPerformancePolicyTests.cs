@@ -27,6 +27,12 @@ public sealed class CompletionPerformancePolicyTests
                     AkburaCompletionContextKind.TopLevel,
                     hasSupplementalItems: true,
                     roslynCompleted: false));
+        Assert.True(
+            AkburaRoslynCompletionSessionPolicy
+                .ShouldPublishSupplementalBeforeRoslyn(
+                    AkburaCompletionContextKind.StateBindingMode,
+                    hasSupplementalItems: true,
+                    roslynCompleted: false));
     }
 
     [Fact]

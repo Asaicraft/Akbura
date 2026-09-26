@@ -1,3 +1,4 @@
+using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
@@ -170,6 +171,47 @@ internal enum ComponentStateFactoryKind : byte
     State,
 }
 
+internal enum ComponentStateBindingRootKind : byte
+{
+    Component,
+    Static,
+    State,
+    Parameter,
+    Service,
+    Command,
+}
+
+internal enum ComponentStateBindingPropertyDependencyKind : byte
+{
+    Parameter,
+    Service,
+    Command,
+    AvaloniaProperty,
+}
+
+internal readonly struct ComponentStateBindingPropertyDependencyPlan
+{
+    public ComponentStateBindingPropertyDependencyPlan(
+        ComponentStateBindingPropertyDependencyKind kind,
+        string? name,
+        CSharpSymbolDefinition avaloniaProperty,
+        string hotReloadIdentity)
+    {
+        Kind = kind;
+        Name = name;
+        AvaloniaProperty = avaloniaProperty;
+        HotReloadIdentity = hotReloadIdentity;
+    }
+
+    public ComponentStateBindingPropertyDependencyKind Kind { get; }
+
+    public string? Name { get; }
+
+    public CSharpSymbolDefinition AvaloniaProperty { get; }
+
+    public string HotReloadIdentity { get; }
+}
+
 [Flags]
 internal enum ComponentStateFlags : byte
 {
@@ -177,6 +219,8 @@ internal enum ComponentStateFlags : byte
     IsReadOnly = 1 << 0,
     UsesHook = 1 << 1,
     IsComposable = 1 << 2,
+    IsObservableSource = 1 << 3,
+    CanReadBindingSource = 1 << 4,
 }
 
 internal readonly struct ComponentStatePlan
@@ -190,6 +234,16 @@ internal readonly struct ComponentStatePlan
         ComponentStateFlags flags,
         ExpressionSyntax initializer,
         StateDeclarationSyntax syntax,
+        ComponentStateBindingRootKind bindingRootKind = ComponentStateBindingRootKind.Component,
+        string? bindingRootName = null,
+        ExpressionSyntax? bindingRootExpression = null,
+        ITypeSymbol? bindingSourceType = null,
+        ITypeSymbol? bindingValueType = null,
+        ImmutableArray<MarkupBindingPathElement> bindingPathElements = default,
+        int bindingFullPathElementCount = 0,
+        ImmutableArray<string> bindingDependencyStateGeneratedNames = default,
+        ImmutableArray<ComponentStateBindingPropertyDependencyPlan> bindingPropertyDependencies = default,
+        string? bindingRootHotReloadIdentity = null,
         IMethodSymbol? hookMethod = null,
         ImmutableArray<UseHookStateArgument> stateArguments = default)
     {
@@ -201,16 +255,47 @@ internal readonly struct ComponentStatePlan
         Flags = flags;
         Initializer = initializer;
         Syntax = syntax;
+        BindingRootKind = bindingRootKind;
+        BindingRootName = bindingRootName;
+        BindingRootExpression = bindingRootExpression;
+        BindingSourceType = bindingSourceType;
+        BindingValueType = bindingValueType;
+        BindingPathElements = bindingPathElements.IsDefault
+            ? ImmutableArray<MarkupBindingPathElement>.Empty
+            : bindingPathElements;
+        BindingFullPathElementCount = bindingFullPathElementCount;
+        BindingDependencyStateGeneratedNames =
+            bindingDependencyStateGeneratedNames.IsDefault
+                ? ImmutableArray<string>.Empty
+                : bindingDependencyStateGeneratedNames;
+        BindingPropertyDependencies = bindingPropertyDependencies.IsDefault
+            ? ImmutableArray<ComponentStateBindingPropertyDependencyPlan>.Empty
+            : bindingPropertyDependencies;
+        BindingRootHotReloadIdentity = bindingRootHotReloadIdentity;
         HookMethod = hookMethod;
         StateArguments = stateArguments;
+        var generatedIdentity = ComponentHotReloadIdentity.CreateStateKey(
+            name,
+            valueType,
+            factoryKind,
+            (flags & ComponentStateFlags.IsComposable) != 0,
+            bindingKind,
+            bindingKind == StateBindingKind.None ? null : initializer.ToString());
         HotReloadKey = ComponentHotReloadIdentity.CreateStateKey(
             name,
             valueType,
             factoryKind,
-            (flags & ComponentStateFlags.IsComposable) != 0);
+            (flags & ComponentStateFlags.IsComposable) != 0,
+            bindingKind,
+            bindingKind == StateBindingKind.None ? null : initializer.ToString(),
+            BindingDependencyStateGeneratedNames.AsSpan(),
+            BindingRootKind,
+            BindingRootHotReloadIdentity,
+            BindingSourceType,
+            BindingPropertyDependencies.AsSpan());
         GeneratedName = ComponentHotReloadIdentity.CreateGeneratedName(
             name,
-            HotReloadKey);
+            generatedIdentity);
     }
 
     public int Id { get; }
@@ -229,6 +314,26 @@ internal readonly struct ComponentStatePlan
 
     public StateDeclarationSyntax Syntax { get; }
 
+    public ComponentStateBindingRootKind BindingRootKind { get; }
+
+    public string? BindingRootName { get; }
+
+    public ExpressionSyntax? BindingRootExpression { get; }
+
+    public ITypeSymbol? BindingSourceType { get; }
+
+    public ITypeSymbol? BindingValueType { get; }
+
+    public ImmutableArray<MarkupBindingPathElement> BindingPathElements { get; }
+
+    public int BindingFullPathElementCount { get; }
+
+    public ImmutableArray<string> BindingDependencyStateGeneratedNames { get; }
+
+    public ImmutableArray<ComponentStateBindingPropertyDependencyPlan> BindingPropertyDependencies { get; }
+
+    public string? BindingRootHotReloadIdentity { get; }
+
     public IMethodSymbol? HookMethod { get; }
 
     public ImmutableArray<UseHookStateArgument> StateArguments { get; }
@@ -242,6 +347,10 @@ internal readonly struct ComponentStatePlan
     public bool UsesHook => (Flags & ComponentStateFlags.UsesHook) != 0;
 
     public bool IsComposable => (Flags & ComponentStateFlags.IsComposable) != 0;
+
+    public bool IsObservableSource => (Flags & ComponentStateFlags.IsObservableSource) != 0;
+
+    public bool CanReadBindingSource => (Flags & ComponentStateFlags.CanReadBindingSource) != 0;
 
     internal static bool IsInitializerHook(IMethodSymbol method)
     {

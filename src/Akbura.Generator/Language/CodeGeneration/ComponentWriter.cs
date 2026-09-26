@@ -21,6 +21,7 @@ internal sealed class ComponentWriter : IDisposable
     private readonly ComponentHotReloadPlan _hotReloadPlan;
     private readonly ComponentGenerationMode _generationMode;
     private readonly BindingWriterEnvironment _bindingEnvironment;
+    private readonly BindingWriterEnvironment _stateBindingEnvironment;
     private readonly ComponentGenerationSourceMap _sourceMap;
     private readonly string _ownerTypeName;
     private readonly string _resourcePath;
@@ -67,6 +68,10 @@ internal sealed class ComponentWriter : IDisposable
         }
 
         _bindingEnvironment = BindingWriterEnvironment.Create(semanticModel, component);
+        var probeCompilation = semanticModel.Compilation.CSharpProbeCompilation;
+        _stateBindingEnvironment = BindingWriterEnvironment.Create(
+            probeCompilation,
+            probeCompilation.GetTypeByMetadataName(component.MetadataName));
 
         var resultEnvironment = MarkupExtensionResultEnvironment.Create(semanticModel);
 
@@ -135,6 +140,7 @@ internal sealed class ComponentWriter : IDisposable
         {
             var writer = new ComponentMemberWriter(
                 _writer,
+                in _stateBindingEnvironment,
                 _sourceMap,
                 _ownerTypeName);
             return writer.WriteDeclarations(_memberPlan);
@@ -153,6 +159,7 @@ internal sealed class ComponentWriter : IDisposable
         {
             var writer = new ComponentMemberWriter(
                 _writer,
+                in _stateBindingEnvironment,
                 _sourceMap,
                 _ownerTypeName);
             writer.WriteDescriptors(_memberPlan);

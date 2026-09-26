@@ -14,6 +14,7 @@ internal sealed class StateSymbol : Symbol, IStateSymbol
         IUseHookSymbol? useHook,
         bool hasExplicitType,
         StateBindingKind bindingKind,
+        bool canReadBindingSource,
         ISymbol? containingSymbol = null,
         ImmutableArray<Microsoft.CodeAnalysis.Location> locations = default,
         ImmutableArray<ISymbolDeclarationReference> declaringSyntaxReferences = default,
@@ -34,6 +35,7 @@ internal sealed class StateSymbol : Symbol, IStateSymbol
         UseHook = useHook;
         HasExplicitType = hasExplicitType;
         BindingKind = bindingKind;
+        CanReadBindingSource = canReadBindingSource;
     }
 
     public override SymbolKind Kind => SymbolKind.State;
@@ -59,6 +61,8 @@ internal sealed class StateSymbol : Symbol, IStateSymbol
     public bool IsBindable => BindingKind != StateBindingKind.None;
 
     public bool IsReadOnly => BindingKind == StateBindingKind.Out;
+
+    public bool CanReadBindingSource { get; }
 
     public StateBindingKind BindingKind { get; }
 

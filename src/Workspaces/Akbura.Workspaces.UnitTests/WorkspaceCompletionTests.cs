@@ -133,6 +133,80 @@ public sealed class WorkspaceCompletionTests
             document.Text.ToString(result.ApplicableSpan));
     }
 
+    [Theory]
+    [InlineData("state string name = ", 3)]
+    [InlineData("state string name = b", 1)]
+    [InlineData("state string name = ou", 1)]
+    [InlineData("state string name = i", 1)]
+    public void Completion_StateBindingModeIsAvailableWithoutSemanticContext(
+        string source,
+        int expectedCount)
+    {
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "StateDemo.akbura");
+        using var workspace = new AkburaWorkspace();
+
+        var syntaxContext = document.GetCompletionContext(source.Length);
+        var result = workspace.LanguageServices.Completion.GetCompletions(
+            document,
+            semanticContext: null,
+            source.Length);
+
+        Assert.Equal(AkburaCompletionContextKind.StateBindingMode, syntaxContext.Kind);
+        Assert.Equal(expectedCount, result.Items.Length);
+        Assert.All(result.Items, static item =>
+        {
+            Assert.Equal(AkburaCompletionKind.Keyword, item.Kind);
+            Assert.EndsWith(" ", item.InsertText, StringComparison.Ordinal);
+        });
+        Assert.Contains(result.Items, static item => item.DisplayText is "bind" or "out" or "in");
+    }
+
+    [Fact]
+    public void Completion_StateBindingModeReplacesTypedPrefixAndFollowingHorizontalWhitespace()
+    {
+        const string sourceWithCaret = "state string name = bi| vm.Name;";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "StateDemo.akbura");
+        using var workspace = new AkburaWorkspace();
+
+        var result = workspace.LanguageServices.Completion.GetCompletions(
+            document,
+            semanticContext: null,
+            position);
+        var item = Assert.Single(result.Items);
+        var changed = document.Text.WithChanges(new TextChange(
+            result.ApplicableSpan,
+            item.InsertText));
+
+        Assert.Equal("bind", item.DisplayText);
+        Assert.Equal("bi ", document.Text.ToString(result.ApplicableSpan));
+        Assert.Equal("state string name = bind vm.Name;", changed.ToString());
+    }
+
+    [Fact]
+    public void Completion_StateBindingPathUsesRoslynAfterMode()
+    {
+        const string sourceWithCaret =
+            "state DemoVm vm = new();\n" +
+            "state string name = bind vm.Na|;";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "StateDemo.akbura");
+
+        Assert.True(document.TryGetCSharpCompletionContext(position, out var context));
+        Assert.Equal(AkburaCSharpCompletionContextKind.Expression, context.Kind);
+        Assert.NotEqual(
+            AkburaCompletionContextKind.StateBindingMode,
+            document.GetCompletionContext(position).Kind);
+    }
+
     [Fact]
     public void Completion_UseEffectOffersIndentedSnippets()
     {
@@ -4202,6 +4276,34 @@ public sealed class WorkspaceCompletionTests
                     semanticContext,
                     projection,
                     "ToUpper");
+            });
+    }
+
+    [Fact]
+    public void CSharpProjection_ExplicitStateInitializerUsesDeclaredExpectedType()
+    {
+        const string source = """
+            namespace Gallery;
+
+            using System;
+            using Avalonia.Controls;
+
+            state Func<string, int> length = value => value.Substr|;
+
+            <StackPanel/>
+            """;
+
+        WithCSharpProjection(
+            source,
+            (semanticContext, context, projection, _) =>
+            {
+                Assert.Equal(
+                    AkburaCSharpCompletionContextKind.Expression,
+                    context.Kind);
+                AssertCompletionContains(
+                    semanticContext,
+                    projection,
+                    "Substring");
             });
     }
 

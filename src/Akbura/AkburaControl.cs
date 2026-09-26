@@ -208,6 +208,7 @@ public abstract partial class AkburaControl : Control, IComponentTree
     private bool _initialUpdatePending;
     private bool _hookStateResetPending;
     private bool _diagnosticStatesChangedPending;
+    private bool _stateResourcesSuspended;
     private bool _isUpdating;
     private bool _updatePending;
     private int _updateSuppressionDepth;
@@ -433,6 +434,31 @@ public abstract partial class AkburaControl : Control, IComponentTree
     /// </remarks>
     /// <returns>The component states.</returns>
     protected abstract ImmutableArray<State> GetStates();
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    protected void ReconcileStateResourcesForHotReload(
+        ImmutableArray<State> previous,
+        ImmutableArray<State> current)
+    {
+        for (var previousIndex = 0; previousIndex < previous.Length; previousIndex++)
+        {
+            var retained = false;
+            for (var currentIndex = 0; currentIndex < current.Length; currentIndex++)
+            {
+                if (ReferenceEquals(previous[previousIndex], current[currentIndex]))
+                {
+                    retained = true;
+                    break;
+                }
+            }
+
+            if (!retained)
+            {
+                previous[previousIndex].SuspendResources();
+            }
+        }
+    }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     [Browsable(false)]
@@ -893,6 +919,7 @@ public abstract partial class AkburaControl : Control, IComponentTree
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
+        ResumeStateResources();
         _useHooks.Resume();
         SetComponentParent(FindComponentParent());
         var participatesInHotReload =
@@ -929,6 +956,15 @@ public abstract partial class AkburaControl : Control, IComponentTree
 
         try
         {
+            SuspendStateResources();
+        }
+        catch (Exception exception)
+        {
+            UseHookFailures.Capture(ref failures, exception);
+        }
+
+        try
+        {
             SuspendLocalRenderScopes();
         }
         catch (Exception exception)
@@ -957,6 +993,37 @@ public abstract partial class AkburaControl : Control, IComponentTree
         UseHookFailures.ThrowIfAny(
             failures,
             "The Akbura component could not be fully detached.");
+    }
+
+    private void SuspendStateResources()
+    {
+        if (_stateResourcesSuspended)
+        {
+            return;
+        }
+
+        _stateResourcesSuspended = true;
+        var states = GetStates();
+        for (var index = 0; index < states.Length; index++)
+        {
+            states[index].SuspendResources();
+        }
+    }
+
+    private void ResumeStateResources()
+    {
+        if (!_stateResourcesSuspended)
+        {
+            return;
+        }
+
+        var states = GetStates();
+        for (var index = 0; index < states.Length; index++)
+        {
+            states[index].ResumeResources();
+        }
+
+        _stateResourcesSuspended = false;
     }
 
     private IComponentTree? FindComponentParent()

@@ -1,4 +1,4 @@
-﻿using Akbura.Language.Binder;
+using Akbura.Language.Binder;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -317,18 +317,35 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                         ? explicitType.Symbol as ITypeSymbol
                         : null);
             var initializerTypeSymbol = useHookBinding.StateType ?? initializerBinding.TypeSymbol;
+            var inferredStateTypeSymbol = bindingKind != StateBindingKind.None &&
+                initializerTypeSymbol != null &&
+                AkburaSemanticModel.TryGetIObservableElementType(
+                    initializerTypeSymbol,
+                    out var observableElementType)
+                    ? observableElementType
+                    : initializerTypeSymbol;
             var initializerType = initializerTypeSymbol == null
                 ? default
                 : new CSharpSymbolDefinition(initializerTypeSymbol);
             var type = hasExplicitType
                 ? explicitType
-                : initializerType;
+                : inferredStateTypeSymbol == null
+                    ? default
+                    : new CSharpSymbolDefinition(inferredStateTypeSymbol);
+            var readBinding = bindingKind != StateBindingKind.None &&
+                type.Symbol is ITypeSymbol stateValueType
+                    ? BindStateSourceValue(stateDeclaration, initializerBinding, stateValueType)
+                    : initializerBinding;
+            var writeBinding = RequiresWritableStateBindingTarget(bindingKind)
+                ? BindStateTargetAssignment(stateDeclaration, type)
+                : CSharpBindingResult.Empty;
             var diagnosticsBag = BindingDiagnosticBag.GetInstance();
             diagnosticsBag.AddRange(CreateStateBindingDiagnostics(
                     stateDeclaration,
                     bindingKind,
                     type,
-                    initializerBinding));
+                    initializerBinding,
+                    writeBinding));
             diagnosticsBag.AddRange(useHookBinding.Diagnostics);
             {
                 using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
@@ -339,10 +356,12 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                     diagnosticsBuilder);
                 if (!useHookBinding.WasRecognized)
                 {
-                    AkburaSemanticModel.AddCSharpBindingDiagnostics(
+                    AddStateInitializerBindingDiagnostics(
                         stateDeclaration,
-                        stateDeclaration.Initializer.Expression.ToFullString().Trim(),
-                        initializerBinding,
+                        bindingKind is StateBindingKind.Bind or StateBindingKind.Out
+                            ? readBinding
+                            : initializerBinding,
+                        bindingKind,
                         diagnosticsBuilder);
                 }
 
@@ -356,7 +375,8 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 initializerType,
                 useHookBinding.Symbol,
                 hasExplicitType,
-                bindingKind));
+                bindingKind,
+                CanReadStateBindingSource(bindingKind, readBinding)));
             CacheBoundStateDeclaration(
                 stateDeclaration,
                 symbolInfo,
@@ -365,6 +385,67 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 useHookBinding.Invocation,
                 diagnostics);
             return symbolInfo;
+        }
+
+        private static void AddStateInitializerBindingDiagnostics(
+            StateDeclarationSyntax stateDeclaration,
+            CSharpBindingResult initializerBinding,
+            StateBindingKind bindingKind,
+            ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+        {
+            var ignoreUnreadableTarget =
+                stateDeclaration.Type != null &&
+                bindingKind == StateBindingKind.In &&
+                !CanReadStateBindingSource(bindingKind, initializerBinding);
+            AkburaSemanticModel.AddCSharpBindingDiagnostics(
+                stateDeclaration,
+                stateDeclaration.Initializer.Expression.ToFullString().Trim(),
+                initializerBinding,
+                diagnosticsBuilder,
+                ignoreUnreadableTarget);
+        }
+
+        private CSharpBindingResult BindStateTargetAssignment(
+            StateDeclarationSyntax stateDeclaration,
+            CSharpSymbolDefinition stateType)
+        {
+            if (stateType.Symbol is not ITypeSymbol type ||
+                stateDeclaration.Initializer.Expression.GetRawCSharpExpression() is not { } target)
+            {
+                return CSharpBindingResult.Empty;
+            }
+
+            var value = CSharpSyntaxFactory.DefaultExpression(
+                CSharpSyntaxFactory.ParseTypeName(type.ToDisplayString(
+                    SymbolDisplayFormat.FullyQualifiedFormat)));
+            var assignment = CSharpSyntaxFactory.AssignmentExpression(
+                Microsoft.CodeAnalysis.CSharp.SyntaxKind.SimpleAssignmentExpression,
+                target,
+                value);
+            return BindCSharpExpression(
+                assignment,
+                stateDeclaration,
+                isBindingPath: false);
+        }
+
+        private CSharpBindingResult BindStateSourceValue(StateDeclarationSyntax stateDeclaration, CSharpBindingResult initializerBinding, ITypeSymbol stateType)
+        {
+            if (initializerBinding.TypeSymbol != null &&
+                AkburaSemanticModel.TryGetIObservableElementType(
+                    initializerBinding.TypeSymbol,
+                    out var observableElementType))
+            {
+                var observableValue = CSharpSyntaxFactory.DefaultExpression(
+                    CSharpSyntaxFactory.ParseTypeName(observableElementType.ToDisplayString(
+                        SymbolDisplayFormat.FullyQualifiedFormat)));
+                return BindCSharpExpression(
+                    observableValue,
+                    stateDeclaration,
+                    isBindingPath: false,
+                    targetType: stateType);
+            }
+
+            return BindStateInitializerExpression(stateDeclaration, stateType);
         }
 
         private AkburaSymbolInfo ResolveParam(ParamDeclarationSyntax paramDeclaration)

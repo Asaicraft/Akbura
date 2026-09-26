@@ -2354,7 +2354,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         StateDeclarationSyntax stateDeclaration,
         StateBindingKind bindingKind,
         CSharpSymbolDefinition stateType,
-        CSharpBindingResult initializerBinding)
+        CSharpBindingResult initializerBinding,
+        CSharpBindingResult writeBinding)
     {
         if (bindingKind == StateBindingKind.None)
         {
@@ -2370,7 +2371,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         if (RequiresWritableStateBindingTarget(bindingKind) &&
-            !IsWritableStateBindingTarget(initializerBinding.Symbol))
+            writeBinding.Diagnostics.Any(static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error))
         {
             diagnosticsBuilder.Add(CreateStateBindingTargetNotWritableDiagnostic(stateDeclaration));
         }
@@ -2387,7 +2389,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return diagnosticsBuilder.ToImmutable();
     }
 
-    private static bool RequiresWritableStateBindingTarget(StateBindingKind bindingKind)
+    internal static bool RequiresWritableStateBindingTarget(StateBindingKind bindingKind)
     {
         return bindingKind is StateBindingKind.Bind or StateBindingKind.In;
     }
@@ -2397,15 +2399,26 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return bindingKind is StateBindingKind.Bind or StateBindingKind.Out;
     }
 
-    private static bool IsWritableStateBindingTarget(RoslynSymbol? symbol)
+    internal static bool CanReadStateBindingSource(
+        StateBindingKind bindingKind,
+        CSharpBindingResult binding)
     {
-        return symbol switch
+        if (bindingKind != StateBindingKind.In)
         {
-            RoslynPropertySymbol property => property.SetMethod?.DeclaredAccessibility == Accessibility.Public,
-            RoslynFieldSymbol field => !field.IsReadOnly && !field.IsConst,
-            null => true,
-            _ => false,
-        };
+            return true;
+        }
+
+        if (binding.Diagnostics.Any(static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error))
+        {
+            return false;
+        }
+
+        var conversion = binding.Conversion;
+        return conversion.TargetType == null ||
+            conversion.IsImplicit ||
+            conversion.SourceType == null ||
+            IsSameType(conversion.SourceType, conversion.TargetType);
     }
 
     private bool CanObserveStateBindingSource(
@@ -2423,8 +2436,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         var containingType = GetBindingSourceContainingType(binding.Symbol) ??
             binding.ReceiverType as INamedTypeSymbol;
 
-        if (containingType != null &&
-            ImplementsINotifyPropertyChanged(containingType))
+        if (containingType != null && CanObserveStateBindingOwner(containingType))
         {
             return true;
         }
@@ -2432,7 +2444,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return binding.Symbol is RoslynFieldSymbol or RoslynPropertySymbol &&
             binding.ReceiverType == null &&
             binding.TypeSymbol != null &&
-            ImplementsINotifyPropertyChanged(binding.TypeSymbol);
+            CanObserveStateBindingOwner(binding.TypeSymbol);
     }
 
     internal static bool IsStateBindingPath(CSharp.ExpressionSyntax expression)
@@ -2473,12 +2485,72 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return false;
     }
 
-    private bool TryGetIObservableElementType(ITypeSymbol type, out ITypeSymbol elementType)
+    private bool CanObserveStateBindingOwner(ITypeSymbol type)
+    {
+        if (ImplementsINotifyPropertyChanged(type) ||
+            ImplementsInterface(type, "System.Collections.Specialized", "INotifyCollectionChanged"))
+        {
+            return true;
+        }
+
+        var avaloniaObject = Compilation.CSharpCompilation.GetTypeByMetadataName(
+            "Avalonia.AvaloniaObject");
+        for (var current = type as INamedTypeSymbol; current != null; current = current.BaseType)
+        {
+            if (SymbolEqualityComparer.Default.Equals(current, avaloniaObject))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ImplementsInterface(ITypeSymbol type, string namespaceName, string typeName)
+    {
+        foreach (var @interface in type.AllInterfaces)
+        {
+            if (@interface.Name == typeName &&
+                @interface.ContainingNamespace.ToDisplayString() == namespaceName)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    internal static bool TryGetIObservableElementType(ITypeSymbol type, out ITypeSymbol elementType)
     {
         if (type is INamedTypeSymbol namedType &&
-            IsIObservableOfT(namedType))
+            TryGetIObservableElementTypeFromNamedType(namedType, out elementType))
         {
-            elementType = namedType.TypeArguments[0];
+            return true;
+        }
+
+        if (type is ITypeParameterSymbol typeParameter)
+        {
+            foreach (var constraintType in typeParameter.ConstraintTypes)
+            {
+                if (constraintType is INamedTypeSymbol namedConstraint &&
+                    TryGetIObservableElementTypeFromNamedType(
+                        namedConstraint,
+                        out elementType))
+                {
+                    return true;
+                }
+            }
+        }
+
+        elementType = null!;
+        return false;
+    }
+
+    private static bool TryGetIObservableElementTypeFromNamedType(INamedTypeSymbol type, out ITypeSymbol elementType)
+    {
+        if (IsIObservableOfT(type))
+        {
+            elementType = type.TypeArguments[0];
             return true;
         }
 
@@ -6184,10 +6256,20 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                     .WithVariables(CSharpSyntaxFactory.SingletonSeparatedList(
                         CSharpSyntaxFactory.VariableDeclarator(
                             CSharpSyntaxFactory.Identifier(name)))))
-            .WithModifiers(CSharpSyntaxFactory.TokenList(
-                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.PrivateKeyword)));
+            .WithModifiers(GetStateProbeFieldModifiers(stateDeclaration));
 
         return true;
+    }
+
+    private static Microsoft.CodeAnalysis.SyntaxTokenList GetStateProbeFieldModifiers(
+        StateDeclarationSyntax stateDeclaration)
+    {
+        return GetStateBindingKind(stateDeclaration.Initializer) == StateBindingKind.Out
+            ? CSharpSyntaxFactory.TokenList(
+                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.PrivateKeyword),
+                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ReadOnlyKeyword))
+            : CSharpSyntaxFactory.TokenList(
+                CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.PrivateKeyword));
     }
 
     private CSharp.TypeSyntax? GetStateProbeFieldType(StateDeclarationSyntax stateDeclaration)
@@ -6882,12 +6964,18 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         AkburaSyntax syntax,
         string expressionText,
         CSharpBindingResult binding,
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder,
+        bool ignoreUnreadableTarget = false)
     {
         if (!binding.Diagnostics.IsDefaultOrEmpty)
         {
             foreach (var diagnostic in binding.Diagnostics)
             {
+                if (ignoreUnreadableTarget && diagnostic.Id is "CS0154" or "CS0271")
+                {
+                    continue;
+                }
+
                 if (diagnostic.Severity == DiagnosticSeverity.Error)
                 {
                     diagnosticsBuilder.Add(CreateCSharpExpressionErrorDiagnostic(

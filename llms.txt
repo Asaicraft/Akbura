@@ -10,7 +10,7 @@ Language
  - [Components and Markup](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
  - [Conditional Markup](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/conditional-markup.md)
  - [Foreach Markup](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/foreach.md)
- - [Reactive State](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
+ - [Reactive State](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/state.md)
  - [Dictionary Resources](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
  - [Avalonia Styles](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
  - [Parameters](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/.md)
@@ -27,6 +27,7 @@ Project
  - [GitHub](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/https://github.com/Asaicraft/Akbura.md)
 
 Akbura
+ - [Reactive State](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/state.md)
  - [Composable Hooks](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/hooks.md)
  - [Commands](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/commands.md): commands.md
  - [Parameters and Bindings](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/parameters.md): Parameters and Directional Bindings

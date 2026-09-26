@@ -9,7 +9,7 @@
     <base href="https://asaicraft.github.io/Akbura/" />
 
     <link rel="icon" type="image/svg+xml" href="img/logo.svg">
-    <title>Differences between XML, XAML and AXAML</title>
+    <title>Reactive State</title>
 
     <script>
             if (location.search === "?dark") {
@@ -180,7 +180,7 @@ Akbura									</span>
 								</a>
 						<ul role="list" class="mb-6 mt-2 ml-3 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 lg:mt-4 lg:space-y-4 lg:border-slate-200">
 								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akbura/state" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+									<a href="https://asaicraft.github.io/Akbura/akbura/state" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
 										Reactive State
 									</a>
 								</li>
@@ -210,7 +210,7 @@ Akbura									</span>
 									</a>
 								</li>
 								<li class="relative">
-									<a href="https://asaicraft.github.io/Akbura/akbura/xml-xaml-axaml" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
+									<a href="https://asaicraft.github.io/Akbura/akbura/xml-xaml-axaml" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
 										XML, XAML and AXAML differences
 									</a>
 								</li>
@@ -263,291 +263,146 @@ Akbura									</span>
 				
 					<section class="not-prose mb-16 md:mb-12">
 						<h1 class="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-gray-50 sm:text-5xl md:text-6xl">
-							Differences between XML, XAML and AXAML
+							Reactive State
 						</h1>
 					</section>
 
 				<div class="not-prose"></div>
 
 				<div class="content">
-					<p>Akbura uses an XML-like element structure, but an <code>.akbura</code> file is not an XML, XAML or AXAML document. It is an Akbura component that can contain normal C# declarations and expressions.</p>
-<p>This distinction matters when syntax from XML or AXAML is copied into an Akbura component.</p>
-<h2 id="xml-xaml-and-axaml">XML, XAML and AXAML<a class="header-anchor" href="javascript:;" onclick="location.hash='#xml-xaml-and-axaml'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p><strong>XML</strong> is a general-purpose markup format.</p>
-<p><strong>XAML</strong> is an XML-based language for declaring .NET object graphs and user interfaces.</p>
-<p><strong>AXAML</strong> means Avalonia XAML. Avalonia uses the <code>.axaml</code> extension to distinguish its XAML dialect from XAML files used by other frameworks.</p>
-<p>Akbura keeps familiar concepts such as elements, attributes and property elements, but it is compiled by the Akbura compiler rather than treated as an XML document.</p>
-<h2 id="dictionary-keys">Dictionary keys<a class="header-anchor" href="javascript:;" onclick="location.hash='#dictionary-keys'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>AXAML uses the XML directive <code>x:Key</code>. Akbura uses <code>x.key</code> or its alias <code>x.Key</code>:</p>
-<pre><code class="language-akbura">using Avalonia.Controls;
-using Avalonia.Media;
+					<h1 id="reactive-state">Reactive state<a class="header-anchor" href="javascript:;" onclick="location.hash='#reactive-state'" aria-label="Permalink">&ZeroWidthSpace;</a></h1>
+<p><code>state</code> declares a reactive value owned by one component instance. The type may
+be explicit or inferred from the initializer:</p>
+<pre><code class="language-akbura">state count = 0;
+state int selectedIndex = 0;
+state string query = &quot;&quot;;
+</code></pre>
+<p>The initializer runs when that state is first created. A normal render caused by
+another value does not recreate it. Assigning an equal value is ignored by the
+default equality comparer. A normal initializer is a snapshot, not a computed
+state: <code>state int doubled = count * 2;</code> does not recalculate when <code>count</code> changes.
+Use a markup expression or a <a href="/akbura/hooks">composable hook</a> for a derived value.</p>
+<h2 id="directional-connections">Directional connections<a class="header-anchor" href="javascript:;" onclick="location.hash='#directional-connections'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>A mode immediately after <code>=</code> connects a state value to a C# binding path:</p>
+<pre><code class="language-akbura">state MyViewModel vm = new MyViewModel();
 
-state int resourceIndex = 0;
-
-&lt;Border&gt;
-    &lt;Border.Resources&gt;
-        &lt;SolidColorBrush x.key=&quot;AccentBrush&quot; Color=&quot;Red&quot; /&gt;
-        &lt;SolidColorBrush x.Key={resourceIndex + 1} Color=&quot;Blue&quot; /&gt;
-    &lt;/Border.Resources&gt;
-&lt;/Border&gt;
+state string? name = bind vm.Name;
+state string fullName = out vm.FullName;
+state string? surname = in vm.Surname;
 </code></pre>
-<p>These are two spellings of one dictionary-entry directive. <code>x:Key</code> is not an
-additional spelling in Akbura. Other attribute names are still case-sensitive.
-A quoted key is a string; <code>{resourceIndex + 1}</code> is a typed C# key expression.
-The key is attached to the parent dictionary entry rather than assigned to a
-property of <code>SolidColorBrush</code>.</p>
-<p><code>x.Name</code> continues to name an element in the component and serves a different
-purpose. Dynamic dictionary keys do not replace element identity. See
-<a href="/#dictionary-resources">Dictionary Resources</a> for key typing, updates,
-ownership, and collisions.</p>
-<h2 id="styles-and-property-references">Styles and property references<a class="header-anchor" href="javascript:;" onclick="location.hash='#styles-and-property-references'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Avalonia styles use the familiar property-element shape in Akbura:</p>
-<pre><code class="language-akbura">using Avalonia.Controls;
-using Avalonia.Styling;
-
-&lt;Border&gt;
-    &lt;Border.Styles&gt;
-        &lt;Style Selector=&quot;Button&quot;&gt;
-            &lt;Setter Property=&quot;Background&quot; Value=&quot;Red&quot; /&gt;
-        &lt;/Style&gt;
-    &lt;/Border.Styles&gt;
-&lt;/Border&gt;
-</code></pre>
-<p><code>Property=&quot;Background&quot;</code> resolves a static Avalonia property reference using the
-style's target context. <code>Property=&quot;Button.Background&quot;</code> supplies an explicit
-owner, and <code>Property={Button.BackgroundProperty}</code> uses C# directly. This also
-works for custom holder properties of type <code>AvaloniaProperty</code>.</p>
-<p>Markup extensions keep Akbura's <code>${...}</code> syntax, including bindings stored in
-a setter:</p>
-<pre><code class="language-akbura">using Avalonia.Controls;
-using Avalonia.Styling;
-using Akbura.Markup;
-
-&lt;Setter Property=&quot;Button.Background&quot; Value=${Binding AccentBrush} /&gt;
-</code></pre>
-<p>See <a href="/#avalonia-styles">Avalonia Styles</a> for supported literal selector forms,
-typed child insertion, contextual values, and property metadata.</p>
-<h2 id="whitespace-and-xmlspace">Whitespace and <code>xml:space</code><a class="header-anchor" href="javascript:;" onclick="location.hash='#whitespace-and-xmlspace'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>CDATA and <code>xml:space</code> solve different problems.</p>
-<p>CDATA prevents its contents from being interpreted as XML markup:</p>
-<pre><code class="language-xml">&lt;![CDATA[
-&lt;Button Content=&quot;Hello&quot; /&gt;
-]]&gt;
-</code></pre>
-<p>The <code>xml:space</code> attribute controls how whitespace inside an XML element should be handled:</p>
-<pre><code class="language-xml">&lt;poem xml:space=&quot;preserve&quot;&gt;
-    First line
-        Indented line
-    Last line
-&lt;/poem&gt;
-</code></pre>
-<p>XML defines two values:</p>
 <table>
 <thead>
 <tr>
-<th>Value</th>
-<th>Meaning</th>
+<th>Declaration</th>
+<th>Data flow</th>
+<th>Can component code assign the state?</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>default</code></td>
-<td>The application's default whitespace processing is acceptable</td>
+<td><code>state T value = expression;</code></td>
+<td>initializer → state once</td>
+<td>Yes</td>
 </tr>
 <tr>
-<td><code>preserve</code></td>
-<td>The application should preserve the whitespace</td>
+<td><code>state T value = bind source.Path;</code></td>
+<td>source ↔ state</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>state T value = out source.Path;</code></td>
+<td>source → state</td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>state T value = in target.Path;</code></td>
+<td>state → target</td>
+<td>Yes</td>
 </tr>
 </tbody>
 </table>
-<p>The value is inherited by descendant elements until it is overridden:</p>
-<pre><code class="language-xml">&lt;root xml:space=&quot;preserve&quot;&gt;
-    &lt;first&gt;
-        Whitespace is preserved here.
-    &lt;/first&gt;
+<p><code>bind</code> reads the initial source value, follows source notifications, and writes
+state changes back. After a write it reads the target again, so a normalizing
+setter such as <code>value.Trim()</code> becomes the final state value instead of causing an
+echo loop.</p>
+<p><code>out</code> follows the source but exposes a shallow-readonly state to component code.
+Assignments, compound assignments, increment/decrement, deconstruction, <code>ref</code>
+and <code>out</code> writes are errors, including inside handlers and hook callbacks. This
+does not make an object stored in the state deeply immutable.</p>
+<p><code>in</code> writes later state assignments to the current target. When the target has an
+accessible getter, its value is read once for compatible initialization; later
+target changes do not create a reverse channel. A write-only target starts at
+<code>default(T)</code> and its setter is not called merely by creating the connection. For
+a write-only target the state type must be explicit because there is no readable
+value from which to infer <code>T</code>. For a nullable/reference type, the state can
+therefore be <code>null</code> until the first component assignment.</p>
+<h2 id="binding-paths-and-observation">Binding paths and observation<a class="header-anchor" href="javascript:;" onclick="location.hash='#binding-paths-and-observation'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Directional initializers accept identifiers, member access and indexers:</p>
+<pre><code class="language-akbura">state string name = bind vm.Name;
+state string surname = in vm.People[0].Surname;
+state string title = out vm.Current.Title;
+</code></pre>
+<p>An arbitrary calculation is not a path. Keep it as a normal initializer or use a
+derived hook:</p>
+<pre><code class="language-akbura">state int snapshot = vm.Age + 1;
+// state int invalid = bind vm.Age + 1;
+</code></pre>
+<p>Akbura observes <code>INotifyPropertyChanged</code>, Avalonia property changes, and
+<code>INotifyCollectionChanged</code> for indexed segments. A plain <code>List&lt;T&gt;</code> or an ordinary
+getter cannot announce every mutation. <code>bind</code> and <code>out</code> report the existing
+non-observable-source warning when no supported notification channel is present.</p>
+<p>Replacing an observable root, intermediate object, or collection item rebuilds
+the path. Events from the old owner are disconnected. If a root or intermediate
+value is <code>null</code>, Akbura does not create an object and does not write to the old
+owner. Read directions retain the last successful value (or <code>default(T)</code> before
+the first value). Writes performed while an <code>in</code>/<code>bind</code> target is disconnected
+are not queued or replayed; after reconnection, <code>bind</code> reads the current target,
+while <code>in</code> waits for the next different state assignment.</p>
+<h2 id="observable-sources">Observable sources<a class="header-anchor" href="javascript:;" onclick="location.hash='#observable-sources'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p><code>out</code> may consume <code>IObservable&lt;T&gt;</code> directly:</p>
+<pre><code class="language-akbura">state string message = out vm.Messages;
+</code></pre>
+<p>The value visible in Akbura is <code>T</code>; the observable object is only the source.
+Before the first <code>OnNext</code>, the value is <code>default(T)</code>. <code>OnCompleted</code> retains the
+last value and releases the subscription. <code>OnError</code> releases the subscription
+and rethrows the same exception to the producer's call path; it is not swallowed
+or converted into a target write. A normal <code>state stream = vm.Messages;</code> stores
+the stream itself and does not subscribe.</p>
+<p>A pure <code>IObservable&lt;T&gt;</code> is not a writable channel, so it cannot be used for
+<code>bind</code> or <code>in</code> merely because it can publish values.</p>
+<h2 id="runtime-ownership-and-hot-reload">Runtime ownership and Hot Reload<a class="header-anchor" href="javascript:;" onclick="location.hash='#runtime-ownership-and-hot-reload'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>The connection belongs to the state and component, not to a particular control
+that reads it. Detaching a component suspends owned subscriptions; reattaching
+restores one connection to the current source. Akbura never disposes the view
+model, collection, or observable itself.</p>
+<p>An unrelated Hot Reload edit preserves compatible local state. The connection
+identity includes its mode and path, so changing <code>bind</code> to <code>out</code>, or changing the
+path, replaces the old binding resources. A state type change uses the existing
+incompatible-state policy instead of casting <code>State&lt;OldT&gt;</code> to <code>State&lt;NewT&gt;</code>.</p>
+<h2 id="state-values-and-hooks">State values and hooks<a class="header-anchor" href="javascript:;" onclick="location.hash='#state-values-and-hooks'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>In ordinary Akbura expressions, <code>count</code> has its value type such as <code>int</code>, not the
+technical runtime type <code>State&lt;int&gt;</code>, and no <code>.Value</code> access is required. When an
+existing hook parameter explicitly expects <code>State&lt;T&gt;</code>, the compiler passes the
+same live state object according to the hook contract:</p>
+<pre><code class="language-akbura">using Akbura.Hooks;
 
-    &lt;second xml:space=&quot;default&quot;&gt;
-        Default processing is restored here.
-    &lt;/second&gt;
-&lt;/root&gt;
+state int count = 0;
+state int delayed = useDebounce(count, 300);
 </code></pre>
-<h3 id="xmlspace-in-xaml-and-axaml"><code>xml:space</code> in XAML and AXAML<a class="header-anchor" href="javascript:;" onclick="location.hash='#xmlspace-in-xaml-and-axaml'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
-<p>XAML processors normally normalize whitespace found in element content. Depending on the content model, line breaks and tabs may be converted to spaces, repeated spaces may be collapsed, and whitespace near element boundaries may be removed.</p>
-<p>Use <code>xml:space=&quot;preserve&quot;</code> when the text must retain its authored whitespace:</p>
-<pre><code class="language-xml">&lt;TextBlock xml:space=&quot;preserve&quot;&gt;
-    First line
-        Indented line
-    Last line
-&lt;/TextBlock&gt;
-</code></pre>
-<h3 id="whitespace-in-akbura">Whitespace in Akbura<a class="header-anchor" href="javascript:;" onclick="location.hash='#whitespace-in-akbura'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
-<p>Akbura files are not XML documents, so <code>xml:space</code> has no special meaning.</p>
-<p>Use a C# raw string to define the exact text value:</p>
-<pre><code class="language-akbura">&lt;TextBlock Text={&quot;&quot;&quot;
-First line
-    Indented line
-Last line
-&quot;&quot;&quot;}/&gt;
-</code></pre>
-<p>The indentation of the closing delimiter determines the common indentation removed from every content line:</p>
-<pre><code class="language-akbura">&lt;Border&gt;
-    &lt;TextBlock Text={&quot;&quot;&quot;
-        First line
-            Indented line
-        Last line
-        &quot;&quot;&quot;}/&gt;
-&lt;/Border&gt;
-</code></pre>
-<p>The indentation needed to align the raw string with the surrounding component is removed. Additional indentation inside the content remains in the resulting string.</p>
-<h3 id="comparison">Comparison<a class="header-anchor" href="javascript:;" onclick="location.hash='#comparison'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Construct</th>
-<th>Purpose</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>&lt;![CDATA[ ... ]]&gt;</code></td>
-<td>Prevent XML content from being parsed as markup</td>
-</tr>
-<tr>
-<td><code>xml:space=&quot;preserve&quot;</code></td>
-<td>Request preservation of whitespace in XML or XAML content</td>
-</tr>
-<tr>
-<td><code>{&quot;&quot;&quot; ... &quot;&quot;&quot;}</code></td>
-<td>Produce a C# string value inside an Akbura expression</td>
-</tr>
-</tbody>
-</table>
-<p>Raw strings replace CDATA in Akbura. They also make <code>xml:space</code> unnecessary for defining multiline text because whitespace belongs directly to the resulting C# string.</p>
-<h2 id="cdata-is-not-supported">CDATA is not supported<a class="header-anchor" href="javascript:;" onclick="location.hash='#cdata-is-not-supported'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>XML can use a CDATA section when text must contain characters that would otherwise be interpreted as markup:</p>
-<pre><code class="language-xml">&lt;FeatureView.Code&gt;
-    &lt;![CDATA[
-    &lt;Button Content=&quot;Hello&quot; /&gt;
-    ]]&gt;
-&lt;/FeatureView.Code&gt;
-</code></pre>
-<p>Akbura does not use CDATA. Place a C# raw string inside an Akbura expression instead:</p>
-<pre><code class="language-akbura">&lt;FeatureView.Code&gt;
-    {&quot;&quot;&quot;
-    &lt;Button Content=&quot;Hello&quot; /&gt;
-    &quot;&quot;&quot;}
-&lt;/FeatureView.Code&gt;
-</code></pre>
-<p>The outer <code>{ ... }</code> is an Akbura C# expression. The <code>&quot;&quot;&quot; ... &quot;&quot;&quot;</code> part is a standard <a href="https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/tokens/raw-string">C# raw string literal</a>.</p>
-<h2 id="why-raw-strings-are-preferable-in-akbura">Why raw strings are preferable in Akbura<a class="header-anchor" href="javascript:;" onclick="location.hash='#why-raw-strings-are-preferable-in-akbura'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<h3 id="indentation-is-normalized">Indentation is normalized<a class="header-anchor" href="javascript:;" onclick="location.hash='#indentation-is-normalized'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
-<p>A multiline raw string uses the indentation of its closing delimiter to determine which leading whitespace should be removed.</p>
-<p>This lets the embedded text stay aligned with the surrounding component:</p>
-<pre><code class="language-akbura">&lt;TextBlock Text={&quot;&quot;&quot;
-    First line
-        Nested line
-    Last line
-    &quot;&quot;&quot;}/&gt;
-</code></pre>
-<p>The indentation required by the component source is not included in the resulting string.</p>
-<h3 id="quotes-and-backslashes-need-less-escaping">Quotes and backslashes need less escaping<a class="header-anchor" href="javascript:;" onclick="location.hash='#quotes-and-backslashes-need-less-escaping'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
-<p>A raw string can contain ordinary quote characters and backslashes without the escaping required by a regular C# string:</p>
-<pre><code class="language-akbura">&lt;TextBlock Text={&quot;&quot;&quot;
-Path: C:\Projects\Akbura
-Message: &quot;Hello&quot;
-&quot;&quot;&quot;}/&gt;
-</code></pre>
-<p>When the content itself contains three consecutive quote characters, use a longer delimiter:</p>
-<pre><code class="language-csharp">var text = &quot;&quot;&quot;&quot;
-The content may contain &quot;&quot;&quot; without ending the string.
-&quot;&quot;&quot;&quot;;
-</code></pre>
-<p>The opening and closing delimiters must contain more consecutive quote characters than any quote sequence inside the content.</p>
-<h3 id="raw-strings-support-interpolation">Raw strings support interpolation<a class="header-anchor" href="javascript:;" onclick="location.hash='#raw-strings-support-interpolation'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
-<p>Add <code>$</code> before the delimiter to create an interpolated raw string:</p>
-<pre><code class="language-akbura">param string name = &quot;Akbura&quot;;
-
-&lt;TextBlock Text={$&quot;&quot;&quot;
-Hello, {name}!
-&quot;&quot;&quot;}/&gt;
-</code></pre>
-<p>The interpolation expression is normal C# and can use:</p>
-<ul>
-<li>component state;</li>
-<li>parameters;</li>
-<li>injected services;</li>
-<li>local variables;</li>
-<li>method calls;</li>
-<li>other C# expressions.</li>
-</ul>
-<p>For example:</p>
-<pre><code class="language-akbura">state int count = 3;
-
-&lt;TextBlock Text={$&quot;&quot;&quot;
-The current count is {count}.
-The next value is {count + 1}.
-&quot;&quot;&quot;}/&gt;
-</code></pre>
-<h3 id="literal-braces-can-be-preserved">Literal braces can be preserved<a class="header-anchor" href="javascript:;" onclick="location.hash='#literal-braces-can-be-preserved'" aria-label="Permalink">&ZeroWidthSpace;</a></h3>
-<p>Interpolated raw strings can use multiple <code>$</code> characters. The number of <code>$</code> characters determines how many braces start an interpolation.</p>
-<p>This is useful when the resulting text itself contains braces:</p>
-<pre><code class="language-csharp">var json = $$&quot;&quot;&quot;
-{
-    &quot;name&quot;: &quot;{‎{name}‎}&quot;
-}
-&quot;&quot;&quot;;
-</code></pre>
-<p>Here, single braces remain part of the text, while <code>{‎{name}‎}</code> is the interpolation.</p>
-<h2 id="comparison-1">Comparison<a class="header-anchor" href="javascript:;" onclick="location.hash='#comparison-1'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<table>
-<thead>
-<tr>
-<th>XML or AXAML</th>
-<th>Akbura</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>&lt;![CDATA[ ... ]]&gt;</code></td>
-<td><code>{&quot;&quot;&quot; ... &quot;&quot;&quot;}</code></td>
-</tr>
-<tr>
-<td>XML text container</td>
-<td>C# string expression</td>
-</tr>
-<tr>
-<td>No C# interpolation</td>
-<td>Supports C# interpolation with <code>$&quot;&quot;&quot;</code></td>
-</tr>
-<tr>
-<td>XML whitespace rules</td>
-<td>C# raw-string indentation rules</td>
-</tr>
-<tr>
-<td>XML escaping model</td>
-<td>Raw-string delimiter rules</td>
-</tr>
-</tbody>
-</table>
-<h2 id="summary">Summary<a class="header-anchor" href="javascript:;" onclick="location.hash='#summary'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>Do not copy CDATA sections into <code>.akbura</code> files.</p>
-<p>Use:</p>
-<pre><code class="language-akbura">{&quot;&quot;&quot;
-Raw text
-&quot;&quot;&quot;}
-</code></pre>
-<p>Use an interpolated raw string when the text depends on component data:</p>
-<pre><code class="language-akbura">{$&quot;&quot;&quot;
-Value: {value}
-&quot;&quot;&quot;}
-</code></pre>
+<p>An <code>out</code> state cannot be passed to a hook parameter that exposes mutable
+<code>State&lt;T&gt;</code> access; use a value/read-only hook contract instead.</p>
+<p>The editor offers <code>bind</code>, <code>out</code>, and <code>in</code> only in the mode position after <code>=</code>.
+After a mode it switches to normal typed C# path completion. Hover shows the
+value type, direction, and readonly status. Ordinary explicitly typed
+initializers keep their expected type, including target-typed <code>new()</code> and lambda
+parameters.</p>
 
 				</div>
 
 				<div class="not-prose"></div>
 				
 					<div class="not-prose py-8">
-						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/src/AkburaDocs/_pages/akbura/xml-xaml-axaml.md" target="_blank" rel="noopener noreferrer">
+						<a class="text-slate-500 font-semibold hover:text-indigo-600 flex items-center" href="https://github.com/Asaicraft/Akbura/blob/master/src/AkburaDocs/_pages/akbura/state.md" target="_blank" rel="noopener noreferrer">
 							Edit this page on GitHub<svg class="ml-1 inline-block w-4 h-4" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" data-v-1ed99556=""><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path><polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg>
 						</a>
 					</div>
@@ -555,18 +410,18 @@ Value: {value}
 					<div class="not-prose my-20">
 								<nav class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 sm:px-0">
 									<div class="-mt-px flex w-0 flex-1">
-											<a href="https://asaicraft.github.io/Akbura/akbura/editor-completion" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+											<a href="https://asaicraft.github.io/Akbura/akbura/" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
 												<!-- Heroicon name: mini/arrow-long-left -->
 												<svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 													<path fill-rule="evenodd" d="M18 10a.75.75 0 01-.75.75H4.66l2.1 1.95a.75.75 0 11-1.02 1.1l-3.5-3.25a.75.75 0 010-1.1l3.5-3.25a.75.75 0 111.02 1.1l-2.1 1.95h12.59A.75.75 0 0118 10z" clip-rule="evenodd"></path>
 												</svg>
-												Editor Completion
+												Akbura
 											</a>
 									</div>
 									<div class="hidden md:-mt-px md:flex"></div>
 									<div class="-mt-px flex w-0 flex-1 justify-end">
-											<a href="https://asaicraft.github.io/Akbura/#dictionary-resources" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
-												Dictionary Resources
+											<a href="https://asaicraft.github.io/Akbura/akbura/hooks" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												Composable Hooks
 												<!-- Heroicon name: mini/arrow-long-right -->
 												<svg class="ml-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 													<path fill-rule="evenodd" d="M2 10a.75.75 0 01.75-.75h12.59l-2.1-1.95a.75.75 0 111.02-1.1l3.5 3.25a.75.75 0 010 1.1l-3.5 3.25a.75.75 0 11-1.02-1.1l2.1-1.95H2.75A.75.75 0 012 10z" clip-rule="evenodd"></path>
@@ -585,83 +440,28 @@ Value: {value}
 							</h5>
 							<ul class="text-slate-700 text-sm leading-6">
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#xml-xaml-and-axaml'" data-id="xml-xaml-and-axaml" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											XML, XAML and AXAML
+										<span v-hash="'#directional-connections'" data-id="directional-connections" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Directional connections
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#dictionary-keys'" data-id="dictionary-keys" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Dictionary keys
+										<span v-hash="'#binding-paths-and-observation'" data-id="binding-paths-and-observation" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Binding paths and observation
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#styles-and-property-references'" data-id="styles-and-property-references" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Styles and property references
+										<span v-hash="'#observable-sources'" data-id="observable-sources" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Observable sources
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#whitespace-and-xmlspace'" data-id="whitespace-and-xmlspace" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Whitespace and 
-										</span>
-											<ul class="ml-4">
-													<li data-id="whitespace-in-akbura" class="text-gray-500 hover:text-gray-900">
-														<span v-hash="'#whitespace-in-akbura'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
-															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
-															Whitespace in Akbura
-														</span>
-													</li>
-													<li data-id="comparison" class="text-gray-500 hover:text-gray-900">
-														<span v-hash="'#comparison'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
-															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
-															Comparison
-														</span>
-													</li>
-											</ul>
-									</li>
-									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#cdata-is-not-supported'" data-id="cdata-is-not-supported" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											CDATA is not supported
+										<span v-hash="'#runtime-ownership-and-hot-reload'" data-id="runtime-ownership-and-hot-reload" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Runtime ownership and Hot Reload
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#why-raw-strings-are-preferable-in-akbura'" data-id="why-raw-strings-are-preferable-in-akbura" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Why raw strings are preferable in Akbura
-										</span>
-											<ul class="ml-4">
-													<li data-id="indentation-is-normalized" class="text-gray-500 hover:text-gray-900">
-														<span v-hash="'#indentation-is-normalized'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
-															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
-															Indentation is normalized
-														</span>
-													</li>
-													<li data-id="quotes-and-backslashes-need-less-escaping" class="text-gray-500 hover:text-gray-900">
-														<span v-hash="'#quotes-and-backslashes-need-less-escaping'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
-															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
-															Quotes and backslashes need less escaping
-														</span>
-													</li>
-													<li data-id="raw-strings-support-interpolation" class="text-gray-500 hover:text-gray-900">
-														<span v-hash="'#raw-strings-support-interpolation'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
-															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
-															Raw strings support interpolation
-														</span>
-													</li>
-													<li data-id="literal-braces-can-be-preserved" class="text-gray-500 hover:text-gray-900">
-														<span v-hash="'#literal-braces-can-be-preserved'" class="cursor-pointer flex text-sm transform transition-colors duration-200 py-2">
-															<svg width="3" height="24" viewBox="0 -9 3 24" class="mr-2 overflow-visible"><path d="M0 0L3 3L0 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
-															Literal braces can be preserved
-														</span>
-													</li>
-											</ul>
-									</li>
-									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#comparison-1'" data-id="comparison-1" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Comparison
-										</span>
-									</li>
-									<li class="group text-gray-800 hover:text-gray-900">
-										<span v-hash="'#summary'" data-id="summary" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
-											Summary
+										<span v-hash="'#state-values-and-hooks'" data-id="state-values-and-hooks" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											State values and hooks
 										</span>
 									</li>
 							</ul>

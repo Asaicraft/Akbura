@@ -1,4 +1,4 @@
-﻿using Akbura.Hooks;
+using Akbura.Hooks;
 using AvaloniaEdit;
 using AvaloniaEdit.Highlighting;
 
@@ -42,14 +42,19 @@ useEffect(() =>
 
             <TabItem Header="Preview">
 
-                <Border p-6
-                        bg-slate-950>
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto">
 
-                    <ContentPresenter Content={preview}
-                                      HorizontalAlignment="Stretch"
-                                      VerticalAlignment="Stretch"/>
+                    <Border p-6
+                            bg-slate-950>
 
-                </Border>
+                        <ContentPresenter Content={preview}
+                                          HorizontalAlignment="Stretch"
+                                          VerticalAlignment="Stretch"/>
+
+                    </Border>
+
+                </ScrollViewer>
 
             </TabItem>
 

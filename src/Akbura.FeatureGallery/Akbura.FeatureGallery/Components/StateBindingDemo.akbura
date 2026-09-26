@@ -1,0 +1,144 @@
+using Akbura.FeatureGallery.Models;
+using Akbura.FeatureGallery.Pages.Page.akcss;
+
+state StateBindingDemoModel model = new();
+state int selectedIndex = bind model.SelectedIndex;
+state string name = bind model.People[selectedIndex].Name;
+state string observedName = out model.People[selectedIndex].Name;
+state string draft = in model.Draft;
+state string persistedDraft = out model.Draft;
+
+<Border p-5
+        bg-slate-900
+        border-1
+        border-slate-700
+        rounded-xl>
+
+    <StackPanel gap-5>
+
+        <StackPanel gap-1>
+
+            <TextBlock Text="Directional state"
+                       text-xl
+                       font-semibold
+                       text-slate-100/>
+
+            <TextBlock
+                Text="The same typed path can synchronize both directions or only the direction you choose."
+                text-sm
+                text-slate-400
+                whitespace-normal/>
+
+        </StackPanel>
+
+        <Grid page-grid-2
+              ${lg}:page-grid-2-desktop>
+
+            <Border p-4
+                    bg-slate-950
+                    rounded-lg>
+
+                <StackPanel gap-3>
+
+                    <TextBlock Text="bind · nested indexed path"
+                               text-sm
+                               font-semibold
+                               text-blue-400/>
+
+                    <StackPanel Orientation="Horizontal"
+                                gap-2>
+
+                        <Button Content="Ada"
+                                Click={selectedIndex = 0}/>
+
+                        <Button Content="Linus"
+                                Click={selectedIndex = 1}/>
+
+                        <Button Content="Grace"
+                                Click={selectedIndex = 2}/>
+
+                    </StackPanel>
+
+                    <TextBox bind:Text={name}
+                             PlaceholderText="Selected person's name"/>
+
+                    <Grid ColumnDefinitions="Auto,*"
+                          gap-x-3>
+
+                        <TextBlock Text="out mirror"
+                                   text-sm
+                                   text-slate-500/>
+
+                        <TextBlock col-1
+                                   Text={observedName}
+                                   text-sm
+                                   text-slate-200/>
+
+                    </Grid>
+
+                    <Button Content="Change selected person in the model"
+                            Click={model.RenameSelected()}
+                            HorizontalAlignment="Left"/>
+
+                </StackPanel>
+
+            </Border>
+
+            <Border page-cell-2
+                    ${lg}:page-cell-2-desktop
+                    p-4
+                    bg-slate-950
+                    rounded-lg>
+
+                <StackPanel gap-3>
+
+                    <TextBlock Text="in · state to target only"
+                               text-sm
+                               font-semibold
+                               text-blue-400/>
+
+                    <TextBox bind:Text={draft}
+                             PlaceholderText="Draft written to the model"/>
+
+                    <Grid ColumnDefinitions="Auto,*"
+                          RowDefinitions="Auto,Auto"
+                          gap-x-3
+                          gap-y-2>
+
+                        <TextBlock Text="in state"
+                                   text-sm
+                                   text-slate-500/>
+
+                        <TextBlock col-1
+                                   Text={draft}
+                                   text-sm
+                                   text-slate-200/>
+
+                        <TextBlock row-1
+                                   Text="model value"
+                                   text-sm
+                                   text-slate-500/>
+
+                        <TextBlock row-1
+                                   col-1
+                                   Text={persistedDraft}
+                                   text-sm
+                                   text-slate-200/>
+
+                    </Grid>
+
+                    <Button Content="Change only the model"
+                            Click={model.ChangeDraftExternally()}
+                            HorizontalAlignment="Left"/>
+
+                </StackPanel>
+
+            </Border>
+
+        </Grid>
+
+        <ViewThisComponentInGithub/>
+
+    </StackPanel>
+
+</Border>

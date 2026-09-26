@@ -1,4 +1,4 @@
-﻿param Router Router;
+param Router Router;
 param string CurrentUrl = "";
 
 <Border p-4 bg-slate-950>
@@ -24,6 +24,10 @@ param string CurrentUrl = "";
 
             <Link Content="Overview"
                   Url="/overview"
+                  Router={Router}/>
+
+            <Link Content="State bindings"
+                  Url="/state-bindings"
                   Router={Router}/>
 
             <Link Content="Commands"

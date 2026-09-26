@@ -1,0 +1,164 @@
+using Akbura.FeatureGallery.Pages.Page.akcss;
+
+<StackPanel page
+            ${md}:page-desktop>
+
+    <StackPanel page-header>
+
+        <TextBlock Text="State bindings"
+                   page-title
+                   ${md}:page-title-desktop/>
+
+        <TextBlock
+            Text="Connect component state to typed C# paths with explicit bind, out and in directions."
+            page-description
+            ${md}:page-description-desktop/>
+
+    </StackPanel>
+
+    <Grid page-grid-3
+          ${lg}:page-grid-3-desktop>
+
+        <Border page-card-accent>
+
+            <StackPanel gap-3>
+
+                <TextBlock Text="bind"
+                           page-card-title/>
+
+                <TextBlock Text="source ↔ state"
+                           page-code/>
+
+                <TextBlock
+                    Text="Reads source changes and writes state changes back to the same typed path."
+                    page-card-description/>
+
+            </StackPanel>
+
+        </Border>
+
+        <Border page-cell-2
+                ${lg}:page-cell-2-desktop
+                page-card>
+
+            <StackPanel gap-3>
+
+                <TextBlock Text="out"
+                           page-card-title/>
+
+                <TextBlock Text="source → state"
+                           page-code/>
+
+                <TextBlock
+                    Text="Keeps a readonly state synchronized with observable source changes."
+                    page-card-description/>
+
+            </StackPanel>
+
+        </Border>
+
+        <Border page-cell-3
+                ${lg}:page-cell-3-desktop
+                page-card>
+
+            <StackPanel gap-3>
+
+                <TextBlock Text="in"
+                           page-card-title/>
+
+                <TextBlock Text="state → target"
+                           page-code/>
+
+                <TextBlock
+                    Text="Uses the target's initial value, then sends state changes without creating a reverse channel."
+                    page-card-description/>
+
+            </StackPanel>
+
+        </Border>
+
+    </Grid>
+
+    <StackPanel page-section>
+
+        <StackPanel page-section-header>
+
+            <TextBlock Text="Try directional state"
+                       page-section-title
+                       ${md}:page-section-title-desktop/>
+
+            <TextBlock
+                Text="Select a person to rebuild the indexed path, edit two-way state, and compare one-way state with the model value."
+                page-section-description/>
+
+        </StackPanel>
+
+        <FeatureView Path="Components/StateBindingDemo.akbura + Models/StateBindingDemoModel.cs">
+
+            <FeatureView.Code>
+                {"""
+                // Components/StateBindingDemo.akbura
+
+                using Akbura.FeatureGallery.Models;
+
+                state StateBindingDemoModel model = new();
+                state int selectedIndex =
+                    bind model.SelectedIndex;
+                state string name =
+                    bind model.People[selectedIndex].Name;
+                state string observedName =
+                    out model.People[selectedIndex].Name;
+                state string draft = in model.Draft;
+                state string persistedDraft = out model.Draft;
+
+                <StackPanel gap-3>
+                    <Button Content="Ada"
+                            Click={selectedIndex = 0} />
+                    <Button Content="Linus"
+                            Click={selectedIndex = 1} />
+
+                    <TextBox bind:Text={name} />
+                    <Button
+                        Content="Change selected person in the model"
+                        Click={model.RenameSelected()} />
+                    <TextBlock Text={observedName} />
+
+                    <TextBox bind:Text={draft} />
+                    <Button Content="Change only the model"
+                            Click={model.ChangeDraftExternally()} />
+                    <TextBlock Text={persistedDraft} />
+                </StackPanel>
+
+                // Models/StateBindingDemoModel.cs
+
+                public sealed class StateBindingDemoModel
+                    : ObservableObject
+                {
+                    public ObservableCollection<StateBindingPerson>
+                        People { get; }
+
+                    public int SelectedIndex { get; set; }
+                    public string Draft { get; set; }
+                }
+                """}
+            </FeatureView.Code>
+
+            <FeatureView.View>
+                <StateBindingDemo/>
+            </FeatureView.View>
+
+        </FeatureView>
+
+        <Border page-note>
+
+            <TextBlock
+                Text="Changing the selected index rebuilds the nested path. The in state writes to Draft, while the out mirror proves that external model changes do not flow back into the in state."
+                page-note-text/>
+
+        </Border>
+
+    </StackPanel>
+
+    <ViewThisPageInGithub/>
+
+</StackPanel>

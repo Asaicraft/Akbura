@@ -1003,6 +1003,441 @@ public sealed class WorkspaceClassificationTests
             AkburaClassificationKind.MethodName);
     }
 
+    [Fact]
+    public void SemanticClassification_CommandParameterTypeAndNameUseSemanticCategories()
+    {
+        const string source = """
+            using Avalonia.Controls;
+
+            command void NavigateTo(Button button);
+
+            <Border/>
+            """;
+        using var workspace = CreateSemanticWorkspace();
+        var text = SourceText.From(source);
+        var context = workspace.OpenOrChangeDocumentContext(
+            new Uri(Path.GetFullPath("NavButton.akbura")),
+            text);
+        var typeStart = source.IndexOf("Button", StringComparison.Ordinal);
+        var nameStart = source.IndexOf("button", StringComparison.Ordinal);
+        var classifications = workspace.LanguageServices.Classification
+            .GetClassifications(
+                context,
+                new TextSpan(0, text.Length));
+
+        AssertOnlyClassification(
+            classifications,
+            typeStart,
+            "Button".Length,
+            AkburaClassificationKind.ClassName);
+        AssertOnlyClassification(
+            classifications,
+            nameStart,
+            "button".Length,
+            AkburaClassificationKind.ParameterName);
+    }
+
+    [Theory]
+    [InlineData("Button", AkburaClassificationKind.ClassName)]
+    [InlineData("button", AkburaClassificationKind.ParameterName)]
+    public void SemanticClassification_CommandParameterSupportsNarrowRequestedSpan(string token, AkburaClassificationKind expectedKind)
+    {
+        const string source = """
+            using Avalonia.Controls;
+
+            command void NavigateTo(Button button);
+
+            <Border/>
+            """;
+        using var workspace = CreateSemanticWorkspace();
+        var text = SourceText.From(source);
+        var context = workspace.OpenOrChangeDocumentContext(
+            new Uri(Path.GetFullPath("NavButton.akbura")),
+            text);
+        var start = source.IndexOf(token, StringComparison.Ordinal);
+        var requestedSpan = new TextSpan(start, token.Length);
+        var classifications = workspace.LanguageServices.Classification
+            .GetClassifications(context, requestedSpan);
+
+        AssertOnlyClassification(
+            classifications,
+            start,
+            token.Length,
+            expectedKind);
+    }
+
+    [Fact]
+    public void SemanticClassification_CommandParameterMatchesUserDeclaration()
+    {
+        const string source = """
+            using System.Collections.ObjectModel;
+
+            namespace PurityUIDashboard;
+
+            param bool IsActive = false;
+            command void NavigateTo(NavButton button);
+
+            <Button/>
+            """;
+        using var workspace = CreateSemanticWorkspace();
+        var text = SourceText.From(source);
+        var context = workspace.OpenOrChangeDocumentContext(
+            new Uri(Path.GetFullPath("NavButton.akbura")),
+            text);
+        var typeStart = source.IndexOf("NavButton button", StringComparison.Ordinal);
+        var nameStart = typeStart + "NavButton ".Length;
+        var classifications = workspace.LanguageServices.Classification
+            .GetClassifications(context, new TextSpan(0, text.Length));
+
+        AssertOnlyClassification(
+            classifications,
+            typeStart,
+            "NavButton".Length,
+            AkburaClassificationKind.ClassName);
+        AssertOnlyClassification(
+            classifications,
+            nameStart,
+            "button".Length,
+            AkburaClassificationKind.ParameterName);
+    }
+
+    [Fact]
+    public void SemanticClassification_CommandParametersKeepOrdinalsAfterUnresolvedParameter()
+    {
+        const string source = """
+            using Avalonia.Controls;
+
+            command void NavigateTo(MissingControl missing, Button button);
+
+            <Border/>
+            """;
+        using var workspace = CreateSemanticWorkspace();
+        var text = SourceText.From(source);
+        var context = workspace.OpenOrChangeDocumentContext(
+            new Uri(Path.GetFullPath("NavButton.akbura")),
+            text);
+        var missingTypeStart = source.IndexOf("MissingControl", StringComparison.Ordinal);
+        var missingNameStart = source.IndexOf("missing", missingTypeStart, StringComparison.Ordinal);
+        var buttonTypeStart = source.IndexOf("Button button", StringComparison.Ordinal);
+        var buttonNameStart = buttonTypeStart + "Button ".Length;
+        var classifications = workspace.LanguageServices.Classification
+            .GetClassifications(context, new TextSpan(0, text.Length));
+
+        AssertOnlyClassification(
+            classifications,
+            missingNameStart,
+            "missing".Length,
+            AkburaClassificationKind.ParameterName);
+        AssertOnlyClassification(
+            classifications,
+            buttonTypeStart,
+            "Button".Length,
+            AkburaClassificationKind.ClassName);
+        AssertOnlyClassification(
+            classifications,
+            buttonNameStart,
+            "button".Length,
+            AkburaClassificationKind.ParameterName);
+        Assert.DoesNotContain(
+            classifications,
+            classification =>
+                classification.Span == new TextSpan(missingTypeStart, "MissingControl".Length) &&
+                classification.Kind == AkburaClassificationKind.ClassName);
+    }
+
+    [Fact]
+    public void SemanticClassification_CommandParametersDoNotShiftPastMissingParameter()
+    {
+        const string source = """
+            using Avalonia.Controls;
+
+            command void NavigateTo(, Button button);
+
+            <Border/>
+            """;
+        using var workspace = CreateSemanticWorkspace();
+        var text = SourceText.From(source);
+        var context = workspace.OpenOrChangeDocumentContext(
+            new Uri(Path.GetFullPath("NavButton.akbura")),
+            text);
+        var typeStart = source.IndexOf("Button button", StringComparison.Ordinal);
+        var nameStart = typeStart + "Button ".Length;
+        var classifications = workspace.LanguageServices.Classification
+            .GetClassifications(context, new TextSpan(0, text.Length));
+
+        AssertOnlyClassification(
+            classifications,
+            typeStart,
+            "Button".Length,
+            AkburaClassificationKind.ClassName);
+        AssertOnlyClassification(
+            classifications,
+            nameStart,
+            "button".Length,
+            AkburaClassificationKind.ParameterName);
+    }
+
+    [Fact]
+    public void SemanticClassification_CommandParameterDoesNotRefineTextInsideStringsOrComments()
+    {
+        const string source = """
+            command void NavigateTo(string text = "NavButton button" /* Button target */);
+
+            <Border/>
+            """;
+        using var workspace = CreateSemanticWorkspace();
+        var text = SourceText.From(source);
+        var context = workspace.OpenOrChangeDocumentContext(
+            new Uri(Path.GetFullPath("Navigation.akbura")),
+            text);
+        var stringStart = source.IndexOf("\"NavButton button\"", StringComparison.Ordinal);
+        var commentStart = source.IndexOf("/* Button target */", StringComparison.Ordinal);
+        var classifications = workspace.LanguageServices.Classification
+            .GetClassifications(context, new TextSpan(0, text.Length));
+
+        AssertOnlyClassification(
+            classifications,
+            stringStart,
+            "\"NavButton button\"".Length,
+            AkburaClassificationKind.String);
+        AssertOnlyClassification(
+            classifications,
+            commentStart,
+            "/* Button target */".Length,
+            AkburaClassificationKind.Comment);
+    }
+
+    [Theory]
+    [InlineData("\n", "    ")]
+    [InlineData("\r\n", "\t")]
+    public void SemanticClassification_CommandParameterMapsComplexTypesAndTrivia(string newLine, string indent)
+    {
+        var source = string.Join(
+            newLine,
+            "using Avalonia.Controls;",
+            "",
+            "command void Configure(",
+            indent + "global::System.Collections.Generic.IReadOnlyList<Button?>[] /* controls */ кнопки,",
+            indent + "(Button Control, int Count) pair);",
+            "",
+            "<Border/>");
+        using var workspace = CreateSemanticWorkspace();
+        var text = SourceText.From(source);
+        var context = workspace.OpenOrChangeDocumentContext(
+            new Uri(Path.GetFullPath("NavButton.akbura")),
+            text);
+        var listStart = source.IndexOf("IReadOnlyList", StringComparison.Ordinal);
+        var firstButtonStart = source.IndexOf("Button?", StringComparison.Ordinal);
+        var secondButtonStart = source.IndexOf("Button Control", StringComparison.Ordinal);
+        var intStart = source.IndexOf("int Count", StringComparison.Ordinal);
+        var firstNameStart = source.IndexOf("кнопки", StringComparison.Ordinal);
+        var secondNameStart = source.IndexOf("pair", StringComparison.Ordinal);
+        var classifications = workspace.LanguageServices.Classification
+            .GetClassifications(context, new TextSpan(0, text.Length));
+
+        AssertOnlyClassification(
+            classifications,
+            listStart,
+            "IReadOnlyList".Length,
+            AkburaClassificationKind.InterfaceName);
+        AssertOnlyClassification(
+            classifications,
+            firstButtonStart,
+            "Button".Length,
+            AkburaClassificationKind.ClassName);
+        AssertOnlyClassification(
+            classifications,
+            secondButtonStart,
+            "Button".Length,
+            AkburaClassificationKind.ClassName);
+        AssertOnlyClassification(
+            classifications,
+            intStart,
+            "int".Length,
+            AkburaClassificationKind.Keyword);
+        AssertOnlyClassification(
+            classifications,
+            firstNameStart,
+            "кнопки".Length,
+            AkburaClassificationKind.ParameterName);
+        AssertOnlyClassification(
+            classifications,
+            secondNameStart,
+            "pair".Length,
+            AkburaClassificationKind.ParameterName);
+    }
+
+    [Fact]
+    public void SemanticClassification_CommandParametersRemainCorrectAcrossIncrementalEdits()
+    {
+        const string initialSource = """
+            using Avalonia.Controls;
+
+            command void NavigateTo(Button button);
+
+            <Border/>
+            """;
+        const string editedSource = """
+            using Avalonia.Controls;
+
+            command void NavigateTo(Border target, Button button);
+
+            <Border/>
+            """;
+        using var workspace = CreateSemanticWorkspace();
+        var path = Path.GetFullPath("NavButton.akbura");
+
+        AssertSource(initialSource, "Button", "button");
+        AssertSource(editedSource, "Border", "target");
+        AssertSource(initialSource, "Button", "button");
+        AssertSource(editedSource, "Button", "button");
+
+        void AssertSource(string source, string typeName, string parameterName)
+        {
+            var text = SourceText.From(source);
+            var context = workspace.OpenOrChangeDocumentContext(new Uri(path), text);
+            var typeStart = source.IndexOf(typeName + " " + parameterName, StringComparison.Ordinal);
+            var nameStart = typeStart + typeName.Length + 1;
+            var classifications = workspace.LanguageServices.Classification
+                .GetClassifications(context, new TextSpan(0, text.Length));
+
+            AssertOnlyClassification(
+                classifications,
+                typeStart,
+                typeName.Length,
+                AkburaClassificationKind.ClassName);
+            AssertOnlyClassification(
+                classifications,
+                nameStart,
+                parameterName.Length,
+                AkburaClassificationKind.ParameterName);
+        }
+    }
+
+    [Fact]
+    public void SemanticClassification_CommandParameterUpdatesWhenTypeKindChanges()
+    {
+        const string source = """
+            command void NavigateTo(NavigationTarget target);
+
+            <Border/>
+            """;
+        var projectId = ProjectId.CreateNewId();
+        var classCompilation = CreateCSharpCompilation().AddSyntaxTrees(
+            CSharpSyntaxTree.ParseText("public class NavigationTarget { }"));
+        var interfaceCompilation = CreateCSharpCompilation().AddSyntaxTrees(
+            CSharpSyntaxTree.ParseText("public interface NavigationTarget { }"));
+        var projectContext = new ProjectContext(
+            projectId,
+            projectFilePath: string.Empty,
+            projectDirectory: Environment.CurrentDirectory,
+            rootNamespace: string.Empty,
+            classCompilation,
+            ImmutableArray<ProjectReference>.Empty);
+        using var workspace = new AkburaWorkspace(projectContext);
+        var text = SourceText.From(source);
+        var path = Path.GetFullPath("Navigation.akbura");
+        var typeStart = source.IndexOf("NavigationTarget", StringComparison.Ordinal);
+
+        AssertTypeKind(AkburaClassificationKind.ClassName);
+
+        workspace.AddOrUpdateProject(new ProjectContext(
+            projectId,
+            projectFilePath: string.Empty,
+            projectDirectory: Environment.CurrentDirectory,
+            rootNamespace: string.Empty,
+            interfaceCompilation,
+            ImmutableArray<ProjectReference>.Empty));
+
+        AssertTypeKind(AkburaClassificationKind.InterfaceName);
+
+        void AssertTypeKind(AkburaClassificationKind expectedKind)
+        {
+            var context = workspace.OpenOrChangeDocumentContext(new Uri(path), text);
+            var classifications = workspace.LanguageServices.Classification
+                .GetClassifications(
+                    context,
+                    new TextSpan(typeStart, "NavigationTarget".Length));
+
+            AssertOnlyClassification(
+                classifications,
+                typeStart,
+                "NavigationTarget".Length,
+                expectedKind);
+        }
+    }
+
+    [Fact]
+    public void SemanticClassification_CommandParameterSurvivesGeneratedCommandUpdates()
+    {
+        const string source = """
+            namespace PurityUIDashboard;
+
+            command void NavigateTo(NavButton button);
+
+            <Button/>
+            """;
+        const string generatedSource = """
+            // <auto-generated />
+            #nullable enable
+
+            namespace PurityUIDashboard;
+
+            public partial class NavigationPage : global::Akbura.AkburaControl
+            {
+                public global::Akbura.IAkburaCommand<NavButton, object> NavigateTo { get; set; } = null!;
+            }
+            """;
+        var projectId = ProjectId.CreateNewId();
+        var baseCompilation = CreateCSharpCompilation();
+        var generatedTree = CSharpSyntaxTree.ParseText(
+            generatedSource,
+            path:
+                "Akbura.BlackSilence/Akbura.BlackSilence.AkburaBlackSilenceGenerator/" +
+                "Akbura.Component.NavigationPage.akbura.00000000.g.cs");
+        using var workspace = new AkburaWorkspace(CreateProjectContext(baseCompilation));
+        var text = SourceText.From(source);
+        var path = Path.GetFullPath("NavigationPage.akbura");
+        var typeStart = source.IndexOf("NavButton", StringComparison.Ordinal);
+        var nameStart = source.IndexOf("button", typeStart, StringComparison.Ordinal);
+
+        AssertClassifications();
+        workspace.AddOrUpdateProject(CreateProjectContext(
+            baseCompilation.AddSyntaxTrees(generatedTree)));
+        AssertClassifications();
+        workspace.AddOrUpdateProject(CreateProjectContext(baseCompilation));
+        AssertClassifications();
+
+        ProjectContext CreateProjectContext(CSharpCompilation compilation)
+        {
+            return new ProjectContext(
+                projectId,
+                projectFilePath: string.Empty,
+                projectDirectory: Environment.CurrentDirectory,
+                rootNamespace: string.Empty,
+                compilation,
+                ImmutableArray<ProjectReference>.Empty);
+        }
+
+        void AssertClassifications()
+        {
+            var context = workspace.OpenOrChangeDocumentContext(new Uri(path), text);
+            var classifications = workspace.LanguageServices.Classification
+                .GetClassifications(context, new TextSpan(0, text.Length));
+
+            AssertOnlyClassification(
+                classifications,
+                typeStart,
+                "NavButton".Length,
+                AkburaClassificationKind.ClassName);
+            AssertOnlyClassification(
+                classifications,
+                nameStart,
+                "button".Length,
+                AkburaClassificationKind.ParameterName);
+        }
+    }
+
     [Theory]
     [InlineData("useStaticResource", "\n", "    ")]
     [InlineData("selectBrush", "\r\n", "\t")]
@@ -1490,6 +1925,10 @@ public sealed class WorkspaceClassificationTests
                 public class AkburaControl : Avalonia.Controls.Control
                 {
                 }
+
+                public interface IAkburaCommand<TParameter, TResult>
+                {
+                }
             }
 
             namespace Akbura.CompilerAnotations
@@ -1604,6 +2043,13 @@ public sealed class WorkspaceClassificationTests
             namespace Gallery
             {
                 public sealed class Options
+                {
+                }
+            }
+
+            namespace PurityUIDashboard
+            {
+                public sealed class NavButton : Avalonia.Controls.Control
                 {
                 }
             }

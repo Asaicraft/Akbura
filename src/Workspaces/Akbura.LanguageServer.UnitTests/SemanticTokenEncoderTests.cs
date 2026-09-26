@@ -23,6 +23,28 @@ public sealed class SemanticTokenEncoderTests
     }
 
     [Fact]
+    public void EncoderMapsCommandParameterTypeAndNameToLspTokenTypes()
+    {
+        var text = SourceText.From("NavButton button");
+        var classifications = ImmutableArray.Create(
+            new AkburaClassifiedSpan(
+                new TextSpan(0, "NavButton".Length),
+                AkburaClassificationKind.ClassName),
+            new AkburaClassifiedSpan(
+                new TextSpan("NavButton ".Length, "button".Length),
+                AkburaClassificationKind.ParameterName));
+
+        var result = new AkburaSemanticTokenEncoder().Encode(
+            text,
+            classifications,
+            new Utf16PositionConverter());
+
+        Assert.Equal(
+            new[] { 0, 0, 9, 3, 0, 0, 10, 6, 12, 0 },
+            result.Data);
+    }
+
+    [Fact]
     public void DeltaReplacesOnlyChangedMiddleData()
     {
         var current = new SemanticTokens

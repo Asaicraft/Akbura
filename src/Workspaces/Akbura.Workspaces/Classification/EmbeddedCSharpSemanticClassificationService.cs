@@ -500,6 +500,11 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
                         declaration,
                         requestedSpan,
                         builder);
+                    AddCommandParameterClassifications(
+                        semanticModel,
+                        declaration,
+                        requestedSpan,
+                        builder);
                     continue;
 
                 case StateDeclarationSyntax declaration
@@ -572,6 +577,66 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
         builder.Add(new AkburaClassifiedSpan(
             declaration.Name.Span,
             AkburaClassificationKind.MethodName));
+    }
+
+    private static void AddCommandParameterClassifications(AkburaSemanticModel semanticModel, CommandDeclarationSyntax declaration, TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
+    {
+        if (!declaration.Parameters.FullSpan.OverlapsWith(requestedSpan) ||
+            !EmbeddedCSharpSyntaxFacts.TryGetParameterList(
+                declaration.Parameters,
+                out var parameterList,
+                out var hostSpan))
+        {
+            return;
+        }
+
+        var sourceOffset = hostSpan.Start - parameterList.FullSpan.Start;
+        var command = semanticModel.GetDeclaredSymbol(declaration) as ICommandSymbol;
+
+        for (var index = 0; index < parameterList.Parameters.Count; index++)
+        {
+            var parameterSyntax = parameterList.Parameters[index];
+            var identifier = parameterSyntax.Identifier;
+
+            if (!identifier.IsMissing)
+            {
+                AddMappedClassification(
+                    identifier.Span,
+                    sourceOffset,
+                    requestedSpan,
+                    AkburaClassificationKind.ParameterName,
+                    builder);
+            }
+
+            if (parameterSyntax.Type == null ||
+                command == null ||
+                FindCommandParameter(command, index, identifier.ValueText) is not { } parameter ||
+                parameter.Type.Symbol is not RoslynITypeSymbol typeSymbol)
+            {
+                continue;
+            }
+
+            AddTypeClassifications(
+                parameterSyntax.Type,
+                typeSymbol,
+                sourceOffset,
+                requestedSpan,
+                builder);
+        }
+    }
+
+    private static ICommandParameterSymbol? FindCommandParameter(ICommandSymbol command, int ordinal, string name)
+    {
+        foreach (var parameter in command.Parameters)
+        {
+            if (parameter.Ordinal == ordinal &&
+                string.Equals(parameter.Name, name, StringComparison.Ordinal))
+            {
+                return parameter;
+            }
+        }
+
+        return null;
     }
 
     private static void AddReferences(ImmutableArray<CSharpSymbolReference> references, TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder)

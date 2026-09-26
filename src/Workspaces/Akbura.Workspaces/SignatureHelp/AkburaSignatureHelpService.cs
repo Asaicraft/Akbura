@@ -44,14 +44,15 @@ internal sealed class AkburaSignatureHelpService :
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var parseOptions = semanticContext.Project.CSharpCompilation
+        var probeCompilation = semanticContext.Project.Compilation.CSharpProbeCompilation;
+        var parseOptions = probeCompilation
             .SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions;
         var tree = CSharpSyntaxTree.Create(
             projection.Root,
             parseOptions,
             document.FilePath + ".signature.cs",
             Encoding.UTF8);
-        var compilation = semanticContext.Project.CSharpCompilation
+        var compilation = probeCompilation
             .AddSyntaxTrees(tree);
         var model = compilation.GetSemanticModel(
             tree,

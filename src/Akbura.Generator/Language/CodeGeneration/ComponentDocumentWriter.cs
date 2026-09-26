@@ -23,8 +23,20 @@ internal static class ComponentDocumentWriter
             throw new ArgumentNullException(nameof(component));
         }
 
+        return GetHintName(component.MetadataName, sourcePath);
+    }
+
+    internal static string GetHintName(string componentMetadataName, string sourcePath)
+    {
+        if (string.IsNullOrWhiteSpace(componentMetadataName))
+        {
+            throw new ArgumentException(
+                "The component metadata name cannot be empty.",
+                nameof(componentMetadataName));
+        }
+
         var identity = string.IsNullOrWhiteSpace(sourcePath)
-            ? component.MetadataName
+            ? componentMetadataName
             : sourcePath;
 
         var sanitizedIdentity = SanitizeHintPart(identity);

@@ -392,7 +392,7 @@ internal sealed class AkburaProjectedCSharpService :
         var workspace = new AdhocWorkspace(s_hostServices.Value);
         try
         {
-            var compilation = semanticContext.Project.CSharpCompilation;
+            var compilation = semanticContext.Project.Compilation.CSharpProbeCompilation;
             var parseOptions = compilation.SyntaxTrees
                 .Select(static tree => tree.Options)
                 .OfType<CSharpParseOptions>()

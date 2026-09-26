@@ -666,6 +666,237 @@ public sealed class ICommandHandlerBindingTests
     }
 
     [Theory]
+    [InlineData(false, "async () => await NavigateTo.Execute(this)", false)]
+    [InlineData(true, "async () => await NavigateTo.Execute(this)", false)]
+    [InlineData(false, "async () => await this.NavigateTo.Execute(this)", false)]
+    [InlineData(true, "async () => await this.NavigateTo.Execute(this)", false)]
+    [InlineData(false, "NavigateTo", true)]
+    [InlineData(true, "NavigateTo", true)]
+    public void NavButton_PostGeneratedSemanticModel_DoesNotDuplicateDeclaredCommand(bool structural, string commandValue, bool hasCommandParameter)
+    {
+        var component =
+            """
+            using System.Collections.Generic;
+            using Avalonia.Controls;
+            using Avalonia.Media;
+
+            namespace Demo;
+
+            param bool IsActive = false;
+            param IList<StreamGeometry> Geometries;
+            command void NavigateTo(NavButton button);
+
+            <Button Command={COMMAND_VALUE}COMMAND_PARAMETER>
+                Navigate
+            </Button>
+            """
+            .Replace("COMMAND_VALUE", commandValue, StringComparison.Ordinal)
+            .Replace(
+                "COMMAND_PARAMETER",
+                hasCommandParameter ? " CommandParameter={this}" : string.Empty,
+                StringComparison.Ordinal);
+        var options = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+        if (structural)
+        {
+            options = options.WithPreprocessorSymbols("DEBUG");
+        }
+
+        var csharpCompilation = CSharpCompilation.Create(
+            "ICommandPostGenerated_" + Guid.NewGuid().ToString("N"),
+            syntaxTrees: [],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
+        var tree = AkburaSyntaxTree.ParseText(component, "NavButton.akbura");
+        var sourceCompilation = new AkburaCompilation(
+            csharpCompilation,
+            [tree],
+            rootNamespace: "Demo");
+        var sourceSemanticModel = sourceCompilation.GetSemanticModel(tree);
+        Assert.Empty(sourceSemanticModel.GetSemanticDiagnostics(tree.GetRoot()));
+
+        var symbol = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
+            sourceSemanticModel.GetSymbolInfo(tree.GetRoot()).Symbol);
+        var generated = ComponentDocumentWriter.Generate(
+            symbol,
+            sourceSemanticModel,
+            tree.FilePath,
+            new Dictionary<Language.Syntax.AkburaSyntax, string>(),
+            mode: structural ? ComponentGenerationMode.DebugStructural : ComponentGenerationMode.ReleaseDirect)
+            .ToString();
+        var generatedTree = CSharpSyntaxTree.ParseText(
+            generated,
+            options,
+            ComponentDocumentWriter.GetHintName(symbol, tree.FilePath));
+        var postGeneratedCompilation = sourceCompilation.WithCSharpCompilation(
+            csharpCompilation.AddSyntaxTrees(generatedTree));
+        var postGeneratedSemanticModel = postGeneratedCompilation.GetSemanticModel(tree);
+        var diagnostics = postGeneratedSemanticModel.GetSemanticDiagnostics(tree.GetRoot());
+
+        Assert.DoesNotContain(
+            diagnostics,
+            static diagnostic =>
+                diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError);
+        Assert.Empty(diagnostics);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NavButton_StaleGeneratedCommandSignature_DoesNotOverrideCurrentSource(bool structural)
+    {
+        const string previousComponent =
+            """
+            using Avalonia.Controls;
+
+            namespace Demo;
+
+            command void NavigateTo(NavButton button);
+
+            <Button Command={async () => await NavigateTo.Execute(this)} />
+            """;
+        const string currentComponent =
+            """
+            using Avalonia.Controls;
+
+            namespace Demo;
+
+            command void NavigateTo(string route);
+
+            <Button Command={async () => await NavigateTo.Execute("home")} />
+            """;
+
+        var (semanticModel, tree) = CreateSemanticModelWithStaleGeneratedComponent(
+            previousComponent,
+            currentComponent,
+            structural);
+
+        Assert.Empty(semanticModel.GetSemanticDiagnostics(tree.GetRoot()));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NavButton_StaleGeneratedCommandName_DoesNotOverrideCurrentSource(bool structural)
+    {
+        const string previousComponent =
+            """
+            using Avalonia.Controls;
+
+            namespace Demo;
+
+            command void NavigateTo(NavButton button);
+
+            <Button Command={async () => await NavigateTo.Execute(this)} />
+            """;
+        const string currentComponent =
+            """
+            using Avalonia.Controls;
+
+            namespace Demo;
+
+            command void OpenPage(NavButton button);
+
+            <Button Command={async () => await OpenPage.Execute(this)} />
+            """;
+
+        var (semanticModel, tree) = CreateSemanticModelWithStaleGeneratedComponent(
+            previousComponent,
+            currentComponent,
+            structural);
+
+        Assert.Empty(semanticModel.GetSemanticDiagnostics(tree.GetRoot()));
+    }
+
+    [Fact]
+    public void NavButton_DeletedCommand_DoesNotBindToStaleGeneratedProperty()
+    {
+        const string previousComponent =
+            """
+            using Avalonia.Controls;
+
+            namespace Demo;
+
+            command void NavigateTo(NavButton button);
+
+            <Button Command={async () => await NavigateTo.Execute(this)} />
+            """;
+        const string currentComponent =
+            """
+            using Avalonia.Controls;
+
+            namespace Demo;
+
+            <Button Command={async () => await NavigateTo.Execute(this)} />
+            """;
+
+        var (semanticModel, tree) = CreateSemanticModelWithStaleGeneratedComponent(
+            previousComponent,
+            currentComponent,
+            structural: false);
+        var diagnostic = Assert.Single(
+            semanticModel.GetSemanticDiagnostics(tree.GetRoot()),
+            static diagnostic =>
+                diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError);
+
+        Assert.DoesNotContain("Ambiguity", diagnostic.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("NavigateTo", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("NavButton.cs")]
+    [InlineData("OtherGenerator/Akbura.Component.NavButton.other.g.cs")]
+    public void NavButton_NonAkburaPartialCommandConflict_RemainsDiagnostic(string csharpPath)
+    {
+        const string component =
+            """
+            using Avalonia.Controls;
+
+            namespace Demo;
+
+            command void NavigateTo(NavButton button);
+
+            <Button Command={async () => await NavigateTo.Execute(this)} />
+            """;
+        const string userPartial =
+            """
+            // <auto-generated />
+
+            namespace Demo;
+
+            public partial class NavButton : Akbura.AkburaControl
+            {
+                public NavButton() : base(Akbura.Engine.AkburaEngine.Empty)
+                {
+                }
+
+                public Akbura.IAkburaCommand<NavButton, object> NavigateTo { get; set; } = null!;
+            }
+            """;
+        var options = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+        var csharpCompilation = CSharpCompilation.Create(
+            "ICommandUserConflict_" + Guid.NewGuid().ToString("N"),
+            [CSharpSyntaxTree.ParseText(userPartial, options, csharpPath)],
+            SymbolTests.CreateAvaloniaReferences(),
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
+        var tree = AkburaSyntaxTree.ParseText(component, "NavButton.akbura");
+        var semanticModel = new AkburaCompilation(
+                csharpCompilation,
+                [tree],
+                rootNamespace: "Demo")
+            .GetSemanticModel(tree);
+
+        Assert.Contains(
+            semanticModel.GetSemanticDiagnostics(tree.GetRoot()),
+            static diagnostic =>
+                diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError &&
+                diagnostic.Message.Contains("Ambiguity", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void ButtonCommand_DirectDeclaredCommand_CompilesWithoutAdapter(bool structural)
@@ -837,6 +1068,63 @@ public sealed class ICommandHandlerBindingTests
         var emitted = emittedCompilation.Emit(output);
         Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics.AsEnumerable()));
         return Assert.IsAssignableFrom<Type>(Assembly.Load(output.ToArray()).GetType("Demo.NavButton"));
+    }
+
+    private static (AkburaSemanticModel SemanticModel, AkburaSyntaxTree Tree) CreateSemanticModelWithStaleGeneratedComponent(string previousComponent, string currentComponent, bool structural)
+    {
+        var options = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+        if (structural)
+        {
+            options = options.WithPreprocessorSymbols("DEBUG");
+        }
+
+        var csharpCompilation = CSharpCompilation.Create(
+            "ICommandStaleGenerated_" + Guid.NewGuid().ToString("N"),
+            syntaxTrees: [],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
+        var previousTree = AkburaSyntaxTree.ParseText(
+            previousComponent,
+            "NavButton.akbura");
+        var previousCompilation = new AkburaCompilation(
+            csharpCompilation,
+            [previousTree],
+            rootNamespace: "Demo");
+        var previousSemanticModel = previousCompilation.GetSemanticModel(previousTree);
+        Assert.Empty(previousSemanticModel.GetSemanticDiagnostics(previousTree.GetRoot()));
+        var previousSymbol = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
+            previousSemanticModel.GetSymbolInfo(previousTree.GetRoot()).Symbol);
+        var generated = ComponentDocumentWriter.Generate(
+            previousSymbol,
+            previousSemanticModel,
+            previousTree.FilePath,
+            new Dictionary<Language.Syntax.AkburaSyntax, string>(),
+            mode: structural ? ComponentGenerationMode.DebugStructural : ComponentGenerationMode.ReleaseDirect);
+        var generatedTree = CSharpSyntaxTree.ParseText(
+            generated,
+            options,
+            ComponentDocumentWriter.GetHintName(previousSymbol, previousTree.FilePath));
+        var currentTree = AkburaSyntaxTree.ParseText(
+            currentComponent,
+            "NavButton.akbura");
+        var currentCompilation = new AkburaCompilation(
+            csharpCompilation.AddSyntaxTrees(generatedTree),
+            [currentTree],
+            rootNamespace: "Demo");
+        var semanticModel = currentCompilation.GetSemanticModel(currentTree);
+
+        var repeatedCompilation = currentCompilation.WithCSharpCompilation(
+            csharpCompilation.AddSyntaxTrees(generatedTree));
+        Assert.Empty(
+            repeatedCompilation
+                .GetSemanticModel(currentTree)
+                .GetSemanticDiagnostics(currentTree.GetRoot())
+                .Where(static diagnostic =>
+                    diagnostic.Message.Contains("Ambiguity", StringComparison.OrdinalIgnoreCase)));
+
+        return (semanticModel, currentTree);
     }
 
     private static Type CompileParentAndNavButton(bool structural)

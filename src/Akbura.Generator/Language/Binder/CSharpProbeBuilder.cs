@@ -595,13 +595,14 @@ internal sealed partial class CSharpProbeBuilder
             AddPrecedingLocalDeclarationsFromList(
                 document.Members,
                 scope,
-                builder);
+                builder,
+                includeLocalFunctions: false);
         }
         // Executable block locals are emitted by WrapExecutableBlockScope
         // inside their original header, not hoisted above its out/pattern locals.
     }
 
-    private static void AddPrecedingLocalDeclarationsFromList<TSyntax>(Akbura.Language.Syntax.SyntaxList<TSyntax> members, AkburaSyntax scope, ImmutableArrayBuilder<CSharp.StatementSyntax> builder) where TSyntax : AkburaSyntax
+    private static void AddPrecedingLocalDeclarationsFromList<TSyntax>(Akbura.Language.Syntax.SyntaxList<TSyntax> members, AkburaSyntax scope, ImmutableArrayBuilder<CSharp.StatementSyntax> builder, bool includeLocalFunctions) where TSyntax : AkburaSyntax
     {
         foreach (var member in members)
         {
@@ -610,32 +611,84 @@ internal sealed partial class CSharpProbeBuilder
                 break;
             }
 
-            if (member is CSharpStatementSyntax statement &&
-                statement.GetRawCSharpStatement() is { } declarationStatement &&
-                (declarationStatement is CSharp.LocalDeclarationStatementSyntax ||
-                    declarationStatement is not CSharp.LocalFunctionStatementSyntax &&
-                    declarationStatement.DescendantNodes(descendIntoChildren: static node =>
-                        node is not (CSharp.BlockSyntax or CSharp.LambdaExpressionSyntax or
-                            CSharp.AnonymousMethodExpressionSyntax or CSharp.LocalFunctionStatementSyntax))
-                        .OfType<CSharp.SingleVariableDesignationSyntax>().Any()))
+            if (member is not CSharpStatementSyntax statement ||
+                statement.GetRawCSharpStatement() is not { } declarationStatement)
             {
-                var hostOffset = statement.Tokens.FullSpan.Start;
-                var declarations = declarationStatement.DescendantNodes()
-                    .Where(static node => node is CSharp.VariableDeclaratorSyntax or CSharp.SingleVariableDesignationSyntax);
-                builder.Add(declarationStatement.ReplaceNodes(declarations,
-                    (original, rewritten) => rewritten.WithAdditionalAnnotations(
-                        new SyntaxAnnotation(
-                            CSharpProbeBinder.ProjectedSymbolAnnotationKind,
-                            new CSharpProbeSymbolOrigin(
-                                Guid.NewGuid().ToString("N"),
-                                Akbura.Language.Symbols.SymbolKind.CSharpSymbol,
-                                GetCSharpDeclarationIdentifier(original).ValueText,
-                                new TextSpan(
-                                    hostOffset + GetCSharpDeclarationIdentifier(original).Span.Start,
-                                    GetCSharpDeclarationIdentifier(original).Span.Length))
-                            .Serialize()))));
+                continue;
             }
+
+            if (declarationStatement is CSharp.LocalFunctionStatementSyntax localFunction)
+            {
+                if (includeLocalFunctions)
+                {
+                    builder.Add(CreateProjectedLocalFunction(
+                        statement,
+                        localFunction,
+                        CSharpSyntaxFactory.Block()));
+                }
+
+                continue;
+            }
+
+            if (declarationStatement is not CSharp.LocalDeclarationStatementSyntax &&
+                !declarationStatement.DescendantNodes(descendIntoChildren: static node =>
+                    node is not (CSharp.BlockSyntax or CSharp.LambdaExpressionSyntax or
+                        CSharp.AnonymousMethodExpressionSyntax or CSharp.LocalFunctionStatementSyntax))
+                    .OfType<CSharp.SingleVariableDesignationSyntax>().Any())
+            {
+                continue;
+            }
+
+            var hostOffset = statement.Tokens.FullSpan.Start;
+            var declarations = declarationStatement.DescendantNodes()
+                .Where(static node => node is CSharp.VariableDeclaratorSyntax or CSharp.SingleVariableDesignationSyntax);
+            builder.Add(declarationStatement.ReplaceNodes(declarations,
+                (original, rewritten) => rewritten.WithAdditionalAnnotations(
+                    new SyntaxAnnotation(
+                        CSharpProbeBinder.ProjectedSymbolAnnotationKind,
+                        new CSharpProbeSymbolOrigin(
+                            Guid.NewGuid().ToString("N"),
+                            Akbura.Language.Symbols.SymbolKind.CSharpSymbol,
+                            GetCSharpDeclarationIdentifier(original).ValueText,
+                            new TextSpan(
+                                hostOffset + GetCSharpDeclarationIdentifier(original).Span.Start,
+                                GetCSharpDeclarationIdentifier(original).Span.Length))
+                        .Serialize()))));
         }
+    }
+
+    internal static CSharp.LocalFunctionStatementSyntax CreateProjectedLocalFunction(CSharpStatementSyntax owner, CSharp.LocalFunctionStatementSyntax localFunction, CSharp.BlockSyntax body)
+    {
+        var hostOffset = owner.Tokens.FullSpan.Start - localFunction.FullSpan.Start;
+        var parameters = localFunction.ParameterList.Parameters;
+        localFunction = localFunction.ReplaceNodes(
+            parameters,
+            (original, rewritten) => rewritten.WithAdditionalAnnotations(
+                new SyntaxAnnotation(
+                    CSharpProbeBinder.ProjectedSymbolAnnotationKind,
+                    new CSharpProbeSymbolOrigin(
+                        Guid.NewGuid().ToString("N"),
+                        Akbura.Language.Symbols.SymbolKind.CSharpSymbol,
+                        original.Identifier.ValueText,
+                        new TextSpan(
+                            hostOffset + original.Identifier.Span.Start,
+                            original.Identifier.Span.Length))
+                    .Serialize())));
+        return localFunction
+            .WithBody(body)
+            .WithExpressionBody(null)
+            .WithSemicolonToken(default)
+            .WithAdditionalAnnotations(
+                new SyntaxAnnotation(
+                    CSharpProbeBinder.ProjectedSymbolAnnotationKind,
+                    new CSharpProbeSymbolOrigin(
+                        Guid.NewGuid().ToString("N"),
+                        Akbura.Language.Symbols.SymbolKind.CSharpSymbol,
+                        localFunction.Identifier.ValueText,
+                        new TextSpan(
+                            hostOffset + localFunction.Identifier.Span.Start,
+                            localFunction.Identifier.Span.Length))
+                    .Serialize()));
     }
 
     private static Microsoft.CodeAnalysis.SyntaxToken GetCSharpDeclarationIdentifier(SyntaxNode declaration)

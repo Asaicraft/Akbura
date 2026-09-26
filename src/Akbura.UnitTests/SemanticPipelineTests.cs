@@ -1504,6 +1504,47 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_CommandFacadeMembersPreserveCommandOriginThroughReceiverWrappers()
+    {
+        const string code = """
+            command bool IsHi();
+
+            var conditional = IsHi?.Execute();
+            var suppressed = IsHi!.Execute();
+            var task = IsHi.Execute().AsTask();
+            """;
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var root = syntaxTree.GetRoot();
+        var command = Assert.IsType<CommandDeclarationSyntax>(root.Members[0]);
+        var commandSymbol = Assert.IsAssignableFrom<ICommandSymbol>(
+            semanticModel.GetSymbolInfo(command).Symbol);
+        var references = root.Members
+            .OfType<CSharpStatementSyntax>()
+            .SelectMany(statement =>
+                semanticModel.GetCSharpSymbolReferences(statement))
+            .ToArray();
+        var executeReferences = references
+            .Where(reference => reference.Name == "Execute")
+            .ToArray();
+
+        Assert.Equal(3, executeReferences.Length);
+        Assert.All(executeReferences, reference =>
+        {
+            Assert.IsAssignableFrom<IMethodSymbol>(
+                reference.CSharpDefinition.Symbol);
+            Assert.Same(commandSymbol, reference.AkburaSymbol);
+        });
+
+        var asTask = Assert.Single(
+            references,
+            reference => reference.Name == "AsTask");
+        Assert.IsAssignableFrom<IMethodSymbol>(
+            asTask.CSharpDefinition.Symbol);
+        Assert.Null(asTask.AkburaSymbol);
+    }
+
+    [Fact]
     public void SemanticModel_MarkupEventHandlerReferences_MapBackToAkburaSymbols()
     {
         const string code =

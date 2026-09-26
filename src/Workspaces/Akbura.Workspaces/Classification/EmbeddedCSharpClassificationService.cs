@@ -330,6 +330,23 @@ internal sealed class EmbeddedCSharpClassificationService
             return AkburaClassificationKind.Keyword;
         }
 
+        if (kind == CSharpSyntaxKind.IdentifierToken)
+        {
+            var isMethodDeclaration = token.Parent switch
+            {
+                CSharp.MethodDeclarationSyntax method =>
+                    token == method.Identifier,
+                CSharp.LocalFunctionStatementSyntax localFunction =>
+                    token == localFunction.Identifier,
+                _ => false,
+            };
+
+            if (isMethodDeclaration)
+            {
+                return AkburaClassificationKind.MethodName;
+            }
+        }
+
         return kind switch
         {
             CSharpSyntaxKind.IdentifierToken =>

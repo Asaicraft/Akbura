@@ -13,7 +13,8 @@ internal readonly struct CSharpSymbolReference
         ISymbol? akburaSymbol,
         string? name = null,
         NullableFlowState nullableFlowState = Microsoft.CodeAnalysis.NullableFlowState.None,
-        bool isNameOfOperand = false)
+        bool isNameOfOperand = false,
+        bool isMethodGroup = false)
     {
         Syntax = syntax ??
             throw new ArgumentNullException(
@@ -24,6 +25,7 @@ internal readonly struct CSharpSymbolReference
         AkburaSymbol = akburaSymbol;
         NullableFlowState = nullableFlowState;
         IsNameOfOperand = isNameOfOperand;
+        IsMethodGroup = isMethodGroup;
 
         Name = string.IsNullOrWhiteSpace(name)
             ? csharpDefinition.Name
@@ -52,6 +54,8 @@ internal readonly struct CSharpSymbolReference
     public NullableFlowState NullableFlowState { get; }
 
     public bool IsNameOfOperand { get; }
+
+    public bool IsMethodGroup { get; }
 
     public bool IsAkburaSymbol =>
         AkburaSymbol != null;

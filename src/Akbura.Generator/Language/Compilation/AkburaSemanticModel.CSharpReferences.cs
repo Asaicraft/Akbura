@@ -21,7 +21,6 @@ namespace Akbura.Language;
 
 internal partial class AkburaSemanticModel
 {
-    private const string CSharpReferenceProbeMethodName = "__AkburaSemanticProbe";
     private const string MarkupInlineReferenceProbeMethodName = "__AkburaMarkupInlineReferenceProbe";
 
     public ImmutableArray<CSharpSymbolReference> GetCSharpSymbolReferences(StateDeclarationSyntax declaration)
@@ -105,49 +104,36 @@ internal partial class AkburaSemanticModel
             return [];
         }
 
-        using var classMembersBuilder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
-        using var statementsBuilder = ImmutableArrayBuilder<CSharp.StatementSyntax>.Rent();
         var akburaSymbolsByName = new Dictionary<string, AkburaSymbol>(StringComparer.Ordinal);
         var akburaSymbolsByCommandTypeName = new Dictionary<string, AkburaSymbol>(StringComparer.Ordinal);
-        foreach (var local in CreateCSharpProbeMembersBefore(statementSyntax, classMembersBuilder, akburaSymbolsByName, akburaSymbolsByCommandTypeName))
-        {
-            statementsBuilder.Add(local);
-        }
+        AddCSharpProbeRootSymbolMappings(
+            akburaSymbolsByName,
+            akburaSymbolsByCommandTypeName);
+        AddMarkupScopeSymbolMappings(
+            statementSyntax,
+            akburaSymbolsByName);
 
-        foreach (var previousStatement in CreateCSharpBlockProbeStatementsBefore(statementSyntax))
-        {
-            statementsBuilder.Add(previousStatement);
-        }
-
-        statementsBuilder.Add(statement);
-
-        var method = CSharpSyntaxFactory.MethodDeclaration(
-                CSharpSyntaxFactory.PredefinedType(CSharpSyntaxFactory.Token(Microsoft.CodeAnalysis.CSharp.SyntaxKind.VoidKeyword)),
-                "__AkburaSemanticProbe")
-            .WithBody(CSharpSyntaxFactory.Block(CSharpSyntaxFactory.List(statementsBuilder.ToImmutable())));
-
-        classMembersBuilder.Add(method);
-        var compilationUnit = BindingSession
-            .GetCSharpProbeBinder(statementSyntax, BinderUsage.Expression)
-            .CreateComponentProbeCompilationUnit(
-                classMembersBuilder.ToImmutable(),
-                "__AkburaSemanticProbe");
+        var binder = BindingSession.GetCSharpProbeBinder(
+            statementSyntax,
+            BinderUsage.Expression);
+        var compilationUnit = new CSharpProbeBuilder(binder)
+            .CreateStatementProbe(
+                statementSyntax,
+                statement);
 
         var semanticModel = CreateReferenceProbeSemanticModel(compilationUnit, out var syntaxTree);
         var probeStatement = syntaxTree
             .GetCompilationUnitRoot()
-            .DescendantNodes()
-            .OfType<CSharp.MethodDeclarationSyntax>()
-            .Single(methodDeclaration => methodDeclaration.Identifier.ValueText == CSharpReferenceProbeMethodName)
-            .Body!
-            .Statements
-            .Last();
+            .GetAnnotatedNodes(
+                CSharpProbeBuilder.StatementProbeAnnotationKind)
+            .OfType<CSharp.StatementSyntax>()
+            .Single();
 
         var sourcePositionOffset =
             statementSyntax.Tokens.FullSpan.Start -
             statement.FullSpan.Start;
 
-        var references =CollectCSharpSymbolReferences(
+        var references = CollectCSharpSymbolReferences(
             semanticModel,
             [
                 new CSharpReferenceTarget(
@@ -564,7 +550,7 @@ internal partial class AkburaSemanticModel
                     continue;
                 }
 
-                var symbol = GetReferenceSymbol(semanticModel, name);
+                var symbolInfo = GetReferenceSymbolInfo(semanticModel, name);
 
                 AddCSharpSymbolReference(
                     semanticModel,
@@ -573,7 +559,7 @@ internal partial class AkburaSemanticModel
                     name,
                     target.MapToSource(
                         name.Identifier.Span),
-                    symbol,
+                    symbolInfo,
                     akburaSymbolsByName,
                     akburaSymbolsByCommandTypeName);
             }
@@ -582,9 +568,7 @@ internal partial class AkburaSemanticModel
         return references.ToImmutable();
     }
 
-    private static RoslynSymbol? GetReferenceSymbol(
-        SemanticModel semanticModel,
-        CSharp.SimpleNameSyntax name)
+    private static CSharpReferenceSymbolInfo GetReferenceSymbolInfo(SemanticModel semanticModel, CSharp.SimpleNameSyntax name)
     {
         if (name.Parent is
                 CSharp.MemberAccessExpressionSyntax
@@ -593,25 +577,27 @@ internal partial class AkburaSemanticModel
                 memberAccess.Name,
                 name))
         {
-            var symbol =
+            var memberInfo =
                 GetBestSymbolInfo(
                     semanticModel,
                     memberAccess);
 
-            if (symbol == null &&
+            if (memberInfo.Symbol == null &&
                 memberAccess.Parent is
                     CSharp.InvocationExpressionSyntax invocation &&
                 ReferenceEquals(
                     invocation.Expression,
                     memberAccess))
             {
-                symbol =
-                    GetBestSymbolInfo(
-                        semanticModel,
-                        invocation);
+                var invocationInfo = GetBestSymbolInfo(
+                    semanticModel,
+                    invocation);
+                return PreferResolvedSymbol(
+                    memberInfo,
+                    invocationInfo);
             }
 
-            return symbol;
+            return memberInfo;
         }
 
         if (name.Parent is
@@ -620,12 +606,15 @@ internal partial class AkburaSemanticModel
                 invocationExpression.Expression,
                 name))
         {
-            return GetBestSymbolInfo(
-                       semanticModel,
-                       invocationExpression) ??
-                GetBestSymbolInfo(
-                    semanticModel,
-                    name);
+            var nameInfo = GetBestSymbolInfo(
+                semanticModel,
+                name);
+            var invocationInfo = GetBestSymbolInfo(
+                semanticModel,
+                invocationExpression);
+            return PreferResolvedSymbol(
+                nameInfo,
+                invocationInfo);
         }
 
         return GetBestSymbolInfo(
@@ -1008,12 +997,50 @@ internal partial class AkburaSemanticModel
         }
     }
 
-    private static RoslynSymbol? GetBestSymbolInfo(
-        Microsoft.CodeAnalysis.SemanticModel semanticModel,
-        CSharp.ExpressionSyntax syntax)
+    private static CSharpReferenceSymbolInfo PreferResolvedSymbol(CSharpReferenceSymbolInfo first, CSharpReferenceSymbolInfo second)
+    {
+        if (first.Symbol != null)
+        {
+            return first;
+        }
+
+        if (second.Symbol != null)
+        {
+            return second;
+        }
+
+        return first.IsMethodGroup
+            ? first
+            : second;
+    }
+
+    private static CSharpReferenceSymbolInfo GetBestSymbolInfo(Microsoft.CodeAnalysis.SemanticModel semanticModel, CSharp.ExpressionSyntax syntax)
     {
         var symbolInfo = semanticModel.GetSymbolInfo(syntax);
-        return symbolInfo.Symbol ?? symbolInfo.CandidateSymbols.FirstOrDefault();
+        if (symbolInfo.Symbol != null)
+        {
+            return new CSharpReferenceSymbolInfo(
+                symbolInfo.Symbol,
+                isMethodGroup: false);
+        }
+
+        if (symbolInfo.CandidateSymbols.Length == 1)
+        {
+            return new CSharpReferenceSymbolInfo(
+                symbolInfo.CandidateSymbols[0],
+                isMethodGroup: false);
+        }
+
+        var isMethodGroup = symbolInfo.CandidateSymbols.Length > 1 &&
+            symbolInfo.CandidateSymbols.All(static candidate =>
+                candidate is IMethodSymbol
+                {
+                    MethodKind: not MethodKind.Constructor and
+                        not MethodKind.StaticConstructor,
+                });
+        return new CSharpReferenceSymbolInfo(
+            symbol: null,
+            isMethodGroup);
     }
 
     private static void AddCSharpSymbolReference(
@@ -1022,48 +1049,158 @@ internal partial class AkburaSemanticModel
         HashSet<string> seenReferences,
         CSharp.ExpressionSyntax syntax,
         TextSpan sourceSpan,
-        RoslynSymbol? symbol,
+        CSharpReferenceSymbolInfo symbolInfo,
         Dictionary<string, AkburaSymbol> akburaSymbolsByName,
         Dictionary<string, AkburaSymbol> akburaSymbolsByCommandTypeName)
     {
-        if (symbol == null)
+        var symbol = symbolInfo.Symbol;
+        if (symbol == null &&
+            !symbolInfo.IsMethodGroup)
         {
             return;
         }
 
-        var key =
-            sourceSpan.Start.ToString(
+        string key;
+        if (symbol == null)
+        {
+            key = sourceSpan.Start.ToString(
+                System.Globalization.CultureInfo.InvariantCulture) +
+                ":" +
+                sourceSpan.Length.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture) +
+                ":MethodGroup";
+        }
+        else
+        {
+            key = sourceSpan.Start.ToString(
                 System.Globalization.CultureInfo
                     .InvariantCulture) +
-            ":" +
-            sourceSpan.Length.ToString(
-                System.Globalization.CultureInfo
-                    .InvariantCulture) +
-            ":" +
-            symbol.Kind +
-            ":" +
-            symbol.ToDisplayString(
-                SymbolDisplayFormat.FullyQualifiedFormat);
+                ":" +
+                sourceSpan.Length.ToString(
+                    System.Globalization.CultureInfo
+                        .InvariantCulture) +
+                ":" +
+                symbol.Kind +
+                ":" +
+                symbol.ToDisplayString(
+                    SymbolDisplayFormat.FullyQualifiedFormat);
+        }
 
         if (!seenReferences.Add(key))
         {
             return;
         }
 
+        var akburaSymbol = symbol == null
+            ? null
+            : TryGetReferencedAkburaSymbol(
+                symbol,
+                akburaSymbolsByName,
+                akburaSymbolsByCommandTypeName);
+        if (akburaSymbol == null &&
+            symbol != null)
+        {
+            akburaSymbol = TryGetCommandReceiverSymbol(
+                semanticModel,
+                syntax,
+                akburaSymbolsByName,
+                akburaSymbolsByCommandTypeName);
+        }
+
         references.Add(
             new CSharpSymbolReference(
                 syntax,
                 sourceSpan,
-                new CSharpSymbolDefinition(symbol),
-                TryGetReferencedAkburaSymbol(
-                    symbol,
-                    akburaSymbolsByName,
-                    akburaSymbolsByCommandTypeName),
+                symbol == null
+                    ? default
+                    : new CSharpSymbolDefinition(symbol),
+                akburaSymbol,
                 GetCSharpReferenceName(syntax),
                 symbol is ILocalSymbol
                     ? semanticModel.GetTypeInfo(syntax).Nullability.FlowState
                     : NullableFlowState.None,
-                IsCSharpNameOfOperand(semanticModel, syntax)));
+                IsCSharpNameOfOperand(semanticModel, syntax),
+                symbolInfo.IsMethodGroup));
+    }
+
+    private static AkburaSymbol? TryGetCommandReceiverSymbol(SemanticModel semanticModel, CSharp.ExpressionSyntax syntax, Dictionary<string, AkburaSymbol> akburaSymbolsByName, Dictionary<string, AkburaSymbol> akburaSymbolsByCommandTypeName)
+    {
+        var receiver = GetMemberReceiver(syntax);
+        if (receiver == null)
+        {
+            return null;
+        }
+
+        var receiverInfo = GetReceiverSymbolInfo(
+            semanticModel,
+            receiver);
+        if (receiverInfo.Symbol is not (IFieldSymbol or ILocalSymbol or IParameterSymbol))
+        {
+            return null;
+        }
+
+        return TryGetReferencedAkburaSymbol(
+            receiverInfo.Symbol,
+            akburaSymbolsByName,
+            akburaSymbolsByCommandTypeName) is ICommandSymbol command
+                ? command
+                : null;
+    }
+
+    private static CSharp.ExpressionSyntax? GetMemberReceiver(CSharp.ExpressionSyntax syntax)
+    {
+        if (syntax.Parent is CSharp.MemberAccessExpressionSyntax memberAccess &&
+            ReferenceEquals(memberAccess.Name, syntax))
+        {
+            return memberAccess.Expression;
+        }
+
+        if (syntax.Parent is not CSharp.MemberBindingExpressionSyntax memberBinding ||
+            !ReferenceEquals(memberBinding.Name, syntax))
+        {
+            return null;
+        }
+
+        for (var current = memberBinding.Parent; current != null; current = current.Parent)
+        {
+            if (current is CSharp.ConditionalAccessExpressionSyntax conditionalAccess &&
+                conditionalAccess.WhenNotNull.Span.Contains(syntax.Span))
+            {
+                return conditionalAccess.Expression;
+            }
+
+            if (current is CSharp.StatementSyntax)
+            {
+                break;
+            }
+        }
+
+        return null;
+    }
+
+    private static CSharpReferenceSymbolInfo GetReceiverSymbolInfo(SemanticModel semanticModel, CSharp.ExpressionSyntax receiver)
+    {
+        var symbolInfo = GetBestSymbolInfo(
+            semanticModel,
+            receiver);
+        if (symbolInfo.Symbol != null)
+        {
+            return symbolInfo;
+        }
+
+        return receiver switch
+        {
+            CSharp.ParenthesizedExpressionSyntax parenthesized =>
+                GetReceiverSymbolInfo(
+                    semanticModel,
+                    parenthesized.Expression),
+            CSharp.PostfixUnaryExpressionSyntax postfix when postfix.IsKind(
+                Microsoft.CodeAnalysis.CSharp.SyntaxKind.SuppressNullableWarningExpression) =>
+                GetReceiverSymbolInfo(
+                    semanticModel,
+                    postfix.Operand),
+            _ => symbolInfo,
+        };
     }
 
     private static bool IsCSharpNameOfOperand(SemanticModel semanticModel, CSharp.ExpressionSyntax syntax)
@@ -1111,227 +1248,6 @@ internal partial class AkburaSemanticModel
         }
     }
 
-    private static ImmutableArray<CSharp.StatementSyntax> CreateCSharpBlockProbeStatementsBefore(
-        CSharpStatementSyntax statementSyntax)
-    {
-        if (statementSyntax.Parent?.Kind != AkburaSyntaxKind.CSharpBlockSyntax)
-        {
-            return [];
-        }
-
-        using var builder = ImmutableArrayBuilder<CSharp.StatementSyntax>.Rent();
-        var block = Unsafe.As<CSharpBlockSyntax>(statementSyntax.Parent);
-        foreach (var member in block.Tokens)
-        {
-            if (ReferenceEquals(member, statementSyntax) ||
-                SemanticSyntaxIdentity.Equals(member, statementSyntax) ||
-                member.Position >= statementSyntax.Position)
-            {
-                break;
-            }
-
-            if (member.Kind != AkburaSyntaxKind.CSharpStatementSyntax)
-            {
-                continue;
-            }
-
-            var previousStatement = ParseCSharpStatement(Unsafe.As<CSharpStatementSyntax>(member));
-            if (previousStatement != null)
-            {
-                builder.Add(previousStatement);
-            }
-        }
-
-        return builder.ToImmutable();
-    }
-
-    private ImmutableArray<CSharp.StatementSyntax> CreateCSharpProbeMembersBefore(
-        AkburaSyntax scope,
-        ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax> classMembersBuilder,
-        Dictionary<string, AkburaSymbol> akburaSymbolsByName,
-        Dictionary<string, AkburaSymbol> akburaSymbolsByCommandTypeName)
-    {
-        using var builder = ImmutableArrayBuilder<CSharp.StatementSyntax>.Rent();
-        foreach (var member in SyntaxTree.GetRoot().Members)
-        {
-            if (member.Position >= scope.Position)
-            {
-                break;
-            }
-
-            switch (member.Kind)
-            {
-                case AkburaSyntaxKind.StateDeclarationSyntax:
-                    var stateDeclaration = Unsafe.As<StateDeclarationSyntax>(member);
-                    AddCSharpProbeLocal(
-                        builder,
-                        akburaSymbolsByName,
-                        stateDeclaration.Name.Identifier.ValueText,
-                        GetStateProbeFieldType(stateDeclaration),
-                        GetSymbolInfo(stateDeclaration).Symbol);
-                    break;
-
-                case AkburaSyntaxKind.ParamDeclarationSyntax:
-                    var paramDeclaration = Unsafe.As<ParamDeclarationSyntax>(member);
-                    AddCSharpProbeLocal(
-                        builder,
-                        akburaSymbolsByName,
-                        paramDeclaration.Name.Identifier.ValueText,
-                        GetParamProbeType(paramDeclaration),
-                        GetSymbolInfo(paramDeclaration).Symbol);
-                    break;
-
-                case AkburaSyntaxKind.InjectDeclarationSyntax:
-                    var injectDeclaration = Unsafe.As<InjectDeclarationSyntax>(member);
-                    AddCSharpProbeLocal(
-                        builder,
-                        akburaSymbolsByName,
-                        injectDeclaration.Name.Identifier.ValueText,
-                        GetInjectProbeType(injectDeclaration),
-                        GetSymbolInfo(injectDeclaration).Symbol);
-                    break;
-
-                case AkburaSyntaxKind.CommandDeclarationSyntax:
-                    var commandDeclaration = Unsafe.As<CommandDeclarationSyntax>(member);
-                    AddCSharpCommandProbeMembers(
-                        classMembersBuilder,
-                        akburaSymbolsByName,
-                        akburaSymbolsByCommandTypeName,
-                        commandDeclaration);
-                    break;
-            }
-        }
-
-        AddCSharpProbeMarkupNameLocals(scope, builder, akburaSymbolsByName);
-        return builder.ToImmutable();
-    }
-
-    private void AddCSharpCommandProbeMembers(
-        ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax> classMembersBuilder,
-        Dictionary<string, AkburaSymbol> akburaSymbolsByName,
-        Dictionary<string, AkburaSymbol> akburaSymbolsByCommandTypeName,
-        CommandDeclarationSyntax commandDeclaration)
-    {
-        if (GetSymbolInfo(commandDeclaration).Symbol is not ICommandSymbol command)
-        {
-            return;
-        }
-
-        foreach (var member in CreateCommandProbeMembers(commandDeclaration))
-        {
-            classMembersBuilder.Add(member);
-        }
-
-        akburaSymbolsByName[command.Name] = command;
-        akburaSymbolsByCommandTypeName["__AkburaCommand_" + ToCSharpIdentifier(command.Name)] = command;
-    }
-
-    private static void AddCSharpProbeLocal(
-        ImmutableArrayBuilder<CSharp.StatementSyntax> builder,
-        Dictionary<string, AkburaSymbol> akburaSymbolsByName,
-        string name,
-        CSharp.TypeSyntax? type,
-        AkburaSymbol? symbol,
-        string? identifierText = null)
-    {
-        if (string.IsNullOrWhiteSpace(name) ||
-            type == null ||
-            symbol == null)
-        {
-            return;
-        }
-
-        builder.Add(CSharpSyntaxFactory.LocalDeclarationStatement(
-            CSharpSyntaxFactory.VariableDeclaration(type)
-                .WithVariables(CSharpSyntaxFactory.SingletonSeparatedList(
-                    CSharpSyntaxFactory.VariableDeclarator(CSharpSyntaxFactory.Identifier(
-                            identifierText ?? name))
-                        .WithInitializer(CSharpSyntaxFactory.EqualsValueClause(
-                            CSharpSyntaxFactory.LiteralExpression(Microsoft.CodeAnalysis.CSharp.SyntaxKind.DefaultLiteralExpression)))))));
-        akburaSymbolsByName[name] = symbol;
-    }
-
-    private void AddCSharpProbeMarkupNameLocals(
-        AkburaSyntax scope,
-        ImmutableArrayBuilder<CSharp.StatementSyntax> builder,
-        Dictionary<string, AkburaSymbol> akburaSymbolsByName)
-    {
-        for (var binder = BindingSession.GetBinder(scope, BinderUsage.Expression);
-             binder != null;
-             binder = binder.Next)
-        {
-            ImmutableArray<AkburaSymbol> symbols;
-            if (binder is MarkupBinder markupBinder)
-            {
-                symbols = markupBinder.GetDeclaredNameSymbols(scope);
-            }
-            else if (binder is ComponentBinder componentBinder)
-            {
-                symbols = componentBinder.GetDeclaredMarkupNameSymbols();
-            }
-            else
-            {
-                continue;
-            }
-
-            foreach (var symbol in symbols)
-            {
-                if (symbol is not IMarkupNameSymbol markupName ||
-                    markupName.Type.Symbol is not ITypeSymbol type ||
-                    akburaSymbolsByName.ContainsKey(markupName.Name))
-                {
-                    continue;
-                }
-
-                AddCSharpProbeLocal(
-                    builder,
-                    akburaSymbolsByName,
-                    markupName.Name,
-                    CSharpSyntaxFactory.ParseTypeName(
-                        type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)),
-                    markupName,
-                    markupName.IdentifierText);
-            }
-
-            if (binder is ComponentBinder)
-            {
-                return;
-            }
-        }
-    }
-
-    private CSharp.TypeSyntax? GetParamProbeType(ParamDeclarationSyntax paramDeclaration)
-    {
-        if (paramDeclaration.Type != null)
-        {
-            try
-            {
-                return paramDeclaration.Type.ToCSharp();
-            }
-            catch (InvalidOperationException)
-            {
-                return null;
-            }
-        }
-
-        return GetSymbolInfo(paramDeclaration).Symbol is IParamSymbol paramSymbol &&
-            paramSymbol.Type.Symbol is ITypeSymbol typeSymbol
-                ? CSharpSyntaxFactory.ParseTypeName(typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
-                : null;
-    }
-
-    private static CSharp.TypeSyntax? GetInjectProbeType(InjectDeclarationSyntax injectDeclaration)
-    {
-        try
-        {
-            return injectDeclaration.Type.ToCSharp();
-        }
-        catch (InvalidOperationException)
-        {
-            return null;
-        }
-    }
-
     private static AkburaSymbol? TryGetReferencedAkburaSymbol(
         RoslynSymbol csharpSymbol,
         Dictionary<string, AkburaSymbol> akburaSymbolsByName,
@@ -1340,7 +1256,12 @@ internal partial class AkburaSemanticModel
         if (csharpSymbol is ILocalSymbol local &&
             akburaSymbolsByName.TryGetValue(local.Name, out var symbol))
         {
-            return MatchesProjectedLocalOrigin(local, symbol) ? symbol : null;
+            return MatchesProjectedSymbolOrigin(
+                local,
+                symbol,
+                allowUnannotated: true)
+                    ? symbol
+                    : null;
         }
 
         if (csharpSymbol is IFieldSymbol field &&
@@ -1352,7 +1273,14 @@ internal partial class AkburaSemanticModel
         if (csharpSymbol is IParameterSymbol parameter &&
             akburaSymbolsByName.TryGetValue(parameter.Name, out symbol))
         {
-            return symbol;
+            return MatchesProjectedSymbolOrigin(
+                parameter,
+                symbol,
+                allowUnannotated:
+                    symbol is ITailwindUtilityParameterSymbol or
+                        ICommandParameterSymbol)
+                    ? symbol
+                    : null;
         }
 
         if (csharpSymbol.ContainingType != null &&
@@ -1364,11 +1292,10 @@ internal partial class AkburaSemanticModel
         return null;
     }
 
-    private static bool MatchesProjectedLocalOrigin(
-        ILocalSymbol local,
-        AkburaSymbol candidate)
+    private static bool MatchesProjectedSymbolOrigin(RoslynSymbol symbol, AkburaSymbol candidate, bool allowUnannotated)
     {
-        foreach (var reference in local.DeclaringSyntaxReferences)
+        var hasAnnotation = false;
+        foreach (var reference in symbol.DeclaringSyntaxReferences)
         {
             // Only this symbol's declaration carries its origin. An annotation
             // on an enclosing foreach or method belongs to another symbol.
@@ -1376,18 +1303,20 @@ internal partial class AkburaSemanticModel
 
             foreach (var annotation in declaration.GetAnnotations(CSharpProbeBinder.ProjectedSymbolAnnotationKind))
             {
-                if (!CSharpProbeSymbolOrigin.TryParse(annotation.Data, out var origin) ||
-                    origin.Kind != candidate.Kind ||
-                    !CSharpProbeBinder.TryGetDeclarationSpan(candidate, out var declarationSpan) ||
-                    origin.DeclarationSpan != declarationSpan)
+                hasAnnotation = true;
+                if (CSharpProbeSymbolOrigin.TryParse(annotation.Data, out var origin) &&
+                    origin.Kind == candidate.Kind &&
+                    CSharpProbeBinder.TryGetDeclarationSpan(candidate, out var declarationSpan) &&
+                    origin.DeclarationSpan == declarationSpan)
                 {
-                    return false;
+                    return true;
                 }
             }
         }
 
         // Preserve name-based mapping for legacy probes without origin metadata.
-        return true;
+        return allowUnannotated &&
+            !hasAnnotation;
     }
 
     private readonly struct CSharpReferenceTarget
@@ -1435,5 +1364,18 @@ internal partial class AkburaSemanticModel
                 sourceStart,
                 probeSpan.Length);
         }
+    }
+
+    private readonly struct CSharpReferenceSymbolInfo
+    {
+        public CSharpReferenceSymbolInfo(RoslynSymbol? symbol, bool isMethodGroup)
+        {
+            Symbol = symbol;
+            IsMethodGroup = isMethodGroup;
+        }
+
+        public RoslynSymbol? Symbol { get; }
+
+        public bool IsMethodGroup { get; }
     }
 }

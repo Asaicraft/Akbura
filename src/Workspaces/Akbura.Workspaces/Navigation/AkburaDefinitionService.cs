@@ -317,6 +317,14 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
                 Math.Min(1, document.Text.Length - position));
         }
 
+        if (IsAmbiguousCSharpMethodGroup(
+                context,
+                position,
+                cancellationToken))
+        {
+            return null;
+        }
+
         if (TryGetUnqualifiedSyntheticOrigin(
                 token,
                 projection,
@@ -377,6 +385,52 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             akburaSymbol: null,
             symbol,
             cancellationToken);
+    }
+
+    private static bool IsAmbiguousCSharpMethodGroup(AkburaDocumentContext context, int position, CancellationToken cancellationToken)
+    {
+        var root = context.Document.SyntaxTree.GetRootSyntax();
+        var token = root.FindTokenInternal(position);
+        var semanticModel = context.Project.Compilation.GetSemanticModel(
+            context.Document.SyntaxTree);
+
+        for (var node = token.Parent; node != null; node = node.Parent)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ImmutableArray<CSharpSymbolReference> references;
+            switch (node)
+            {
+                case CSharpExpressionSyntax condition when condition.Parent is MarkupIfStatementSyntax or MarkupElseIfClauseSyntax or MarkupCodeIfStatementSyntax or MarkupForeachKeyClauseSyntax:
+                    references = semanticModel.GetCSharpSymbolReferences(condition);
+                    break;
+
+                case MarkupForeachHeaderSyntax header:
+                    references = semanticModel.GetCSharpSymbolReferences(header);
+                    break;
+
+                case MarkupCodeStatementSyntax code:
+                    references = semanticModel.GetCSharpSymbolReferences(code);
+                    break;
+
+                case CSharpStatementSyntax statement:
+                    references = semanticModel.GetCSharpSymbolReferences(statement);
+                    break;
+
+                case InlineExpressionSyntax expression:
+                    references = semanticModel.GetCSharpSymbolReferences(expression);
+                    break;
+
+                default:
+                    continue;
+            }
+
+            return references.Any(reference =>
+                reference.IsMethodGroup &&
+                reference.SourceSpan.Contains(position));
+        }
+
+        return false;
     }
 
     private static bool TryGetUnqualifiedSyntheticOrigin(

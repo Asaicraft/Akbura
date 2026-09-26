@@ -45,6 +45,34 @@ public sealed class SemanticTokenEncoderTests
     }
 
     [Fact]
+    public void EncoderMapsMethodNamesToLspMethodTokenType()
+    {
+        const string firstMethod = "FindFirstComponentAncestor";
+        const string secondMethod = "ResolveComponent";
+        var text = SourceText.From($"{firstMethod}\n{secondMethod}");
+        var classifications = ImmutableArray.Create(
+            new AkburaClassifiedSpan(
+                new TextSpan(0, firstMethod.Length),
+                AkburaClassificationKind.MethodName),
+            new AkburaClassifiedSpan(
+                new TextSpan(firstMethod.Length + 1, secondMethod.Length),
+                AkburaClassificationKind.MethodName));
+
+        var result = new AkburaSemanticTokenEncoder().Encode(
+            text,
+            classifications,
+            new Utf16PositionConverter());
+
+        Assert.Equal(
+            new[]
+            {
+                0, 0, firstMethod.Length, 8, 0,
+                1, 0, secondMethod.Length, 8, 0,
+            },
+            result.Data);
+    }
+
+    [Fact]
     public void DeltaReplacesOnlyChangedMiddleData()
     {
         var current = new SemanticTokens

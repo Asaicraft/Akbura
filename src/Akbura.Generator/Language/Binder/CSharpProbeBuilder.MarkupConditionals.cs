@@ -58,6 +58,7 @@ internal sealed partial class CSharpProbeBuilder
             {
                 statement = WrapExecutableBlockScope(executableBlock, scope, statement);
                 if (executableBlock.Parent is CSharpStatementSyntax executableOwner &&
+                    executableOwner.Parent is AkburaDocumentSyntax &&
                     executableOwner.GetRawCSharpStatement() is CSharp.LocalFunctionStatementSyntax)
                 {
                     // The probe method already carries the function signature.

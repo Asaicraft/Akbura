@@ -26,7 +26,11 @@ internal sealed partial class CSharpProbeBuilder
         }
 
         using var preceding = ImmutableArrayBuilder<CSharp.StatementSyntax>.Rent();
-        AddPrecedingLocalDeclarationsFromList(block.Tokens, child, preceding);
+        AddPrecedingLocalDeclarationsFromList(
+            block.Tokens,
+            child,
+            preceding,
+            includeLocalFunctions: true);
         preceding.Add(statement);
         var body = CSharpSyntaxFactory.Block(CSharpSyntaxFactory.List(preceding.ToImmutable()));
 
@@ -71,6 +75,8 @@ internal sealed partial class CSharpProbeBuilder
             CSharp.FixedStatementSyntax fixedStatement => fixedStatement.WithStatement(body),
             CSharp.CheckedStatementSyntax checkedStatement => checkedStatement.WithBlock(body),
             CSharp.UnsafeStatementSyntax unsafeStatement => unsafeStatement.WithBlock(body),
+            CSharp.LocalFunctionStatementSyntax localFunction when owner.Parent is not AkburaDocumentSyntax =>
+                CreateProjectedLocalFunction(owner, localFunction, body),
             _ => body,
         };
     }

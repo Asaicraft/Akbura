@@ -678,6 +678,11 @@ internal sealed class EmbeddedCSharpSemanticClassificationService
             }
         }
 
+        if (reference.IsMethodGroup)
+        {
+            return AkburaClassificationKind.MethodName;
+        }
+
         return GetRoslynClassification(
             reference.CSharpDefinition.Symbol);
     }

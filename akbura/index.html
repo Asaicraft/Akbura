@@ -188,6 +188,11 @@ Akbura									</span>
 									</a>
 								</li>
 								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/event-hooks" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Avalonia Event Hooks
+									</a>
+								</li>
+								<li class="relative">
 									<a href="https://asaicraft.github.io/Akbura/akbura/commands" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
 										Commands
 									</a>
@@ -482,6 +487,10 @@ useEffect(async () =&gt;
 &lt;/UserControl&gt;
 </code></pre>
 <p>Akbura components therefore integrate into existing Avalonia applications without a wrapper or a separate hosting element.</p>
+<h2 id="component-event-hooks">Component event hooks<a class="header-anchor" href="javascript:;" onclick="location.hash='#component-event-hooks'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Use <a href="/akbura/event-hooks">Avalonia event hooks</a> to handle the component's
+lifecycle, input, gesture, layout and property events without manually managing
+<code>+=</code>, <code>-=</code>, or a subscription <code>useEffect</code>.</p>
 
 				</div>
 
@@ -532,6 +541,11 @@ useEffect(async () =&gt;
 									<li class="group text-gray-800 hover:text-gray-900">
 										<span v-hash="'#complete-example'" data-id="complete-example" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
 											Complete example
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#component-event-hooks'" data-id="component-event-hooks" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Component event hooks
 										</span>
 									</li>
 							</ul>

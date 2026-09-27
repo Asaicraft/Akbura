@@ -29,6 +29,7 @@ Project
 Akbura
  - [Reactive State](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/state.md)
  - [Composable Hooks](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/hooks.md)
+ - [Avalonia Event Hooks](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/event-hooks.md): Avalonia Control Event Hooks
  - [Commands](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/commands.md): commands.md
  - [Parameters and Bindings](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/parameters.md): Parameters and Directional Bindings
  - [Using Components in AXAML](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akbura/axaml-integration.md): Using Akbura Components in AXAML

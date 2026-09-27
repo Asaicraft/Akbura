@@ -181,6 +181,13 @@ internal sealed class InitializeHandler :
                 },
                 Range = true,
             },
+            DocumentFormattingProvider = true,
+            DocumentRangeFormattingProvider = true,
+            DocumentOnTypeFormattingProvider = new DocumentOnTypeFormattingOptions
+            {
+                FirstTriggerCharacter = "}",
+                MoreTriggerCharacter = ["{", ";", ">", "\n"],
+            },
             DiagnosticProvider =
                 capabilities.SupportsPullDiagnostics
                     ? new DiagnosticOptions()

@@ -72,6 +72,16 @@ public sealed class LifecycleTests
             Assert.True(initialized.Capabilities.DocumentSymbolProvider);
             Assert.True(initialized.Capabilities.SemanticTokensProvider
                 .Full.Delta);
+            Assert.True(initialized.Capabilities.DocumentFormattingProvider);
+            Assert.True(initialized.Capabilities.DocumentRangeFormattingProvider);
+            Assert.Equal(
+                "}",
+                initialized.Capabilities.DocumentOnTypeFormattingProvider
+                    .FirstTriggerCharacter);
+            Assert.Contains(
+                ">",
+                initialized.Capabilities.DocumentOnTypeFormattingProvider
+                    .MoreTriggerCharacter);
 
             await rpc.NotifyWithParameterObjectAsync(
                 LspMethods.Initialized,

@@ -12,6 +12,7 @@ public static class AkburaTagPairCompletionFactory
         AkburaSyntacticDocument document,
         int position,
         AkburaTypingOptions options,
+        AkburaMarkupTagPairContext? markupTagContext,
         out AkburaTagPairCompletion completion,
         CancellationToken cancellationToken = default)
     {
@@ -27,6 +28,7 @@ public static class AkburaTagPairCompletionFactory
 
         var closingTag = document.GetAutoClosingTagText(
             position,
+            markupTagContext,
             cancellationToken);
         if (closingTag == null)
         {
@@ -54,6 +56,22 @@ public static class AkburaTagPairCompletionFactory
             insertionText,
             newLine.Length + innerIndentation.Length);
         return true;
+    }
+
+    public static bool TryCreate(
+        AkburaSyntacticDocument document,
+        int position,
+        AkburaTypingOptions options,
+        out AkburaTagPairCompletion completion,
+        CancellationToken cancellationToken = default)
+    {
+        return TryCreate(
+            document,
+            position,
+            options,
+            markupTagContext: null,
+            out completion,
+            cancellationToken);
     }
 
     private static string CreateIndentation(

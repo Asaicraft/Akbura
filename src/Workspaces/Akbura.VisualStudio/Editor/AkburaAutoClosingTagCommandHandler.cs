@@ -1,5 +1,6 @@
 using Akbura.Workspaces;
 using Akbura.Workspaces.AutomaticPairing;
+using Akbura.VisualStudio.Editor.AutomaticPairing;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.Commanding;
 using Microsoft.VisualStudio.Shell;
@@ -50,6 +51,19 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
         CommandExecutionContext executionContext)
     {
         var typedCharacter = args.TypedChar;
+        var initialSnapshot = args.SubjectBuffer.CurrentSnapshot;
+        var initialCaret = args.TextView.Caret.Position.BufferPosition;
+        if (ReferenceEquals(
+                initialCaret.Snapshot.TextBuffer,
+                args.SubjectBuffer))
+        {
+            AkburaPendingMarkupAutoCloseState.BeginTypeCharCommand(
+                args.TextView,
+                args.SubjectBuffer,
+                typedCharacter,
+                initialSnapshot,
+                initialCaret.Position);
+        }
 
         nextCommandHandler();
 
@@ -69,6 +83,14 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
         }
 
         var caretPosition = caret.Position;
+        var markupTagContext = typedCharacter == '>'
+            ? AkburaPendingMarkupAutoCloseState.TryTake(
+                args.TextView,
+                args.SubjectBuffer,
+                typedCharacter,
+                snapshot,
+                caretPosition)
+            : null;
         var trackingMode = typedCharacter == '/'
             ? PointTrackingMode.Negative
             : PointTrackingMode.Positive;
@@ -90,7 +112,8 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
                         args,
                         snapshot,
                         caretPosition,
-                        trackingPoint))
+                        trackingPoint,
+                        markupTagContext))
                 .FileAndForget("Akbura/AutoClosingTag");
 
             return;
@@ -110,7 +133,8 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
         TypeCharCommandArgs args,
         ITextSnapshot snapshot,
         int caretPosition,
-        ITrackingPoint trackingPoint)
+        ITrackingPoint trackingPoint,
+        AkburaMarkupTagPairContext? markupTagContext)
     {
         try
         {
@@ -134,6 +158,7 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
                     document,
                     caretPosition,
                     typingOptions,
+                    markupTagContext,
                     out var completion))
             {
                 AkburaWorkspaceDiagnostics.Write(

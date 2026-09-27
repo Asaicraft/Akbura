@@ -49,4 +49,8 @@ public sealed class AkburaPairSessionDto
     public int RequiredDelimiterLength { get; set; }
 
     public int OuterLiteralDelimiterCount { get; set; }
+
+    public string? ParentElementName { get; set; }
+
+    public Range? ParentEndTagRange { get; set; }
 }

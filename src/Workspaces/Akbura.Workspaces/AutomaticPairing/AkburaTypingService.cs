@@ -156,6 +156,14 @@ internal sealed class AkburaTypingService : IAkburaTypingService
         var kind = character == '<'
             ? AkburaPairSessionKind.MarkupAnglePair
             : AkburaPairSessionKind.FixedPair;
+        var markupTagContext = kind == AkburaPairSessionKind.MarkupAnglePair
+            ? TransformMarkupTagContext(
+                document.GetMarkupTagPairContext(
+                    command.Position,
+                    cancellationToken),
+                command.Position,
+                insertedText.Length)
+            : null;
         var session = new AkburaPairSession(
             kind,
             new TextSpan(command.Position, 1),
@@ -165,7 +173,10 @@ internal sealed class AkburaTypingService : IAkburaTypingService
             character.ToString(),
             decision.ClosingText,
             RequiredDelimiterLength: 1,
-            OuterLiteralDelimiterCount: 0);
+            OuterLiteralDelimiterCount: 0)
+        {
+            MarkupTagContext = markupTagContext,
+        };
 
         return Handled(
             ImmutableArray.Create(
@@ -202,6 +213,7 @@ internal sealed class AkburaTypingService : IAkburaTypingService
                 document,
                 afterGreater,
                 command.Options,
+                session.MarkupTagContext,
                 out completion,
                 cancellationToken);
         var changes = !hasCompletion
@@ -273,6 +285,7 @@ internal sealed class AkburaTypingService : IAkburaTypingService
             changedDocument,
             command.Position + 1,
             command.Options,
+            markupTagContext: null,
             out var completion,
             cancellationToken);
         var insertedText = hasCompletion
@@ -773,6 +786,10 @@ internal sealed class AkburaTypingService : IAkburaTypingService
                 ClosingSpan = new TextSpan(
                     session.ClosingSpan.Start + length,
                     session.ClosingSpan.Length),
+                MarkupTagContext = TransformMarkupTagContext(
+                    session.MarkupTagContext,
+                    position,
+                    length),
             };
         }
 
@@ -788,12 +805,42 @@ internal sealed class AkburaTypingService : IAkburaTypingService
                 ClosingSpan = new TextSpan(
                     session.ClosingSpan.Start + length,
                     session.ClosingSpan.Length),
+                MarkupTagContext = TransformMarkupTagContext(
+                    session.MarkupTagContext,
+                    position,
+                    length),
             };
         }
 
         return position < session.ClosingSpan.End
             ? null
             : session;
+    }
+
+    private static AkburaMarkupTagPairContext? TransformMarkupTagContext(
+        AkburaMarkupTagPairContext? context,
+        int position,
+        int length)
+    {
+        if (context is not { } markupContext)
+        {
+            return null;
+        }
+
+        var endTagSpan = markupContext.ParentEndTagSpan;
+        if (position <= endTagSpan.Start)
+        {
+            return markupContext with
+            {
+                ParentEndTagSpan = new TextSpan(
+                    endTagSpan.Start + length,
+                    endTagSpan.Length),
+            };
+        }
+
+        return position < endTagSpan.End
+            ? null
+            : markupContext;
     }
 
     private static bool IsStructuralAkcssBraceAfterInsertion(

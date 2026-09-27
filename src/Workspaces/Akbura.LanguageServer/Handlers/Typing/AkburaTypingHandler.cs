@@ -200,6 +200,14 @@ internal sealed class AkburaTypingHandler :
                 $"Unknown Akbura pair session kind '{session.Kind}'.");
         }
 
+        AkburaMarkupTagPairContext? markupTagContext =
+            session.ParentElementName is { Length: > 0 } parentName &&
+            session.ParentEndTagRange is { } parentEndTagRange
+            ? new AkburaMarkupTagPairContext(
+                parentName,
+                positions.ToTextSpan(text, parentEndTagRange))
+            : null;
+
         return new AkburaPairSession(
             kind,
             positions.ToTextSpan(text, session.OpeningRange),
@@ -207,7 +215,10 @@ internal sealed class AkburaTypingHandler :
             session.OpeningText ?? string.Empty,
             session.ClosingText ?? string.Empty,
             session.RequiredDelimiterLength,
-            session.OuterLiteralDelimiterCount);
+            session.OuterLiteralDelimiterCount)
+        {
+            MarkupTagContext = markupTagContext,
+        };
     }
 
     private static AkburaPairSessionDto? MapSessionToProtocol(
@@ -220,7 +231,7 @@ internal sealed class AkburaTypingHandler :
             return null;
         }
 
-        return new AkburaPairSessionDto
+        var result = new AkburaPairSessionDto
         {
             Kind = session.Kind.ToString(),
             OpeningRange = positions.ToRange(
@@ -235,5 +246,16 @@ internal sealed class AkburaTypingHandler :
             OuterLiteralDelimiterCount =
                 session.OuterLiteralDelimiterCount,
         };
+
+        if (session.MarkupTagContext is { } markupTagContext)
+        {
+            result.ParentElementName =
+                markupTagContext.ParentElementName;
+            result.ParentEndTagRange = positions.ToRange(
+                text,
+                markupTagContext.ParentEndTagSpan);
+        }
+
+        return result;
     }
 }

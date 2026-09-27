@@ -1,4 +1,5 @@
 using Akbura.Workspaces;
+using Akbura.Workspaces.AutomaticPairing;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.BraceCompletion;
 using Microsoft.VisualStudio.Text.Editor;
@@ -12,18 +13,23 @@ internal sealed class AkburaBraceCompletionSession :
     private ITrackingPoint _closingPoint;
     private bool _started;
     private bool _finished;
+    private AkburaPendingMarkupAutoCloseState? _pendingMarkupAutoCloseState;
 
     public AkburaBraceCompletionSession(
         ITextView textView,
         SnapshotPoint openingPoint,
         char openingBrace,
-        char closingBrace)
+        char closingBrace,
+        AkburaPendingMarkupAutoCloseState? pendingMarkupAutoCloseState = null)
     {
         TextView = textView ??
             throw new ArgumentNullException(nameof(textView));
         SubjectBuffer = openingPoint.Snapshot.TextBuffer;
         OpeningBrace = openingBrace;
         ClosingBrace = closingBrace;
+        _pendingMarkupAutoCloseState = openingBrace == '<'
+            ? pendingMarkupAutoCloseState
+            : null;
         // Visual Studio may insert a newline, indentation, and the opening brace
         // in one edit after creating the session. Track to the end of that edit
         // so Start() resolves the opening brace immediately before this point.
@@ -111,6 +117,18 @@ internal sealed class AkburaBraceCompletionSession :
             PointTrackingMode.Positive);
         _started = true;
 
+        if (_pendingMarkupAutoCloseState is { } pendingMarkupAutoCloseState)
+        {
+            var generatedClosingAnglePoint =
+                applied.CreateTrackingPoint(
+                    closingPosition,
+                    PointTrackingMode.Positive);
+            pendingMarkupAutoCloseState.TrackPairPoints(
+                _openingPoint,
+                generatedClosingAnglePoint);
+            _pendingMarkupAutoCloseState.Register();
+        }
+
         MoveCaretTo(applied, closingPosition);
         AkburaWorkspaceDiagnostics.Write(
             AkburaWorkspaceDiagnostics.Category.AutoClosingTag,
@@ -122,12 +140,27 @@ internal sealed class AkburaBraceCompletionSession :
 
     public void Finish()
     {
-        Invalidate();
+        _pendingMarkupAutoCloseState?.Finish();
+        Invalidate(cancelMarkupAutoCloseState: false);
     }
 
     public void PreOverType(out bool handledCommand)
     {
+        var snapshot = SubjectBuffer.CurrentSnapshot;
+        var hasMarkupClosingAngle = ClosingBrace == '>' &&
+            _pendingMarkupAutoCloseState != null &&
+            TryGetPairPositions(
+                out var pairSnapshot,
+                out _,
+                out var closingPosition) &&
+            ReferenceEquals(pairSnapshot, snapshot) &&
+            TryGetCaretPosition(snapshot, out var caretPosition) &&
+            caretPosition == closingPosition;
         handledCommand = TryMoveAcrossClosingBrace();
+        if (handledCommand && hasMarkupClosingAngle)
+        {
+            _pendingMarkupAutoCloseState?.PublishPending(snapshot);
+        }
     }
 
     public void PostOverType()
@@ -313,8 +346,13 @@ internal sealed class AkburaBraceCompletionSession :
         }
     }
 
-    private void Invalidate()
+    private void Invalidate(bool cancelMarkupAutoCloseState = true)
     {
+        if (cancelMarkupAutoCloseState)
+        {
+            _pendingMarkupAutoCloseState?.Cancel();
+        }
+
         _started = false;
         _finished = true;
     }

@@ -9,4 +9,7 @@ public sealed record AkburaPairSession(
     string OpeningText,
     string ClosingText,
     int RequiredDelimiterLength,
-    int OuterLiteralDelimiterCount);
+    int OuterLiteralDelimiterCount)
+{
+    public AkburaMarkupTagPairContext? MarkupTagContext { get; init; }
+}

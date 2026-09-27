@@ -1,3 +1,4 @@
+using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Akbura.Workspaces.UnitTests;
@@ -1043,6 +1044,88 @@ public sealed class WorkspaceSyntacticDocumentTests
     }
 
     [Fact]
+    public void SyntacticDocument_DoesNotUseAncestorEndTagForNestedAutoClose()
+    {
+        const string source = """
+            <Button>
+                <StackPanel>
+                    <Button>
+                </StackPanel>
+            </Button>
+            """;
+        var position = source.LastIndexOf(
+                "<Button>",
+                StringComparison.Ordinal) +
+            "<Button>".Length;
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+        var root = document.SyntaxTree.GetRootSyntax();
+        var buttonElements = root
+            .DescendantNodes()
+            .OfType<MarkupElementSyntax>()
+            .Where(element =>
+                element.StartTag?.Name.ToFullString().Trim() == "Button")
+            .ToArray();
+
+        var outerButton = Assert.Single(
+            buttonElements,
+            element => element.StartTag!.Span.Start == 0);
+        var innerButton = Assert.Single(
+            buttonElements,
+            element => element.StartTag!.Span.Start > 0);
+
+        Assert.False(HasCompleteEndTag(innerButton.EndTag));
+        Assert.True(HasCompleteEndTag(outerButton.EndTag));
+        Assert.Equal(
+            "Button",
+            outerButton.EndTag!.Name.ToFullString().Trim());
+        Assert.Equal(
+            "</Button>",
+            document.GetAutoClosingTagText(position));
+    }
+
+    [Theory]
+    [InlineData("<Button>\n    <StackPanel>\n        <Button></Button>\n    </StackPanel>\n</Button>")]
+    [InlineData("<Button><Button></Button></Button>")]
+    public void SyntacticDocument_UsesInnerOwnedEndTag(
+        string source)
+    {
+        var innerStart = source.LastIndexOf(
+            "<Button>",
+            StringComparison.Ordinal);
+        var position = innerStart + "<Button>".Length;
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        Assert.Null(document.GetAutoClosingTagText(position));
+    }
+
+    [Fact]
+    public void SyntacticDocument_AutoClosesWhenDifferentNameAncestorEnds()
+    {
+        const string source = """
+            <Border>
+                <StackPanel>
+                    <Button>
+                </StackPanel>
+            </Border>
+            """;
+        var position = source.IndexOf(
+                "<Button>",
+                StringComparison.Ordinal) +
+            "<Button>".Length;
+        var document = AkburaSyntacticDocument.Parse(
+            SourceText.From(source),
+            "Component.akbura");
+
+        Assert.Equal(
+            "</Button>",
+            document.GetAutoClosingTagText(position));
+    }
+
+    [Fact]
     public void SyntacticDocument_AkcssDoesNotOfferMarkupEditing()
     {
         const string source = ".card { Value: value < Other; }";
@@ -1055,6 +1138,16 @@ public sealed class WorkspaceSyntacticDocumentTests
             document.GetAkcssCompletionContext(source.Length).Kind);
         Assert.Null(
             document.GetAutoClosingTagText(source.Length));
+    }
+
+    private static bool HasCompleteEndTag(
+        MarkupEndTagSyntax? endTag)
+    {
+        return endTag != null &&
+            !endTag.IsMissing &&
+            !endTag.LessSlashToken.IsMissing &&
+            !endTag.GreaterToken.IsMissing &&
+            !endTag.Name.IsMissing;
     }
 
     [Theory]

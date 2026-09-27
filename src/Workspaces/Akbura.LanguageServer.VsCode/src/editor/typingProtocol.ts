@@ -27,6 +27,8 @@ export interface AkburaPairSessionDto {
     closingText: string;
     requiredDelimiterLength: number;
     outerLiteralDelimiterCount: number;
+    parentElementName?: string;
+    parentEndTagRange?: ProtocolRange;
 }
 
 export interface AkburaTypingParams {

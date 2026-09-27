@@ -1,6 +1,7 @@
 using Akbura.Language;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
+using Akbura.Workspaces.AutomaticPairing;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 
@@ -184,7 +185,70 @@ public sealed partial class AkburaSyntacticDocument
     /// Returns a closing tag that should be inserted after a newly typed
     /// <c>&gt;</c>, or <see langword="null"/> when no insertion is needed.
     /// </summary>
-    public string? GetAutoClosingTagText(int position, CancellationToken cancellationToken = default)
+    public AkburaMarkupTagPairContext? GetMarkupTagPairContext(
+        int position,
+        CancellationToken cancellationToken = default)
+    {
+        return GetMarkupTagPairContext(
+            position,
+            out _,
+            cancellationToken);
+    }
+
+    public AkburaMarkupTagPairContext? GetMarkupTagPairContext(
+        int position,
+        out string? failureReason,
+        CancellationToken cancellationToken = default)
+    {
+        ValidatePosition(position);
+        if (SyntaxTree.Kind == SyntaxTreeKind.Akcss)
+        {
+            failureReason = "not-markup-syntax";
+            return null;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var root = SyntaxTree.GetRootSyntax();
+        var parentStartTag = GetOpenElementStartTag(root, position);
+        if (parentStartTag?.Parent is not MarkupElementSyntax parent)
+        {
+            failureReason = "no-containing-element";
+            return null;
+        }
+
+        if (!HasCompleteEndTag(parent.EndTag))
+        {
+            failureReason = "no-complete-parent-end-tag";
+            return null;
+        }
+
+        var parentName = parentStartTag.Name.ToFullString().Trim();
+        if (parentName.Length == 0)
+        {
+            failureReason = "empty-parent-name";
+            return null;
+        }
+
+        failureReason = null;
+        return new AkburaMarkupTagPairContext(
+                parentName,
+                parent.EndTag!.Span);
+    }
+
+    public string? GetAutoClosingTagText(
+        int position,
+        CancellationToken cancellationToken = default)
+    {
+        return GetAutoClosingTagText(
+            position,
+            markupTagContext: null,
+            cancellationToken);
+    }
+
+    public string? GetAutoClosingTagText(
+        int position,
+        AkburaMarkupTagPairContext? markupTagContext,
+        CancellationToken cancellationToken = default)
     {
         ValidatePosition(position);
         if (SyntaxTree.Kind == SyntaxTreeKind.Akcss ||
@@ -216,22 +280,56 @@ public sealed partial class AkburaSyntacticDocument
                 !candidate.CloseToken.IsMissing &&
                 candidate.CloseToken.Kind ==
                     SyntaxKind.GreaterThanToken &&
-                candidate.CloseToken.Span.End == position);
+                candidate.Span.End == position);
         if (startTag != null && !startTag.Name.IsMissing)
         {
             var syntaxName = startTag.Name.ToFullString().Trim();
-            return syntaxName.Length == 0
-                ? null
-                : HasMatchingClosingTagAfter(
-                    root,
-                    position,
-                    syntaxName)
-                    ? null
-                    : $"</{syntaxName}>";
+            var element = startTag.Parent as MarkupElementSyntax;
+            if (syntaxName.Length == 0)
+            {
+                return null;
+            }
+
+            var endTag = element?.EndTag;
+            var hasOwnedEndTag = HasCompleteEndTag(endTag) &&
+                string.Equals(
+                    endTag!.Name.ToFullString().Trim(),
+                    syntaxName,
+                    StringComparison.Ordinal);
+            if (!hasOwnedEndTag)
+            {
+                System.Diagnostics.Trace.WriteLine(
+                    $"[Akbura.AutoClose] name={syntaxName}, " +
+                    $"ownedEndTag=false, " +
+                    $"pairContext={markupTagContext.HasValue}, " +
+                    $"priorParent={markupTagContext?.ParentElementName ?? "<none>"}, " +
+                    $"priorParentEndTag={markupTagContext?.ParentEndTagSpan.ToString() ?? "<none>"}, " +
+                    "ownedEndTagSpan=<none>, reboundParentEndTag=false, decision=insert");
+                return $"</{syntaxName}>";
+            }
+
+            var isReboundParentEndTag =
+                markupTagContext is { } context &&
+                string.Equals(
+                    context.ParentElementName,
+                    syntaxName,
+                    StringComparison.Ordinal) &&
+                endTag!.Span == context.ParentEndTagSpan;
+            System.Diagnostics.Trace.WriteLine(
+                $"[Akbura.AutoClose] name={syntaxName}, " +
+                "ownedEndTag=true, " +
+                $"pairContext={markupTagContext.HasValue}, " +
+                $"priorParent={markupTagContext?.ParentElementName ?? "<none>"}, " +
+                $"priorParentEndTag={markupTagContext?.ParentEndTagSpan.ToString() ?? "<none>"}, " +
+                $"ownedEndTagSpan={endTag!.Span}, " +
+                $"reboundParentEndTag={isReboundParentEndTag}, " +
+                $"decision={(isReboundParentEndTag ? "insert" : "suppress")}");
+            return isReboundParentEndTag
+                ? $"</{syntaxName}>"
+                : null;
         }
 
-        if (!TryGetStartTagNameEndingAt(position, out var name) ||
-            HasMatchingClosingTagAfter(root, position, name))
+        if (!TryGetStartTagNameEndingAt(position, out var name))
         {
             return null;
         }
@@ -1038,39 +1136,6 @@ public sealed partial class AkburaSyntacticDocument
         return true;
     }
 
-    private static bool HasMatchingClosingTagAfter(AkburaSyntax root, int position, string name)
-    {
-        var depth = 0;
-        foreach (var node in root.DescendantNodes().Where(node => node.Span.Start >= position).OrderBy(node => node.Span.Start))
-        {
-            if (node is MarkupStartTagSyntax startTag &&
-                startTag.CloseToken.Kind !=
-                    SyntaxKind.SlashGreaterToken &&
-                string.Equals(
-                    startTag.Name.ToFullString().Trim(),
-                    name,
-                    StringComparison.Ordinal))
-            {
-                depth++;
-            }
-            else if (node is MarkupEndTagSyntax endTag &&
-                     string.Equals(
-                         endTag.Name.ToFullString().Trim(),
-                         name,
-                         StringComparison.Ordinal))
-            {
-                if (depth == 0)
-                {
-                    return true;
-                }
-
-                depth--;
-            }
-        }
-
-        return false;
-    }
-
     private static bool IsBeforeTagClose(int position, SyntaxToken closeToken)
     {
         return closeToken.IsMissing ||
@@ -1352,7 +1417,7 @@ public sealed partial class AkburaSyntacticDocument
             if (startTag == null ||
                 startTag.CloseToken.IsMissing ||
                 startTag.CloseToken.Kind != SyntaxKind.GreaterThanToken ||
-                startTag.CloseToken.Span.End > position ||
+                startTag.Span.End > position ||
                 HasCompleteEndTagBefore(
                     element.EndTag,
                     position))

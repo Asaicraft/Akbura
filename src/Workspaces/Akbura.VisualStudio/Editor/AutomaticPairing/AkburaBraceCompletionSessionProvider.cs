@@ -1,4 +1,5 @@
 using Akbura.Workspaces;
+using Akbura.Workspaces.AutomaticPairing;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.BraceCompletion;
 using Microsoft.VisualStudio.Text.Editor;
@@ -79,6 +80,36 @@ internal sealed class AkburaBraceCompletionSessionProvider :
             var document = _parserService.GetSyntacticDocument(
                 snapshot,
                 budget.Token);
+            AkburaMarkupTagPairContext? markupTagContext = null;
+            if (openingBrace == '<')
+            {
+                var markupOpeningPosition = openingPoint.Position > 0 &&
+                    snapshot[openingPoint.Position - 1] == '<'
+                    ? openingPoint.Position - 1
+                    : openingPoint.Position;
+                markupTagContext = document.GetMarkupTagPairContext(
+                    markupOpeningPosition,
+                    out var contextFailureReason,
+                    budget.Token);
+                if (markupTagContext is { } context)
+                {
+                    AkburaWorkspaceDiagnostics.Write(
+                        AkburaWorkspaceDiagnostics.Category.AutoClosingTag,
+                        $"Markup auto-close context captured: " +
+                        $"parent={context.ParentElementName}, " +
+                        $"parentEndTag=[{context.ParentEndTagSpan.Start}.." +
+                        $"{context.ParentEndTagSpan.End}), " +
+                        $"opening={markupOpeningPosition}.");
+                }
+                else
+                {
+                    AkburaWorkspaceDiagnostics.Write(
+                        AkburaWorkspaceDiagnostics.Category.AutoClosingTag,
+                        "Markup auto-close context not captured: " +
+                        $"position={markupOpeningPosition}, " +
+                        $"reason={contextFailureReason}.");
+                }
+            }
             // Native VS may report the point ON an already inserted brace,
             // whereas the shared typing service accepts a caret AFTER it.
             // Inspect the existing token first; do not simulate a second '{'.
@@ -130,13 +161,22 @@ internal sealed class AkburaBraceCompletionSessionProvider :
                 return false;
             }
 
+            var pendingMarkupAutoCloseState =
+                markupTagContext is { } capturedContext
+                    ? new AkburaPendingMarkupAutoCloseState(
+                        textView,
+                        snapshot.TextBuffer,
+                        capturedContext,
+                        snapshot)
+                    : null;
             session = new AkburaBraceCompletionSession(
                 textView,
                 isStructuralBrace
                     ? new SnapshotPoint(snapshot, structuralOpeningPosition)
                     : openingPoint,
                 openingBrace,
-                closingBrace);
+                closingBrace,
+                pendingMarkupAutoCloseState);
             var contextName = isStructuralBrace
                 ? "StructuralMarkupOrAkcss"
                 : decision.ContextKind.ToString();

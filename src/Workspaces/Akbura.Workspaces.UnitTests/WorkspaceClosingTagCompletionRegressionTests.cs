@@ -67,6 +67,41 @@ public sealed class WorkspaceClosingTagCompletionRegressionTests
         Assert.Null(document.GetSlashCompletionIndentationLevel(source.Length));
     }
 
+    [Fact]
+    public void NestedSameNameAutoClose_MatchesFullAndIncrementalParsing()
+    {
+        const string source =
+            "<Button>\r\n" +
+            "    <StackPanel>\r\n" +
+            "        <Button\r\n" +
+            "    </StackPanel>\r\n" +
+            "</Button>";
+        var openingPosition = source.LastIndexOf(
+            "<Button",
+            StringComparison.Ordinal);
+        var insertionPosition = openingPosition + "<Button".Length;
+        var originalText = SourceText.From(source);
+        var original = AkburaSyntacticDocument.Parse(
+            originalText,
+            "Component.akbura");
+        var changedText = originalText.WithChanges(
+            new TextChange(
+                new TextSpan(insertionPosition, 0),
+                ">"));
+        var incremental = original.WithText(changedText);
+        var full = AkburaSyntacticDocument.Parse(
+            changedText,
+            "Component.akbura");
+        var position = insertionPosition + 1;
+
+        Assert.Equal(
+            "</Button>",
+            full.GetAutoClosingTagText(position));
+        Assert.Equal(
+            full.GetAutoClosingTagText(position),
+            incremental.GetAutoClosingTagText(position));
+    }
+
     private static void AssertParent(
         AkburaSyntacticDocument document, int position, string parent, bool existingGreater)
     {

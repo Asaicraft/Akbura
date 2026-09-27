@@ -24,6 +24,8 @@ interface TrackedPairSession {
     closingText: string;
     requiredDelimiterLength: number;
     outerLiteralDelimiterCount: number;
+    parentElementName?: string;
+    parentEndTag?: OffsetSpan;
 }
 
 export class AkburaPairSessionManager implements vscode.Disposable {
@@ -216,12 +218,23 @@ export class AkburaPairSessionManager implements vscode.Disposable {
             if (end <= session.opening.start) {
                 shift(session.opening, delta);
                 shift(session.closing, delta);
+                if (session.parentEndTag != null) {
+                    shift(session.parentEndTag, delta);
+                }
                 continue;
             }
 
             if (start >= session.opening.end &&
                 end <= session.closing.start) {
                 shift(session.closing, delta);
+                if (session.parentEndTag != null) {
+                    if (start <= session.parentEndTag.start) {
+                        shift(session.parentEndTag, delta);
+                    } else if (start < session.parentEndTag.end) {
+                        session.parentEndTag = undefined;
+                        session.parentElementName = undefined;
+                    }
+                }
                 continue;
             }
 
@@ -275,7 +288,14 @@ export class AkburaPairSessionManager implements vscode.Disposable {
             requiredDelimiterLength:
                 session.requiredDelimiterLength,
             outerLiteralDelimiterCount:
-                session.outerLiteralDelimiterCount
+                session.outerLiteralDelimiterCount,
+            parentElementName: session.parentElementName,
+            parentEndTag: session.parentEndTagRange == null ||
+                session.parentElementName == null
+                ? undefined
+                : toOffsetSpan(
+                    document,
+                    session.parentEndTagRange!)
         };
     }
 
@@ -298,7 +318,14 @@ export class AkburaPairSessionManager implements vscode.Disposable {
             requiredDelimiterLength:
                 session.requiredDelimiterLength,
             outerLiteralDelimiterCount:
-                session.outerLiteralDelimiterCount
+                session.outerLiteralDelimiterCount,
+            parentElementName: session.parentElementName,
+            parentEndTagRange: session.parentEndTag == null ||
+                session.parentElementName == null
+                ? undefined
+                : toProtocolRange(
+                    document,
+                    session.parentEndTag)
         };
     }
 

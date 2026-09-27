@@ -1,4 +1,6 @@
 using Akbura.Workspaces;
+using Akbura.Workspaces.AutomaticPairing;
+using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.Commanding;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;
@@ -115,9 +117,24 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
             var document = await _parserService
                 .GetSyntacticDocumentAsync(snapshot)
                 .ConfigureAwait(false);
-            var closingTag = document
-                .GetAutoClosingTagText(caretPosition);
-            if (closingTag == null)
+            var editorOptions = args.TextView.Options;
+            var typingOptions = new AkburaTypingOptions(
+                Math.Max(
+                    1,
+                    editorOptions.GetOptionValue(
+                        DefaultOptions.TabSizeOptionId)),
+                Math.Max(
+                    0,
+                    editorOptions.GetOptionValue(
+                        DefaultOptions.IndentSizeOptionId)),
+                editorOptions.GetOptionValue(
+                    DefaultOptions.ConvertTabsToSpacesOptionId),
+                GetNewLine(document.Text));
+            if (!AkburaTagPairCompletionFactory.TryCreate(
+                    document,
+                    caretPosition,
+                    typingOptions,
+                    out var completion))
             {
                 AkburaWorkspaceDiagnostics.Write(
                     AkburaWorkspaceDiagnostics.Category.AutoClosingTag,
@@ -129,7 +146,7 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
             AkburaWorkspaceDiagnostics.Write(
                 AkburaWorkspaceDiagnostics.Category.AutoClosingTag,
                 $"Parsed closing tag " +
-                $"'{closingTag}'.");
+                $"'{completion.InsertionText}'.");
 
             await ThreadHelper.JoinableTaskFactory
                 .SwitchToMainThreadAsync();
@@ -152,7 +169,7 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
             if (StartsWith(
                     currentSnapshot,
                     insertionPosition,
-                    closingTag))
+                    completion.InsertionText))
             {
                 AkburaWorkspaceDiagnostics.Write(
                     AkburaWorkspaceDiagnostics.Category.AutoClosingTag,
@@ -171,7 +188,7 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
             using var edit = args.SubjectBuffer.CreateEdit();
             if (!edit.Insert(
                     insertionPosition,
-                    closingTag))
+                    completion.InsertionText))
             {
                 AkburaWorkspaceDiagnostics.Write(
                     AkburaWorkspaceDiagnostics.Category.AutoClosingTag,
@@ -189,12 +206,12 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
                 args.TextView.Caret.MoveTo(
                     new SnapshotPoint(
                         appliedSnapshot,
-                        insertionPosition));
+                        insertionPosition + completion.CaretOffset));
             }
 
             AkburaWorkspaceDiagnostics.Write(
                 AkburaWorkspaceDiagnostics.Category.AutoClosingTag,
-                $"Inserted '{closingTag}' " +
+                $"Inserted '{completion.InsertionText}' " +
                 $"at {insertionPosition}.");
         }
         catch (Exception exception)
@@ -452,6 +469,22 @@ internal sealed class AkburaAutoClosingTagCommandHandler :
         var spaceCount = width % tabSize;
         return new string('\t', tabCount) +
             new string(' ', spaceCount);
+    }
+
+    private static string GetNewLine(SourceText text)
+    {
+        foreach (var line in text.Lines)
+        {
+            if (line.EndIncludingLineBreak > line.End)
+            {
+                return text.ToString(
+                    TextSpan.FromBounds(
+                        line.End,
+                        line.EndIncludingLineBreak));
+            }
+        }
+
+        return Environment.NewLine;
     }
 
     private static bool StartsWith(

@@ -55,7 +55,7 @@ public sealed class WorkspaceTypingTests
     }
 
     [Fact]
-    public void GeneratedGreaterOvertypesAndAddsClosingTag()
+    public void GeneratedGreaterOvertypesAndAddsIndentedTagPair()
     {
         var (document, position) = Parse("<Button|>");
         var session = new AkburaPairSession(
@@ -70,9 +70,33 @@ public sealed class WorkspaceTypingTests
         var result = Type(document, position, '>', session);
 
         Assert.True(result.Handled);
-        Assert.Equal("</Button>", Assert.Single(result.Changes).NewText);
-        Assert.Equal(position + 1, result.NewPosition);
+        Assert.Equal("\r\n    \r\n</Button>", Assert.Single(result.Changes).NewText);
+        Assert.Equal(position + 7, result.NewPosition);
         Assert.Null(result.Session);
+    }
+
+    [Fact]
+    public void GreaterThanAddsMultilineTagPairWithCaretInside()
+    {
+        var (document, position) = Parse("<StackPanel|");
+
+        var result = Type(document, position, '>');
+
+        Assert.True(result.Handled);
+        Assert.Equal(">\r\n    \r\n</StackPanel>", Assert.Single(result.Changes).NewText);
+        Assert.Equal(position + 7, result.NewPosition);
+        Assert.Null(result.Session);
+    }
+
+    [Fact]
+    public void GreaterThanPreservesStructuralIndentationForNestedTagPair()
+    {
+        var (document, position) = Parse("<Grid>\r\n    <StackPanel|");
+
+        var result = Type(document, position, '>');
+
+        Assert.Equal(">\r\n        \r\n    </StackPanel>", Assert.Single(result.Changes).NewText);
+        Assert.Equal(position + 11, result.NewPosition);
     }
 
     [Fact]

@@ -196,21 +196,26 @@ internal sealed class AkburaTypingService : IAkburaTypingService
         }
 
         var afterGreater = session.ClosingSpan.Start + 1;
-        var closingTag = command.Options.AutoClosingTags
-            ? document.GetAutoClosingTagText(
+        var completion = default(AkburaTagPairCompletion);
+        var hasCompletion = command.Options.AutoClosingTags &&
+            AkburaTagPairCompletionFactory.TryCreate(
+                document,
                 afterGreater,
-                cancellationToken)
-            : null;
-        var changes = string.IsNullOrEmpty(closingTag)
+                command.Options,
+                out completion,
+                cancellationToken);
+        var changes = !hasCompletion
             ? NoChanges
             : ImmutableArray.Create(
                 new TextChange(
                     new TextSpan(afterGreater, 0),
-                    closingTag!));
+                    completion.InsertionText));
 
         result = Handled(
             changes,
-            afterGreater,
+            hasCompletion
+                ? afterGreater + completion.CaretOffset
+                : afterGreater,
             session: null);
         return true;
     }
@@ -264,19 +269,24 @@ internal sealed class AkburaTypingService : IAkburaTypingService
             command.Position,
             ">",
             cancellationToken);
-        var closingTag = changedDocument.GetAutoClosingTagText(
+        var hasCompletion = AkburaTagPairCompletionFactory.TryCreate(
+            changedDocument,
             command.Position + 1,
+            command.Options,
+            out var completion,
             cancellationToken);
-        var insertedText = string.IsNullOrEmpty(closingTag)
-            ? ">"
-            : ">" + closingTag;
+        var insertedText = hasCompletion
+            ? ">" + completion.InsertionText
+            : ">";
 
         return Handled(
             ImmutableArray.Create(
                 new TextChange(
                     new TextSpan(command.Position, 0),
                     insertedText)),
-            command.Position + 1,
+            hasCompletion
+                ? command.Position + 1 + completion.CaretOffset
+                : command.Position + 1,
             session: null);
     }
 

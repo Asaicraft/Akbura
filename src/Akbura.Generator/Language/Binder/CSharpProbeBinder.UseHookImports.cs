@@ -17,7 +17,8 @@ internal sealed partial class CSharpProbeBinder
 
     private UseHookImports CreateUseHookImports(
         CSharp.InvocationExpressionSyntax invocation,
-        ImmutableArray<INamedTypeSymbol> hookTypes)
+        ImmutableArray<INamedTypeSymbol> hookTypes,
+        bool omitSelfParameter = false)
     {
         if (invocation.Expression is not CSharp.SimpleNameSyntax name)
         {
@@ -51,6 +52,31 @@ internal sealed partial class CSharpProbeBinder
                 // method to its real declaring type before producing operations.
                 var declaration = (CSharp.MethodDeclarationSyntax)CSharpSyntaxFactory.ParseMemberDeclaration(
                     method.ToDisplayString(s_useHookImportDisplayFormat) + " => throw null!;")!;
+                var parameters = declaration.ParameterList.Parameters;
+                if (omitSelfParameter && parameters.Count != 0)
+                {
+                    parameters = parameters.RemoveAt(0);
+                }
+
+                for (var index = 0; index < parameters.Count; index++)
+                {
+                    var methodParameterIndex = index + (omitSelfParameter ? 1 : 0);
+                    if (!method.Parameters[methodParameterIndex].IsOptional)
+                    {
+                        continue;
+                    }
+
+                    parameters = parameters.Replace(
+                        parameters[index],
+                        parameters[index].WithDefault(
+                            CSharpSyntaxFactory.EqualsValueClause(
+                                CSharpSyntaxFactory.LiteralExpression(
+                                    CSharpSyntaxKind.DefaultLiteralExpression,
+                                    CSharpSyntaxFactory.Token(CSharpSyntaxKind.DefaultKeyword)))));
+                }
+
+                declaration = declaration.WithParameterList(
+                    declaration.ParameterList.WithParameters(parameters));
                 declarations.Add(declaration.WithAdditionalAnnotations(new SyntaxAnnotation(
                     UseHookImportAnnotationKind,
                     methods.Count.ToString(CultureInfo.InvariantCulture))));

@@ -25,6 +25,19 @@ internal abstract partial class AkburaSemanticModel
             .GetVisibleStateHookMethods(namePrefix, cancellationToken);
     }
 
+    internal ImmutableArray<UseHookCompletionCandidate> LookupVisibleRenderHooks(CSharpStatementSyntax statement, string namePrefix, CancellationToken cancellationToken)
+    {
+        if (statement == null)
+        {
+            throw new ArgumentNullException(nameof(statement));
+        }
+
+        ValidateSyntaxTreeOwnership(statement);
+        return BindingSession
+            .GetUseHookBinder(statement, BinderUsage.Expression)
+            .GetVisibleRenderHookMethods(namePrefix, cancellationToken);
+    }
+
     internal CSharpProbeProjection CreateCSharpCompletionProjection(CSharpExpressionSyntax expressionSyntax, int relativePosition)
     {
         if (expressionSyntax == null)
@@ -232,6 +245,18 @@ internal abstract partial class AkburaSemanticModel
         {
             throw new InvalidOperationException(
                 "The statement could not be parsed as C#.");
+        }
+
+        var useHookBinder = BindingSession.GetUseHookBinder(
+            statementSyntax,
+            BinderUsage.Expression);
+        if (useHookBinder.TryCreateRenderHookCompletionProjection(
+                statementSyntax,
+                statement,
+                relativePosition,
+                out var hookProjection))
+        {
+            return hookProjection;
         }
 
         var binder = BindingSession.GetCSharpProbeBinder(

@@ -12,6 +12,10 @@
         "link": "/akbura/hooks"
       },
       {
+        "text": "Avalonia Event Hooks",
+        "link": "/akbura/event-hooks"
+      },
+      {
         "text": "Commands",
         "link": "/akbura/commands"
       },

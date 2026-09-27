@@ -215,6 +215,7 @@ public abstract partial class AkburaControl : Control, IComponentTree
     private long _hotReloadRequestGeneration;
     private long _pendingHotReloadRequestGeneration;
     private readonly UseHookRuntime _useHooks;
+    private readonly ControlEventLifecycleBridge _controlEventLifecycle;
     private readonly long _hotReloadCreationRevision;
 
     public AkburaControl() : this(AkburaEngine.Singletone)
@@ -226,6 +227,7 @@ public abstract partial class AkburaControl : Control, IComponentTree
     {
         _engine = akburaEngine;
         _useHooks = new UseHookRuntime(this);
+        _controlEventLifecycle = new ControlEventLifecycleBridge(this);
         _hotReloadCreationRevision =
             AkburaHotReloadRuntime.CaptureRevision();
     }
@@ -656,6 +658,10 @@ public abstract partial class AkburaControl : Control, IComponentTree
             detach));
     }
 
+    internal int GetCurrentUseHookIndex() => _useHooks.CurrentRegistrationIndex;
+
+    internal ControlEventLifecycleBridge ControlEventLifecycle => _controlEventLifecycle;
+
     internal State<T> GetHookState<T>(StateInfo<T> info, T initialValue) =>
         _useHooks.GetState(info, initialValue);
 
@@ -742,6 +748,7 @@ public abstract partial class AkburaControl : Control, IComponentTree
                     }
 
                     _useHooks.BeginFrame();
+                    _controlEventLifecycle.BeginHookFrame();
                     hookFrameStarted = true;
                     PrepareHookStates();
 
@@ -764,6 +771,7 @@ public abstract partial class AkburaControl : Control, IComponentTree
                     _useHooks.CompleteFrame(CommitUseHookFrame);
                     if (_useHooks.IsFrameCommitted)
                     {
+                        _controlEventLifecycle.CompleteHookFrame();
                         _initialUpdatePending = false;
                     }
                     else
@@ -918,6 +926,7 @@ public abstract partial class AkburaControl : Control, IComponentTree
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
+        _controlEventLifecycle.CancelVisualDetach();
         base.OnAttachedToVisualTree(e);
         ResumeStateResources();
         _useHooks.Resume();
@@ -935,6 +944,7 @@ public abstract partial class AkburaControl : Control, IComponentTree
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
+        _controlEventLifecycle.BeginVisualDetach();
         List<Exception>? failures = null;
         try
         {

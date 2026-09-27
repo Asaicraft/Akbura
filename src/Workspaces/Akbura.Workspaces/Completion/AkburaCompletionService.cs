@@ -409,10 +409,115 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
             context,
             position,
             cancellationToken);
+        AddRenderHookItems(
+            items,
+            semanticContext,
+            context,
+            cancellationToken);
 
         return new AkburaCompletionResult(
             context.ApplicableSpan,
             items.ToImmutable());
+    }
+
+    private static void AddRenderHookItems(ImmutableArrayBuilder<AkburaCompletionItem> items, AkburaDocumentContext? semanticContext, AkburaSyntacticCompletionContext context, CancellationToken cancellationToken)
+    {
+        if (semanticContext == null || semanticContext.Document.SyntaxTree.Kind == SyntaxTreeKind.Akcss)
+        {
+            return;
+        }
+
+        var semanticModel = semanticContext.Project.Compilation.GetSemanticModel(
+            semanticContext.Document.SyntaxTree);
+        var statement = semanticModel.SyntaxTree
+            .GetRootSyntax()
+            .DescendantNodes()
+            .OfType<CSharpStatementSyntax>()
+            .FirstOrDefault(candidate =>
+                candidate.FullSpan.Start <= context.ApplicableSpan.Start &&
+                candidate.FullSpan.End >= context.ApplicableSpan.End);
+        if (statement == null)
+        {
+            return;
+        }
+
+        var selected = new Dictionary<string, UseHookCompletionCandidate>(StringComparer.Ordinal);
+        var candidates = semanticModel.LookupVisibleRenderHooks(
+            statement,
+            context.Prefix,
+            cancellationToken);
+        foreach (var candidate in candidates)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!selected.TryGetValue(candidate.Method.Name, out var current) ||
+                IsBetterRenderHookOverload(candidate, current))
+            {
+                selected[candidate.Method.Name] = candidate;
+            }
+        }
+
+        foreach (var candidate in selected.Values.OrderBy(static candidate => candidate.Method.Name, StringComparer.Ordinal))
+        {
+            var method = candidate.Method;
+            var suffix = FormatStateHookSuffix(candidate);
+            var documentation = GetRenderHookDocumentation(method, cancellationToken);
+            var description = $"{method.Name}{suffix}{Environment.NewLine}" +
+                (documentation == null
+                    ? string.Empty
+                    : documentation + Environment.NewLine) +
+                $"Declared in {method.ContainingType.ToDisplayString()}";
+            items.Add(new AkburaCompletionItem(
+                method.Name,
+                method.Name,
+                AkburaCompletionKind.Hook,
+                description,
+                descriptionFactory: null,
+                suffix: suffix,
+                priority: 10));
+        }
+    }
+
+    private static string? GetRenderHookDocumentation(IMethodSymbol method, CancellationToken cancellationToken)
+    {
+        var xml = method.GetDocumentationCommentXml(cancellationToken: cancellationToken) ?? string.Empty;
+        var summaryStart = xml.IndexOf("<summary>", StringComparison.Ordinal);
+        var summaryEnd = xml.IndexOf("</summary>", StringComparison.Ordinal);
+        if (summaryStart < 0 || summaryEnd <= summaryStart)
+        {
+            return null;
+        }
+
+        summaryStart += "<summary>".Length;
+        return string.Join(
+            " ",
+            xml.Substring(summaryStart, summaryEnd - summaryStart)
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    private static bool IsBetterRenderHookOverload(UseHookCompletionCandidate candidate, UseHookCompletionCandidate current)
+    {
+        var candidateRank = GetRenderHookCallbackRank(candidate);
+        var currentRank = GetRenderHookCallbackRank(current);
+        return candidateRank != currentRank
+            ? candidateRank < currentRank
+            : IsBetterHookOverload(candidate, current);
+    }
+
+    private static int GetRenderHookCallbackRank(UseHookCompletionCandidate candidate)
+    {
+        var callback = GetVisibleHookParameters(candidate).FirstOrDefault();
+        if (callback?.Type is not INamedTypeSymbol callbackType)
+        {
+            return 3;
+        }
+
+        var metadataName = callbackType.OriginalDefinition.ToDisplayString();
+        return metadataName switch
+        {
+            "System.Action<T>" => 0,
+            "System.Action" => 1,
+            _ => 2,
+        };
     }
 
     private static AkburaCompletionResult CreateDescriptorResult(AkburaSyntacticCompletionContext context, ImmutableArray<TopLevelCompletionDescriptor> descriptors)

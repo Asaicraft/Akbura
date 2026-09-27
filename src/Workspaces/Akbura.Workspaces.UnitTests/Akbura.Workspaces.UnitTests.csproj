@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Akbura.Workspaces\Akbura.Workspaces.csproj" />
+    <ProjectReference Include="..\..\Akbura\Akbura.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>

@@ -15,6 +15,36 @@ public sealed class UsefulHookIntegrationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void ControlEventHooks_CompileAllCallbackFormsInBothBackends(bool debugStructural)
+    {
+        const string source =
+            """
+            using System;
+            using Akbura.Hooks;
+            using Avalonia.Controls;
+            using Avalonia.Interactivity;
+
+            useAttachedToVisualTree(ResolveComponent);
+            useKeyDown(() => { });
+            useKeyUp(args => { args.Handled = true; });
+            useContextCanceled((sender, args) => { args.Handled = sender != null; }, handledEventsToo: true);
+            useDataContextChanged(() => { });
+            useDataContextChanged(args => { });
+            useDataContextChanged((sender, args) => { });
+            useInitialized(() => { });
+            useDetachedFromVisualTree(args => { });
+            useUnloaded((sender, args) => { }, RoutingStrategies.Direct, handledEventsToo: true);
+            useRequestBringIntoView(args => { args.Handled = true; });
+
+            <Border />
+            """;
+
+        _ = Compile(source, EventHookOwner, debugStructural);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void AllHooks_CompileFromShortDslCalls(bool debugStructural)
     {
         const string source =
@@ -215,6 +245,21 @@ public sealed class UsefulHookIntegrationTests
             {
                 public IDisposable Subscribe(IObserver<int> observer) => new Subscription();
             }
+        }
+        """;
+
+    private const string EventHookOwner =
+        """
+        using Akbura;
+        using Akbura.Engine;
+
+        namespace Demo;
+
+        public partial class PlannerView : AkburaControl
+        {
+            public PlannerView() : base(AkburaEngine.Empty) { }
+
+            private void ResolveComponent() { }
         }
         """;
 }

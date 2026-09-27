@@ -158,6 +158,39 @@ internal sealed partial class CSharpProbeBinder
             : probe;
     }
 
+    internal CSharpProbeProjection CreateUseHookCompletionProjection(AkburaSyntax syntax, CSharp.StatementSyntax statement, CSharp.InvocationExpressionSyntax invocation, ImmutableArray<INamedTypeSymbol> hookTypes, int relativePosition)
+    {
+        var annotation = new SyntaxAnnotation(CSharpProbeBuilder.CompletionAnnotationKind);
+        var annotatedStatement = statement.WithAdditionalAnnotations(annotation);
+        var probeScope = CreateCompletionProbeScope(syntax, annotatedStatement);
+        var method = CSharpSyntaxFactory.MethodDeclaration(
+                CSharpSyntaxFactory.PredefinedType(
+                    CSharpSyntaxFactory.Token(CSharpSyntaxKind.VoidKeyword)),
+                "__akbura_use_hook_completion_probe")
+            .WithBody(CreateProbeBlock(probeScope.LocalStatements, annotatedStatement));
+        var imports = CreateUseHookImports(
+            invocation,
+            hookTypes,
+            omitSelfParameter: true);
+        var members = AddProbeMethod(probeScope.MemberDeclarations, method);
+        var usingDirectives = CreateUseHookUsingDirectives(hookTypes);
+        if (!imports.Types.IsDefaultOrEmpty)
+        {
+            members = members.AddRange(imports.Types);
+            usingDirectives = usingDirectives.AddRange(imports.UsingDirectives);
+        }
+
+        var root = CreateComponentProbeCompilationUnit(
+            members,
+            "__AkburaUseHookCompletionProbe",
+            usingDirectives);
+        return CSharpProbeBuilder.CreateProjection(
+            root,
+            annotatedStatement,
+            annotation,
+            relativePosition);
+    }
+
     private CSharpProbeScope CreateUseHookProbeScope(
         AkburaSyntax syntax,
         CSharp.InvocationExpressionSyntax invocation)

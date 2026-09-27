@@ -132,6 +132,15 @@ internal sealed class UseHookRuntime
 
     public bool IsFrameCommitted { get; private set; }
 
+    public int CurrentRegistrationIndex
+    {
+        get
+        {
+            EnsureCollecting();
+            return _pending.Count;
+        }
+    }
+
     public void BeginFrame()
     {
         if (_isCollecting || _isCompleting)

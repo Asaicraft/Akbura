@@ -1,6 +1,6 @@
 using Akbura.ComponentTree;
+using Akbura.Hooks;
 using Avalonia.Threading;
-using Avalonia.VisualTree;
 
 state string? componentUrl = null;
 
@@ -49,24 +49,16 @@ void ResolveComponent()
     }
 }
 
-useEffect(() =>
+useAttachedToVisualTree(() =>
 {
-    EventHandler<VisualTreeAttachmentEventArgs> onAttached =
-        (_, _) =>
-        {
-            Dispatcher.UIThread.Post(
-                ResolveComponent);
-        };
-
-    AttachedToVisualTree += onAttached;
-
     Dispatcher.UIThread.Post(
         ResolveComponent);
+});
 
-    return () =>
-    {
-        AttachedToVisualTree -= onAttached;
-    };
+useEffect(() =>
+{
+    Dispatcher.UIThread.Post(
+        ResolveComponent);
 }, []);
 
 <ViewThisInGithub

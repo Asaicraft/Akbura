@@ -133,6 +133,7 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
                     semanticModel.GetCSharpSymbolReferences(condition),
                 MarkupForeachHeaderSyntax header => semanticModel.GetCSharpSymbolReferences(header),
                 MarkupCodeStatementSyntax code => semanticModel.GetCSharpSymbolReferences(code),
+                CSharpStatementSyntax statement => semanticModel.GetCSharpSymbolReferences(statement),
                 _ => default,
             };
             if (references.IsDefaultOrEmpty)
@@ -151,13 +152,7 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
                     GetCSharpSignature(symbolReference.CSharpDefinition.Symbol);
                 if (signature != null)
                 {
-                    var details = symbolReference.AkburaSymbol is IStateSymbol referencedState
-                        ? GetStateDetails(referencedState)
-                        : symbolReference.CSharpDefinition.Symbol is { } projectedSymbol &&
-                        Akbura.Workspaces.References.AkburaSymbolKeyFactory.TryGetProjectedLocalOrigin(projectedSymbol,
-                            out var origin) && origin.Kind == Akbura.Language.Symbols.SymbolKind.MarkupLoopIndex
-                        ? ImmutableArray.Create("Read-only zero-based index in the source sequence, before filtering or jumps.")
-                        : ImmutableArray<string>.Empty;
+                    var details = GetCSharpReferenceDetails(symbolReference, cancellationToken);
                     return new AkburaQuickInfo(symbolReference.SourceSpan,
                         AkburaQuickInfoKind.Symbol, signature, details);
                 }
@@ -338,6 +333,53 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
         return symbol is ILocalSymbol local
             ? local.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat) + " " + local.Name
             : symbol?.ToDisplayString();
+    }
+
+    private static ImmutableArray<string> GetCSharpReferenceDetails(CSharpSymbolReference reference, CancellationToken cancellationToken)
+    {
+        if (reference.AkburaSymbol is IStateSymbol state)
+        {
+            return GetStateDetails(state);
+        }
+
+        var symbol = reference.CSharpDefinition.Symbol;
+        if (symbol != null &&
+            Akbura.Workspaces.References.AkburaSymbolKeyFactory.TryGetProjectedLocalOrigin(
+                symbol,
+                out var origin) &&
+            origin.Kind == Akbura.Language.Symbols.SymbolKind.MarkupLoopIndex)
+        {
+            return ImmutableArray.Create(
+                "Read-only zero-based index in the source sequence, before filtering or jumps.");
+        }
+
+        var documentation = GetDocumentation(symbol, cancellationToken);
+        return documentation == null
+            ? ImmutableArray<string>.Empty
+            : ImmutableArray.Create(documentation);
+    }
+
+    private static string? GetDocumentation(Microsoft.CodeAnalysis.ISymbol? symbol, CancellationToken cancellationToken)
+    {
+        var xml = symbol?.GetDocumentationCommentXml(
+            cancellationToken: cancellationToken) ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(xml))
+        {
+            return null;
+        }
+
+        var summaryStart = xml.IndexOf("<summary>", StringComparison.Ordinal);
+        var summaryEnd = xml.IndexOf("</summary>", StringComparison.Ordinal);
+        if (summaryStart < 0 || summaryEnd <= summaryStart)
+        {
+            return null;
+        }
+
+        summaryStart += "<summary>".Length;
+        return string.Join(
+            " ",
+            xml.Substring(summaryStart, summaryEnd - summaryStart)
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
     }
 
     private static AkburaQuickInfo CreateStateQuickInfo(TextSpan span, IStateSymbol state)

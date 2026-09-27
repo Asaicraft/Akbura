@@ -273,3 +273,9 @@ Avalonia view:
 ```
 
 Akbura components therefore integrate into existing Avalonia applications without a wrapper or a separate hosting element.
+
+## Component event hooks
+
+Use [Avalonia event hooks](/akbura/event-hooks) to handle the component's
+lifecycle, input, gesture, layout and property events without manually managing
+`+=`, `-=`, or a subscription `useEffect`.

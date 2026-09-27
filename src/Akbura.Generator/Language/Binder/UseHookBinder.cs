@@ -147,6 +147,59 @@ internal sealed class UseHookBinder : Binder
         return builder.ToImmutable();
     }
 
+    internal ImmutableArray<UseHookCompletionCandidate> GetVisibleRenderHookMethods(string namePrefix, CancellationToken cancellationToken)
+    {
+        using var builder = ImmutableArrayBuilder<UseHookCompletionCandidate>.Rent();
+        var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        foreach (var hookType in GetVisibleHookTypes(namePrefix, exactName: false))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            foreach (var member in hookType.GetMembers())
+            {
+                if (member is not IMethodSymbol method ||
+                    !method.Name.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase) ||
+                    method.Name == "useEffect" ||
+                    method.Name == "useEventListener" ||
+                    !HasAttribute(method, UseHookAttributeMetadataName) ||
+                    !TryValidateHookMethod(method, out var selfParameter, out _) ||
+                    !TryValidateContext(method, UseHookContext.Render, out _) ||
+                    !seen.Add(method))
+                {
+                    continue;
+                }
+
+                builder.Add(new UseHookCompletionCandidate(method, selfParameter));
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    internal bool TryCreateRenderHookCompletionProjection(CSharpStatementSyntax syntax, CSharp.StatementSyntax statement, int relativePosition, out CSharpProbeProjection projection)
+    {
+        if (statement is CSharp.ExpressionStatementSyntax
+            {
+                Expression: CSharp.InvocationExpressionSyntax invocation,
+            } &&
+            TryGetInvocationName(invocation, out var invocationName))
+        {
+            var hookTypes = GetVisibleHookTypes(invocationName);
+            if (!hookTypes.IsDefaultOrEmpty)
+            {
+                projection = _probeBinder.CreateUseHookCompletionProjection(
+                    syntax,
+                    statement,
+                    invocation,
+                    hookTypes,
+                    relativePosition);
+                return true;
+            }
+        }
+
+        projection = default;
+        return false;
+    }
+
     private bool TryBindInvocation(
         AkburaSyntax syntax,
         CSharp.InvocationExpressionSyntax invocation,

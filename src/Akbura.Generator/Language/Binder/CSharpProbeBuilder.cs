@@ -12,7 +12,7 @@ namespace Akbura.Language.Binder;
 
 internal sealed partial class CSharpProbeBuilder
 {
-    private const string CompletionAnnotationKind = "AkburaCSharpCompletionTarget";
+    internal const string CompletionAnnotationKind = "AkburaCSharpCompletionTarget";
     private const string ReturnProbeAnnotationKind = "AkburaCSharpReturnProbe";
     internal const string StatementProbeAnnotationKind = "AkburaCSharpStatementProbe";
 

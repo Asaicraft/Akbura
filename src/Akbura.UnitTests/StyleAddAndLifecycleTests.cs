@@ -5,6 +5,8 @@ using Akbura.Language.Syntax;
 using Akbura.ComponentTree;
 using Avalonia.Data;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Templates;
 using Avalonia.Media;
 using Avalonia.Styling;
 using Microsoft.CodeAnalysis;
@@ -16,6 +18,163 @@ namespace Akbura.UnitTests;
 [Collection(AvaloniaHeadlessCollection.Name)]
 public sealed class StyleAddAndLifecycleTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task ControlTheme_StaticResourceBasedOnSurvivesSubtreeUpdates(bool debugStructural, bool applicationResource)
+    {
+        const string source =
+            """
+            using Avalonia.Controls;
+            using Avalonia.Styling;
+            using Avalonia.Markup.Xaml.MarkupExtensions;
+            state double opacity = 0.25;
+            <Button>
+                <Button.Theme>
+                    <ControlTheme BasedOn=${StaticResource {typeof(Button)}} TargetType="Button">
+                        <Setter Property="Opacity" Value={opacity} />
+                        <Style Selector="^:pointerover">
+                            <Setter Property="Background" Value="Red" />
+                        </Style>
+                    </ControlTheme>
+                </Button.Theme>
+            </Button>
+            """;
+        var ownerType = Compile(AkcssActivatorPlannerTests.CreateFixture(source, OwnerSource), debugStructural);
+        await AvaloniaHeadlessTestSession.GetSession().Dispatch(() =>
+        {
+            var inheritedTemplate = new FuncControlTemplate<Button>((_, _) => new Border());
+            var inheritedTheme = new ControlTheme(typeof(Button))
+            {
+                Setters =
+                {
+                    new Setter(Control.WidthProperty, 91d),
+                    new Setter(TemplatedControl.TemplateProperty, inheritedTemplate),
+                },
+            };
+            var owner = Assert.IsAssignableFrom<AkburaControl>(Activator.CreateInstance(ownerType));
+            var resources = applicationResource ? Avalonia.Application.Current!.Resources : owner.Resources;
+            var hadResource = resources.TryGetValue(typeof(Button), out var previousResource);
+            resources[typeof(Button)] = inheritedTheme;
+            var window = new Window { Content = owner };
+            try
+            {
+                window.Show();
+                var button = Assert.IsType<Button>(owner.Child);
+                var theme = Assert.IsType<ControlTheme>(button.Theme);
+                Assert.Same(inheritedTheme, theme.BasedOn);
+                Assert.Same(inheritedTemplate, button.Template);
+                Assert.IsType<Style>(Assert.Single(theme.Children));
+                Assert.Equal(91d, button.Width);
+                Assert.Equal(0.25, button.Opacity);
+
+                Assert.IsType<State<double>>(Assert.Single(owner.GetDiagnosticStates())).Value = 0.6;
+                window.UpdateLayout();
+
+                Assert.Same(button, owner.Child);
+                Assert.NotSame(theme, button.Theme);
+                Assert.Same(inheritedTheme, button.Theme!.BasedOn);
+                Assert.Same(inheritedTemplate, button.Template);
+                Assert.IsType<Style>(Assert.Single(button.Theme.Children));
+                Assert.Equal(91d, button.Width);
+                Assert.Equal(0.6, button.Opacity);
+            }
+            finally
+            {
+                window.Close();
+                if (hadResource)
+                    resources[typeof(Button)] = previousResource;
+                else
+                    resources.Remove(typeof(Button));
+            }
+        }, CancellationToken.None);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ClrProperties_AssignResourceAndObjectResultsWithoutAssigningSentinels(bool debugStructural)
+    {
+        const string source =
+            """
+            using Avalonia.Controls;
+            using Avalonia.Markup.Xaml.MarkupExtensions;
+            using Demo;
+            <ContentControl>
+                <PlainValues Title=${StaticResource title}
+                             Count=${StaticResource count}
+                             Optional=${StaticResource count}
+                             Runtime=${ObjectValue}
+                             Unset=${Unset}
+                             Nothing=${Nothing} />
+            </ContentControl>
+            """;
+        const string custom =
+            """
+            namespace Demo
+            {
+                public sealed class PlainValues
+                {
+                    public string? Title { get; set; } = "initial";
+                    public int Count { get; set; }
+                    public int? Optional { get; set; }
+                    public int Runtime { get; set; }
+                    public string Unset { get; set; } = "unchanged unset";
+                    public string Nothing { get; set; } = "unchanged nothing";
+                }
+
+                public sealed class ObjectValueExtension
+                {
+                    public object ProvideValue(System.IServiceProvider services)
+                    {
+                        var target = (Avalonia.Markup.Xaml.IProvideValueTarget?)services.GetService(typeof(Avalonia.Markup.Xaml.IProvideValueTarget));
+                        if (target?.TargetObject is not PlainValues ||
+                            target.TargetProperty is not System.Reflection.PropertyInfo { Name: "Runtime", PropertyType: var type } ||
+                            type != typeof(int))
+                            throw new System.InvalidOperationException("Incorrect CLR property context.");
+                        return 19;
+                    }
+                }
+
+                public sealed class UnsetExtension
+                {
+                    public object ProvideValue(System.IServiceProvider services) => Avalonia.AvaloniaProperty.UnsetValue;
+                }
+
+                public sealed class NothingExtension
+                {
+                    public object ProvideValue(System.IServiceProvider services) => Avalonia.Data.BindingOperations.DoNothing;
+                }
+            }
+            """;
+        var ownerType = Compile(AkcssActivatorPlannerTests.CreateFixture(source, OwnerSource + "\r\n" + custom), debugStructural);
+        await AvaloniaHeadlessTestSession.GetSession().Dispatch(() =>
+        {
+            var owner = Assert.IsAssignableFrom<AkburaControl>(Activator.CreateInstance(ownerType));
+            owner.Resources["title"] = null;
+            owner.Resources["count"] = 42;
+            var window = new Window { Content = owner };
+            try
+            {
+                window.Show();
+                var values = Assert.IsType<ContentControl>(owner.Child).Content!;
+                var type = values.GetType();
+                Assert.Null(type.GetProperty("Title")!.GetValue(values));
+                Assert.Equal(42, type.GetProperty("Count")!.GetValue(values));
+                Assert.Equal(42, type.GetProperty("Optional")!.GetValue(values));
+                Assert.Equal(19, type.GetProperty("Runtime")!.GetValue(values));
+                Assert.Equal("unchanged unset", type.GetProperty("Unset")!.GetValue(values));
+                Assert.Equal("unchanged nothing", type.GetProperty("Nothing")!.GetValue(values));
+            }
+            finally
+            {
+                window.Close();
+            }
+        }, CancellationToken.None);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

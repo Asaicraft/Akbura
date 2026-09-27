@@ -309,6 +309,13 @@ internal readonly ref struct ComponentPropertyWriter
 
         var targetContext = context.WithTarget(targetExpression, targetProperty);
 
+        if (plan.Destination.Kind == PropertyWriteKind.ClrProperty &&
+            plan.ValueKind is ComponentPropertyValueKind.StaticResource or ComponentPropertyValueKind.RuntimeMarkupExtensionResult)
+        {
+            WriteClrMarkupExtensionResult(component, plan, targetExpression, targetContext);
+            return;
+        }
+
         switch (plan.ValueKind)
         {
             case ComponentPropertyValueKind.MarkupExtensionValue:
@@ -387,6 +394,32 @@ internal readonly ref struct ComponentPropertyWriter
         var writer = new MarkupExtensionWriter(_writer, in _environment);
         writer.Write(GetMarkupExtension(component, plan.PayloadIndex).Extension, context);
         propertyWriter.WriteEnd(end);
+    }
+
+    private void WriteClrMarkupExtensionResult(
+        in ComponentPlan component,
+        in ComponentPropertyWritePlan plan,
+        string target,
+        in MarkupExtensionWriteContext context)
+    {
+        using var scope = _writer.BuildScope();
+        _writer.Write("object? __markupResult = ");
+        var extensionWriter = new MarkupExtensionWriter(_writer, in _environment);
+        extensionWriter.Write(GetMarkupExtension(component, plan.PayloadIndex).Extension, context);
+        _writer.WriteLine(";");
+
+        // StaticResource may defer a Control's CLR assignment and return UnsetValue.
+        // Neither that marker nor DoNothing is a value to cast into the property.
+        _writer.WriteLine("if (!global::System.Object.ReferenceEquals(__markupResult, global::Avalonia.AvaloniaProperty.UnsetValue) &&");
+        _writer.WriteLine("    !global::System.Object.ReferenceEquals(__markupResult, global::Avalonia.Data.BindingOperations.DoNothing))");
+        using var assignmentScope = _writer.BuildScope();
+        var propertyWriter = new PropertyWriter(_writer);
+        var end = propertyWriter.WriteStart(plan.Destination, target);
+        _writer.Write("(");
+        new CSharpValueWriter(_writer).WriteTypeName(plan.Destination.ClrProperty!.Type);
+        _writer.Write(")__markupResult!");
+        propertyWriter.WriteEnd(end);
+        _writer.WriteLine();
     }
 
     private void WriteBinding(

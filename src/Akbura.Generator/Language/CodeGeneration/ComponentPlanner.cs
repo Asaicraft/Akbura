@@ -1792,6 +1792,12 @@ internal static partial class ComponentPlanner
                 firstUpdateValue = new ComponentContentValueReference(
                     ComponentContentValueKind.Element,
                     _childElementIds.WrittenSpan[pending.ChildElements.Start]);
+                if ((_elements[firstUpdateValue.Index].Flags & ComponentElementFlags.IsStyleSubtree) != 0)
+                {
+                    // Style subtrees are recreated on each frame, so their owning
+                    // property must receive the new snapshot as well.
+                    updateValue = firstUpdateValue;
+                }
             }
             else if (!firstUpdateValue.IsValid && HasExpressionContent(content))
             {
@@ -2197,8 +2203,10 @@ internal static partial class ComponentPlanner
                 return default;
             }
 
+            var assignsClrResult = destination.Kind == PropertyWriteKind.ClrProperty &&
+                kind is ComponentPropertyValueKind.StaticResource or ComponentPropertyValueKind.RuntimeMarkupExtensionResult;
             if (kind != ComponentPropertyValueKind.MarkupExtensionValue &&
-                !destination.HasAvaloniaPropertyTarget)
+                !destination.HasAvaloniaPropertyTarget && !assignsClrResult)
             {
                 return default;
             }

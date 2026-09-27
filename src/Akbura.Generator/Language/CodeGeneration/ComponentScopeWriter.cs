@@ -208,7 +208,9 @@ internal readonly ref partial struct ComponentScopeWriter
 
             var elementContext = context.ForElement(elementId);
             WriteStructuralOrderedAssignments(plan, element, elementContext,
-                conditionalOneTime: true, skipFrameContents: true);
+                conditionalOneTime: true,
+                skipFrameContents: true,
+                skipNonStructuralPropertyElementValues: true);
 
             _writer.Write("if (");
             _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName);

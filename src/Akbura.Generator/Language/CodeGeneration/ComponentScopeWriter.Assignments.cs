@@ -33,7 +33,9 @@ internal readonly ref partial struct ComponentScopeWriter
         if (phase == ComponentAssignmentPhase.Initial && element.UsesRuntimeStorage)
         {
             WriteStructuralOrderedAssignments(plan, element, context, conditionalOneTime: false,
-                skipFrameContents: false, initialized, scopeContext);
+                skipFrameContents: false,
+                initialized: initialized,
+                initializationContext: scopeContext);
         }
         else
         {
@@ -100,6 +102,7 @@ internal readonly ref partial struct ComponentScopeWriter
         in MarkupExtensionWriteContext context,
         bool conditionalOneTime,
         bool skipFrameContents,
+        bool skipNonStructuralPropertyElementValues = false,
         bool[]? initialized = null,
         ComponentScopeWriteContext initializationContext = default)
     {
@@ -182,6 +185,15 @@ internal readonly ref partial struct ComponentScopeWriter
                 else if (target.Kind == ComponentContentTargetKind.Property)
                 {
                     ref readonly var content = ref plan.PropertyContents.ItemRef(target.Index);
+                    if (skipNonStructuralPropertyElementValues &&
+                        content.FirstUpdateValue.Kind == ComponentContentValueKind.Element &&
+                        !ComponentContentWriter.CanWriteStructuralProperty(plan, content))
+                    {
+                        // Temporary elements are recreated by Update and cannot be
+                        // referenced from this separate hot-reload helper method.
+                        continue;
+                    }
+
                     var hasOwnedFactory =
                         content.FirstUpdateValue.Kind is ComponentContentValueKind.Template or ComponentContentValueKind.DeferredContent &&
                         content.Destination.Kind is PropertyWriteKind.ClrProperty or PropertyWriteKind.AvaloniaProperty or

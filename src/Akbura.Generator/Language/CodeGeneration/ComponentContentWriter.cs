@@ -57,29 +57,16 @@ internal readonly ref struct ComponentContentWriter
         in ComponentPlan component,
         in ComponentPropertyContentPlan plan)
     {
-        var value = plan.FirstUpdateValue;
-        if (value.Kind != ComponentContentValueKind.Element ||
-            (uint)plan.OwnerElementId >= (uint)component.Elements.Length ||
-            (uint)value.Index >= (uint)component.Elements.Length)
+        if (!CanWriteStructuralProperty(component, plan))
         {
             return false;
         }
 
+        var value = plan.FirstUpdateValue;
         ref readonly var owner = ref component.Elements.ItemRef(
             plan.OwnerElementId);
         ref readonly var child = ref component.Elements.ItemRef(value.Index);
-        if (!owner.UsesRuntimeStorage || !child.UsesRuntimeStorage)
-        {
-            return false;
-        }
-
         var destination = plan.Destination;
-        if (destination.Kind == PropertyWriteKind.ClrProperty &&
-            destination.ClrProperty?.GetMethod == null)
-        {
-            return false;
-        }
-
         var methodName = destination.Kind switch
         {
             PropertyWriteKind.ClrProperty or
@@ -145,6 +132,40 @@ internal readonly ref struct ComponentContentWriter
         _writer.WriteLine(");");
         _writer.CurrentIndent -= _writer.TabSize;
         return true;
+    }
+
+    public static bool CanWriteStructuralProperty(
+        in ComponentPlan component,
+        in ComponentPropertyContentPlan plan)
+    {
+        var value = plan.FirstUpdateValue;
+        if (value.Kind != ComponentContentValueKind.Element ||
+            (uint)plan.OwnerElementId >= (uint)component.Elements.Length ||
+            (uint)value.Index >= (uint)component.Elements.Length)
+        {
+            return false;
+        }
+
+        ref readonly var owner = ref component.Elements.ItemRef(
+            plan.OwnerElementId);
+        ref readonly var child = ref component.Elements.ItemRef(value.Index);
+        if (!owner.UsesRuntimeStorage || !child.UsesRuntimeStorage)
+        {
+            return false;
+        }
+
+        var destination = plan.Destination;
+        if (destination.Kind == PropertyWriteKind.ClrProperty &&
+            destination.ClrProperty?.GetMethod == null)
+        {
+            return false;
+        }
+
+        return destination.Kind is
+            PropertyWriteKind.ClrProperty or
+            PropertyWriteKind.ComponentParameter or
+            PropertyWriteKind.DirectMember or
+            PropertyWriteKind.AvaloniaProperty;
     }
 
     public bool WriteStructuralConstantValue(

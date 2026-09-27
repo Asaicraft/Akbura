@@ -234,6 +234,72 @@ public sealed class AkburaCsGeneratorTests
     }
 
     [Fact]
+    public void Generator_DoesNotReferenceTemporaryPropertyElementsFromHotReloadHelper()
+    {
+        const string component = """
+            using Avalonia.Controls;
+            using Avalonia.Styling;
+
+            <Button>
+                <Button.Theme>
+                    <ControlTheme TargetType={typeof(Button)}>
+                        <Style Selector={null}>
+                        </Style>
+                    </ControlTheme>
+                </Button.Theme>
+            </Button>
+            """;
+        var parseOptions = CSharpParseOptions.Default
+            .WithLanguageVersion(LanguageVersion.Preview);
+        var compilation = CSharpCompilation.Create(
+            "AkburaGeneratedPropertyElementHotReloadTests",
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(
+                    "global using System.IO;",
+                    parseOptions),
+            ],
+            references: SymbolTests.CreateAvaloniaReferences(),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var sourcePath = Path.Combine(
+            Environment.CurrentDirectory,
+            "ThemeButton.akbura");
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators:
+            [
+                new AkburaCsGenerator().AsSourceGenerator(),
+            ],
+            additionalTexts:
+            [
+                new TestAdditionalText(
+                    sourcePath,
+                    SourceText.From(component)),
+            ],
+            parseOptions: parseOptions);
+
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var updatedCompilation,
+            out var generatorDiagnostics);
+
+        Assert.DoesNotContain(
+            generatorDiagnostics,
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+        var generated = Assert.Single(
+            Assert.Single(driver.GetRunResult().Results).GeneratedSources);
+        Assert.Contains(
+            "ThemeProperty, __element1",
+            generated.SourceText.ToString(),
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            updatedCompilation.GetDiagnostics(),
+            static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
     public void Generator_UsesControlCandidateForAmbiguousAkcssTargetType()
     {
         const string akcss =

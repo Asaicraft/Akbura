@@ -669,6 +669,16 @@ public sealed class ConditionalRenderStateTests
             state.SelectConditionalBranch(i, 0);
         }
 
+        // Exercise the same hot loop before measuring so tiered compilation and
+        // runtime bookkeeping are not attributed to steady-state reconciliation.
+        for (var iteration = 0; iteration < 100; iteration++)
+        {
+            for (var i = 0; i < regionCount; i++)
+            {
+                state.SelectConditionalBranch(i, 0);
+            }
+        }
+
         var before = GC.GetAllocatedBytesForCurrentThread();
         var changed = false;
         for (var iteration = 0; iteration < 100; iteration++)

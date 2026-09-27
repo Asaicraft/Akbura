@@ -3,6 +3,7 @@ using Akbura.LanguageServer.Protocol;
 using Akbura.LanguageServer.Protocol.Serialization;
 using StreamJsonRpc;
 using System.IO.Pipes;
+using System.Text.Json;
 
 namespace Akbura.LanguageServer.IntegrationTests;
 
@@ -72,8 +73,10 @@ public sealed class TypingLifecycleTests
         Assert.Equal(caret + 1, result.Position.Character);
     }
 
-    [Fact]
-    public async Task TypingSessionSurvivesDidChangeAndCompletesTag()
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public async Task TypingSessionSurvivesDidChangeAndCompletesTag(string newLine)
     {
         await using var fixture = await TypingServerFixture.CreateAsync();
         var uri = new Uri(
@@ -127,22 +130,33 @@ public sealed class TypingLifecycleTests
             OuterLiteralDelimiterCount =
                 pair.Session.OuterLiteralDelimiterCount,
         };
+        var completionRequest = Request(
+            uri,
+            version: 2,
+            line: 0,
+            character: 7,
+            ">",
+            session);
+        completionRequest.Options.AdditionalOptions = new()
+        {
+            ["newLine"] = JsonSerializer.SerializeToElement(newLine),
+        };
         var completion = await fixture.Rpc
             .InvokeWithParameterObjectAsync<AkburaTypingResponse>(
                 LspMethods.Typing,
-                Request(
-                    uri,
-                    version: 2,
-                    line: 0,
-                    character: 7,
-                    ">",
-                    session),
+                completionRequest,
                 fixture.Cancellation.Token);
 
+        Assert.True(completion.Handled);
+        Assert.False(completion.Stale);
         var edit = Assert.Single(completion.Edits);
-        Assert.Equal("</Button>", edit.NewText);
+        Assert.Equal(newLine + "    " + newLine + "</Button>", edit.NewText);
+        Assert.Equal(0, edit.Range.Start.Line);
         Assert.Equal(8, edit.Range.Start.Character);
-        Assert.Equal(8, completion.Position.Character);
+        Assert.Equal(0, edit.Range.End.Line);
+        Assert.Equal(8, edit.Range.End.Character);
+        Assert.Equal(1, completion.Position.Line);
+        Assert.Equal(4, completion.Position.Character);
         Assert.Null(completion.Session);
     }
 

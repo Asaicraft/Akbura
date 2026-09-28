@@ -1264,7 +1264,7 @@ public sealed class BindingWriterTests
         Assert.Contains("\"Item[]\"", complexField);
         Assert.Contains("\"LoadAsync\"", complexField);
         Assert.Contains(
-            ".CreateInpcPropertyAccessor, true)",
+            ".CreateInpcPropertyAccessor), true)",
             complexField);
         Assert.Contains(
             ".StreamTask<global::Demo.StreamContainer>()",
@@ -1284,9 +1284,13 @@ public sealed class BindingWriterTests
         Assert.Contains(
             ".Property(" +
             "global::Avalonia.Controls.Grid.ColumnProperty, " +
+            "new global::System.Func<" +
+            "global::System.WeakReference<object?>, " +
+            "global::Avalonia.Data.Core.IPropertyInfo, " +
+            "global::Avalonia.Data.Core.Plugins.IPropertyAccessor>(" +
             "global::Avalonia.Markup.Xaml.MarkupExtensions." +
             "CompiledBindings.PropertyInfoAccessorFactory." +
-            "CreateAvaloniaPropertyAccessor, true)",
+            "CreateAvaloniaPropertyAccessor), true)",
             attachedPropertyField);
         Assert.Contains(
             ".ArrayElement(new int[] { 1, 2 }, " +

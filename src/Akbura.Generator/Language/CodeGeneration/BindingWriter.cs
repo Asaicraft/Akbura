@@ -1167,6 +1167,11 @@ internal ref struct BindingWriter
     private const string AccessorFactoryType = "global::Avalonia.Markup.Xaml.MarkupExtensions." +
         "CompiledBindings.PropertyInfoAccessorFactory";
 
+    private const string PropertyAccessorFactoryDelegateType =
+        "global::System.Func<global::System.WeakReference<object?>, " +
+        "global::Avalonia.Data.Core.IPropertyInfo, " +
+        "global::Avalonia.Data.Core.Plugins.IPropertyAccessor>";
+
     private readonly CodeWriter _writer;
     private readonly CSharpValueWriter _valueWriter;
     private readonly BindingWriterEnvironment _environment;
@@ -1502,9 +1507,13 @@ internal ref struct BindingWriter
             WriteStaticMemberReference(avaloniaProperty);
 
             _writer
+                .Write(", ");
+
+            WriteAccessorFactoryDelegate(
+                "CreateAvaloniaPropertyAccessor");
+
+            _writer
                 .Write(", ")
-                .Write(AccessorFactoryType)
-                .Write(".CreateAvaloniaPropertyAccessor, ")
                 .Write(acceptsNull ? "true)" : "false)");
 
             return;
@@ -1526,9 +1535,13 @@ internal ref struct BindingWriter
         WriteStaticMemberReference(attachedProperty);
 
         _writer
+            .Write(", ");
+
+        WriteAccessorFactoryDelegate(
+            "CreateAvaloniaPropertyAccessor");
+
+        _writer
             .Write(", ")
-            .Write(AccessorFactoryType)
-            .Write(".CreateAvaloniaPropertyAccessor, ")
             .Write(acceptsNull ? "true)" : "false)");
     }
 
@@ -1581,9 +1594,14 @@ internal ref struct BindingWriter
         WriteTypeName(valueType);
 
         _writer
-            .Write(")), ")
-            .Write(AccessorFactoryType)
-            .Write(".CreateInpcPropertyAccessor, ")
+            .Write("))")
+            .Write(", ");
+
+        WriteAccessorFactoryDelegate(
+            "CreateInpcPropertyAccessor");
+
+        _writer
+            .Write(", ")
             .Write(acceptsNull ? "true)" : "false)");
     }
 
@@ -1636,9 +1654,14 @@ internal ref struct BindingWriter
         WriteTypeName(valueType);
 
         _writer
-            .Write(")), ")
-            .Write(AccessorFactoryType)
-            .Write(".CreateInpcPropertyAccessor, ")
+            .Write("))")
+            .Write(", ");
+
+        WriteAccessorFactoryDelegate(
+            "CreateInpcPropertyAccessor");
+
+        _writer
+            .Write(", ")
             .Write(acceptsNull ? "true)" : "false)");
     }
 
@@ -1728,11 +1751,24 @@ internal ref struct BindingWriter
         }
         else
         {
-            _writer.Write(AccessorFactoryType).Write(".CreateInpcPropertyAccessor");
+            WriteAccessorFactoryDelegate(
+                "CreateInpcPropertyAccessor");
         }
 
         _writer.Write(", ");
         _writer.Write(acceptsNull ? "true)" : "false)");
+    }
+
+    private void WriteAccessorFactoryDelegate(string methodName)
+    {
+        _writer
+            .Write("new ")
+            .Write(PropertyAccessorFactoryDelegateType)
+            .Write("(")
+            .Write(AccessorFactoryType)
+            .Write(".")
+            .Write(methodName)
+            .Write(")");
     }
 
     private void WriteArrayPathElement(

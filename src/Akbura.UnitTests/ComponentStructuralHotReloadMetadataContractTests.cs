@@ -224,6 +224,43 @@ public sealed class ComponentStructuralHotReloadMetadataContractTests
         AssertContractEqual(initialContract, removedContract);
     }
 
+    [Fact]
+    public void DebugStructural_ClrBindingRemoval_PreservesCompleteMetadataContract()
+    {
+        const string original =
+            "using Avalonia.Controls;\r\n" +
+            "using Demo;\r\n" +
+            "\r\n" +
+            "param ViewModel Vm;\r\n" +
+            "<TextBlock Text=${Binding Vm.Name} />\r\n";
+        const string removed =
+            "using Avalonia.Controls;\r\n" +
+            "using Demo;\r\n" +
+            "\r\n" +
+            "param ViewModel Vm;\r\n" +
+            "<TextBlock />\r\n";
+        const string hostSource =
+            "namespace Demo;\r\n" +
+            "\r\n" +
+            "public sealed class ViewModel\r\n" +
+            "{\r\n" +
+            "    public string Name { get; set; } = string.Empty;\r\n" +
+            "}\r\n";
+
+        var initialContract = GenerateEmitAndReadContract(
+            "ClrBindingPage.akbura",
+            original,
+            hostSource,
+            "Demo.ClrBindingPage");
+        var removedContract = GenerateEmitAndReadContract(
+            "ClrBindingPage.akbura",
+            removed,
+            hostSource,
+            "Demo.ClrBindingPage");
+
+        AssertContractEqual(initialContract, removedContract);
+    }
+
     private static string[] GenerateEmitAndReadContract(
         string fileName,
         string componentSource,

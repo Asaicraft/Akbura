@@ -133,8 +133,11 @@ public sealed class StateWriterTests
             StringComparison.Ordinal);
         Assert.Contains(
             ".Property(global::Avalonia.Layout.Layoutable.WidthProperty, " +
+            "new global::System.Func<global::System.WeakReference<object?>, " +
+            "global::Avalonia.Data.Core.IPropertyInfo, " +
+            "global::Avalonia.Data.Core.Plugins.IPropertyAccessor>(" +
             "global::Avalonia.Markup.Xaml.MarkupExtensions.CompiledBindings." +
-            "PropertyInfoAccessorFactory.CreateAvaloniaPropertyAccessor, false)",
+            "PropertyInfoAccessorFactory.CreateAvaloniaPropertyAccessor), false)",
             output,
             StringComparison.Ordinal);
         Assert.DoesNotContain(

@@ -383,6 +383,21 @@ internal static CSharpTypeSyntax CSharpTypeSyntax(SyntaxTokenList tokens)
 
 An empty list (`_tokens == null`) is a valid state and must NOT be treated as an error.
 
+**8.4. GREEN rewriters must preserve separated-list storage**
+
+For every Nooken field declared as `syntaxlist<X, SepToken>`, the GREEN backing
+node contains alternating `X` nodes and separator tokens. The generated GREEN
+rewriter MUST call the separated-list overload and MUST NOT pass the generated
+`GreenSyntaxList<X>` wrapper directly to `VisitList`:
+
+```csharp
+VisitList(node.Segments.AsSeparatedList<GreenX>()).Node
+```
+
+The separated overload visits the physical backing list, so separator tokens,
+trivia, and diagnostics are preserved. A plain `syntaxlist<X>` or `TokenList`
+continues to use `VisitList(node.Items)` without `AsSeparatedList`.
+
 9. **Null & Debug**
 
    * GREEN side: use `Debug.Assert` / `AkburaDebug.Assert` for required fields (non-null, correct kind).

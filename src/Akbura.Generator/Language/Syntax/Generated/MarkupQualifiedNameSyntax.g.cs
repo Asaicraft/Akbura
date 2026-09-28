@@ -171,7 +171,7 @@ namespace Akbura.Language.Syntax.Green
         public override GreenNode? VisitMarkupQualifiedNameSyntax(GreenMarkupQualifiedNameSyntax node)
         {
             return node.UpdateMarkupQualifiedNameSyntax(
-                VisitList(node.Segments).Node);
+                VisitList(node.Segments.AsSeparatedList<GreenMarkupNameSegmentSyntax>()).Node);
         }
     }
 }

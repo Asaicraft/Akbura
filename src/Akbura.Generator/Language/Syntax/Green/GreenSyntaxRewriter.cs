@@ -70,9 +70,9 @@ internal partial class GreenSyntaxRewriter : GreenSyntaxVisitor<GreenNode>
 
     public SeparatedGreenSyntaxList<TNode> VisitList<TNode>(SeparatedGreenSyntaxList<TNode> list) where TNode : GreenNode
     {
-        // A separated list is filled with C# nodes and C# tokens.  Both of which
-        // derive from InternalSyntax.CSharpSyntaxNode.  So this cast is appropriately
-        // typesafe.
+        // A separated list contains syntax nodes and separator tokens in one
+        // physical backing list. Visit that backing list so both kinds are
+        // rewritten without casting separator tokens to the element type.
         var withSeps = list.GetWithSeparators();
         var result = this.VisitList(withSeps);
         if (result != withSeps)

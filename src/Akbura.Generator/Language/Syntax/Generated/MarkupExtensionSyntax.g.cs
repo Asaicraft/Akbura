@@ -220,7 +220,7 @@ namespace Akbura.Language.Syntax.Green
                 (GreenSyntaxToken)VisitToken(node.DollarToken),
                 (GreenSyntaxToken)VisitToken(node.OpenBrace),
                 (GreenMarkupExtensionTypeSyntax)Visit(node.Type)!,
-                VisitList(node.Arguments).Node,
+                VisitList(node.Arguments.AsSeparatedList<GreenMarkupExtensionArgumentSyntax>()).Node,
                 (GreenSyntaxToken)VisitToken(node.CloseBrace));
         }
     }

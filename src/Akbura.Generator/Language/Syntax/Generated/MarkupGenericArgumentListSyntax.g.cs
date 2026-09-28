@@ -216,7 +216,7 @@ namespace Akbura.Language.Syntax.Green
         {
             return node.UpdateMarkupGenericArgumentListSyntax(
                 (GreenSyntaxToken)VisitToken(node.OpenBrace),
-                VisitList(node.Arguments).Node,
+                VisitList(node.Arguments.AsSeparatedList<GreenCSharpTypeSyntax>()).Node,
                 (GreenSyntaxToken)VisitToken(node.CloseBrace));
         }
     }

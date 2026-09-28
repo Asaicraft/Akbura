@@ -213,7 +213,7 @@ namespace Akbura.Language.Syntax.Green
                 (GreenTailwindPrefixSegmentSyntax?)Visit(node.Prefix),
                 (GreenSimpleNameSyntax)Visit(node.Name)!,
                 (GreenSyntaxToken?)VisitToken(node.Minus),
-                VisitList(node.Segments).Node);
+                VisitList(node.Segments.AsSeparatedList<GreenTailwindSegmentSyntax>()).Node);
         }
     }
 }

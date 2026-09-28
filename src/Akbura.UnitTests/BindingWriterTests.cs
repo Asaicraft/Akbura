@@ -244,7 +244,7 @@ public sealed class BindingWriterTests
     }
 
     [Fact]
-    public void ReflectionElementName_UsesSourceAndWritesOnlyThePathTail()
+    public void DefaultBindingElementName_UsesSourceAndCompiledPathTail()
     {
         // Avalonia path (whitespace-insensitive): #header.Name
         var fixture = CreateFixture();
@@ -272,20 +272,31 @@ public sealed class BindingWriterTests
             nameScopeExpression: null,
             elements,
             ref nextCachedPathId);
+        var cachedPath = WriteCachedBindingPath(
+            fixture,
+            plan);
+        var binding = WriteBinding(
+            fixture,
+            plan,
+            CreateWriteContext(
+                nameScopeExpression: null,
+                scopeId: 3));
 
         Assert.True(plan.IsValid);
+        Assert.True(plan.UsesCompiledPath);
         Assert.Equal("__header", plan.SourceExpression);
         Assert.Equal(1, plan.PathElementStart);
-        Assert.Equal(path.IndexOf("Name", StringComparison.Ordinal), plan.ReflectionPathStart);
         Assert.Same(path, plan.Binding.Path);
-        Assert.False(plan.HasCachedPath);
-        Assert.Equal(0, nextCachedPathId);
+        Assert.True(plan.HasCachedPath);
+        Assert.Equal(1, nextCachedPathId);
+        Assert.Contains("\"Name\"", cachedPath);
         Assert.Equal(
-            "new global::Avalonia.Data.Binding(\"Name\") { Source = __header }",
-            WriteBinding(
-                fixture,
-                plan,
-                CreateWriteContext(nameScopeExpression: null, scopeId: 3)));
+            "new global::Avalonia.Data.CompiledBinding(s_bindingPath0) { Source = __header }",
+            binding);
+        AssertGeneratedCSharpCompiles(
+            fixture,
+            cachedPath,
+            binding);
     }
 
     [Fact]
@@ -656,6 +667,58 @@ public sealed class BindingWriterTests
                 cachedPath,
                 binding);
         }
+    }
+
+    [Fact]
+    public void DefaultBinding_TypedAncestor_UsesCompiledBindingPath()
+    {
+        // Avalonia path: $parent[Demo.Element].Name
+        var fixture = CreateFixture();
+        var sourceType = fixture.GetRequiredType("Demo.ViewModel");
+        var elementType = fixture.GetRequiredType("Demo.Element");
+        var nameProperty = GetProperty(elementType, "Name");
+        var extension = CreateBindingExtension(
+            fixture,
+            MarkupBindingKind.Reflection,
+            "$parent[Demo.Element].Name",
+            sourceType,
+            [
+                new MarkupBindingPathElement(
+                    MarkupBindingPathElementKind.Ancestor,
+                    "$parent[Demo.Element]",
+                    type: new CSharpSymbolDefinition(elementType)),
+                CreatePropertyElement(nameProperty),
+            ]);
+        var nextCachedPathId = 0;
+        var plan = CreatePlan(
+            fixture,
+            extension,
+            scopeId: 0,
+            nameScopeExpression: null,
+            [],
+            ref nextCachedPathId);
+        var cachedPath = WriteCachedBindingPath(fixture, plan);
+        var binding = WriteBinding(
+            fixture,
+            plan,
+            CreateWriteContext(
+                nameScopeExpression: null,
+                scopeId: 0));
+
+        Assert.True(plan.IsValid);
+        Assert.True(plan.UsesCompiledPath);
+        Assert.True(plan.HasCachedPath);
+        Assert.Contains(
+            ".Ancestor(typeof(global::Demo.Element), 0)",
+            cachedPath);
+        Assert.Contains("\"Name\"", cachedPath);
+        Assert.Equal(
+            "new global::Avalonia.Data.CompiledBinding(s_bindingPath0)",
+            binding);
+        AssertGeneratedCSharpCompiles(
+            fixture,
+            cachedPath,
+            binding);
     }
 
     [Fact]
@@ -1607,6 +1670,7 @@ public sealed class BindingWriterTests
 
             internal sealed class BindingWriterOutput
             {
+                private static readonly global::Demo.Element __header = new();
             {{cachedPathField}}
                 private static global::Avalonia.Data.CompiledBinding CreateBinding()
                 {

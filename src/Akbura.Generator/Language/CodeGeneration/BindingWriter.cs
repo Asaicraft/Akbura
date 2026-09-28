@@ -269,6 +269,7 @@ internal readonly struct BindingWritePlan
         int cachedPathId,
         int consumedElementNamePropertyIndex,
         int explicitElementNamePathPropertyIndex,
+        bool usesCompiledPath,
         bool isValid,
         int sourceElementReferenceIndex = -1)
     {
@@ -280,6 +281,7 @@ internal readonly struct BindingWritePlan
         CachedPathId = cachedPathId;
         ConsumedElementNamePropertyIndex = consumedElementNamePropertyIndex;
         ExplicitElementNamePathPropertyIndex = explicitElementNamePathPropertyIndex;
+        UsesCompiledPath = usesCompiledPath;
         IsValid = isValid;
         SourceElementReferenceIndex = sourceElementReferenceIndex;
     }
@@ -317,6 +319,12 @@ internal readonly struct BindingWritePlan
     /// CompiledBindingPathBuilder.ElementName.
     /// </summary>
     public int ExplicitElementNamePathPropertyIndex { get; }
+
+    /// <summary>
+    /// True when code generation uses Avalonia CompiledBindingPath.
+    /// Plain Binding opts in only when the complete semantic path is static.
+    /// </summary>
+    public bool UsesCompiledPath { get; }
 
     public bool IsValid { get; }
 
@@ -384,14 +392,22 @@ internal readonly struct BindingWritePlan
                 cachedPathId: -1,
                 consumedElementNamePropertyIndex: -1,
                 explicitElementNamePathPropertyIndex: -1,
+                usesCompiledPath: false,
                 isValid: false);
         }
 
         var sourcePropertyIndex = FindPropertyIndex(extension, "Source");
         var relativeSourcePropertyIndex = FindPropertyIndex(extension, "RelativeSource");
         var elementNamePropertyIndex = FindPropertyIndex(extension, "ElementName");
+        var typeResolverPropertyIndex = FindPropertyIndex(extension, "TypeResolver");
 
         var hasExplicitSource = sourcePropertyIndex >= 0 || relativeSourcePropertyIndex >= 0;
+        var isExplicitCompiled = binding.Kind == MarkupBindingKind.Compiled;
+        var canPromoteDefaultBinding =
+            binding.Kind == MarkupBindingKind.Reflection &&
+            IsDefaultAvaloniaBinding(binding.BindingType.Symbol);
+        var canAttemptCompiledPath =
+            isExplicitCompiled || canPromoteDefaultBinding;
 
         string? sourceExpression = null;
         var sourceElementReferenceIndex = -1;
@@ -420,12 +436,9 @@ internal readonly struct BindingWritePlan
             {
                 consumedElementNamePropertyIndex = elementNamePropertyIndex;
             }
-            else if (binding.Kind == MarkupBindingKind.Compiled)
+            else if (canAttemptCompiledPath)
             {
                 explicitElementNamePathPropertyIndex = elementNamePropertyIndex;
-
-                consumedElementNamePropertyIndex = elementNamePropertyIndex;
-
                 requiresNameScope = true;
             }
         }
@@ -457,17 +470,18 @@ internal readonly struct BindingWritePlan
 
                     reflectionPathStart = GetPathAfterRootStart(binding.Path, root.Text);
                 }
-                else if (binding.Kind == MarkupBindingKind.Compiled)
+                else if (canAttemptCompiledPath)
                 {
                     requiresNameScope = true;
                 }
             }
         }
 
+        var usesCompiledPath = false;
         var isValid = true;
         var isCacheable = false;
 
-        if (binding.Kind == MarkupBindingKind.Compiled)
+        if (canAttemptCompiledPath)
         {
             var analysis = AnalyzeCompiledPath(
                 in environment,
@@ -477,17 +491,38 @@ internal readonly struct BindingWritePlan
                 requiresNameScope,
                 nameScopeExpression);
 
-            isValid = analysis.IsValid;
+            var compiledPathIsValid =
+                analysis.IsValid &&
+                relativeSourcePropertyIndex < 0 &&
+                typeResolverPropertyIndex < 0;
 
-            // CompiledBinding does not expose RelativeSource as
-            // a writable runtime property. It must eventually be
-            // represented as a path root.
-            if (relativeSourcePropertyIndex >= 0)
+            if (isExplicitCompiled)
             {
-                isValid = false;
+                isValid = compiledPathIsValid;
+                usesCompiledPath = compiledPathIsValid;
+            }
+            else if (compiledPathIsValid)
+            {
+                usesCompiledPath = true;
+            }
+            else
+            {
+                // Plain Binding is opportunistic: preserve ReflectionBinding
+                // semantics whenever the path is not completely static.
+                isValid = binding.BindingType.Symbol is ITypeSymbol;
             }
 
-            isCacheable = isValid && allowCache && analysis.IsCacheable;
+            if (usesCompiledPath &&
+                explicitElementNamePathPropertyIndex >= 0)
+            {
+                consumedElementNamePropertyIndex =
+                    explicitElementNamePathPropertyIndex;
+            }
+
+            isCacheable =
+                usesCompiledPath &&
+                allowCache &&
+                analysis.IsCacheable;
         }
         else
         {
@@ -507,8 +542,19 @@ internal readonly struct BindingWritePlan
             cachedPathId,
             consumedElementNamePropertyIndex,
             explicitElementNamePathPropertyIndex,
+            usesCompiledPath,
             isValid,
             sourceElementReferenceIndex);
+    }
+
+    private static bool IsDefaultAvaloniaBinding(ISymbol? symbol)
+    {
+        return symbol is ITypeSymbol type &&
+            string.Equals(
+                type.ToDisplayString(
+                    SymbolDisplayFormat.FullyQualifiedFormat),
+                "global::Avalonia.Data.Binding",
+                StringComparison.Ordinal);
     }
 
     private static PathAnalysis AnalyzeCompiledPath(
@@ -1094,7 +1140,7 @@ internal ref struct BindingWriter
         }
 
         Debug.Assert(plan.IsValid);
-        Debug.Assert(plan.Binding.Kind == MarkupBindingKind.Compiled);
+        Debug.Assert(plan.UsesCompiledPath);
 
         _writer.Write("private static readonly ").Write(CompiledBindingPathType).Write(" ");
 
@@ -1124,7 +1170,7 @@ internal ref struct BindingWriter
 
         var effectiveContext = context.WithElementReferences(_elementReferences);
 
-        if (plan.Binding.Kind == MarkupBindingKind.Compiled)
+        if (plan.UsesCompiledPath)
         {
             WriteCompiledBinding(plan, effectiveContext);
         }

@@ -372,6 +372,152 @@ public sealed class WorkspaceClassificationTests
     }
 
     [Fact]
+    public void SyntacticClassification_ClassifiesStandaloneCommentInCSharpBlock()
+    {
+        const string source = """
+            void OpenDocumentation()
+            {
+                // TODO: open documentation
+            }
+
+            <Border/>
+            """;
+
+        using var workspace = new AkburaWorkspace();
+        var text = SourceText.From(source);
+        var document = AkburaSyntacticDocument.Parse(
+            text,
+            "Sidebar.akbura");
+        var classifications = workspace.LanguageServices.Classification
+            .GetSyntacticClassifications(
+                document,
+                new TextSpan(0, text.Length));
+        var comment = "// TODO: open documentation";
+        var commentStart = source.IndexOf(
+            comment,
+            StringComparison.Ordinal);
+
+        AssertOnlyClassification(
+            classifications,
+            commentStart,
+            comment.Length,
+            AkburaClassificationKind.Comment);
+    }
+
+    [Fact]
+    public void SyntacticClassification_ClassifiesMultilineCommentInEmptyCSharpBlock()
+    {
+        const string source = """
+            void OpenDocumentation()
+            {
+                /* TODO:
+                   open documentation */
+            }
+
+            <Border/>
+            """;
+
+        using var workspace = new AkburaWorkspace();
+        var text = SourceText.From(source);
+        var document = AkburaSyntacticDocument.Parse(
+            text,
+            "Sidebar.akbura");
+        var classifications = workspace.LanguageServices.Classification
+            .GetSyntacticClassifications(
+                document,
+                new TextSpan(0, text.Length));
+        var commentStart = source.IndexOf(
+            "/* TODO:",
+            StringComparison.Ordinal);
+        var commentEnd = source.IndexOf(
+            "*/",
+            commentStart,
+            StringComparison.Ordinal) + 2;
+
+        AssertOnlyClassification(
+            classifications,
+            commentStart,
+            commentEnd - commentStart,
+            AkburaClassificationKind.Comment);
+    }
+
+    [Fact]
+    public void SyntacticClassification_ClassifiesCommentsAttachedToCSharpBlockBraces()
+    {
+        const string source = """
+            void OpenDocumentation()
+            { // after open brace
+                Work();
+                // before close brace
+            }
+
+            <Border/>
+            """;
+
+        using var workspace = new AkburaWorkspace();
+        var text = SourceText.From(source);
+        var document = AkburaSyntacticDocument.Parse(
+            text,
+            "Sidebar.akbura");
+        var classifications = workspace.LanguageServices.Classification
+            .GetSyntacticClassifications(
+                document,
+                new TextSpan(0, text.Length));
+        var openingComment = "// after open brace";
+        var closingComment = "// before close brace";
+
+        AssertOnlyClassification(
+            classifications,
+            source.IndexOf(openingComment, StringComparison.Ordinal),
+            openingComment.Length,
+            AkburaClassificationKind.Comment);
+        AssertOnlyClassification(
+            classifications,
+            source.IndexOf(closingComment, StringComparison.Ordinal),
+            closingComment.Length,
+            AkburaClassificationKind.Comment);
+    }
+
+    [Fact]
+    public void SyntacticClassification_DoesNotDuplicateInlineCSharpComment()
+    {
+        const string source = """
+            void OpenDocumentation()
+            {
+                var url = "docs"; // TODO: open
+            }
+
+            <Border/>
+            """;
+
+        using var workspace = new AkburaWorkspace();
+        var text = SourceText.From(source);
+        var document = AkburaSyntacticDocument.Parse(
+            text,
+            "Sidebar.akbura");
+        var classifications = workspace.LanguageServices.Classification
+            .GetSyntacticClassifications(
+                document,
+                new TextSpan(0, text.Length));
+        var comment = "// TODO: open";
+        var commentStart = source.IndexOf(
+            comment,
+            StringComparison.Ordinal);
+        var commentSpan = new TextSpan(commentStart, comment.Length);
+
+        Assert.Equal(
+            1,
+            classifications.Count(classification =>
+                classification.Span == commentSpan &&
+                classification.Kind == AkburaClassificationKind.Comment));
+        Assert.DoesNotContain(
+            classifications,
+            classification =>
+                classification.Span.OverlapsWith(commentSpan) &&
+                classification.Span != commentSpan);
+    }
+
+    [Fact]
     public void SyntacticClassification_UsesAkcssParserFromFilePath()
     {
         const string source = """

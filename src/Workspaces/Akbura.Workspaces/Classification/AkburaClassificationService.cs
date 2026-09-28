@@ -519,6 +519,14 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
 
     private static bool IsClassifiedAsEmbeddedCSharpNode(SyntaxToken token)
     {
+        // CSharpStatementSyntax intentionally classifies only its header when
+        // it has a body. CSharpBlockSyntax owns the structural braces and
+        // their trivia, so let the ordinary Akbura classifier process them.
+        if (token.Parent is CSharpBlockSyntax)
+        {
+            return false;
+        }
+
         for (var node = token.Parent; node != null; node = node.Parent)
         {
             switch (node)

@@ -492,6 +492,7 @@ internal readonly struct BindingWritePlan
                 nameScopeExpression);
 
             var compiledPathIsValid =
+                HasCompleteSemanticPath(binding) &&
                 analysis.IsValid &&
                 (relativeSourcePropertyIndex < 0 ||
                  HasNormalizedRelativeSource(
@@ -559,6 +560,12 @@ internal readonly struct BindingWritePlan
                     SymbolDisplayFormat.FullyQualifiedFormat),
                 "global::Avalonia.Data.Binding",
                 StringComparison.Ordinal);
+    }
+
+    private static bool HasCompleteSemanticPath(MarkupBindingValue binding)
+    {
+        return binding.Path.Length == 0 ||
+            !binding.PathElements.IsDefaultOrEmpty;
     }
 
     private static bool HasNormalizedRelativeSource(

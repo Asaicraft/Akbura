@@ -68,10 +68,10 @@ public sealed class MarkupExtensionResultWriterTests
     }
 
     [Fact]
-    public void BindingBaseWriteBinding_WritesPlannedReflectionBinding()
+    public void BindingBaseWriteBinding_WritesReflectionFallbackForIncompleteDefaultBinding()
     {
         var fixture = CreateFixture();
-        var extension = CreateReflectionBinding(fixture);
+        var extension = CreateIncompleteDefaultBinding(fixture);
         var environment = fixture.BindingEnvironment;
         var plan = BindingWritePlan.CreateInline(
             in environment,
@@ -86,6 +86,7 @@ public sealed class MarkupExtensionResultWriterTests
             in environment);
 
         Assert.True(plan.IsValid);
+        Assert.False(plan.UsesCompiledPath);
 
         resultWriter.WriteBinding(
             target,
@@ -97,6 +98,22 @@ public sealed class MarkupExtensionResultWriterTests
             "global::Avalonia.Controls.Border.BackgroundProperty, " +
             "new global::Avalonia.Data.Binding(\"Name\"));",
             codeWriter.GetText().ToString());
+    }
+
+    [Fact]
+    public void ExplicitReflectionBinding_NeverUsesCompiledPath()
+    {
+        var fixture = CreateFixture();
+        var extension = CreateExplicitReflectionBinding(fixture);
+        var environment = fixture.BindingEnvironment;
+        var plan = BindingWritePlan.CreateInline(
+            in environment,
+            extension,
+            scopeId: 0,
+            nameScopeExpression: null);
+
+        Assert.True(plan.IsValid);
+        Assert.False(plan.UsesCompiledPath);
     }
 
     [Fact]
@@ -553,7 +570,7 @@ public sealed class MarkupExtensionResultWriterTests
             extension.IsUpdateDependent);
     }
 
-    private static MarkupExtensionValue CreateReflectionBinding(
+    private static MarkupExtensionValue CreateIncompleteDefaultBinding(
         TestFixture fixture)
     {
         var bindingType = fixture.GetRequiredType(
@@ -571,6 +588,33 @@ public sealed class MarkupExtensionResultWriterTests
         return new MarkupExtensionValue(
             rawText: "Binding Name",
             name: "Binding",
+            new CSharpSymbolDefinition(bindingType),
+            constructor: default,
+            provideValueMethod: default,
+            new CSharpSymbolDefinition(bindingType),
+            arguments: [],
+            properties: [],
+            binding);
+    }
+
+    private static MarkupExtensionValue CreateExplicitReflectionBinding(
+        TestFixture fixture)
+    {
+        var bindingType = fixture.GetRequiredType(
+            "Avalonia.Data.ReflectionBinding");
+        var objectType = fixture.Compilation.GetSpecialType(
+            SpecialType.System_Object);
+        var binding = new MarkupBindingValue(
+            MarkupBindingKind.Reflection,
+            path: "Name",
+            new CSharpSymbolDefinition(bindingType),
+            new CSharpSymbolDefinition(objectType),
+            new CSharpSymbolDefinition(objectType),
+            pathElements: []);
+
+        return new MarkupExtensionValue(
+            rawText: "ReflectionBinding Name",
+            name: "ReflectionBinding",
             new CSharpSymbolDefinition(bindingType),
             constructor: default,
             provideValueMethod: default,

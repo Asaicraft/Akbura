@@ -762,6 +762,51 @@ public sealed class BindingWriterTests
     }
 
     [Fact]
+    public void VisualAncestor_WritesVisualAncestorPath_AndCompiles()
+    {
+        // Avalonia path: visual ancestor of level 2 (zero-based level 1).
+        var fixture = CreateFixture();
+        var elementType = fixture.GetRequiredType("Demo.Element");
+        var nameProperty = GetProperty(elementType, "Name");
+        var extension = CreateBindingExtension(
+            fixture,
+            MarkupBindingKind.Compiled,
+            "Name",
+            elementType,
+            [
+                new MarkupBindingPathElement(
+                    MarkupBindingPathElementKind.VisualAncestor,
+                    "$ancestor",
+                    type: new CSharpSymbolDefinition(elementType),
+                    level: 1),
+                new MarkupBindingPathElement(
+                    MarkupBindingPathElementKind.Property,
+                    "Name",
+                    symbol: new CSharpSymbolDefinition(nameProperty),
+                    type: new CSharpSymbolDefinition(nameProperty.Type)),
+            ]);
+        var nextCachedPathId = 0;
+        var plan = CreatePlan(
+            fixture,
+            extension,
+            scopeId: 0,
+            nameScopeExpression: null,
+            [],
+            ref nextCachedPathId);
+        var cachedPath = WriteCachedBindingPath(fixture, plan);
+        var binding = WriteBinding(
+            fixture,
+            plan,
+            CreateWriteContext(nameScopeExpression: null, scopeId: 0));
+
+        Assert.True(plan.IsValid);
+        Assert.Contains(
+            ".VisualAncestor(typeof(global::Demo.Element), 1)",
+            cachedPath);
+        AssertGeneratedCSharpCompiles(fixture, cachedPath, binding);
+    }
+
+    [Fact]
     public void UnsignedEnumAboveInt64Max_WritesUncheckedEnumCast_AndCompiles()
     {
         // Avalonia empty path: .

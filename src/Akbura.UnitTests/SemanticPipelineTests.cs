@@ -5626,6 +5626,114 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_RelativeSource_NormalizesCompiledBindingRoots()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "using Demo;\n" +
+            "\n" +
+            "<StackPanel x.DataType=\"Demo.ViewModel\">\n" +
+            "    <TextBlock Text=${Binding Name, RelativeSource=${RelativeSource Self}} />\n" +
+            "    <TextBlock Text=${Binding Name, RelativeSource=${RelativeSource FindAncestor, AncestorType=StackPanel, AncestorLevel=2}} />\n" +
+            "    <TextBlock Text=${Binding Name, RelativeSource=${RelativeSource FindAncestor, AncestorType=StackPanel, Tree=Logical}} />\n" +
+            "    <TextBlock Text=${Binding Name, RelativeSource=${RelativeSource Mode=FindAncestor, AncestorType=StackPanel, AncestorLevel=2}} />\n" +
+            "    <TextBlock Text=${Binding Name, RelativeSource=${RelativeSource DataContext}} />\n" +
+            "</StackPanel>";
+
+        const string csharpCode =
+            "namespace Demo; public sealed class ViewModel { public string Name { get; } = \"\"; }";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(AvaloniaBindingCSharpCode, csharpCode));
+        var textBlocks = syntaxTree.GetRootSyntax()
+            .DescendantNodes()
+            .OfType<MarkupElementSyntax>()
+            .Where(static element => element.StartTag?.Name.ToString() == "TextBlock")
+            .ToArray();
+
+        var selfBinding = GetMarkupBinding(semanticModel, textBlocks[0]);
+        var selfRoot = selfBinding.PathElements[0];
+        Assert.Equal(MarkupBindingPathElementKind.Self, selfRoot.Kind);
+        Assert.Equal("Avalonia.Controls.TextBlock", selfRoot.Type.Symbol?.ToDisplayString());
+        Assert.Equal(MarkupBindingPathElementKind.Property, selfBinding.PathElements[1].Kind);
+
+        var ancestorBinding = GetMarkupBinding(semanticModel, textBlocks[1]);
+        var ancestorRoot = ancestorBinding.PathElements[0];
+        Assert.Equal(MarkupBindingPathElementKind.VisualAncestor, ancestorRoot.Kind);
+        Assert.Equal(1, ancestorRoot.Level);
+        Assert.Equal("Avalonia.Controls.StackPanel", ancestorRoot.Type.Symbol?.ToDisplayString());
+        Assert.Equal(MarkupBindingPathElementKind.Property, ancestorBinding.PathElements[1].Kind);
+
+        var logicalBinding = GetMarkupBinding(semanticModel, textBlocks[2]);
+        var logicalRoot = logicalBinding.PathElements[0];
+        Assert.Equal(MarkupBindingPathElementKind.Ancestor, logicalRoot.Kind);
+        Assert.Equal(0, logicalRoot.Level);
+
+        var namedModeBinding = GetMarkupBinding(semanticModel, textBlocks[3]);
+        Assert.Equal(
+            MarkupBindingPathElementKind.VisualAncestor,
+            namedModeBinding.PathElements[0].Kind);
+
+        var dataContextBinding = GetMarkupBinding(semanticModel, textBlocks[4]);
+        Assert.Equal(MarkupBindingPathElementKind.Property, dataContextBinding.PathElements[0].Kind);
+        Assert.Equal("Demo.ViewModel", dataContextBinding.SourceType.Symbol?.ToDisplayString());
+    }
+
+    [Fact]
+    public void SemanticModel_RelativeSource_TemplatedParentUsesControlThemeTargetType()
+    {
+        const string code =
+            "using Avalonia.Controls;\n" +
+            "using Avalonia.Styling;\n" +
+            "\n" +
+            "<Button>\n" +
+            "    <Button.Theme>\n" +
+            "        <ControlTheme TargetType=\"Button\">\n" +
+            "            <Style Selector=\"^:pointerover /template/ ContentPresenter#PART_ContentPresenter\">\n" +
+            "                <Setter Property=\"Background\" Value=${Binding Background, RelativeSource=${RelativeSource TemplatedParent}} />\n" +
+            "            </Style>\n" +
+            "        </ControlTheme>\n" +
+            "    </Button.Theme>\n" +
+            "</Button>";
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(
+            syntaxTree,
+            CreateCSharpCompilation(AvaloniaBindingCSharpCode));
+        var setter = Assert.Single(
+            syntaxTree.GetRootSyntax()
+                .DescendantNodes()
+                .OfType<MarkupElementSyntax>(),
+            static element => element.StartTag?.Name.ToString() == "Setter");
+        var valueAttribute = Assert.Single(
+            setter.StartTag!.Attributes,
+            static attribute => attribute.ToFullString().StartsWith("Value", StringComparison.Ordinal));
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(valueAttribute));
+        var binding = Assert.IsType<MarkupBindingValue>(
+            Assert.IsType<MarkupExtensionValue>(operation.ConvertedValue).Binding);
+        var root = binding.PathElements[0];
+
+        Assert.Equal(MarkupBindingPathElementKind.TemplatedParent, root.Kind);
+        Assert.Equal("Avalonia.Controls.Button", root.Type.Symbol?.ToDisplayString());
+        Assert.Empty(semanticModel.GetSemanticDiagnostics(valueAttribute));
+    }
+
+    private static MarkupBindingValue GetMarkupBinding(
+        AkburaSemanticModel semanticModel,
+        MarkupElementSyntax element)
+    {
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(element.StartTag!.Attributes));
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attribute));
+        var extension = Assert.IsType<MarkupExtensionValue>(operation.ConvertedValue);
+        return Assert.IsType<MarkupBindingValue>(extension.Binding);
+    }
+
+    [Fact]
     public void SemanticModel_CompiledElementNameBinding_UsesForwardDeclaredElementType()
     {
         const string code =
@@ -9699,6 +9807,8 @@ public class SemanticPipelineTests
                 : base(path)
             {
             }
+
+            public object? RelativeSource { get; set; }
         }
 
         public sealed class CompiledBindingPath

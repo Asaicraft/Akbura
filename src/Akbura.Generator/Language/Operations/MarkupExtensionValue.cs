@@ -105,6 +105,7 @@ internal enum MarkupBindingPathElementKind
     ElementName,
     Self,
     Ancestor,
+    VisualAncestor,
     TemplatedParent,
     Not,
     TypeCast,

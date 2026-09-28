@@ -333,6 +333,7 @@ internal partial class AkburaSemanticModel
     private bool TryResolveMarkupExtensionType(string name, out INamedTypeSymbol extensionType, out ImmutableArray<INamedTypeSymbol> ambiguousTypes)
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
+        INamedTypeSymbol? fallbackType = null;
         foreach (var candidate in GetMarkupExtensionTypeCandidates(name))
         {
             if (!seen.Add(candidate))
@@ -345,7 +346,18 @@ internal partial class AkburaSemanticModel
                     out extensionType,
                     out ambiguousTypes))
             {
-                return true;
+                // A type name without the conventional `Extension` suffix is
+                // allowed to coexist with its markup-extension counterpart
+                // (for example Avalonia.Data.RelativeSource and
+                // RelativeSourceExtension).  In markup syntax the latter is
+                // the only valid candidate, because it exposes ProvideValue.
+                if (FindMarkupExtensionProvideValueMethod(extensionType) != null)
+                {
+                    return true;
+                }
+
+                fallbackType ??= extensionType;
+                extensionType = null!;
             }
 
             if (!ambiguousTypes.IsDefaultOrEmpty)
@@ -353,6 +365,13 @@ internal partial class AkburaSemanticModel
                 extensionType = null!;
                 return false;
             }
+        }
+
+        if (fallbackType != null)
+        {
+            extensionType = fallbackType;
+            ambiguousTypes = ImmutableArray<INamedTypeSymbol>.Empty;
+            return true;
         }
 
         extensionType = null!;
@@ -363,12 +382,12 @@ internal partial class AkburaSemanticModel
     private static IEnumerable<string> GetMarkupExtensionTypeCandidates(string name)
     {
         var normalizedName = NormalizeMarkupExtensionTypeName(name);
-        yield return normalizedName;
-
         if (!HasMarkupExtensionSuffix(normalizedName))
         {
             yield return AddMarkupExtensionSuffix(normalizedName);
         }
+
+        yield return normalizedName;
 
         if (IsQualifiedMarkupExtensionName(normalizedName))
         {
@@ -377,11 +396,12 @@ internal partial class AkburaSemanticModel
 
         foreach (var namespaceName in GetDefaultMarkupExtensionNamespaces())
         {
-            yield return namespaceName + "." + normalizedName;
             if (!HasMarkupExtensionSuffix(normalizedName))
             {
                 yield return namespaceName + "." + AddMarkupExtensionSuffix(normalizedName);
             }
+
+            yield return namespaceName + "." + normalizedName;
         }
     }
 
@@ -756,6 +776,8 @@ internal partial class AkburaSemanticModel
 
         string? path = null;
         string? compiledElementName = null;
+        var hasRelativeSourceProperty = false;
+        MarkupExtensionValue? relativeSourceValue = null;
         var positionalIndex = 0;
         foreach (var argument in extensionSyntax.Arguments)
         {
@@ -797,6 +819,13 @@ internal partial class AkburaSemanticModel
                     {
                         var propertyArgument = Unsafe.As<MarkupExtensionPropertyArgumentSyntax>(argument);
                         var propertyName = propertyArgument.Name.Identifier.ValueText;
+                        if (string.Equals(
+                                propertyName,
+                                "RelativeSource",
+                                StringComparison.Ordinal))
+                        {
+                            hasRelativeSourceProperty = true;
+                        }
                         var isPathProperty = string.Equals(
                             propertyName,
                             "Path",
@@ -843,6 +872,14 @@ internal partial class AkburaSemanticModel
                                     : extensionProperty?.Type,
                                 diagnosticsBuilder);
 
+                        if (string.Equals(
+                                propertyName,
+                                "RelativeSource",
+                                StringComparison.Ordinal))
+                        {
+                            relativeSourceValue = boundValue.NestedValue;
+                        }
+
                         if (isPathProperty)
                         {
                             path = boundValue.Text;
@@ -881,6 +918,19 @@ internal partial class AkburaSemanticModel
             bindingSourceType = elementNameType;
         }
 
+        var relativeSourceRoot = default(MarkupBindingPathElement);
+        INamedTypeSymbol? relativeSourceType = null;
+        var hasNormalizedRelativeSource = hasRelativeSourceProperty &&
+            TryCreateRelativeSourcePathRoot(
+                markupAttribute,
+                relativeSourceValue,
+                out relativeSourceRoot,
+                out relativeSourceType);
+        if (hasNormalizedRelativeSource && relativeSourceType != null)
+        {
+            bindingSourceType = relativeSourceType;
+        }
+
         var pathElements = BindMarkupBindingPath(
             markupAttribute,
             path,
@@ -888,6 +938,22 @@ internal partial class AkburaSemanticModel
             bindingSourceType,
             diagnosticsBuilder,
             out var bindingResultType);
+
+        if (hasNormalizedRelativeSource)
+        {
+            if (relativeSourceType != null)
+            {
+                pathElements = ImmutableArray.Create(relativeSourceRoot).AddRange(pathElements);
+                bindingResultType ??= relativeSourceType;
+            }
+            else
+            {
+                // DataContext is the default compiled-binding source.  The
+                // RelativeSource extension only describes that source and
+                // must not remain an initializer on CompiledBinding.
+                bindingSourceType = hasDataType ? dataType : null;
+            }
+        }
         var bindingValue = new MarkupBindingValue(
             kind,
             path,
@@ -914,6 +980,172 @@ internal partial class AkburaSemanticModel
             new CSharpSymbolDefinition(resultType),
             diagnosticsBuilder.ToImmutable());
         return true;
+    }
+
+    private bool TryCreateRelativeSourcePathRoot(
+        MarkupAttributeSyntax markupAttribute,
+        MarkupExtensionValue? relativeSource,
+        out MarkupBindingPathElement root,
+        out INamedTypeSymbol? sourceType)
+    {
+        root = default;
+        sourceType = null;
+        if (relativeSource == null ||
+            !string.Equals(
+                GetUnqualifiedMarkupExtensionName(relativeSource.Name),
+                "RelativeSource",
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var mode = GetRelativeSourceValue(relativeSource, "Mode");
+        if (mode.Length == 0 && relativeSource.Arguments.Length > 0)
+        {
+            mode = relativeSource.Arguments[0].Text.Trim();
+        }
+
+        if (string.Equals(mode, "Self", StringComparison.Ordinal))
+        {
+            sourceType = GetContainingMarkupComponentSymbol(markupAttribute)?.ComponentType;
+            root = new MarkupBindingPathElement(
+                MarkupBindingPathElementKind.Self,
+                "$self",
+                type: sourceType == null
+                    ? default
+                    : new CSharpSymbolDefinition(sourceType));
+            return true;
+        }
+
+        if (string.Equals(mode, "TemplatedParent", StringComparison.Ordinal))
+        {
+            TryGetMarkupControlThemeTargetType(
+                markupAttribute,
+                out sourceType);
+            root = new MarkupBindingPathElement(
+                MarkupBindingPathElementKind.TemplatedParent,
+                "$templatedParent",
+                type: sourceType == null
+                    ? default
+                    : new CSharpSymbolDefinition(sourceType));
+            return true;
+        }
+
+        if (string.Equals(mode, "DataContext", StringComparison.Ordinal))
+        {
+            root = new MarkupBindingPathElement(
+                MarkupBindingPathElementKind.Unknown,
+                "$dataContext");
+            return true;
+        }
+
+        if (!string.Equals(mode, "FindAncestor", StringComparison.Ordinal) ||
+            !TryGetRelativeSourceType(relativeSource, out sourceType))
+        {
+            return false;
+        }
+
+        var level = 0;
+        var levelText = GetRelativeSourceValue(relativeSource, "AncestorLevel");
+        if (int.TryParse(levelText, out var ancestorLevel))
+        {
+            level = Math.Max(0, ancestorLevel - 1);
+        }
+
+        var tree = GetRelativeSourceValue(relativeSource, "Tree");
+        var kind = string.Equals(tree, "Logical", StringComparison.Ordinal)
+            ? MarkupBindingPathElementKind.Ancestor
+            : MarkupBindingPathElementKind.VisualAncestor;
+        root = new MarkupBindingPathElement(
+            kind,
+            "$ancestor",
+            type: new CSharpSymbolDefinition(sourceType!),
+            level: level);
+        return true;
+    }
+
+    private bool TryGetRelativeSourceType(
+        MarkupExtensionValue relativeSource,
+        out INamedTypeSymbol? sourceType)
+    {
+        var typeText = GetRelativeSourceValue(relativeSource, "AncestorType");
+        typeText = typeText.Trim();
+        if (typeText.StartsWith("typeof(", StringComparison.Ordinal) &&
+            typeText.EndsWith(")", StringComparison.Ordinal))
+        {
+            typeText = typeText[7..^1];
+        }
+
+        return TryBindMarkupDataType(typeText, out sourceType);
+    }
+
+    private static string GetRelativeSourceValue(
+        MarkupExtensionValue relativeSource,
+        string propertyName)
+    {
+        foreach (var property in relativeSource.Properties)
+        {
+            if (string.Equals(property.Name, propertyName, StringComparison.Ordinal))
+            {
+                var converted = property.ConvertedValue?.ToString() ?? string.Empty;
+                var literal = property.Value.Trim();
+                if (string.IsNullOrEmpty(converted) ||
+                    int.TryParse(converted, out _) ||
+                    converted.IndexOf('.') >= 0)
+                {
+                    return literal;
+                }
+
+                return converted;
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private bool TryGetMarkupControlThemeTargetType(
+        MarkupAttributeSyntax markupAttribute,
+        out INamedTypeSymbol? targetType)
+    {
+        for (var current = markupAttribute.Parent; current != null; current = current.Parent)
+        {
+            if (current is not MarkupElementSyntax element || element.StartTag == null)
+            {
+                continue;
+            }
+
+            var ownerType = ResolveMarkupReferenceOwner(element.StartTag.Name.ToString());
+            if (!IsMarkupTypeOrBase(ownerType, "Avalonia.Styling.ControlTheme"))
+            {
+                continue;
+            }
+
+            foreach (var attribute in element.StartTag.Attributes)
+            {
+                if (!string.Equals(
+                        GetMarkupAssignmentName(attribute),
+                        "TargetType",
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var value = GetMarkupAttributeValue(attribute);
+                var text = value is MarkupLiteralAttributeValueSyntax literal
+                    ? GetMarkupLiteralAttributeValueText(literal)
+                    : value is MarkupDynamicAttributeValueSyntax dynamicValue &&
+                      ParseInlineExpression(dynamicValue.Expression) is CSharp.TypeOfExpressionSyntax typeOf
+                        ? typeOf.Type.ToString()
+                        : string.Empty;
+                if (TryBindMarkupDataType(text, out targetType))
+                {
+                    return true;
+                }
+            }
+        }
+
+        targetType = null;
+        return false;
     }
 
     private static bool IsAvaloniaBindingExtensionName(string name)

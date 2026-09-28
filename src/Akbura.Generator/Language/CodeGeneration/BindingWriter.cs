@@ -493,7 +493,11 @@ internal readonly struct BindingWritePlan
 
             var compiledPathIsValid =
                 analysis.IsValid &&
-                relativeSourcePropertyIndex < 0 &&
+                (relativeSourcePropertyIndex < 0 ||
+                 HasNormalizedRelativeSource(
+                     extension,
+                     binding,
+                     relativeSourcePropertyIndex)) &&
                 typeResolverPropertyIndex < 0;
 
             if (isExplicitCompiled)
@@ -555,6 +559,52 @@ internal readonly struct BindingWritePlan
                     SymbolDisplayFormat.FullyQualifiedFormat),
                 "global::Avalonia.Data.Binding",
                 StringComparison.Ordinal);
+    }
+
+    private static bool HasNormalizedRelativeSource(
+        MarkupExtensionValue extension,
+        MarkupBindingValue binding,
+        int relativeSourcePropertyIndex)
+    {
+        if (!binding.PathElements.IsDefaultOrEmpty)
+        {
+            var root = binding.PathElements[0].Kind;
+            if (root is MarkupBindingPathElementKind.Self or
+                MarkupBindingPathElementKind.Ancestor or
+                MarkupBindingPathElementKind.VisualAncestor or
+                MarkupBindingPathElementKind.TemplatedParent)
+            {
+                return true;
+            }
+        }
+
+        var property = extension.Properties[relativeSourcePropertyIndex];
+        if (property.NestedValue == null ||
+            property.NestedValue.Arguments.IsDefaultOrEmpty &&
+            property.NestedValue.Properties.IsDefaultOrEmpty)
+        {
+            return false;
+        }
+
+        if (!property.NestedValue.Arguments.IsDefaultOrEmpty &&
+            string.Equals(
+                property.NestedValue.Arguments[0].Text.Trim(),
+                "DataContext",
+                StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        foreach (var nestedProperty in property.NestedValue.Properties)
+        {
+            if (string.Equals(nestedProperty.Name, "Mode", StringComparison.Ordinal) &&
+                string.Equals(nestedProperty.Value.Trim(), "DataContext", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static PathAnalysis AnalyzeCompiledPath(
@@ -680,6 +730,7 @@ internal readonly struct BindingWritePlan
 
                 case MarkupBindingPathElementKind.Self:
                 case MarkupBindingPathElementKind.Ancestor:
+                case MarkupBindingPathElementKind.VisualAncestor:
                 case MarkupBindingPathElementKind.TemplatedParent:
                     currentType = element.Type.Symbol as ITypeSymbol ?? currentType;
                     break;
@@ -1380,6 +1431,13 @@ internal ref struct BindingWriter
 
                     break;
 
+                case MarkupBindingPathElementKind.VisualAncestor:
+                    WriteVisualAncestorPathElement(element);
+
+                    currentType = element.Type.Symbol as ITypeSymbol ?? currentType;
+
+                    break;
+
                 case MarkupBindingPathElementKind.TemplatedParent:
                     _writer.Write(".TemplatedParent()");
 
@@ -1746,6 +1804,26 @@ internal ref struct BindingWriter
 
         _writer.WriteIntegerLiteral(element.Level ?? 0);
 
+        _writer.Write(")");
+    }
+
+    private void WriteVisualAncestorPathElement(in MarkupBindingPathElement element)
+    {
+        _writer.Write(".VisualAncestor(");
+
+        if (element.Type.Symbol is ITypeSymbol ancestorType)
+        {
+            _writer.Write("typeof(");
+            WriteTypeName(ancestorType);
+            _writer.Write(")");
+        }
+        else
+        {
+            _writer.Write("null!");
+        }
+
+        _writer.Write(", ");
+        _writer.WriteIntegerLiteral(element.Level ?? 0);
         _writer.Write(")");
     }
 

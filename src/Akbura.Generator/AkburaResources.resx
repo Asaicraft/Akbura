@@ -399,7 +399,7 @@
   <data name="AKBURA_SEMANTIC_MarkupConditionalHookNotSupported" xml:space="preserve">
     <value>Parent hooks cannot be invoked in conditional markup until branch-local hook frames are supported.</value>
   </data>
-  <data name="AKBURA_SEMANTIC_MarkupConditionalContentCardinality" xml:space="preserve">
+  <data name="AKBURA_SEMANTIC_MarkupScalarContentCardinality" xml:space="preserve">
     <value>Scalar markup content permits at most one active contribution, but this sequence can contribute {0}.</value>
   </data>
   <data name="AKBURA_SEMANTIC_UnsupportedConditionalContentDestination" xml:space="preserve">

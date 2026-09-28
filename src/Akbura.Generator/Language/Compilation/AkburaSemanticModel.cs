@@ -5211,14 +5211,14 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             AddMarkupConditionalDictionaryDiagnostics(contentModel, children, diagnosticsBuilder);
         }
 
-        if (HasMarkupConditionalContent(contentSyntax) &&
+        if (HasMarkupElementOrConditionalContent(contentSyntax) &&
             contentModel.Kind == MarkupContentKind.Property)
         {
             var cardinality = MarkupContentCardinality.FromSequence(children);
             if (cardinality.Maximum > 1)
             {
                 diagnosticsBuilder.Add(new AkburaSemanticDiagnostic(markupElement,
-                    ErrorCodes.AKBURA_SEMANTIC_MarkupConditionalContentCardinality,
+                    ErrorCodes.AKBURA_SEMANTIC_MarkupScalarContentCardinality,
                     [cardinality.Maximum.ToString(System.Globalization.CultureInfo.InvariantCulture)]));
             }
         }

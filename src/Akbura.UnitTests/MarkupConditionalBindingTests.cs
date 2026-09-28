@@ -360,7 +360,7 @@ public sealed class MarkupConditionalBindingTests
             "</ItemsControl.ItemTemplate></ItemsControl>");
 
         Assert.Contains(fixture.SemanticModel.GetSemanticDiagnostics(fixture.ComponentTree.GetRoot()),
-            diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupConditionalContentCardinality);
+            diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupScalarContentCardinality);
     }
 
     [Theory]
@@ -498,6 +498,52 @@ public sealed class MarkupConditionalBindingTests
         Assert.Empty(fixture.SemanticModel.GetSemanticDiagnostics(fixture.ComponentTree.GetRoot()));
     }
 
+    [Fact]
+    public void ScalarContent_RejectsMultipleDirectElementChildren()
+    {
+        var fixture = CreateFixture(
+            "<Button><StackPanel /><Border /></Button>");
+
+        var diagnostics = fixture.SemanticModel.GetSemanticDiagnostics(
+            fixture.ComponentTree.GetRoot());
+
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupScalarContentCardinality);
+    }
+
+    [Fact]
+    public void ScalarContent_AllowsSingleDirectElementChild()
+    {
+        var fixture = CreateFixture(
+            "<Button><StackPanel /></Button>");
+
+        Assert.Empty(
+            fixture.SemanticModel.GetSemanticDiagnostics(fixture.ComponentTree.GetRoot()));
+    }
+
+    [Fact]
+    public void ScalarContent_RejectsElementAndText()
+    {
+        var fixture = CreateFixture(
+            "<Button><Border />text</Button>");
+
+        var diagnostics = fixture.SemanticModel.GetSemanticDiagnostics(
+            fixture.ComponentTree.GetRoot());
+
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupScalarContentCardinality);
+    }
+
+    [Fact]
+    public void ScalarContent_AllowsSynthesizedTextValue()
+    {
+        var fixture = CreateFixture(
+            "param string Name = \"Akbura\"; <Button>Hello {Name}</Button>");
+
+        Assert.Empty(
+            fixture.SemanticModel.GetSemanticDiagnostics(fixture.ComponentTree.GetRoot()));
+    }
+
     [Theory]
     [InlineData("$if (ready) { <TextBlock /><Button /> } $else { <Border /> }")]
     [InlineData("$if (ready) { <TextBlock /> } $if (!ready) { <Button /> }")]
@@ -508,7 +554,7 @@ public sealed class MarkupConditionalBindingTests
         var diagnostics = fixture.SemanticModel.GetSemanticDiagnostics(fixture.ComponentTree.GetRoot());
 
         Assert.Contains(diagnostics, diagnostic =>
-            diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupConditionalContentCardinality);
+            diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupScalarContentCardinality);
     }
 
     [Fact]

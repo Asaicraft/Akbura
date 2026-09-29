@@ -62,6 +62,34 @@ public sealed class BlackSilenceIncrementalGenerationTests
         AssertParityWithFresh(project, updated, project.Options, files);
     }
 
+    [Fact]
+    public void TypedUtilityEdit_OnAkburaChildPreservesActivatorsAndMatchesFreshGeneration()
+    {
+        var project = new TestProject(publishDiagnostics: true);
+        var parent = project.File("Page.akbura", Component(
+            "using Akbura.Styles.akcss;\r\n<Grid><Child row-2 self-center mb-4 /></Grid>"));
+        var child = project.File("Child.akbura", Component("<Border />"));
+        var initial = Run(project, CreateDriver(project.Options, parent, child));
+        var initialSource = initial.Snapshot.Entries["component:Page.akbura"].Source.SourceText.ToString();
+
+        Assert.Equal(3, GetUtilityCandidateCount(initialSource));
+        Assert.Contains("global::Akbura.AkburaControl.SetAkcssStyles(", initialSource, StringComparison.Ordinal);
+        foreach (var key in new[] { "row", "self-center", "mb" })
+        {
+            Assert.Contains("conflictKey: \"" + key + "\"", initialSource, StringComparison.Ordinal);
+        }
+
+        var offset = parent.Text.ToString().IndexOf("row-2", StringComparison.Ordinal) + "row-".Length;
+        var edited = parent.WithText(parent.Text.WithChanges(new TextChange(new TextSpan(offset, 1), "3")));
+        var updated = Run(project, initial.Driver.ReplaceAdditionalText(parent, edited));
+        var updatedSource = updated.Snapshot.Entries["component:Page.akbura"].Source.SourceText.ToString();
+
+        Assert.Equal(3, GetUtilityCandidateCount(updatedSource));
+        Assert.NotEqual(initialSource, updatedSource);
+        AssertReusedExcept(initial, updated, "component:Page.akbura");
+        AssertParityWithFresh(project, updated, project.Options, edited, child);
+    }
+
     [Theory]
     [InlineData(false, true)]
     [InlineData(true, true)]
@@ -130,13 +158,13 @@ public sealed class BlackSilenceIncrementalGenerationTests
         Assert.Equal(7, GetUtilityCandidateCount(revertedSource));
         AssertReusedExcept(updated, reverted, "component:Page.akbura");
         AssertParityWithFresh(project, reverted, project.Options, restored, other);
+    }
 
-        static int GetUtilityCandidateCount(string source)
-        {
-            return CSharpSyntaxTree.ParseText(source).GetRoot().DescendantNodes()
-                .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ObjectCreationExpressionSyntax>()
-                .Count(static creation => creation.Type.ToString() == "global::Akbura.Akcss.AkcssUtilityCandidateActivator");
-        }
+    private static int GetUtilityCandidateCount(string source)
+    {
+        return CSharpSyntaxTree.ParseText(source).GetRoot().DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ObjectCreationExpressionSyntax>()
+            .Count(static creation => creation.Type.ToString() == "global::Akbura.Akcss.AkcssUtilityCandidateActivator");
     }
 
     [Theory]

@@ -198,11 +198,12 @@ internal sealed partial class MarkupBinder
                 typesByName.Add(targetText, targetType);
             }
 
+            var componentType = GetAkcssTargetComponentType(containingComponent);
             if (targetType.IsDefault ||
-                containingComponent.ComponentType == null ||
+                componentType == null ||
                 targetType.Symbol is not ITypeSymbol resolvedTarget ||
                 !AkburaSemanticModel.IsAssignableTo(
-                    containingComponent.ComponentType,
+                    componentType,
                     resolvedTarget))
             {
                 candidate = default;
@@ -629,7 +630,7 @@ internal sealed partial class MarkupBinder
             }
         }
 
-        if (containingComponent?.ComponentType is null)
+        if (GetAkcssTargetComponentType(containingComponent) is null)
         {
             return ImmutableArray<ITailwindUtilitySymbol>.Empty;
         }
@@ -1748,6 +1749,11 @@ internal sealed partial class MarkupBinder
         return symbol;
     }
 
+    private INamedTypeSymbol? GetAkcssTargetComponentType(IMarkupComponentSymbol? component)
+    {
+        return component == null ? null : SemanticModel.GetMarkupComponentReferenceType(component);
+    }
+
     private bool IsAkcssTargetCompatible(
         IAkcssSymbol symbol,
         IMarkupComponentSymbol? containingComponent)
@@ -1757,9 +1763,10 @@ internal sealed partial class MarkupBinder
             return true;
         }
 
-        return containingComponent?.ComponentType != null &&
+        var componentType = GetAkcssTargetComponentType(containingComponent);
+        return componentType != null &&
             symbol.TargetType.Symbol is ITypeSymbol targetType &&
-            AkburaSemanticModel.IsAssignableTo(containingComponent.ComponentType, targetType);
+            AkburaSemanticModel.IsAssignableTo(componentType, targetType);
     }
 
     private ImmutableArray<IAkcssSymbol> ResolveAkcssClassSymbolsForAttribute(

@@ -12,6 +12,34 @@ public sealed partial class WorkspaceCompletionTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void Completion_TypedUtilityIncludesGeneratedAkburaComponent(bool localStyles)
+    {
+        using var workspace = CreateRuntimeUtilityWorkspace(CreateRuntimeUtilityReferences());
+        workspace.OpenOrChangeDocumentContext(new Uri(Path.GetFullPath("Child.akbura")),
+            SourceText.From("namespace Demo;\r\nusing Avalonia.Controls;\r\n<Border />"));
+        var source = "using Demo;\r\n" + (localStyles ? """
+            @akcss {
+                @using Avalonia.Controls;
+                @utilities {
+                    Control.row-(int row) { Grid.Row: row; }
+                    Border.row-border { }
+                }
+            }
+            """ : "using Akbura.Styles.akcss;") + "\r\n<Child row-";
+        var path = Path.GetFullPath("Parent.akbura");
+        var text = SourceText.From(source);
+        var context = workspace.OpenOrChangeDocumentContext(new Uri(path), text);
+        var result = workspace.LanguageServices.Completion.GetCompletions(AkburaSyntacticDocument.Parse(text, path), context, source.Length);
+
+        var item = Assert.Single(result.Items, candidate => candidate.DisplayText == "row-(int row)");
+        Assert.Equal(AkburaCompletionKind.TailwindUtility, item.Kind);
+        Assert.Equal("Control", item.Suffix);
+        Assert.DoesNotContain(result.Items, candidate => candidate.DisplayText == "row-border");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void Completion_UtilityIncludesBaseTargetForDerivedComponent(bool metadata)
     {
         var references = CreateRuntimeUtilityReferences();

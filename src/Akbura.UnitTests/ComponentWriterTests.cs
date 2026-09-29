@@ -1,4 +1,5 @@
 using Akbura.Language.CodeGeneration;
+using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
@@ -8,6 +9,77 @@ namespace Akbura.UnitTests;
 
 public sealed class ComponentWriterTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void TypedAkcssUtilities_WorkOnAkburaChildComponent(bool localStyles, bool codeBehind)
+    {
+        var styles = localStyles ? """
+            @akcss {
+                @using Avalonia.Controls;
+                @using Avalonia.Layout;
+                @using Avalonia;
+                Border.card { Opacity: 0.25; }
+                Control.card { Opacity: 0.5; }
+                @utilities {
+                    Control.row-(int row) { Grid.Row: row; }
+                    Control.self-center { HorizontalAlignment: HorizontalAlignment.Center; }
+                    Control.mb-(double value) { Margin: new Thickness(0, 0, 0, value); }
+                }
+            }
+            """ : "using Akbura.Styles.akcss;";
+        var component = "using Avalonia.Controls;\r\nusing Demo;\r\n" + styles +
+            "\r\n<Grid>\r\n<Child row-2 self-center mb-4" + (localStyles ? " class=\"card\"" : string.Empty) + " />\r\n</Grid>";
+        var fixture = CreateFixtureWithChildComponent(component, "using Avalonia.Controls;\r\n<Border />",
+            codeBehind ? "namespace Demo; public partial class Child { }" : null);
+        using var codeWriter = new CodeWriter();
+        using var writer = CreateWriter(codeWriter, fixture);
+        var child = Assert.Single(writer.Elements, element => element.Syntax.StartTag?.Name.ToFullString().Trim() == "Child");
+        var symbol = fixture.GetElementSymbol(child.Syntax);
+
+        if (!codeBehind)
+        {
+            Assert.Null(symbol.ComponentType);
+        }
+        Assert.NotNull(symbol.AkburaComponent);
+        Assert.Empty(fixture.SemanticModel.GetSemanticDiagnostics(child.Syntax));
+        var row = Assert.Single(symbol.AttributeOperations.OfType<ITailwindUtilityAttributeOperation>(), operation => operation.UtilityName == "row");
+        Assert.Equal("2", Assert.Single(row.Arguments).Text);
+        Assert.Equal(localStyles ? 4 : 3, child.Akcss.Activators.Length);
+        Assert.Equal(new[] { "row", "self-center", "mb" }, writer.Plan.Akcss.Candidates.Select(candidate => candidate.ConflictKey));
+        Assert.True(writer.WriteSetStyles(child.Id, "__child", CreateWriteContext()));
+        var output = codeWriter.GetText().ToString();
+        foreach (var key in new[] { "row", "self-center", "mb" })
+        {
+            Assert.Contains("conflictKey: \"" + key + "\"", output, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void TypedAkcssUtility_IncompatibleChildTargetReportsDiagnostic()
+    {
+        const string component = """
+            using Demo;
+            @akcss {
+                @using Avalonia.Controls;
+                @utilities {
+                    Border.border-only { Opacity: 0.5; }
+                }
+            }
+            <Child border-only />
+            """;
+        var fixture = CreateFixtureWithChildComponent(component, "using Avalonia.Controls;\r\n<Border />");
+        using var codeWriter = new CodeWriter();
+        using var writer = CreateWriter(codeWriter, fixture);
+        var child = Assert.Single(writer.Elements);
+
+        Assert.True(child.Akcss.Activators.IsEmpty);
+        Assert.Contains(fixture.SemanticModel.GetSemanticDiagnostics(child.Syntax),
+            diagnostic => diagnostic.Code == "AKBURA_SEMANTIC_TailwindUtilityNotFound");
+    }
+
     [Fact]
     public void Constructor_BuildsOnePlanWithContiguousElementRanges()
     {
@@ -753,9 +825,10 @@ public sealed class ComponentWriterTests
 
     private static AkcssActivatorPlannerTests.PlannerFixture CreateFixtureWithChildComponent(
         string component,
-        string childComponent)
+        string childComponent,
+        string? additionalCSharp = null)
     {
-        var baseFixture = AkcssActivatorPlannerTests.CreateFixture(component);
+        var baseFixture = AkcssActivatorPlannerTests.CreateFixture(component, additionalCSharp);
         var childTree = Akbura.Language.AkburaSyntaxTree.ParseText(childComponent, "Child.akbura");
         var compilation = new Akbura.Language.AkburaCompilation(
             baseFixture.CSharpCompilation,

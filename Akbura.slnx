@@ -39,6 +39,19 @@
     <File Path="draft-concepts/Dependecy Injection.md" />
     <File Path="draft-concepts/User defined hook.md" />
   </Folder>
+  <Folder Name="/eng/">
+    <File Path="eng/AkburaTemplateVerificationPlan.psm1" />
+    <File Path="eng/Set-AkburaTemplateVersions.ps1" />
+    <File Path="eng/Test-AkburaTemplateVerificationPlan.ps1" />
+    <File Path="eng/Update-DocsNuGetVersions.ps1" />
+    <File Path="eng/Verify-AkburaCollectionParameters.ps1" />
+    <File Path="eng/Verify-AkburaEditorResourceFixes.ps1" />
+    <File Path="eng/Verify-AkburaExtensionVersions.ps1" />
+    <File Path="eng/Verify-AkburaNewTemplates.ps1" />
+    <File Path="eng/Verify-AkburaResourceRegressions.ps1" />
+    <File Path="eng/Verify-AkburaTemplates.ps1" />
+    <File Path="eng/Verify-AkburaXplatPlatform.ps1" />
+  </Folder>
   <Folder Name="/For Contributors/">
     <File Path="For Contributors/adding-features-without-new-syntax.md" />
     <File Path="For Contributors/hot-reload.md" />

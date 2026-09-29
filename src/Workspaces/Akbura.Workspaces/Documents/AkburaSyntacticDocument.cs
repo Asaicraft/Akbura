@@ -11,21 +11,20 @@ namespace Akbura.Workspaces.Documents;
 /// </summary>
 public sealed partial class AkburaSyntacticDocument
 {
-    private readonly ImmutableArray<BlockBoundaries>
-        _indentationBlocks;
+    private readonly ImmutableArray<IndentationSpan> _indentationSpans;
 
     private AkburaSyntacticDocument(
         SourceText text,
         string filePath,
         AkburaSyntaxTree syntaxTree,
         ImmutableArray<AkburaOutliningRegion> outliningRegions,
-        ImmutableArray<BlockBoundaries> indentationBlocks)
+        ImmutableArray<IndentationSpan> indentationSpans)
     {
         Text = text;
         FilePath = filePath;
         SyntaxTree = syntaxTree;
         OutliningRegions = outliningRegions;
-        _indentationBlocks = indentationBlocks;
+        _indentationSpans = indentationSpans;
     }
 
     public SourceText Text { get; }
@@ -63,7 +62,7 @@ public sealed partial class AkburaSyntacticDocument
             CreateSyntacticFacts(
                 syntaxTree.GetRootSyntax(),
                 text,
-                out var indentationBlocks,
+                out var indentationSpans,
                 cancellationToken);
 
         return new AkburaSyntacticDocument(
@@ -71,7 +70,7 @@ public sealed partial class AkburaSyntacticDocument
             filePath,
             syntaxTree,
             outliningRegions,
-            indentationBlocks);
+            indentationSpans);
     }
 
     internal static AkburaSyntacticDocument Create(
@@ -86,7 +85,7 @@ public sealed partial class AkburaSyntacticDocument
         var outliningRegions = CreateSyntacticFacts(
             document.SyntaxTree.GetRootSyntax(),
             document.Text,
-            out var indentationBlocks,
+            out var indentationSpans,
             cancellationToken);
 
         return new AkburaSyntacticDocument(
@@ -94,7 +93,7 @@ public sealed partial class AkburaSyntacticDocument
             document.FilePath,
             document.SyntaxTree,
             outliningRegions,
-            indentationBlocks);
+            indentationSpans);
     }
     /// <summary>
     /// Creates a syntax-only document by incrementally applying text changes
@@ -136,14 +135,14 @@ public sealed partial class AkburaSyntacticDocument
         var outliningRegions = CreateSyntacticFacts(
             syntaxTree.GetRootSyntax(),
             newText,
-            out var indentationBlocks,
+            out var indentationSpans,
             cancellationToken);
         return new AkburaSyntacticDocument(
             newText,
             FilePath,
             syntaxTree,
             outliningRegions,
-            indentationBlocks);
+            indentationSpans);
     }
     /// <summary>
     /// Returns the structural indentation level for the specified line.
@@ -173,12 +172,11 @@ public sealed partial class AkburaSyntacticDocument
         CancellationToken cancellationToken)
     {
         var level = 0;
-        foreach (var boundaries in _indentationBlocks)
+        foreach (var span in _indentationSpans)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (boundaries.BodyStart <= position &&
-                position < boundaries.CloseStart)
+            if (span.Start <= position && position < span.End)
             {
                 level++;
             }
@@ -191,17 +189,23 @@ public sealed partial class AkburaSyntacticDocument
         CreateSyntacticFacts(
             AkburaSyntax root,
             SourceText text,
-            out ImmutableArray<BlockBoundaries> indentationBlocks,
+            out ImmutableArray<IndentationSpan> indentationSpans,
             CancellationToken cancellationToken)
     {
         using var builder =
             ImmutableArrayBuilder<AkburaOutliningRegion>.Rent();
         using var indentationBuilder =
-            ImmutableArrayBuilder<BlockBoundaries>.Rent();
+            ImmutableArrayBuilder<IndentationSpan>.Rent();
 
         foreach (var node in root.DescendantNodes())
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            if (node is MarkupStartTagSyntax startTag &&
+                TryGetStartTagIndentationSpan(startTag, text, out var continuation))
+            {
+                indentationBuilder.Add(continuation);
+            }
 
             if (!TryGetBlockBoundaries(
                     node,
@@ -211,7 +215,7 @@ public sealed partial class AkburaSyntacticDocument
                 continue;
             }
 
-            indentationBuilder.Add(boundaries);
+            indentationBuilder.Add(new IndentationSpan(boundaries.BodyStart, boundaries.CloseStart));
 
             if (!boundaries.CanOutline ||
                 boundaries.OutlineSpan.End > text.Length)
@@ -236,15 +240,40 @@ public sealed partial class AkburaSyntacticDocument
                     boundaries.CollapsedText));
         }
 
-        indentationBlocks = indentationBuilder.AsEnumerable()
-            .OrderBy(static boundaries =>
-                boundaries.BodyStart)
+        indentationSpans = indentationBuilder.AsEnumerable()
+            .OrderBy(static span => span.Start)
             .ToImmutableArray();
 
         return builder.AsEnumerable()
             .OrderBy(static region => region.Span.Start)
             .ThenByDescending(static region => region.Span.Length)
             .ToImmutableArray();
+    }
+
+    private static bool TryGetStartTagIndentationSpan(MarkupStartTagSyntax startTag, SourceText text, out IndentationSpan span)
+    {
+        span = default;
+        if (startTag.LessToken.IsMissing || startTag.Name.IsMissing)
+        {
+            return false;
+        }
+
+        // Start after the name so an empty attribute line also gets smart indent.
+        var start = startTag.Name.Span.End;
+        // The closing delimiter is the final token; derive its position from the node span.
+        var end = startTag.Span.End - startTag.CloseToken.Width;
+        if (startTag.CloseToken.IsMissing)
+        {
+            // Recovery must stop at this tag, not indent subsequent recovered nodes.
+            end = startTag.FullSpan.End;
+            if (end == text.Length)
+            {
+                end = GetOpenEndedClosePosition(text.Length);
+            }
+        }
+
+        span = new IndentationSpan(start, end);
+        return start < end;
     }
 
     private static int GetFirstNonWhitespacePosition(
@@ -393,6 +422,8 @@ public sealed partial class AkburaSyntacticDocument
             ? int.MaxValue
             : textLength + 1;
     }
+
+    private readonly record struct IndentationSpan(int Start, int End);
 
     private readonly struct BlockBoundaries
     {

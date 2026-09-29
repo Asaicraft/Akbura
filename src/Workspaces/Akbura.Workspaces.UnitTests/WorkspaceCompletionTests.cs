@@ -7,7 +7,7 @@ using System.Collections.Immutable;
 
 namespace Akbura.Workspaces.UnitTests;
 
-public sealed class WorkspaceCompletionTests
+public sealed partial class WorkspaceCompletionTests
 {
     [Fact]
     public void CompletionResult_DefaultValueHasEmptyItems()

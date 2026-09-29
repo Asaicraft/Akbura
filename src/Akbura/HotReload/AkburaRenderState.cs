@@ -7,6 +7,7 @@ using Akbura.Akcss;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
+using Avalonia.Diagnostics;
 using Avalonia.Interactivity;
 
 namespace Akbura.HotReload;
@@ -2994,8 +2995,7 @@ public sealed partial class AkburaRenderState : IDisposable
     {
         private readonly AvaloniaObject _target;
         private readonly AvaloniaProperty _property;
-        private readonly bool _baselineWasSet;
-        private readonly object? _baselineValue;
+        private readonly AvaloniaPropertyBaseline _baseline;
 
         public AvaloniaRenderPropertyState(
             long ownerNodeId,
@@ -3010,8 +3010,7 @@ public sealed partial class AkburaRenderState : IDisposable
                 property,
                 desiredValue,
                 declarationIdentity: null,
-                target.IsSet(property),
-                target.GetValue(property))
+                CaptureAvaloniaPropertyBaseline(target, property))
         {
         }
 
@@ -3029,8 +3028,7 @@ public sealed partial class AkburaRenderState : IDisposable
                 property,
                 desiredValue,
                 declarationIdentity,
-                target.IsSet(property),
-                target.GetValue(property))
+                CaptureAvaloniaPropertyBaseline(target, property))
         {
         }
 
@@ -3041,8 +3039,7 @@ public sealed partial class AkburaRenderState : IDisposable
             AvaloniaProperty property,
             object? desiredValue,
             string? declarationIdentity,
-            bool baselineWasSet,
-            object? baselineValue)
+            AvaloniaPropertyBaseline baseline)
             : base(
                 ownerNodeId,
                 slot,
@@ -3052,8 +3049,7 @@ public sealed partial class AkburaRenderState : IDisposable
         {
             _target = target;
             _property = property;
-            _baselineWasSet = baselineWasSet;
-            _baselineValue = baselineValue;
+            _baseline = baseline;
         }
 
         public override bool Matches(RenderPropertyState other)
@@ -3065,16 +3061,18 @@ public sealed partial class AkburaRenderState : IDisposable
 
         public override void ApplyValue(object? value)
         {
-            _target.SetCurrentValue(_property, value);
+            // Generated markup attributes are Avalonia local values. Structural
+            // hot reload may suppress replay of an unchanged declaration, but
+            // applying it must retain normal XAML local-value semantics.
+            _target.SetValue(
+                _property,
+                value,
+                BindingPriority.LocalValue);
         }
 
         public override void RestoreBaseline()
         {
-            RestoreAvaloniaValue(
-                _target,
-                _property,
-                _baselineWasSet,
-                _baselineValue);
+            _baseline.Restore(_target, _property);
         }
 
         public override RenderRevisionMutation CreateMutation()
@@ -3082,8 +3080,7 @@ public sealed partial class AkburaRenderState : IDisposable
             return new AvaloniaRenderPropertyMutation(
                 _target,
                 _property,
-                _target.IsSet(_property),
-                _target.GetValue(_property));
+                CaptureAvaloniaPropertyBaseline(_target, _property));
         }
 
         public override RenderPropertyState WithDeclaration(
@@ -3096,8 +3093,50 @@ public sealed partial class AkburaRenderState : IDisposable
                 _property,
                 declaration.DesiredValue,
                 declaration.DeclarationIdentity,
-                _baselineWasSet,
-                _baselineValue);
+                _baseline);
+        }
+    }
+
+    private readonly struct AvaloniaPropertyBaseline
+    {
+        public AvaloniaPropertyBaseline(
+            bool wasSet,
+            object? value,
+            BindingPriority priority,
+            bool isOverriddenCurrentValue)
+        {
+            WasSet = wasSet;
+            Value = value;
+            Priority = priority;
+            IsOverriddenCurrentValue = isOverriddenCurrentValue;
+        }
+
+        public bool WasSet { get; }
+
+        public object? Value { get; }
+
+        public BindingPriority Priority { get; }
+
+        public bool IsOverriddenCurrentValue { get; }
+
+        public void Restore(
+            AvaloniaObject target,
+            AvaloniaProperty property)
+        {
+            if (!WasSet)
+            {
+                target.ClearValue(property);
+                return;
+            }
+
+            if (Priority == BindingPriority.LocalValue ||
+                IsOverriddenCurrentValue)
+            {
+                target.SetCurrentValue(property, Value);
+                return;
+            }
+
+            target.ClearValue(property);
         }
     }
 
@@ -3138,8 +3177,7 @@ public sealed partial class AkburaRenderState : IDisposable
 
     private abstract class AvaloniaPropertyOperation : RenderOperationResource
     {
-        private readonly bool _baselineWasSet;
-        private readonly object? _baselineValue;
+        private readonly AvaloniaPropertyBaseline _baseline;
 
         protected AvaloniaPropertyOperation(
             AvaloniaObject target,
@@ -3153,13 +3191,11 @@ public sealed partial class AkburaRenderState : IDisposable
                 ReferenceEquals(previous.Target, target) &&
                 ReferenceEquals(previous.Property, property))
             {
-                _baselineWasSet = previous._baselineWasSet;
-                _baselineValue = previous._baselineValue;
+                _baseline = previous._baseline;
             }
             else
             {
-                _baselineWasSet = target.IsSet(property);
-                _baselineValue = target.GetValue(property);
+                _baseline = CaptureAvaloniaPropertyBaseline(target, property);
             }
         }
 
@@ -3169,11 +3205,7 @@ public sealed partial class AkburaRenderState : IDisposable
 
         protected void RestoreBaseline()
         {
-            RestoreAvaloniaValue(
-                Target,
-                Property,
-                _baselineWasSet,
-                _baselineValue);
+            _baseline.Restore(Target, Property);
         }
     }
 
@@ -3524,44 +3556,33 @@ public sealed partial class AkburaRenderState : IDisposable
     {
         private readonly AvaloniaObject _target;
         private readonly AvaloniaProperty _property;
-        private readonly bool _wasSet;
-        private readonly object? _value;
+        private readonly AvaloniaPropertyBaseline _baseline;
 
         public AvaloniaRenderPropertyMutation(
             AvaloniaObject target,
             AvaloniaProperty property,
-            bool wasSet,
-            object? value)
+            AvaloniaPropertyBaseline baseline)
         {
             _target = target;
             _property = property;
-            _wasSet = wasSet;
-            _value = value;
+            _baseline = baseline;
         }
 
         public override void Rollback()
         {
-            RestoreAvaloniaValue(
-                _target,
-                _property,
-                _wasSet,
-                _value);
+            _baseline.Restore(_target, _property);
         }
     }
 
-    private static void RestoreAvaloniaValue(
+    private static AvaloniaPropertyBaseline CaptureAvaloniaPropertyBaseline(
         AvaloniaObject target,
-        AvaloniaProperty property,
-        bool wasSet,
-        object? value)
+        AvaloniaProperty property)
     {
-        if (wasSet)
-        {
-            target.SetCurrentValue(property, value);
-        }
-        else
-        {
-            target.ClearValue(property);
-        }
+        var diagnostic = target.GetDiagnostic(property);
+        return new AvaloniaPropertyBaseline(
+            target.IsSet(property),
+            target.GetValue(property),
+            diagnostic.Priority,
+            diagnostic.IsOverriddenCurrentValue);
     }
 }

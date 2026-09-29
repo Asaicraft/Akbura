@@ -6,6 +6,7 @@ using Avalonia;
 using Avalonia.Collections;
 using Avalonia.Controls;
 using Avalonia.Data;
+using Avalonia.Diagnostics;
 using System.Collections;
 using System.Collections.Immutable;
 using System.Collections.Specialized;
@@ -970,6 +971,158 @@ public sealed class AkburaRenderStateTests
 
         Assert.Equal("baseline", root.AvaloniaValue);
         Assert.True(root.IsSet(ScalarContainerNode.AvaloniaValueProperty));
+    }
+
+    [Fact]
+    public void AvaloniaValue_UsesLocalValuePriorityAndRemovalRevealsStyle()
+    {
+        var state = new AkburaRenderState();
+        var plan = new[]
+        {
+            Spec<ScalarContainerNode>(-1, RootSlot, "Root"),
+        };
+
+        Begin(state, "revision-1", plan);
+        var root = state.GetRequired<ScalarContainerNode>(0);
+        using var style = root.SetValue(
+            ScalarContainerNode.AvaloniaValueProperty,
+            "Theme",
+            BindingPriority.Style);
+        state.ReconcileAvaloniaValue(
+            0,
+            "Value",
+            root,
+            ScalarContainerNode.AvaloniaValueProperty,
+            "Value=Generated",
+            "Generated");
+        state.CompleteRevision();
+
+        Assert.Equal("Generated", root.AvaloniaValue);
+        Assert.Equal(
+            BindingPriority.LocalValue,
+            root.GetDiagnostic(ScalarContainerNode.AvaloniaValueProperty).Priority);
+
+        Begin(state, "revision-2", plan);
+        state.CompleteRevision();
+
+        Assert.Equal("Theme", root.AvaloniaValue);
+        Assert.Equal(
+            BindingPriority.Style,
+            root.GetDiagnostic(ScalarContainerNode.AvaloniaValueProperty).Priority);
+    }
+
+    [Fact]
+    public void AvaloniaValue_UnchangedDeclarationPreservesRuntimeLocalValue()
+    {
+        var state = new AkburaRenderState();
+        var plan = new[]
+        {
+            Spec<ScalarContainerNode>(-1, RootSlot, "Root"),
+        };
+
+        Begin(state, "revision-1", plan);
+        var root = state.GetRequired<ScalarContainerNode>(0);
+        state.ReconcileAvaloniaValue(
+            0,
+            "Value",
+            root,
+            ScalarContainerNode.AvaloniaValueProperty,
+            "Value=Generated",
+            "Generated");
+        state.CompleteRevision();
+
+        root.AvaloniaValue = "Runtime";
+
+        Begin(state, "revision-2", plan);
+        state.ReconcileAvaloniaValue(
+            0,
+            "Value",
+            root,
+            ScalarContainerNode.AvaloniaValueProperty,
+            "Value=Generated",
+            "Generated");
+        state.CompleteRevision();
+
+        Assert.Equal("Runtime", root.AvaloniaValue);
+        Assert.Equal(
+            BindingPriority.LocalValue,
+            root.GetDiagnostic(ScalarContainerNode.AvaloniaValueProperty).Priority);
+    }
+
+    [Fact]
+    public void AvaloniaValue_ChangedDeclarationReappliesLocalValue()
+    {
+        var state = new AkburaRenderState();
+        var plan = new[]
+        {
+            Spec<ScalarContainerNode>(-1, RootSlot, "Root"),
+        };
+
+        Begin(state, "revision-1", plan);
+        var root = state.GetRequired<ScalarContainerNode>(0);
+        state.ReconcileAvaloniaValue(
+            0,
+            "Value",
+            root,
+            ScalarContainerNode.AvaloniaValueProperty,
+            "Value=First",
+            "First");
+        state.CompleteRevision();
+
+        Begin(state, "revision-2", plan);
+        state.ReconcileAvaloniaValue(
+            0,
+            "Value",
+            root,
+            ScalarContainerNode.AvaloniaValueProperty,
+            "Value=Second",
+            "Second");
+        state.CompleteRevision();
+
+        Assert.Equal("Second", root.AvaloniaValue);
+        Assert.Equal(
+            BindingPriority.LocalValue,
+            root.GetDiagnostic(ScalarContainerNode.AvaloniaValueProperty).Priority);
+    }
+
+    [Fact]
+    public async Task AvaloniaValue_AbortPreservesExistingLocalBinding()
+    {
+        await RunOnAvaloniaThread(
+            AvaloniaValue_AbortPreservesExistingLocalBindingCore);
+    }
+
+    private static void AvaloniaValue_AbortPreservesExistingLocalBindingCore()
+    {
+        var state = new AkburaRenderState();
+        var plan = new[]
+        {
+            Spec<ScalarContainerNode>(-1, RootSlot, "Root"),
+        };
+        var source = new BindingSource("Bound");
+
+        Begin(state, "revision-1", plan);
+        var root = state.GetRequired<ScalarContainerNode>(0);
+        root.Bind(
+            ScalarContainerNode.AvaloniaValueProperty,
+            CreateBinding(source));
+        state.CompleteRevision();
+
+        Begin(state, "revision-2", plan);
+        state.ReconcileAvaloniaValue(
+            0,
+            "Value",
+            root,
+            ScalarContainerNode.AvaloniaValueProperty,
+            "Value=Generated",
+            "Generated");
+        Assert.Equal("Generated", root.AvaloniaValue);
+
+        state.AbortRevision();
+
+        Assert.Equal("Bound", root.AvaloniaValue);
+        source.Value = "Updated";
+        Assert.Equal("Updated", root.AvaloniaValue);
     }
 
     [Fact]

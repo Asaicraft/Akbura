@@ -117,6 +117,14 @@ public sealed class AkburaProjectSynchronizer
             .ConfigureAwait(false);
 
         var projectSnapshot = _workspace.AddOrUpdateProject(context);
+        if (excludedDocument != null &&
+            ContainsDocument(project, excludedDocument) &&
+            projectSnapshot.TryGetDocument(excludedDocument, out var excludedSnapshot) &&
+            !documents.Any(input => DocumentUri.Equals(input.Uri, excludedDocument)))
+        {
+            documents = documents.Add(new AkburaDocumentInput(excludedSnapshot.Uri, excludedSnapshot.Text));
+        }
+
         _workspace.SynchronizeProjectDocuments(
             projectSnapshot.Id,
             documents,
@@ -131,6 +139,26 @@ public sealed class AkburaProjectSynchronizer
             documents,
             resourceDocuments,
             ImmutableArray<AkburaProjectLoadDiagnostic>.Empty);
+    }
+
+    private static bool ContainsDocument(Project project, Uri uri)
+    {
+        if (!uri.IsFile)
+        {
+            return false;
+        }
+
+        var path = Path.GetFullPath(uri.LocalPath);
+        foreach (var document in project.Documents.Concat(project.AdditionalDocuments))
+        {
+            if (RoslynProjectDocumentLoader.IsAkburaDocument(document.FilePath) &&
+                string.Equals(Path.GetFullPath(document.FilePath!), path, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private async Task<ImmutableArray<AkburaLoadedProject>> SynchronizeProjectsAsync(IEnumerable<Project> projects, Func<Uri, SourceText?>? openTextProvider, CancellationToken cancellationToken)

@@ -380,17 +380,36 @@ public sealed class AkburaWorkspace : IDisposable
             var oldProject = oldSolution.GetRequiredProject(projectId);
             var documents = oldProject.Documents;
             var changed = false;
+            var inputUris = new HashSet<Uri>(DocumentUriEqualityComparer.Instance);
 
             foreach (var input in inputs)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-
                 if (input.Uri == null || input.Text == null)
                 {
                     throw new ArgumentException(
                         "Project synchronization inputs must contain a URI and text.",
                         nameof(inputs));
                 }
+
+                inputUris.Add(input.Uri);
+            }
+
+            foreach (var pair in oldProject.Documents)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (inputUris.Contains(pair.Value.Uri))
+                {
+                    continue;
+                }
+
+                documents = documents.Remove(pair.Key);
+                changed = true;
+            }
+
+            foreach (var input in inputs)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
 
                 if (TryGetDocument(
                         documents,
@@ -1075,6 +1094,31 @@ public sealed class AkburaWorkspace : IDisposable
 
         document = null!;
         return false;
+    }
+
+    private sealed class DocumentUriEqualityComparer : IEqualityComparer<Uri>
+    {
+        public static DocumentUriEqualityComparer Instance { get; } = new();
+
+        public bool Equals(Uri? left, Uri? right)
+        {
+            return ReferenceEquals(left, right) ||
+                left != null && right != null && DocumentUri.Equals(left, right);
+        }
+
+        public int GetHashCode(Uri uri)
+        {
+            if (uri == null)
+            {
+                throw new ArgumentNullException(nameof(uri));
+            }
+
+            var identity = uri.IsFile
+                ? Path.GetFullPath(uri.LocalPath)
+                : uri.GetComponents(UriComponents.AbsoluteUri, UriFormat.SafeUnescaped);
+            return (uri.IsFile ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal)
+                .GetHashCode(identity);
+        }
     }
 
     private static bool HaveSameResourceDocuments(ImmutableDictionary<ResourceDictionaryIdentity, ResourceDocumentSnapshot> left, ImmutableDictionary<ResourceDictionaryIdentity, ResourceDocumentSnapshot> right)

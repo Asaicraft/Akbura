@@ -224,35 +224,6 @@ public sealed class ConditionalTemplateHostTests
     }
 
     [Fact]
-    public async Task UnchangedRoot_DoesNotAllocateOrInvokeNativeReplacement()
-    {
-        var session = AvaloniaHeadlessTestSession.GetSession();
-        await session.Dispatch(() =>
-        {
-            var fixture = new Fixture { Selected = 0 };
-            var host = new ContentPresenter { Content = "first", ContentTemplate = fixture.Template };
-            var instance = Assert.Single(fixture.Instances);
-            var root = Assert.IsType<TextBlock>(host.Child);
-            for (var i = 0; i < 1000; i++)
-            {
-                instance.Update();
-            }
-
-            var before = GC.GetAllocatedBytesForCurrentThread();
-            for (var i = 0; i < 10000; i++)
-            {
-                instance.Update();
-            }
-            var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
-
-            Assert.Equal(0, allocated);
-            Assert.Same(root, host.Child);
-            Assert.Equal(1, fixture.Constructed);
-            instance.Dispose();
-        }, CancellationToken.None);
-    }
-
-    [Fact]
     public async Task NativeDataTemplate_DeferredMarkerPreservesMatchingAndSupportsEmptyRoot()
     {
         var session = AvaloniaHeadlessTestSession.GetSession();

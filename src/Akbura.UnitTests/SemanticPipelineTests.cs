@@ -9337,6 +9337,65 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_VoidMarkupCommand_DiscardsBooleanAssignmentResult()
+    {
+        const string aCode =
+            "namespace SomeNs;\n" +
+            "\n" +
+            "command void ToggleSidebar();";
+        const string bCode =
+            "using SomeNs;\n" +
+            "\n" +
+            "state bool isExpanded = false;\n" +
+            "<A ToggleSidebar={() => isExpanded = !isExpanded}/>";
+
+        var aSyntaxTree = AkburaSyntaxTree.ParseText(aCode, "A.akbura");
+        var bSyntaxTree = AkburaSyntaxTree.ParseText(bCode, "B.akbura");
+        var compilation = new AkburaCompilation(CreateCSharpCompilation(), [aSyntaxTree, bSyntaxTree]);
+        var semanticModel = compilation.GetSemanticModel(bSyntaxTree);
+        var element = GetOnlyMarkupElement(bSyntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupCommandBindingOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.Equal(MarkupCommandResultMode.NoResult, operation.ResultMode);
+        Assert.True(operation.HandlerResultType.IsDefault);
+        Assert.False(operation.HasErrors);
+        Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
+    }
+
+    [Fact]
+    public void SemanticModel_VoidMarkupCommand_DoesNotDiscardBooleanValueExpression()
+    {
+        const string aCode =
+            "namespace SomeNs;\n" +
+            "\n" +
+            "command void ToggleSidebar();";
+        const string bCode =
+            "using SomeNs;\n" +
+            "\n" +
+            "state bool isExpanded = false;\n" +
+            "<A ToggleSidebar={() => isExpanded}/>";
+
+        var aSyntaxTree = AkburaSyntaxTree.ParseText(aCode, "A.akbura");
+        var bSyntaxTree = AkburaSyntaxTree.ParseText(bCode, "B.akbura");
+        var compilation = new AkburaCompilation(CreateCSharpCompilation(), [aSyntaxTree, bSyntaxTree]);
+        var semanticModel = compilation.GetSemanticModel(bSyntaxTree);
+        var element = GetOnlyMarkupElement(bSyntaxTree);
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(Assert.Single(element.StartTag!.Attributes));
+
+        var operation = Assert.IsAssignableFrom<IMarkupCommandBindingOperation>(
+            semanticModel.GetOperation(attribute));
+
+        Assert.Equal(MarkupCommandResultMode.ReturnsResult, operation.ResultMode);
+        Assert.Contains(
+            semanticModel.GetSemanticDiagnostics(attribute),
+            diagnostic => diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupCommandHandlerSignatureMismatch);
+        Assert.True(operation.HasErrors);
+    }
+
+    [Fact]
     public void SemanticModel_MarkupCommandAttribute_BindsCSharpBlockLocalScope()
     {
         const string aCode =

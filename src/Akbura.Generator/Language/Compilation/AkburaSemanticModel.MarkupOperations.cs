@@ -3491,7 +3491,7 @@ internal partial class AkburaSemanticModel
             return MarkupCommandHandlerAnalysis.Error;
         }
 
-        return expression switch
+        var handler = expression switch
         {
             CSharp.ParenthesizedLambdaExpressionSyntax lambda => AnalyzeMarkupCommandLambda(
                 markupAttribute,
@@ -3522,6 +3522,38 @@ internal partial class AkburaSemanticModel
                 handlerType,
                 resultType: default,
                 handlerOperation),
+        };
+
+        if (!command.HasResult &&
+            handler.ResultMode == MarkupCommandResultMode.ReturnsResult &&
+            handler.ResultType.Symbol is ITypeSymbol { SpecialType: SpecialType.System_Boolean } &&
+            HasBooleanAssignmentExpressionBody(expression))
+        {
+            return new MarkupCommandHandlerAnalysis(
+                handler.Kind,
+                handler.ArgumentMode,
+                MarkupCommandResultMode.NoResult,
+                handler.ParameterCount,
+                handler.IsAsync,
+                handler.ContainsAwait,
+                handler.Type,
+                resultType: default,
+                handler.Operation,
+                handler.Diagnostics,
+                handler.ParameterTypes,
+                handler.HasUnsupportedParameterModifiers);
+        }
+
+        return handler;
+    }
+
+    private static bool HasBooleanAssignmentExpressionBody(CSharp.ExpressionSyntax expression)
+    {
+        return expression switch
+        {
+            CSharp.ParenthesizedLambdaExpressionSyntax { Body: CSharp.AssignmentExpressionSyntax } => true,
+            CSharp.SimpleLambdaExpressionSyntax { Body: CSharp.AssignmentExpressionSyntax } => true,
+            _ => false,
         };
     }
 

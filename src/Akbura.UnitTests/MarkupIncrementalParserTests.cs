@@ -33,6 +33,29 @@ public sealed class MarkupIncrementalParserTests
     }
 
     [Fact]
+    public void QuotedUriValueEdit_PreservesCommentLikeTextAndSiblingAttributes()
+    {
+        const string oldCode = "<Image Source=\"avares:/PurityDashboard/Assets/Texture.png\" Stretch=\"Fill\"/>";
+        const string newCode = "<Image Source=\"avares://PurityDashboard/Assets/Texture.png\" Stretch=\"Fill\"/>";
+        var insertPosition = oldCode.IndexOf("PurityDashboard", StringComparison.Ordinal);
+
+        var (oldMarkup, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            insertPosition,
+            oldLength: 0,
+            newLength: 1);
+
+        var oldAttributes = oldMarkup.Element.StartTag!.Attributes;
+        var newAttributes = newMarkup.Element.StartTag!.Attributes;
+
+        Assert.False(newMarkup.ContainsDiagnostics);
+        Assert.Equal(newCode, newMarkup.ToFullString());
+        Assert.NotSame(oldAttributes[0], newAttributes[0]);
+        Assert.Same(oldAttributes[1], newAttributes[1]);
+    }
+
+    [Fact]
     public void InsertAttribute_ReusesSurroundingAttributes()
     {
         const string oldCode = "<Button Text=\"Save\" Role=\"Action\"/>";

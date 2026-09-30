@@ -2009,13 +2009,21 @@ partial class Parser
         var openQuote = EatToken();
         rawText.Append(openQuote.ToFullString());
 
-        while (CurrentToken.Kind != quoteKind &&
-               CurrentToken.Kind != SyntaxKind.EndOfFileToken)
+        var previousMode = _mode;
+        _mode = quoteKind == SyntaxKind.DoubleQuoteToken
+            ? Lexer.LexerMode.InMarkupDoubleQuotedText
+            : Lexer.LexerMode.InMarkupSingleQuotedText;
+
+        try
         {
-            var token = EatToken();
-            var tokenText = token.ToFullString();
+            var textToken = EatToken();
+            var tokenText = textToken.ToFullString();
             rawText.Append(tokenText);
-            valueText.Append(tokenText);
+            valueText.Append(textToken.ValueText);
+        }
+        finally
+        {
+            _mode = previousMode;
         }
 
         var closeQuote = EatToken(quoteKind);

@@ -2883,7 +2883,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);
         }
 
-        if (markupElement.ContainsDiagnostics || IsIncompleteMarkupStartTag(startTag))
+        if (IsIncompleteMarkupStartTag(startTag))
         {
             SetSemanticDiagnostics(markupElement, ImmutableArray<AkburaSemanticDiagnostic>.Empty);
             return AkburaSymbolInfo.None(AkburaCandidateReason.UnsupportedSyntax);

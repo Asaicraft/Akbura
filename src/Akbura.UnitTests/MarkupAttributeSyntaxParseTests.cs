@@ -166,6 +166,23 @@ public class MarkupAttributeSyntaxParseTests
         Assert.Equal(code, syntax.ToFullString());
     }
 
+    [Theory]
+    [InlineData("Source=\"avares://PurityDashboard/Assets/Texture.png\"")]
+    [InlineData("Value=\"https://example.com/image.png\"")]
+    [InlineData("Value=\"foo//bar\"")]
+    [InlineData("Value=\"foo/*bar*/baz\"")]
+    [InlineData("Value='foo//bar'")]
+    public void PlainAttribute_QuotedValue_PreservesCommentLikeText(string code)
+    {
+        var parser = MakeParser(code);
+
+        var syntax = Assert.IsType<GreenMarkupPlainAttributeSyntax>(
+            parser.ParseMarkupAttributeSyntax());
+
+        Assert.False(syntax.ContainsDiagnostics);
+        Assert.Equal(code, syntax.ToFullString());
+    }
+
     [Fact]
     public void ExpressionPrefix_MissingUtility_ProducesIncompletePrefixedAttribute()
     {

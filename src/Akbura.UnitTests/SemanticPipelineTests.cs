@@ -4120,6 +4120,79 @@ public class SemanticPipelineTests
     }
 
     [Fact]
+    public void SemanticModel_ValidParentAndPropertyElementResolveWithBrokenChildSyntax()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Avalonia.Media;
+
+            <Border>
+                <Border.Background>
+                    <LinearGradientBrush>
+                        <GradientStop Offset="0" Color="#313860" />
+                        <GradientStop Offset="1" Color="#151928" />
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Image Source= />
+            </Border>
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var border = GetOnlyMarkupElement(syntaxTree);
+        var propertyContent = Assert.IsType<MarkupElementContentSyntax>(
+            border.Body[0]);
+        var propertyElement = propertyContent.Element;
+
+        Assert.True(border.ContainsDiagnostics);
+        Assert.IsAssignableFrom<IMarkupComponentSymbol>(
+            semanticModel.GetSymbolInfo(border).Symbol);
+
+        var property = Assert.IsAssignableFrom<AkburaPropertySymbol>(
+            semanticModel.GetSymbolInfo(propertyElement).Symbol);
+
+        Assert.Equal("Background", property.Name);
+        Assert.DoesNotContain(
+            semanticModel.GetSemanticDiagnostics(propertyElement),
+            static diagnostic =>
+                diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupComponentNotFound);
+    }
+
+    [Fact]
+    public void SemanticModel_AvaresUriDoesNotBreakSiblingPropertyElementBinding()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+            using Avalonia.Media;
+
+            <Border>
+                <Border.Background>
+                    <LinearGradientBrush>
+                        <GradientStop Offset="0" Color="#313860" />
+                        <GradientStop Offset="1" Color="#151928" />
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Image Source="avares://PurityDashboard/Assets/Texture.png" Stretch="Fill" Opacity="0.2" />
+            </Border>
+            """;
+
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var border = GetOnlyMarkupElement(syntaxTree);
+        var propertyContent = Assert.IsType<MarkupElementContentSyntax>(
+            border.Body[0]);
+        var propertyElement = propertyContent.Element;
+        var property = Assert.IsAssignableFrom<AkburaPropertySymbol>(
+            semanticModel.GetSymbolInfo(propertyElement).Symbol);
+
+        Assert.False(syntaxTree.GetRoot().ContainsDiagnostics);
+        Assert.Equal("Background", property.Name);
+        Assert.True(semanticModel.GetSemanticDiagnostics(syntaxTree.GetRoot()).IsEmpty);
+    }
+
+    [Fact]
     public void SemanticModel_PropertyElementRawStringExpressionWithSemicolon_BindsToString()
     {
         var featureViewTree = ComponentSyntaxTree.ParseText(

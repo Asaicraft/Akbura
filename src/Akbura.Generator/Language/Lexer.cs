@@ -53,6 +53,8 @@ internal sealed partial class Lexer : IDisposable
 		InMarkupForeachHeader = 1 << 11,
 		InMarkupCodeStatement = 1 << 12,
 		InMarkupForeachKey = 1 << 13,
+		InMarkupDoubleQuotedText = 1 << 14,
+		InMarkupSingleQuotedText = 1 << 15,
 	}
 
 	internal struct TokenInfo
@@ -162,6 +164,16 @@ internal sealed partial class Lexer : IDisposable
 #endif
 		_mode = mode;
 
+		if (mode == LexerMode.InMarkupDoubleQuotedText)
+		{
+			return LexMarkupQuotedText('"');
+		}
+
+		if (mode == LexerMode.InMarkupSingleQuotedText)
+		{
+			return LexMarkupQuotedText('\'');
+		}
+
 		if (mode is not (LexerMode.TopLevel or LexerMode.InAkcss or LexerMode.InCSharpStatement))
 		{
 			var tokenInfo = mode switch
@@ -202,6 +214,25 @@ internal sealed partial class Lexer : IDisposable
 #endif
 
 		return ParseNextToken();
+	}
+
+	private GreenSyntaxToken LexMarkupQuotedText(char quote)
+	{
+		var start = TextWindow.Position;
+		while (true)
+		{
+			var character = TextWindow.PeekChar();
+			if (character == quote ||
+			    character == SlidingTextWindow.InvalidCharacter)
+			{
+				break;
+			}
+
+			TextWindow.AdvanceChar();
+		}
+
+		var text = TextWindow.GetText(start, intern: false);
+		return (GreenSyntaxToken)GreenSyntaxFactory.AkTextLiteralToken(text, text)!;
 	}
 
 	private GreenSyntaxToken ParseNextToken()

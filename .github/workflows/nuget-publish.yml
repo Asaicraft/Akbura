@@ -129,12 +129,23 @@ jobs:
           dotnet restore "$DIAGNOSTICS_PROJECT"
           dotnet restore "$TEMPLATES_PROJECT"
 
+      - name: Build Akbura tests
+        shell: bash
+        run: |
+          dotnet build "$TEST_PROJECT" \
+            --configuration Release \
+            --no-restore
+
       - name: Test Akbura
         shell: bash
         run: |
           dotnet test "$TEST_PROJECT" \
             --configuration Release \
-            --no-restore
+            --no-build \
+            --no-restore \
+            --logger "console;verbosity=normal" \
+            --blame-hang \
+            --blame-hang-timeout 2m
 
       - name: Pack Akbura
         shell: bash

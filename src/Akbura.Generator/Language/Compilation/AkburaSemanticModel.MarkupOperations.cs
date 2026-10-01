@@ -221,7 +221,8 @@ internal partial class AkburaSemanticModel
                             markupAttribute,
                             positionalArgument.Value,
                             parameter?.Type,
-                            diagnosticsBuilder);
+                            diagnosticsBuilder,
+                            parameter);
 
                         argumentsBuilder.Add(new MarkupExtensionArgumentValue(
                             boundValue.Text,
@@ -258,7 +259,8 @@ internal partial class AkburaSemanticModel
                             markupAttribute,
                             propertyArgument.Value,
                             extensionProperty?.Type,
-                            diagnosticsBuilder);
+                            diagnosticsBuilder,
+                            extensionProperty);
 
                         propertiesBuilder.Add(new MarkupExtensionPropertyValue(
                             propertyName,
@@ -796,7 +798,8 @@ internal partial class AkburaSemanticModel
                                 markupAttribute,
                                 positionalArgument.Value,
                                 parameter?.Type,
-                                diagnosticsBuilder);
+                                diagnosticsBuilder,
+                                parameter);
 
                         if (isPathArgument)
                         {
@@ -870,7 +873,8 @@ internal partial class AkburaSemanticModel
                                     ? Compilation.CSharpCompilation.GetSpecialType(
                                         SpecialType.System_String)
                                     : extensionProperty?.Type,
-                                diagnosticsBuilder);
+                                diagnosticsBuilder,
+                                extensionProperty);
 
                         if (string.Equals(
                                 propertyName,
@@ -2626,8 +2630,62 @@ internal partial class AkburaSemanticModel
         return TryBindMarkupDataType(typeText, out dataType);
     }
 
-    private MarkupExtensionBoundValue BindMarkupExtensionValue(MarkupAttributeSyntax markupAttribute, MarkupExtensionValueSyntax valueSyntax, ITypeSymbol? expectedType, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    private MarkupExtensionBoundValue BindMarkupExtensionValue(MarkupAttributeSyntax markupAttribute, MarkupExtensionValueSyntax valueSyntax, ITypeSymbol? expectedType, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder, Microsoft.CodeAnalysis.ISymbol? targetMember = null)
     {
+        if (targetMember != null &&
+            expectedType != null &&
+            IsAvaloniaPropertyType(expectedType) &&
+            valueSyntax is MarkupExtensionLiteralValueSyntax inheritedLiteralValue &&
+            TryGetInheritedDataTypeFromScopeKind(
+                targetMember,
+                out var scopeKind))
+        {
+            var propertyName = GetMarkupExtensionLiteralText(inheritedLiteralValue).Trim();
+            if (!TryGetInheritedDataTypeFromScopeTargetType(
+                    markupAttribute,
+                    scopeKind,
+                    out var targetType))
+            {
+                diagnosticsBuilder.Add(CreateMarkupExtensionErrorDiagnostic(
+                    inheritedLiteralValue,
+                    propertyName,
+                    $"Could not determine the target type for InheritDataTypeFrom({scopeKind})."));
+                return new MarkupExtensionBoundValue(
+                    propertyName,
+                    new CSharpSymbolDefinition(expectedType),
+                    default,
+                    default,
+                    null,
+                    null);
+            }
+
+            var propertyField = FindAvaloniaPropertyField(
+                targetType,
+                propertyName);
+            if (propertyField == null)
+            {
+                diagnosticsBuilder.Add(CreateMarkupExtensionErrorDiagnostic(
+                    inheritedLiteralValue,
+                    propertyName,
+                    $"Avalonia property '{propertyName}' was not found on '{targetType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}' or its base types."));
+                return new MarkupExtensionBoundValue(
+                    propertyName,
+                    new CSharpSymbolDefinition(expectedType),
+                    default,
+                    default,
+                    null,
+                    null);
+            }
+
+            return new MarkupExtensionBoundValue(
+                propertyName,
+                new CSharpSymbolDefinition(propertyField.Type),
+                default,
+                default,
+                new CSharpSymbolDefinition(propertyField),
+                null);
+        }
+
         switch (valueSyntax.Kind)
         {
             case AkburaSyntaxKind.MarkupExtensionExpressionValueSyntax:

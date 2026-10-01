@@ -3631,6 +3631,132 @@ public sealed partial class WorkspaceCompletionTests
     }
 
     [Theory]
+    [InlineData("${TemplateBinding |}")]
+    [InlineData("${TemplateBinding Bac|}")]
+    [InlineData("${TemplateBinding Property=|}")]
+    [InlineData("${TemplateBinding Property=Bac|}")]
+    public void Completion_InheritDataTypeFromControlTemplateOffersAvaloniaProperties(
+        string extensionWithCaret)
+    {
+        const string prefix =
+            "namespace Gallery;\r\n\r\n" +
+            "using Avalonia.Controls;\r\n" +
+            "using Avalonia.Styling;\r\n" +
+            "using Avalonia.Markup.Xaml.Templates;\r\n\r\n" +
+            "<ControlTheme TargetType=\"TemplateTarget\">\r\n" +
+            "    <Setter Property=\"Template\">\r\n" +
+            "        <ControlTemplate>\r\n" +
+            "            <Border Background=";
+        const string suffix =
+            "/>\r\n" +
+            "        </ControlTemplate>\r\n" +
+            "    </Setter>\r\n" +
+            "</ControlTheme>";
+        var sourceWithCaret = prefix + extensionWithCaret + suffix;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            stylesSource: null,
+            assertion: (workspace, semanticContext, syntacticDocument) =>
+            {
+                Assert.Equal(
+                    AkburaCompletionContextKind.MarkupExtensionArgumentValue,
+                    syntacticDocument.GetCompletionContext(position).Kind);
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+                Assert.Contains(
+                    result.Items,
+                    static item => item.DisplayText == "Background");
+                if (!extensionWithCaret.Contains("Bac|", StringComparison.Ordinal))
+                {
+                    Assert.Contains(
+                        result.Items,
+                        static item => item.DisplayText == "BorderBrush");
+                }
+            },
+            additionalCSharpSource: """
+                namespace Avalonia.Metadata
+                {
+                    public enum InheritDataTypeFromScopeKind
+                    {
+                        Style,
+                        ControlTemplate,
+                    }
+
+                    [System.AttributeUsage(System.AttributeTargets.Parameter | System.AttributeTargets.Property)]
+                    public sealed class InheritDataTypeFromAttribute : System.Attribute
+                    {
+                        public InheritDataTypeFromAttribute(InheritDataTypeFromScopeKind scopeKind)
+                        {
+                        }
+                    }
+                }
+
+                namespace Avalonia.Data
+                {
+                    public sealed class TemplateBinding
+                    {
+                        public TemplateBinding(
+                            [Avalonia.Metadata.InheritDataTypeFrom(
+                                Avalonia.Metadata.InheritDataTypeFromScopeKind.ControlTemplate)]
+                            Avalonia.AvaloniaProperty property)
+                        {
+                        }
+
+                        [Avalonia.Metadata.InheritDataTypeFrom(
+                            Avalonia.Metadata.InheritDataTypeFromScopeKind.ControlTemplate)]
+                        public Avalonia.AvaloniaProperty Property { get; set; }
+
+                        public object ProvideValue(System.IServiceProvider serviceProvider) => new();
+                    }
+                }
+
+                namespace Avalonia.Styling
+                {
+                    public sealed class ControlTheme
+                    {
+                        public System.Type TargetType { get; set; }
+                    }
+
+                    public sealed class Setter
+                    {
+                        public Avalonia.AvaloniaProperty Property { get; set; }
+
+                        public object Value { get; set; }
+                    }
+                }
+
+                namespace Avalonia.Markup.Xaml.Templates
+                {
+                    public sealed class ControlTemplate
+                    {
+                    }
+                }
+
+                namespace Gallery
+                {
+                    public class TemplateTargetBase : Avalonia.Controls.Control
+                    {
+                        public static readonly Avalonia.AvaloniaProperty<Avalonia.Media.IBrush?>
+                            BackgroundProperty = new();
+
+                        public static readonly Avalonia.AvaloniaProperty<Avalonia.Media.IBrush?>
+                            BorderBrushProperty = new();
+                    }
+
+                    public sealed class TemplateTarget : TemplateTargetBase
+                    {
+                    }
+                }
+                """);
+    }
+
+    [Theory]
     [InlineData(
         "<Border Tag=${Custom 0, Mo|}/>",
         "Mode",

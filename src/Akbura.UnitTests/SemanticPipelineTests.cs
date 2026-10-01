@@ -4845,6 +4845,62 @@ public class SemanticPipelineTests
         Assert.True(semanticModel.GetSemanticDiagnostics(attribute).IsEmpty);
     }
 
+    [Theory]
+    [InlineData("${TemplateBinding Background}", false)]
+    [InlineData("${TemplateBinding Property=Background}", true)]
+    public void SemanticModel_InheritDataTypeFromControlTemplate_ResolvesAvaloniaProperty(
+        string extensionText,
+        bool isNamedArgument)
+    {
+        var code =
+            "using Avalonia.Controls;\r\n" +
+            "using Avalonia.Styling;\r\n" +
+            "using Avalonia.Markup.Xaml.Templates;\r\n\r\n" +
+            "<ControlTheme TargetType=\"Button\">\r\n" +
+            "    <Setter Property=\"Template\">\r\n" +
+            "        <ControlTemplate>\r\n" +
+            "            <Border Background=" + extensionText + "/>\r\n" +
+            "        </ControlTemplate>\r\n" +
+            "    </Setter>\r\n" +
+            "</ControlTheme>";
+        var syntaxTree = AkburaSyntaxTree.ParseText(code);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var border = syntaxTree.GetRoot().DescendantNodes()
+            .OfType<MarkupElementSyntax>()
+            .Single(element => element.StartTag?.Name.ToString() == "Border");
+        var attribute = Assert.IsType<MarkupPlainAttributeSyntax>(
+            Assert.Single(border.StartTag!.Attributes));
+        var operation = Assert.IsAssignableFrom<IMarkupPropertySetterOperation>(
+            semanticModel.GetOperation(attribute));
+        var extension = Assert.IsType<MarkupExtensionValue>(operation.ConvertedValue);
+
+        Assert.False(operation.HasErrors,
+            string.Join(" | ", semanticModel.GetSemanticDiagnostics(attribute)
+                .Select(static diagnostic => diagnostic.Message)));
+        Assert.Empty(semanticModel.GetSemanticDiagnostics(attribute));
+
+        var propertyField = isNamedArgument
+            ? Assert.IsType<CSharpSymbolDefinition>(
+                Assert.Single(extension.Properties).ConvertedValue).Symbol
+            : Assert.IsType<CSharpSymbolDefinition>(
+                Assert.Single(extension.Arguments).ConvertedValue).Symbol;
+        Assert.IsAssignableFrom<IFieldSymbol>(propertyField);
+        Assert.Equal("BackgroundProperty", propertyField!.Name);
+
+        if (isNamedArgument)
+        {
+            var property = Assert.Single(extension.Properties);
+            Assert.Equal("Property", property.Name);
+            Assert.Equal("Property", property.Property.Symbol?.Name);
+        }
+        else
+        {
+            var argument = Assert.Single(extension.Arguments);
+            Assert.Equal("property", Assert.IsAssignableFrom<IParameterSymbol>(
+                argument.Parameter.Symbol).Name);
+        }
+    }
+
     [Fact]
     public void SemanticModel_MarkupExtensionAttribute_ResolvesGlobalQualifiedExtension()
     {

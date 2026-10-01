@@ -133,18 +133,11 @@ internal sealed partial class AkburaCompletionService
 
     private static ImmutableArray<AkburaCompletionItem> GetMarkupExtensionArgumentValueItems(AkburaSemanticModel semanticModel, AkburaSyntacticCompletionContext context, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(
-                context.MarkupExtensionArgumentName) ||
-            !TryGetMarkupCompletionSyntax(
+        if (!TryGetMarkupCompletionSyntax(
                 semanticModel,
                 context,
-                out _,
-                out var extension) ||
-            semanticModel
-                .GetMarkupExtensionArgumentValueTypeForCompletion(
-                    extension,
-                    context.MarkupExtensionArgumentName!,
-                    cancellationToken) is not { } valueType)
+                out var attribute,
+                out var extension))
         {
             return [];
         }
@@ -152,7 +145,42 @@ internal sealed partial class AkburaCompletionService
         using var items =
             Akbura.Pools.ImmutableArrayBuilder<AkburaCompletionItem>
                 .Rent();
-        if (valueType.TypeKind == TypeKind.Enum)
+
+        var inheritedProperties = semanticModel
+            .LookupInheritedAvaloniaPropertiesForMarkupExtensionCompletion(
+                attribute,
+                extension,
+                context.MarkupExtensionArgumentIndex,
+                context.MarkupExtensionArgumentName,
+                cancellationToken);
+        foreach (var candidate in inheritedProperties)
+        {
+            if (!MatchesPrefix(candidate.Name, context.Prefix))
+            {
+                continue;
+            }
+
+            items.Add(new AkburaCompletionItem(
+                candidate.Name,
+                candidate.Name,
+                AkburaCompletionKind.Property,
+                candidate.Field.ToDisplayString(),
+                descriptionFactory: null,
+                suffix: candidate.ValueType.ToDisplayString(
+                    SymbolDisplayFormat.MinimallyQualifiedFormat)));
+        }
+
+        if (string.IsNullOrWhiteSpace(context.MarkupExtensionArgumentName))
+        {
+            return OrderCompletionItems(items.ToImmutable(), context.Prefix);
+        }
+
+        var valueType = semanticModel
+            .GetMarkupExtensionArgumentValueTypeForCompletion(
+                extension,
+                context.MarkupExtensionArgumentName!,
+                cancellationToken);
+        if (valueType?.TypeKind == TypeKind.Enum)
         {
             foreach (var field in valueType.GetMembers().OfType<IFieldSymbol>())
             {
@@ -171,7 +199,7 @@ internal sealed partial class AkburaCompletionService
                     descriptionFactory: null));
             }
         }
-        else if (valueType.SpecialType ==
+        else if (valueType?.SpecialType ==
                  SpecialType.System_Boolean)
         {
             foreach (var value in new[] { "false", "true" })

@@ -33,6 +33,25 @@ public sealed class MarkupIncrementalParserTests
     }
 
     [Fact]
+    public void QuotedAttribute_InsertTextIntoEmptyQuotes_PreservesSpaces()
+    {
+        const string oldCode = "<Button Text=\"\"></Button>";
+        const string inserted = "ADD A NEW CARD";
+        var insertPosition = oldCode.IndexOf("\"\"", StringComparison.Ordinal) + 1;
+        var newCode = oldCode.Insert(insertPosition, inserted);
+
+        var (_, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            insertPosition,
+            oldLength: 0,
+            newLength: inserted.Length);
+
+        Assert.False(newMarkup.ContainsDiagnostics);
+        Assert.Equal(newCode, newMarkup.ToFullString());
+    }
+
+    [Fact]
     public void QuotedUriValueEdit_PreservesCommentLikeTextAndSiblingAttributes()
     {
         const string oldCode = "<Image Source=\"avares:/PurityDashboard/Assets/Texture.png\" Stretch=\"Fill\"/>";

@@ -131,7 +131,7 @@ internal sealed partial class Parser
 
     private GreenCSharpExpressionSyntax ParseMarkupConditionSyntax(bool incremental, bool foreachKey = false)
     {
-        ResetLookaheadForMarkupCondition();
+        ResetLookaheadForLexerModeChange();
         var previousMode = _mode;
         _mode = foreachKey ? Lexer.LexerMode.InMarkupForeachKey : Lexer.LexerMode.InMarkupCondition;
         try
@@ -154,7 +154,7 @@ internal sealed partial class Parser
         }
     }
 
-    private void ResetLookaheadForMarkupCondition()
+    private void ResetLookaheadForLexerModeChange()
     {
         if (_tokenOffset >= _tokenCount)
         {

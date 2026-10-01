@@ -56,6 +56,26 @@ public sealed class QuotedResourceRegressionTests
     }
 
     [Fact]
+    public void EmptyQuotedAttribute_CharacterwiseTextInsertion_PreservesMarkupParsing()
+    {
+        const string prefix = "state int count = 0;\r\n\r\n<Button Text=\"";
+        const string suffix = "\"></Button>";
+        const string inserted = "ADD A NEW CARD";
+        var text = SourceText.From(prefix + suffix);
+        var root = AkburaSyntaxTree.ParseText(text, "MainView.akbura").GetRoot();
+        var position = prefix.Length;
+
+        foreach (var character in inserted)
+        {
+            root = ApplyAndCompare(root, ref text,
+                new TextChange(new TextSpan(position++, 0), character.ToString()));
+        }
+
+        Assert.Empty(AllDiagnostics(root));
+        Assert.Equal(prefix + inserted + suffix, root.ToFullString());
+    }
+
+    [Fact]
     public void QuoteDeletionAndReinsertion_DoesNotLeaveStaleDiagnostics()
     {
         var text = SourceText.From(Prefix + "\"Icon.Home\"" + Suffix);

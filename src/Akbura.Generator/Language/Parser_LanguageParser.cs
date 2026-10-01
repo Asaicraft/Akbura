@@ -2009,6 +2009,8 @@ partial class Parser
         var openQuote = EatToken();
         rawText.Append(openQuote.ToFullString());
 
+        ResetLookaheadForLexerModeChange();
+
         var previousMode = _mode;
         _mode = quoteKind == SyntaxKind.DoubleQuoteToken
             ? Lexer.LexerMode.InMarkupDoubleQuotedText

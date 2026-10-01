@@ -44,7 +44,7 @@ internal sealed partial class Parser
 
     private GreenMarkupForeachHeaderSyntax ParseMarkupForeachHeaderSyntax(bool incremental)
     {
-        ResetLookaheadForMarkupCondition();
+        ResetLookaheadForLexerModeChange();
         var previousMode = _mode;
         _mode = Lexer.LexerMode.InMarkupForeachHeader;
         try
@@ -175,7 +175,7 @@ internal sealed partial class Parser
 
     private GreenMarkupCodeStatementSyntax ParseMarkupCodeStatementSyntax(bool incremental)
     {
-        ResetLookaheadForMarkupCondition();
+        ResetLookaheadForLexerModeChange();
         var previousMode = _mode;
         _mode = Lexer.LexerMode.InMarkupCodeStatement;
         try

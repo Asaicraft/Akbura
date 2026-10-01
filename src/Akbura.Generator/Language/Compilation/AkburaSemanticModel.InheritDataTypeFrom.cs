@@ -12,6 +12,8 @@ internal partial class AkburaSemanticModel
 {
     private const string InheritDataTypeFromAttributeMetadataName =
         "Avalonia.Metadata.InheritDataTypeFromAttribute";
+    private const string ControlTemplateScopeAttributeMetadataName =
+        "Avalonia.Metadata.ControlTemplateScopeAttribute";
 
     internal bool TryGetInheritedDataTypeFromScopeKind(
         ISymbol targetMember,
@@ -214,63 +216,145 @@ internal partial class AkburaSemanticModel
         MarkupAttributeSyntax anchor,
         out INamedTypeSymbol targetType)
     {
-        if (TryGetMarkupControlThemeTargetType(anchor, out var themeTarget) &&
-            themeTarget != null)
+        for (var element = GetContainingMarkupElement(anchor);
+             element != null;
+             element = GetParentMarkupElement(element))
         {
-            targetType = themeTarget;
-            return true;
-        }
-
-        for (var current = anchor.Parent; current != null; current = current.Parent)
-        {
-            if (current is not MarkupElementSyntax element ||
-                element.StartTag == null ||
-                !IsMarkupTypeOrBase(
-                    ResolveMarkupReferenceOwner(element.StartTag.Name.ToString()),
-                    "Avalonia.Markup.Xaml.Templates.ControlTemplate"))
+            if (element.StartTag == null ||
+                !IsControlTemplateScopeType(
+                    ResolveMarkupReferenceOwner(
+                        element.StartTag.Name.ToString())))
             {
                 continue;
             }
 
-            for (var parent = GetParentMarkupElement(element);
-                 parent != null;
-                 parent = GetParentMarkupElement(parent))
+            if (TryGetControlTemplateScopeTargetType(
+                    element,
+                    out targetType))
             {
-                var parentName = parent.StartTag?.Name.ToString();
-                if (parentName == null)
-                {
-                    continue;
-                }
-
-                var separator = parentName.LastIndexOf('.');
-                if (separator <= 0 ||
-                    !parentName[(separator + 1)..].Equals(
-                        "Template",
-                        StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                var ownerType = ResolveMarkupReferenceOwner(
-                    parentName[..separator]);
-                if (ownerType != null)
-                {
-                    targetType = ownerType;
-                    return true;
-                }
+                return true;
             }
 
-            var outerElement = GetParentMarkupElement(element);
-            if (outerElement != null)
+            break;
+        }
+
+        targetType = null!;
+        return false;
+    }
+
+    private bool IsControlTemplateScopeType(INamedTypeSymbol? type)
+    {
+        if (type == null)
+        {
+            return false;
+        }
+
+        for (var current = type; current != null; current = current.BaseType)
+        {
+            if (HasControlTemplateScopeAttribute(current))
             {
-                var styleTarget = GetMarkupStyleTargetContext(outerElement);
-                if (!styleTarget.IsUnknown &&
-                    !styleTarget.IsAmbiguous &&
-                    styleTarget.Types.Length == 1)
-                {
-                    targetType = styleTarget.Types[0];
-                    return true;
-                }
+                return true;
+            }
+        }
+
+        foreach (var @interface in type.AllInterfaces)
+        {
+            if (HasControlTemplateScopeAttribute(@interface))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasControlTemplateScopeAttribute(ISymbol symbol)
+    {
+        foreach (var attribute in symbol.GetAttributes())
+        {
+            if (attribute.AttributeClass?.ToDisplayString() ==
+                ControlTemplateScopeAttributeMetadataName)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool TryGetControlTemplateScopeTargetType(
+        MarkupElementSyntax scopeElement,
+        out INamedTypeSymbol targetType)
+    {
+        foreach (var attribute in scopeElement.StartTag!.Attributes)
+        {
+            if (!string.Equals(
+                    GetMarkupAssignmentName(attribute),
+                    "TargetType",
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var value = GetMarkupAttributeValue(attribute);
+            var typeName = value switch
+            {
+                MarkupLiteralAttributeValueSyntax literal =>
+                    GetMarkupLiteralAttributeValueText(literal),
+                MarkupDynamicAttributeValueSyntax dynamicValue when
+                    ParseInlineExpression(dynamicValue.Expression) is
+                        Microsoft.CodeAnalysis.CSharp.Syntax.TypeOfExpressionSyntax typeOf =>
+                    typeOf.Type.ToString(),
+                _ => string.Empty,
+            };
+
+            if (TryBindMarkupDataType(typeName, out targetType))
+            {
+                return true;
+            }
+        }
+
+        var parentElement = GetParentMarkupElement(scopeElement);
+        if (parentElement != null)
+        {
+            var styleTarget = GetMarkupStyleTargetContext(parentElement);
+            if (!styleTarget.IsUnknown &&
+                !styleTarget.IsAmbiguous &&
+                styleTarget.Types.Length == 1)
+            {
+                targetType = styleTarget.Types[0];
+                return true;
+            }
+
+            if (TryGetControlTemplateScopeParentControlType(
+                    parentElement,
+                    out targetType))
+            {
+                return true;
+            }
+        }
+
+        targetType = Compilation.CSharpCompilation.GetTypeByMetadataName(
+            "Avalonia.Controls.Control")!;
+        return targetType != null;
+    }
+
+    private bool TryGetControlTemplateScopeParentControlType(
+        MarkupElementSyntax parentElement,
+        out INamedTypeSymbol targetType)
+    {
+        var parentName = parentElement.StartTag?.Name.ToString();
+        if (parentName != null)
+        {
+            var separator = parentName.LastIndexOf('.');
+            var typeName = separator > 0
+                ? parentName[..separator]
+                : parentName;
+            var parentType = ResolveMarkupReferenceOwner(typeName);
+            if (IsMarkupTypeOrBase(parentType, "Avalonia.Controls.Control"))
+            {
+                targetType = parentType!;
+                return true;
             }
         }
 

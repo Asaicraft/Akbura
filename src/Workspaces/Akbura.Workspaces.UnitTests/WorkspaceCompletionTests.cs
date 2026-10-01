@@ -3682,6 +3682,15 @@ public sealed partial class WorkspaceCompletionTests
             additionalCSharpSource: """
                 namespace Avalonia.Metadata
                 {
+                    [System.AttributeUsage(
+                        System.AttributeTargets.Class |
+                        System.AttributeTargets.Interface |
+                        System.AttributeTargets.Struct,
+                        Inherited = true)]
+                    public sealed class ControlTemplateScopeAttribute : System.Attribute
+                    {
+                    }
+
                     public enum InheritDataTypeFromScopeKind
                     {
                         Style,
@@ -3733,7 +3742,16 @@ public sealed partial class WorkspaceCompletionTests
 
                 namespace Avalonia.Markup.Xaml.Templates
                 {
-                    public sealed class ControlTemplate
+                    public sealed class ControlTemplate :
+                        Avalonia.Controls.Templates.IControlTemplate
+                    {
+                    }
+                }
+
+                namespace Avalonia.Controls.Templates
+                {
+                    [Avalonia.Metadata.ControlTemplateScope]
+                    public interface IControlTemplate
                     {
                     }
                 }
@@ -3751,6 +3769,240 @@ public sealed partial class WorkspaceCompletionTests
 
                     public sealed class TemplateTarget : TemplateTargetBase
                     {
+                    }
+                }
+                """);
+    }
+
+    [Theory]
+    [InlineData("DerivedTemplateScope")]
+    [InlineData("InterfaceTemplateScope")]
+    public void Completion_ControlTemplateScopeAttributeResolvesCustomScopeTargetType(
+        string scopeType)
+    {
+        var sourceWithCaret =
+            "namespace Gallery;\r\n\r\n" +
+            "using Avalonia.Controls;\r\n" +
+            "using Avalonia.Styling;\r\n\r\n" +
+            "<ControlTheme TargetType=\"FallbackTarget\">\r\n" +
+            "    <Setter Property=\"Template\">\r\n" +
+            $"        <{scopeType} TargetType=\"TemplateTarget\">\r\n" +
+            "            <Border Background=${TemplateBinding Bac|}/>\r\n" +
+            $"        </{scopeType}>\r\n" +
+            "    </Setter>\r\n" +
+            "</ControlTheme>";
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            stylesSource: null,
+            assertion: (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.Contains(
+                    result.Items,
+                    static item => item.DisplayText == "Background");
+                Assert.DoesNotContain(
+                    result.Items,
+                    static item => item.DisplayText == "FallbackProperty");
+            },
+            additionalCSharpSource: """
+                namespace Avalonia.Metadata
+                {
+                    [System.AttributeUsage(
+                        System.AttributeTargets.Class |
+                        System.AttributeTargets.Interface |
+                        System.AttributeTargets.Struct,
+                        Inherited = true)]
+                    public sealed class ControlTemplateScopeAttribute : System.Attribute
+                    {
+                    }
+
+                    public enum InheritDataTypeFromScopeKind
+                    {
+                        Style,
+                        ControlTemplate,
+                    }
+
+                    [System.AttributeUsage(System.AttributeTargets.Parameter | System.AttributeTargets.Property)]
+                    public sealed class InheritDataTypeFromAttribute : System.Attribute
+                    {
+                        public InheritDataTypeFromAttribute(InheritDataTypeFromScopeKind scopeKind)
+                        {
+                        }
+                    }
+                }
+
+                namespace Avalonia.Data
+                {
+                    public sealed class TemplateBinding
+                    {
+                        public TemplateBinding(
+                            [Avalonia.Metadata.InheritDataTypeFrom(
+                                Avalonia.Metadata.InheritDataTypeFromScopeKind.ControlTemplate)]
+                            Avalonia.AvaloniaProperty property)
+                        {
+                        }
+
+                        public object ProvideValue(System.IServiceProvider serviceProvider) => new();
+                    }
+                }
+
+                namespace Avalonia.Styling
+                {
+                    public sealed class ControlTheme
+                    {
+                        public System.Type TargetType { get; set; }
+                    }
+
+                    public sealed class Setter
+                    {
+                        public Avalonia.AvaloniaProperty Property { get; set; }
+
+                        public object Value { get; set; }
+                    }
+                }
+
+                namespace Gallery
+                {
+                    public abstract class TemplateScopeBase
+                    {
+                        public System.Type TargetType { get; set; }
+                    }
+
+                    [Avalonia.Metadata.ControlTemplateScope]
+                    public abstract class AttributedTemplateScopeBase : TemplateScopeBase
+                    {
+                    }
+
+                    public sealed class DerivedTemplateScope : AttributedTemplateScopeBase
+                    {
+                    }
+
+                    [Avalonia.Metadata.ControlTemplateScope]
+                    public interface ITemplateScope
+                    {
+                        System.Type TargetType { get; set; }
+                    }
+
+                    public sealed class InterfaceTemplateScope : ITemplateScope
+                    {
+                        public System.Type TargetType { get; set; }
+                    }
+
+                    public class TemplateTargetBase : Avalonia.Controls.Control
+                    {
+                        public static readonly Avalonia.AvaloniaProperty<Avalonia.Media.IBrush?>
+                            BackgroundProperty = new();
+                    }
+
+                    public sealed class TemplateTarget : TemplateTargetBase
+                    {
+                    }
+
+                    public sealed class FallbackTarget : Avalonia.Controls.Control
+                    {
+                        public static readonly Avalonia.AvaloniaProperty<Avalonia.Media.IBrush?>
+                            FallbackProperty = new();
+                    }
+                }
+                """);
+    }
+
+    [Theory]
+    [InlineData(
+        "<TemplateHost><TemplateHost.Template><NoTargetScope><Border Background=${TemplateBinding Hos|}/></NoTargetScope></TemplateHost.Template></TemplateHost>",
+        "Host")]
+    [InlineData(
+        "<NoTargetScope><Border Background=${TemplateBinding Bac|}/></NoTargetScope>",
+        "Background")]
+    public void Completion_ControlTemplateScopeAttributeUsesControlFallbacks(
+        string markupWithCaret,
+        string expectedProperty)
+    {
+        var sourceWithCaret =
+            "namespace Gallery;\r\n\r\n" +
+            "using Avalonia.Controls;\r\n\r\n" +
+            markupWithCaret;
+        var position = sourceWithCaret.IndexOf('|');
+        var source = sourceWithCaret.Remove(position, 1);
+
+        WithWorkspace(
+            source,
+            stylesSource: null,
+            assertion: (workspace, semanticContext, syntacticDocument) =>
+            {
+                var result = workspace.LanguageServices.Completion
+                    .GetCompletions(
+                        syntacticDocument,
+                        semanticContext,
+                        position);
+
+                Assert.Contains(
+                    result.Items,
+                    item => item.DisplayText == expectedProperty);
+            },
+            additionalCSharpSource: """
+                namespace Avalonia.Metadata
+                {
+                    [System.AttributeUsage(
+                        System.AttributeTargets.Class |
+                        System.AttributeTargets.Interface |
+                        System.AttributeTargets.Struct,
+                        Inherited = true)]
+                    public sealed class ControlTemplateScopeAttribute : System.Attribute
+                    {
+                    }
+
+                    public enum InheritDataTypeFromScopeKind
+                    {
+                        Style,
+                        ControlTemplate,
+                    }
+
+                    [System.AttributeUsage(System.AttributeTargets.Parameter | System.AttributeTargets.Property)]
+                    public sealed class InheritDataTypeFromAttribute : System.Attribute
+                    {
+                        public InheritDataTypeFromAttribute(InheritDataTypeFromScopeKind scopeKind)
+                        {
+                        }
+                    }
+                }
+
+                namespace Avalonia.Data
+                {
+                    public sealed class TemplateBinding
+                    {
+                        public TemplateBinding(
+                            [Avalonia.Metadata.InheritDataTypeFrom(
+                                Avalonia.Metadata.InheritDataTypeFromScopeKind.ControlTemplate)]
+                            Avalonia.AvaloniaProperty property)
+                        {
+                        }
+
+                        public object ProvideValue(System.IServiceProvider serviceProvider) => new();
+                    }
+                }
+
+                namespace Gallery
+                {
+                    [Avalonia.Metadata.ControlTemplateScope]
+                    public sealed class NoTargetScope
+                    {
+                    }
+
+                    public sealed class TemplateHost : Avalonia.Controls.Control
+                    {
+                        public object Template { get; set; }
+
+                        public static readonly Avalonia.AvaloniaProperty<Avalonia.Media.IBrush?>
+                            HostProperty = new();
                     }
                 }
                 """);
@@ -7193,6 +7445,9 @@ public sealed partial class WorkspaceCompletionTests
                         HorizontalAlignment { get; set; }
 
                     public Avalonia.Media.IBrush? Background { get; set; }
+
+                    public static readonly Avalonia.AvaloniaProperty<Avalonia.Media.IBrush?>
+                        BackgroundProperty = new();
 
                     public Avalonia.Media.Color Tint { get; set; }
 

@@ -9,6 +9,8 @@ using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Diagnostics;
 using Avalonia.Interactivity;
+using Avalonia.Markup.Xaml.Converters;
+using Avalonia.Media;
 
 namespace Akbura.HotReload;
 
@@ -2993,6 +2995,8 @@ public sealed partial class AkburaRenderState : IDisposable
 
     private sealed class AvaloniaRenderPropertyState : RenderPropertyState
     {
+        private static readonly BitmapTypeConverter s_imageSourceConverter = new();
+
         private readonly AvaloniaObject _target;
         private readonly AvaloniaProperty _property;
         private readonly AvaloniaPropertyBaseline _baseline;
@@ -3064,6 +3068,13 @@ public sealed partial class AkburaRenderState : IDisposable
             // Generated markup attributes are Avalonia local values. Structural
             // hot reload may suppress replay of an unchanged declaration, but
             // applying it must retain normal XAML local-value semantics.
+            if (value is string imageSource &&
+                _property.PropertyType == typeof(IImage))
+            {
+                value = s_imageSourceConverter.ConvertFromInvariantString(
+                    imageSource);
+            }
+
             _target.SetValue(
                 _property,
                 value,

@@ -7,6 +7,7 @@ using Avalonia.Collections;
 using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Diagnostics;
+using Avalonia.Media.Imaging;
 using System.Collections;
 using System.Collections.Immutable;
 using System.Collections.Specialized;
@@ -912,6 +913,49 @@ public sealed class AkburaRenderStateTests
                 "revision-1",
                 _ => throw new InvalidOperationException(),
                 _ => throw new InvalidOperationException()));
+    }
+
+    [Fact]
+    public async Task AvaloniaValue_ImageSourceUriIsConvertedDuringHotReload()
+    {
+        var session = AvaloniaHeadlessTestSession.GetSession();
+        await session.Dispatch(() =>
+        {
+            var imagePath = Path.Combine(
+                Path.GetTempPath(),
+                Guid.NewGuid().ToString("N") + ".png");
+            File.WriteAllBytes(
+                imagePath,
+                Convert.FromBase64String(
+                    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/pXcAAAAASUVORK5CYII="));
+
+            try
+            {
+                using var state = new AkburaRenderState();
+                var plan = new[]
+                {
+                    Spec<Image>(-1, RootSlot, "Image"),
+                };
+
+                Begin(state, "revision-1", plan);
+                var image = state.GetRequired<Image>(0);
+                state.ReconcileAvaloniaValue(
+                    0,
+                    "Image.Source",
+                    image,
+                    Image.SourceProperty,
+                    "Source=URI",
+                    new Uri(imagePath).AbsoluteUri);
+                state.CompleteRevision();
+
+                Assert.IsType<Bitmap>(image.Source);
+            }
+            finally
+            {
+                File.Delete(imagePath);
+            }
+            return true;
+        }, CancellationToken.None);
     }
 
     [Fact]

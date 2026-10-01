@@ -67,17 +67,20 @@ internal readonly struct BindingWriterEnvironment
     private readonly INamedTypeSymbol? _withinType;
     private readonly INamedTypeSymbol? _avaloniaObjectType;
     private readonly INamedTypeSymbol? _avaloniaPropertyType;
+    private readonly INamedTypeSymbol? _parameterDescriptorType;
 
     private BindingWriterEnvironment(
         CSharpCompilation compilation,
         INamedTypeSymbol? withinType,
         INamedTypeSymbol? avaloniaObjectType,
-        INamedTypeSymbol? avaloniaPropertyType)
+        INamedTypeSymbol? avaloniaPropertyType,
+        INamedTypeSymbol? parameterDescriptorType)
     {
         _compilation = compilation;
         _withinType = withinType;
         _avaloniaObjectType = avaloniaObjectType;
         _avaloniaPropertyType = avaloniaPropertyType;
+        _parameterDescriptorType = parameterDescriptorType;
     }
 
     public static BindingWriterEnvironment Create(
@@ -106,7 +109,8 @@ internal readonly struct BindingWriterEnvironment
             compilation,
             withinType,
             compilation.GetTypeByMetadataName("Avalonia.AvaloniaObject"),
-            compilation.GetTypeByMetadataName("Avalonia.AvaloniaProperty"));
+            compilation.GetTypeByMetadataName("Avalonia.AvaloniaProperty"),
+            compilation.GetTypeByMetadataName("Akbura.ComponentTree.Parameter"));
     }
 
     public bool IsAccessible(ISymbol symbol)
@@ -142,9 +146,11 @@ internal readonly struct BindingWriterEnvironment
     /// </summary>
     public bool TryGetAvaloniaProperty(
         IPropertySymbol property,
-        out ISymbol avaloniaProperty)
+        out ISymbol avaloniaProperty,
+        out bool isParameterDescriptor)
     {
         avaloniaProperty = null!;
+        isParameterDescriptor = false;
 
         if (_avaloniaObjectType == null ||
             _avaloniaPropertyType == null ||
@@ -182,12 +188,21 @@ internal readonly struct BindingWriterEnvironment
                     _ => null,
                 };
 
-                if (memberType == null || !IsAvaloniaPropertyType(memberType))
+                if (memberType == null)
+                {
+                    continue;
+                }
+
+                var parameterDescriptor = _parameterDescriptorType != null &&
+                    memberType is INamedTypeSymbol namedType &&
+                    IsDerivedFrom(namedType, _parameterDescriptorType);
+                if (!parameterDescriptor && !IsAvaloniaPropertyType(memberType))
                 {
                     continue;
                 }
 
                 avaloniaProperty = member;
+                isParameterDescriptor = parameterDescriptor;
                 return true;
             }
         }
@@ -1500,11 +1515,18 @@ internal ref struct BindingWriter
         ITypeSymbol? sourceType,
         bool includeSetter)
     {
-        if (_environment.TryGetAvaloniaProperty(property, out var avaloniaProperty))
+        if (_environment.TryGetAvaloniaProperty(
+                property,
+                out var avaloniaProperty,
+                out var isParameterDescriptor))
         {
             _writer.Write(".Property(");
 
             WriteStaticMemberReference(avaloniaProperty);
+            if (isParameterDescriptor)
+            {
+                _writer.Write(".AvaloniaProperty");
+            }
 
             _writer
                 .Write(", ");

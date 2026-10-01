@@ -1471,7 +1471,8 @@ internal static partial class ComponentPlanner
                             PropertyWritePlan.Create(
                                 property,
                                 targetType,
-                                propertyOperation.AssignsCollectionSource),
+                                propertyOperation.AssignsCollectionSource,
+                                propertyOperation.ConvertedValue is MarkupExtensionValue),
                             propertyOperation));
                         _pendingFirstUpdateActions.Add(PendingFirstUpdateActionPlan.CreateProperty(index));
                         break;

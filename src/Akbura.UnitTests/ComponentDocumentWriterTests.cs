@@ -13,6 +13,65 @@ namespace Akbura.UnitTests;
 public sealed class ComponentDocumentWriterTests
 {
     [Fact]
+    public void Generate_TemplateBindingOnAttachedProperty_BindsAvaloniaProperty()
+    {
+        const string componentSource =
+            """
+            using Avalonia.Controls;
+            using Avalonia.Controls.Documents;
+            using Avalonia.Controls.Presenters;
+            using Avalonia.Markup.Xaml.Templates;
+            using Avalonia.Styling;
+
+            <TextBox>
+                <TextBox.Theme>
+                    <ControlTheme TargetType="TextBox">
+                        <Setter Property="Template">
+                            <ControlTemplate>
+                                <TextPresenter TextElement.Foreground=${TemplateBinding Foreground} />
+                            </ControlTemplate>
+                        </Setter>
+                    </ControlTheme>
+                </TextBox.Theme>
+            </TextBox>
+            """;
+        var fixture = AkcssActivatorPlannerTests.CreateFixture(componentSource);
+        var component = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
+            fixture.SemanticModel.GetSymbolInfo(fixture.ComponentTree.GetRoot()).Symbol);
+        var semanticDiagnostics = fixture.SemanticModel.GetSemanticDiagnostics(fixture.ComponentTree.GetRoot());
+        Assert.True(
+            semanticDiagnostics.IsEmpty,
+            string.Join(
+                Environment.NewLine,
+                semanticDiagnostics.Select(static diagnostic => diagnostic.Code + ": " + diagnostic.Message)));
+        var generatedText = ComponentDocumentWriter.Generate(
+            component,
+            fixture.SemanticModel,
+            "Views/PlannerView.akbura",
+            new Dictionary<AkburaSyntax, string>(),
+            CancellationToken.None);
+        var generatedSource = generatedText.ToString();
+
+        Assert.Contains(
+            ".Bind(global::Avalonia.Controls.Documents.TextElement.ForegroundProperty,",
+            generatedSource,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("TextElement.SetForeground(", generatedSource, StringComparison.Ordinal);
+
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            generatedText,
+            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview));
+        var diagnostics = fixture.CSharpCompilation.AddSyntaxTrees(syntaxTree)
+            .GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .ToArray();
+
+        Assert.True(
+            diagnostics.Length == 0,
+            string.Join(Environment.NewLine, diagnostics.Select(static diagnostic => diagnostic.ToString())));
+    }
+
+    [Fact]
     public void Generate_WritesCompleteCompilableDocument()
     {
         const string componentSource =

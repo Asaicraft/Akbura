@@ -591,6 +591,59 @@ public sealed class BindingWriterTests
     }
 
     [Fact]
+    public void CachedPathField_UnwrapsGeneratedComponentParameter()
+    {
+        // Avalonia path: $parent[Demo.CardTextBox].Icon
+        const string componentSource =
+            """
+            public abstract class CardTextBox : global::Akbura.AkburaControl
+            {
+                public static readonly global::Akbura.ComponentTree.Parameter<CardTextBox, string>
+                    IconProperty =
+                        global::Akbura.ComponentTree.Parameter.Create<CardTextBox, string>("Icon");
+
+                public string Icon { get; set; } = "";
+            }
+            """;
+        var fixture = CreateFixture(componentSource);
+        var componentType = fixture.GetRequiredType("Demo.CardTextBox");
+        var iconProperty = GetProperty(componentType, "Icon");
+        var extension = CreateBindingExtension(
+            fixture,
+            MarkupBindingKind.Compiled,
+            "$parent[Demo.CardTextBox].Icon",
+            componentType,
+            [
+                new MarkupBindingPathElement(
+                    MarkupBindingPathElementKind.Ancestor,
+                    "$parent[Demo.CardTextBox]",
+                    type: new CSharpSymbolDefinition(componentType)),
+                CreatePropertyElement(iconProperty),
+            ]);
+        var nextCachedPathId = 0;
+        var plan = CreatePlan(
+            fixture,
+            extension,
+            scopeId: 0,
+            nameScopeExpression: null,
+            [],
+            ref nextCachedPathId);
+
+        var cachedPath = WriteCachedBindingPath(fixture, plan);
+        var binding = WriteBinding(
+            fixture,
+            plan,
+            CreateWriteContext(nameScopeExpression: null, scopeId: 0));
+
+        Assert.True(plan.IsValid);
+        Assert.Contains(
+            "global::Demo.CardTextBox.IconProperty.AvaloniaProperty",
+            cachedPath,
+            StringComparison.Ordinal);
+        AssertGeneratedCSharpCompiles(fixture, cachedPath, binding);
+    }
+
+    [Fact]
     public void ValueTypeMembers_DoNotWriteSetters_AndGeneratedPathsCompile()
     {
         // Avalonia paths: Value and [0]
@@ -1316,7 +1369,7 @@ public sealed class BindingWriterTests
             ]);
     }
 
-    private static TestFixture CreateFixture()
+    private static TestFixture CreateFixture(string? additionalCSharp = null)
     {
         const string csharpSource =
             """
@@ -1425,7 +1478,7 @@ public sealed class BindingWriterTests
             syntaxTrees:
             [
                 CSharpSyntaxTree.ParseText(
-                    csharpSource,
+                    csharpSource + "\n" + additionalCSharp,
                     CSharpParseOptions.Default.WithLanguageVersion(
                         LanguageVersion.Preview)),
             ],

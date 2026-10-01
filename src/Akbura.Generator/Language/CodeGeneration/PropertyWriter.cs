@@ -86,13 +86,14 @@ internal readonly struct PropertyWritePlan
     public static PropertyWritePlan Create(
         AkburaPropertySymbol property,
         ITypeSymbol targetType,
-        bool assignsCollectionSource = false)
+        bool assignsCollectionSource = false,
+        bool preferAttachedAvaloniaProperty = false)
     {
         Debug.Assert(targetType != null);
 
         return targetType == null
             ? default
-            : CreateCore(property, targetType, assignsCollectionSource);
+            : CreateCore(property, targetType, assignsCollectionSource, preferAttachedAvaloniaProperty);
     }
 
     public static PropertyWritePlan Create(RoslynPropertySymbol property)
@@ -116,13 +117,21 @@ internal readonly struct PropertyWritePlan
     private static PropertyWritePlan CreateCore(
         AkburaPropertySymbol property,
         ITypeSymbol? targetType,
-        bool assignsCollectionSource = false)
+        bool assignsCollectionSource = false,
+        bool preferAttachedAvaloniaProperty = false)
     {
         Debug.Assert(property != null);
 
         if (property == null)
         {
             return default;
+        }
+
+        if (preferAttachedAvaloniaProperty &&
+            property.WriteKind == PropertyAccessKind.AttachedAccessor &&
+            property.AvaloniaPropertyDefinition.Symbol is IFieldSymbol { IsStatic: true })
+        {
+            return CreateAvaloniaProperty(property);
         }
 
         return property.WriteKind switch

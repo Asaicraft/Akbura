@@ -3,3 +3,12 @@
 
 [$RootKey$\ShellFileAssociations\.akcss]
 "DefaultIconMoniker"="A4BE0232-1E36-4B93-93D8-6614639B6B32:2"
+
+
+// Route .akbura files to the standard text editor so the XML editor cannot
+// claim markup-only files by sniffing their leading '<'.
+[$RootKey$\Editors\{8B382828-6202-11D1-8870-0000F87579D2}\Extensions]
+"akbura"=dword:00000032
+
+[$RootKey$\Editors\{C7747503-0E24-4FBE-BE4B-94180C3947D7}\Extensions]
+"akbura"=dword:00000031

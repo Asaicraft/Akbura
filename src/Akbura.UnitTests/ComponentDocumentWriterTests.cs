@@ -151,6 +151,50 @@ public sealed class ComponentDocumentWriterTests
     }
 
     [Fact]
+    public void Generate_UseEffectLambda_CapturesRenderLocal()
+    {
+        const string componentSource =
+            """
+            using Akbura.Hooks;
+            using Avalonia.Controls;
+
+            state double width = useTopLevelWidth();
+            state bool isMobileExpanded = false;
+            var isMobile = width < 640d;
+
+            useEffect(() =>
+            {
+                if (!isMobile)
+                    isMobileExpanded = false;
+            }, [isMobile]);
+
+            <Button />
+            """;
+        var fixture = AkcssActivatorPlannerTests.CreateFixture(componentSource);
+        var component = Assert.IsAssignableFrom<IAkburaComponentSymbol>(
+            fixture.SemanticModel.GetSymbolInfo(fixture.ComponentTree.GetRoot()).Symbol);
+        var diagnostics = fixture.SemanticModel.GetSemanticDiagnostics(fixture.ComponentTree.GetRoot());
+        Assert.True(diagnostics.IsEmpty,
+            string.Join(Environment.NewLine, diagnostics.Select(
+                static diagnostic => diagnostic.Code + ": " + diagnostic.Message)));
+
+        var generated = ComponentDocumentWriter.Generate(
+            component,
+            fixture.SemanticModel,
+            "Views/PlannerView.akbura",
+            new Dictionary<AkburaSyntax, string>());
+        var tree = CSharpSyntaxTree.ParseText(
+            generated,
+            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview));
+        var compileErrors = fixture.CSharpCompilation.AddSyntaxTrees(tree)
+            .GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .ToArray();
+        Assert.True(compileErrors.Length == 0,
+            string.Join(Environment.NewLine, compileErrors.Select(static diagnostic => diagnostic.ToString())));
+    }
+
+    [Fact]
     public void Generate_TopLevelWidthHookAndDerivedLocal_AreVisibleToUserMethod()
     {
         const string componentSource =

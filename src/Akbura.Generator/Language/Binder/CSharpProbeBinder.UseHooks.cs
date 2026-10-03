@@ -86,9 +86,13 @@ internal sealed partial class CSharpProbeBinder
         ImmutableArray<UseHookStateArgument> stateArguments = default)
     {
         var sourceInvocation = invocation;
+        var precedingLocals = syntax is CSharpStatementSyntax
+            ? CSharpProbeBuilder.GetPrecedingLocalDeclarations(syntax)
+            : ImmutableArray<CSharp.StatementSyntax>.Empty;
         var probeScope = CreateUseHookProbeScope(
             syntax,
-            invocation);
+            invocation,
+            precedingLocals);
         if (!stateArguments.IsDefaultOrEmpty)
         {
             var stateType = Compilation.CSharpCompilation.GetTypeByMetadataName(
@@ -125,7 +129,7 @@ internal sealed partial class CSharpProbeBinder
                 CSharpSyntaxFactory.PredefinedType(
                     CSharpSyntaxFactory.Token(CSharpSyntaxKind.VoidKeyword)),
                 "__akbura_use_hook_probe")
-            .WithBody(CreateProbeBlock(probeScope.LocalStatements, statement));
+            .WithBody(CreateProbeBlock(probeScope.LocalStatements, precedingLocals, statement));
         var imports = CreateUseHookImports(sourceInvocation, hookTypes);
         var members = AddProbeMethod(probeScope.MemberDeclarations, method);
         var usingDirectives = CreateUseHookUsingDirectives(hookTypes);
@@ -162,12 +166,19 @@ internal sealed partial class CSharpProbeBinder
     {
         var annotation = new SyntaxAnnotation(CSharpProbeBuilder.CompletionAnnotationKind);
         var annotatedStatement = statement.WithAdditionalAnnotations(annotation);
-        var probeScope = CreateCompletionProbeScope(syntax, annotatedStatement);
+        var precedingLocals = syntax is CSharpStatementSyntax
+            ? CSharpProbeBuilder.GetPrecedingLocalDeclarations(syntax)
+            : ImmutableArray<CSharp.StatementSyntax>.Empty;
+        var analyzedBlock = CreateProbeBlock(
+            ImmutableArray<CSharp.StatementSyntax>.Empty,
+            precedingLocals,
+            annotatedStatement);
+        var probeScope = CreateCompletionProbeScope(syntax, analyzedBlock);
         var method = CSharpSyntaxFactory.MethodDeclaration(
                 CSharpSyntaxFactory.PredefinedType(
                     CSharpSyntaxFactory.Token(CSharpSyntaxKind.VoidKeyword)),
                 "__akbura_use_hook_completion_probe")
-            .WithBody(CreateProbeBlock(probeScope.LocalStatements, annotatedStatement));
+            .WithBody(CreateProbeBlock(probeScope.LocalStatements, precedingLocals, annotatedStatement));
         var imports = CreateUseHookImports(
             invocation,
             hookTypes,
@@ -193,10 +204,15 @@ internal sealed partial class CSharpProbeBinder
 
     private CSharpProbeScope CreateUseHookProbeScope(
         AkburaSyntax syntax,
-        CSharp.InvocationExpressionSyntax invocation)
+        CSharp.InvocationExpressionSyntax invocation,
+        ImmutableArray<CSharp.StatementSyntax> precedingLocals)
     {
         var excludedNames = GetInvocationTargetIdentifierNames(invocation);
-        var scope = CreateProbeScope(syntax, invocation, excludedNames);
+        var analyzedBlock = CreateProbeBlock(
+            ImmutableArray<CSharp.StatementSyntax>.Empty,
+            precedingLocals,
+            CSharpSyntaxFactory.ExpressionStatement(invocation));
+        var scope = CreateProbeScope(syntax, analyzedBlock, excludedNames);
         using var members = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
         using var locals = ImmutableArrayBuilder<CSharp.StatementSyntax>.Rent();
         members.AddRange(scope.MemberDeclarations);
@@ -215,7 +231,7 @@ internal sealed partial class CSharpProbeBinder
         var diagnostics = BindingDiagnosticBag.GetInstance();
         try
         {
-            foreach (var identifier in invocation.DescendantNodes()
+            foreach (var identifier in analyzedBlock.DescendantNodes()
                          .OfType<CSharp.IdentifierNameSyntax>())
             {
                 if (!names.Add(identifier.Identifier.ValueText) ||

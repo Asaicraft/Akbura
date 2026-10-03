@@ -236,6 +236,13 @@ internal sealed partial class CSharpProbeBinder : Binder
             return false;
         }
 
+        if (methodSyntax.Parent is AkburaDocumentSyntax document &&
+            ComponentRenderLocalFunctionFacts.GetCapturedFunctions(document).Contains(methodSyntax))
+        {
+            return TryBindCapturedComponentMethodStatement(
+                syntax, methodSyntax, isBindingPath, out boundStatement);
+        }
+
         var relativeSpan = new TextSpan(
             syntax.Span.Start - methodSyntax.Position,
             syntax.Span.Length);
@@ -279,6 +286,61 @@ internal sealed partial class CSharpProbeBinder : Binder
             semanticModel,
             probeStatement,
             isBindingPath);
+        return true;
+    }
+
+    private bool TryBindCapturedComponentMethodStatement(
+        AkburaSyntax syntax,
+        CSharpStatementSyntax methodSyntax,
+        bool isBindingPath,
+        out BoundStatement boundStatement)
+    {
+        boundStatement = null!;
+        if (CSharpSyntaxFactory.ParseStatement(methodSyntax.ToFullString()) is not
+            CSharp.LocalFunctionStatementSyntax function)
+        {
+            return false;
+        }
+
+        var relativeSpan = new TextSpan(
+            syntax.Span.Start - methodSyntax.Position,
+            syntax.Span.Length);
+        var statement = function.DescendantNodes()
+            .OfType<CSharp.StatementSyntax>()
+            .FirstOrDefault(candidate => candidate.Span == relativeSpan);
+        if (statement == null)
+        {
+            return false;
+        }
+
+        var annotation = new SyntaxAnnotation();
+        function = function.ReplaceNode(
+            statement,
+            statement.WithAdditionalAnnotations(annotation));
+        var excludedNames = function.ParameterList.Parameters
+            .Select(static parameter => parameter.Identifier.ValueText)
+            .Append(function.Identifier.ValueText)
+            .ToImmutableArray();
+        var probeScope = CreateProbeScope(syntax, function, excludedNames);
+        var precedingLocals = CSharpProbeBuilder.GetPrecedingLocalDeclarations(methodSyntax);
+        var wrapper = CSharpSyntaxFactory.MethodDeclaration(
+                CSharpSyntaxFactory.PredefinedType(
+                    CSharpSyntaxFactory.Token(CSharpSyntaxKind.VoidKeyword)),
+                "__AkburaComponentMethodProbe")
+            .WithBody(CreateProbeBlock(
+                probeScope.LocalStatements,
+                precedingLocals,
+                function));
+        var syntaxTree = CreateSyntaxTree(CreateComponentProbeCompilationUnit(
+            AddProbeMethod(probeScope.MemberDeclarations, wrapper),
+            "__AkburaComponentMethodProbe"));
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var probeStatement = syntaxTree.GetRoot()
+            .GetAnnotatedNodes(annotation)
+            .OfType<CSharp.StatementSyntax>()
+            .Single();
+        boundStatement = BindStatementTree(
+            syntax, semanticModel, probeStatement, isBindingPath);
         return true;
     }
 

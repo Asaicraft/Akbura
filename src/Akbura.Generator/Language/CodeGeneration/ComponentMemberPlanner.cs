@@ -1062,11 +1062,14 @@ internal static class ComponentMemberPlanner
         private void LowerUserMembers()
         {
             var members = _component.DeclarationSyntax.Members;
+            var capturedFunctions = ComponentRenderLocalFunctionFacts.GetCapturedFunctions(
+                _component.DeclarationSyntax);
 
             for (var i = 0; i < members.Count; i++)
             {
                 if (members[i] is not CSharpStatementSyntax syntax ||
                     syntax.GetRawCSharpStatement() is not CSharp.LocalFunctionStatementSyntax localFunction ||
+                    capturedFunctions.Contains(syntax) ||
                     localFunction.ContainsDiagnostics ||
                     HasSemanticErrors(syntax))
                 {

@@ -86,13 +86,15 @@ internal readonly struct ComponentRoutedEventPlan
         ISymbol eventSymbol,
         ITypeSymbol handlerType,
         string handlerExpression,
-        AkburaSyntax syntax)
+        AkburaSyntax syntax,
+        bool refreshClosure)
     {
         Kind = kind;
         EventSymbol = eventSymbol;
         HandlerType = handlerType;
         HandlerExpression = handlerExpression;
         Syntax = syntax;
+        RefreshClosure = refreshClosure;
     }
 
     public ComponentRoutedEventKind Kind { get; }
@@ -105,6 +107,8 @@ internal readonly struct ComponentRoutedEventPlan
 
     public AkburaSyntax? Syntax { get; }
 
+    public bool RefreshClosure { get; }
+
     public bool IsValid =>
         Kind != ComponentRoutedEventKind.None &&
         EventSymbol != null &&
@@ -115,28 +119,32 @@ internal readonly struct ComponentRoutedEventPlan
     public static ComponentRoutedEventPlan CreateClrEvent(
         IEventSymbol eventSymbol,
         string handlerExpression,
-        AkburaSyntax syntax)
+        AkburaSyntax syntax,
+        bool refreshClosure = false)
     {
         return new ComponentRoutedEventPlan(
             ComponentRoutedEventKind.ClrEvent,
             eventSymbol,
             eventSymbol.Type,
             handlerExpression,
-            syntax);
+            syntax,
+            refreshClosure);
     }
 
     public static ComponentRoutedEventPlan CreateAvaloniaRoutedEvent(
         ISymbol eventSymbol,
         ITypeSymbol handlerType,
         string handlerExpression,
-        AkburaSyntax syntax)
+        AkburaSyntax syntax,
+        bool refreshClosure = false)
     {
         return new ComponentRoutedEventPlan(
             ComponentRoutedEventKind.AvaloniaRoutedEvent,
             eventSymbol,
             handlerType,
             handlerExpression,
-            syntax);
+            syntax,
+            refreshClosure);
     }
 }
 
@@ -167,7 +175,8 @@ internal readonly struct ComponentCommandBindingPlan
         ComponentCommandAwaitableKind awaitableKind = ComponentCommandAwaitableKind.None,
         bool isCommandReference = true,
         ITypeSymbol? awaitableResultType = null,
-        MarkupCommandTargetKind targetKind = MarkupCommandTargetKind.DeclaredCommand)
+        MarkupCommandTargetKind targetKind = MarkupCommandTargetKind.DeclaredCommand,
+        bool refreshClosure = false)
     {
         Destination = destination;
         CommandName = commandName ?? throw new ArgumentNullException(nameof(commandName));
@@ -187,6 +196,7 @@ internal readonly struct ComponentCommandBindingPlan
         IsCommandReference = isCommandReference;
         AwaitableResultType = awaitableResultType;
         TargetKind = targetKind;
+        RefreshClosure = refreshClosure;
     }
 
     public PropertyWritePlan Destination { get; }
@@ -224,6 +234,8 @@ internal readonly struct ComponentCommandBindingPlan
     public ITypeSymbol? AwaitableResultType { get; }
 
     public MarkupCommandTargetKind TargetKind { get; }
+
+    public bool RefreshClosure { get; }
 
     public bool IsICommandAdapter => TargetKind == MarkupCommandTargetKind.ICommandProperty;
 

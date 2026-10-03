@@ -55,12 +55,23 @@ internal readonly ref struct ComponentFirstUpdateActionWriter
 
     public void WriteRoutedEvent(
         in ComponentRoutedEventPlan plan,
-        string targetExpression)
+        string targetExpression,
+        int handlerIndex = -1)
     {
         Debug.Assert(plan.IsValid);
         Debug.Assert(!string.IsNullOrEmpty(targetExpression));
 
         using var mapping = _mappings.WriteStart(plan.Syntax!);
+        if (handlerIndex >= 0)
+        {
+            _writer.Write("this.");
+            _writer.Write(GetHandlerFieldName(handlerIndex));
+            _writer.Write(" = (");
+            _valueWriter.WriteTypeName(plan.HandlerType);
+            _writer.Write(")(");
+            _writer.Write(plan.HandlerExpression!);
+            _writer.WriteLine(");");
+        }
 
         switch (plan.Kind)
         {
@@ -72,7 +83,9 @@ internal readonly ref struct ComponentFirstUpdateActionWriter
                 _writer.Write(").");
                 _valueWriter.WriteIdentifier(clrEvent.Name);
                 _writer.Write(" += ");
-                _writer.Write(plan.HandlerExpression!);
+                _writer.Write(handlerIndex >= 0
+                    ? "this." + GetHandlerFieldName(handlerIndex)
+                    : plan.HandlerExpression!);
                 _writer.WriteLine(";");
                 return;
             case ComponentRoutedEventKind.AvaloniaRoutedEvent when plan.EventSymbol != null:
@@ -81,13 +94,91 @@ internal readonly ref struct ComponentFirstUpdateActionWriter
                 _writer.Write(").AddHandler(");
                 _valueWriter.WriteStaticMemberReference(plan.EventSymbol);
                 _writer.Write(", ");
-                _writer.Write(plan.HandlerExpression!);
+                _writer.Write(handlerIndex >= 0
+                    ? "this." + GetHandlerFieldName(handlerIndex)
+                    : plan.HandlerExpression!);
                 _writer.WriteLine(");");
                 return;
             default:
                 Debug.Fail("An invalid routed-event plan reached code generation.");
                 return;
         }
+    }
+
+    public static string GetHandlerFieldName(int index) =>
+        "__akburaEventHandler" + index;
+
+    public void WriteRefreshRoutedEvent(
+        in ComponentRoutedEventPlan plan,
+        string targetExpression,
+        int handlerIndex)
+    {
+        Debug.Assert(plan.IsValid);
+        Debug.Assert(handlerIndex >= 0);
+
+        using var mapping = _mappings.WriteStart(plan.Syntax!);
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        var fieldName = GetHandlerFieldName(handlerIndex);
+        var previousName = "__akburaPreviousEventHandler" + handlerIndex;
+        var nextName = "__akburaNextEventHandler" + handlerIndex;
+        _writer.Write("if (this.").Write(fieldName).Write(" is { } ").Write(previousName).WriteLine(")");
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        WriteEventTarget(plan, targetExpression);
+        WriteEventRemoval(plan, previousName);
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
+
+        _writer.Write("var ").Write(nextName).Write(" = (");
+        _valueWriter.WriteTypeName(plan.HandlerType);
+        _writer.Write(")(").Write(plan.HandlerExpression!).WriteLine(");");
+        WriteEventTarget(plan, targetExpression);
+        WriteEventAddition(plan, nextName);
+        _writer.Write("this.").Write(fieldName).Write(" = ").Write(nextName).WriteLine(";");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
+    }
+
+    private void WriteEventTarget(in ComponentRoutedEventPlan plan, string targetExpression)
+    {
+        if (plan.Kind == ComponentRoutedEventKind.ClrEvent && plan.EventSymbol is IEventSymbol clrEvent)
+        {
+            _writer.Write("((");
+            _valueWriter.WriteTypeName(clrEvent.ContainingType);
+            _writer.Write(")").Write(targetExpression).Write(").");
+            _valueWriter.WriteIdentifier(clrEvent.Name);
+            return;
+        }
+
+        _writer.Write("((global::Avalonia.Interactivity.Interactive)");
+        _writer.Write(targetExpression).Write(")");
+    }
+
+    private void WriteEventRemoval(in ComponentRoutedEventPlan plan, string handler)
+    {
+        if (plan.Kind == ComponentRoutedEventKind.ClrEvent)
+        {
+            _writer.Write(" -= ").Write(handler).WriteLine(";");
+            return;
+        }
+
+        _writer.Write(".RemoveHandler(");
+        _valueWriter.WriteStaticMemberReference(plan.EventSymbol!);
+        _writer.Write(", ").Write(handler).WriteLine(");");
+    }
+
+    private void WriteEventAddition(in ComponentRoutedEventPlan plan, string handler)
+    {
+        if (plan.Kind == ComponentRoutedEventKind.ClrEvent)
+        {
+            _writer.Write(" += ").Write(handler).WriteLine(";");
+            return;
+        }
+
+        _writer.Write(".AddHandler(");
+        _valueWriter.WriteStaticMemberReference(plan.EventSymbol!);
+        _writer.Write(", ").Write(handler).WriteLine(");");
     }
 
     public void WriteStructuralRoutedEvent(

@@ -152,6 +152,74 @@ internal readonly ref partial struct ComponentScopeWriter
         }
     }
 
+    public void WriteRefreshCallbackClosures(in ComponentPlan plan)
+    {
+        var writer = new ComponentFirstUpdateActionWriter(_writer, _sourceMap);
+        for (var elementIndex = 0; elementIndex < plan.Elements.Length; elementIndex++)
+        {
+            ref readonly var element = ref plan.Elements.ItemRef(elementIndex);
+            if (element.ScopeId != 0 || element.IsLocal ||
+                _generationMode.UsesStructuralRuntime() &&
+                (!element.UsesRuntimeStorage ||
+                    element.ConditionalRegionId >= 0 ||
+                    element.RuntimeStorageRootScopeId > 0))
+            {
+                continue;
+            }
+
+            for (var actionIndex = 0; actionIndex < element.FirstUpdateActions.Length; actionIndex++)
+            {
+                ref readonly var action = ref plan.FirstUpdateActions.ItemRef(
+                    element.FirstUpdateActions.Start + actionIndex);
+                if (action.Kind == ComponentFirstUpdateActionKind.CommandBinding)
+                {
+                    ref readonly var command = ref plan.CommandBindings.ItemRef(action.Index);
+                    if (!command.RefreshClosure)
+                    {
+                        continue;
+                    }
+
+                    if (_generationMode.UsesStructuralRuntime() &&
+                        ComponentFirstUpdateActionWriter.CanWriteStructuralCommandBinding(command))
+                    {
+                        writer.WriteStructuralCommandBinding(
+                            command, element.RuntimeStorageId, element.Identifier,
+                            refreshClosure: true);
+                    }
+                    else
+                    {
+                        writer.WriteCommandBinding(command, element.Identifier);
+                    }
+
+                    continue;
+                }
+
+                if (action.Kind != ComponentFirstUpdateActionKind.RoutedEvent)
+                {
+                    continue;
+                }
+
+                ref readonly var routedEvent = ref plan.RoutedEvents.ItemRef(action.Index);
+                if (!routedEvent.RefreshClosure)
+                {
+                    continue;
+                }
+
+                if (_generationMode.UsesStructuralRuntime())
+                {
+                    writer.WriteStructuralRoutedEvent(
+                        routedEvent, element.RuntimeStorageId, element.Identifier,
+                        refreshClosure: true);
+                }
+                else
+                {
+                    writer.WriteRefreshRoutedEvent(
+                        routedEvent, element.Identifier, action.Index);
+                }
+            }
+        }
+    }
+
     public void WriteHotReloadState(
         in ComponentPlan plan,
         in ComponentScopePlan scope,
@@ -320,7 +388,14 @@ internal readonly ref partial struct ComponentScopeWriter
                 {
                     Debug.Assert((uint)action.Index < (uint)plan.RoutedEvents.Length);
                     ref readonly var routedEvent = ref plan.RoutedEvents.ItemRef(action.Index);
-                    actionWriter.WriteRoutedEvent(routedEvent, targetExpression);
+                    actionWriter.WriteRoutedEvent(
+                        routedEvent,
+                        targetExpression,
+                        !_generationMode.UsesStructuralRuntime() &&
+                            element.ScopeId == 0 && !element.IsLocal &&
+                            routedEvent.RefreshClosure
+                            ? action.Index
+                            : -1);
                     break;
                 }
                 case ComponentFirstUpdateActionKind.CommandBinding:

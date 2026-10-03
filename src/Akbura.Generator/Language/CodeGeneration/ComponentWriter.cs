@@ -267,6 +267,38 @@ internal sealed class ComponentWriter : IDisposable
             wroteAny = true;
         }
 
+        for (var elementIndex = 0; elementIndex < _plan.Elements.Length; elementIndex++)
+        {
+            ref readonly var element = ref _plan.Elements.ItemRef(elementIndex);
+            if (element.ScopeId != 0 || element.IsLocal)
+            {
+                continue;
+            }
+
+            for (var actionIndex = 0; actionIndex < element.FirstUpdateActions.Length; actionIndex++)
+            {
+                ref readonly var action = ref _plan.FirstUpdateActions.ItemRef(
+                    element.FirstUpdateActions.Start + actionIndex);
+                if (action.Kind != ComponentFirstUpdateActionKind.RoutedEvent)
+                {
+                    continue;
+                }
+
+                ref readonly var routedEvent = ref _plan.RoutedEvents.ItemRef(action.Index);
+                if (!routedEvent.RefreshClosure)
+                {
+                    continue;
+                }
+
+                _writer.Write("private ");
+                new CSharpValueWriter(_writer).WriteTypeName(routedEvent.HandlerType);
+                _writer.Write("? ");
+                _writer.Write(ComponentFirstUpdateActionWriter.GetHandlerFieldName(action.Index));
+                _writer.WriteLine(";");
+                wroteAny = true;
+            }
+        }
+
         return wroteAny;
     }
 

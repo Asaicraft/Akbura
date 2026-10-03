@@ -616,6 +616,8 @@ internal static partial class ComponentPlanner
         {
             var members = _component.DeclarationSyntax.Members;
             var captureReferences = CreateRenderCaptureReferences();
+            var capturedFunctions = ComponentRenderLocalFunctionFacts.GetCapturedFunctions(
+                _component.DeclarationSyntax);
 
             for (var i = 0; i < members.Count; i++)
             {
@@ -626,7 +628,7 @@ internal static partial class ComponentPlanner
 
                 var statement = syntax.GetRawCSharpStatement();
                 if (statement == null ||
-                    statement is CSharp.LocalFunctionStatementSyntax)
+                    statement is CSharp.LocalFunctionStatementSyntax && !capturedFunctions.Contains(syntax))
                 {
                     continue;
                 }
@@ -670,7 +672,8 @@ internal static partial class ComponentPlanner
                     ComponentRenderStatementKind.Statement,
                     statement,
                     syntax,
-                    statement is CSharp.LocalDeclarationStatementSyntax || !declaredLocals.IsDefaultOrEmpty
+                    statement is CSharp.LocalDeclarationStatementSyntax or CSharp.LocalFunctionStatementSyntax ||
+                        !declaredLocals.IsDefaultOrEmpty
                         ? ComponentRenderStatementPhase.Both
                         : ComponentRenderStatementPhase.Update,
                     renderCaptures: CreateRenderCaptures(declaredLocals, captureReferences)));
@@ -1606,11 +1609,14 @@ internal static partial class ComponentPlanner
         private void LowerRoutedEvent(IMarkupRoutedEventBindingOperation operation)
         {
             var handlerExpression = GetEventHandlerExpression(operation);
+            var refreshClosure = ComponentRenderLocalFunctionFacts.RequiresFreshClosure(
+                _component.DeclarationSyntax, handlerExpression);
             ComponentRoutedEventPlan plan;
 
             if (operation.Event.ClrEventDefinition.Symbol is IEventSymbol { IsStatic: false } clrEvent)
             {
-                plan = ComponentRoutedEventPlan.CreateClrEvent(clrEvent, handlerExpression, operation.Syntax);
+                plan = ComponentRoutedEventPlan.CreateClrEvent(
+                    clrEvent, handlerExpression, operation.Syntax, refreshClosure);
             }
             else if (operation.Event.RoutedEventDefinition.Symbol is { } routedEvent &&
                 (routedEvent is IFieldSymbol { IsStatic: true } or
@@ -1621,7 +1627,8 @@ internal static partial class ComponentPlanner
                     routedEvent,
                     handlerType,
                     handlerExpression,
-                    operation.Syntax);
+                    operation.Syntax,
+                    refreshClosure);
             }
             else
             {
@@ -1670,7 +1677,9 @@ internal static partial class ComponentPlanner
                 GetCommandAwaitableKind(operation),
                 IsDirectCommandReference(operation),
                 GetCommandAwaitableResultType(operation),
-                operation.TargetKind);
+                operation.TargetKind,
+                ComponentRenderLocalFunctionFacts.RequiresFreshClosure(
+                    _component.DeclarationSyntax, handler.ToFullString()));
             if (!plan.IsValid)
             {
                 return;

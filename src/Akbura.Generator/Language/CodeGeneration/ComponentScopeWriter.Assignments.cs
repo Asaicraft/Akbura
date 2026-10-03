@@ -397,7 +397,14 @@ internal readonly ref partial struct ComponentScopeWriter
                             subscriptions.WriteRegistration(element, plan.PropertySubscriptions.ItemRef(action.Index));
                             break;
                         case ComponentFirstUpdateActionKind.RoutedEvent:
-                            actionWriter.WriteRoutedEvent(plan.RoutedEvents.ItemRef(action.Index), element.Identifier);
+                            actionWriter.WriteRoutedEvent(
+                                plan.RoutedEvents.ItemRef(action.Index),
+                                element.Identifier,
+                                !_generationMode.UsesStructuralRuntime() &&
+                                    element.ScopeId == 0 && !element.IsLocal &&
+                                    plan.RoutedEvents.ItemRef(action.Index).RefreshClosure
+                                    ? action.Index
+                                    : -1);
                             break;
                         case ComponentFirstUpdateActionKind.CommandBinding:
                             actionWriter.WriteCommandBinding(plan.CommandBindings.ItemRef(action.Index), element.Identifier);

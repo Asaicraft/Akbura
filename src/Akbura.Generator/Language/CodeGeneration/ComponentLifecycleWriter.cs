@@ -350,6 +350,7 @@ internal readonly ref struct ComponentLifecycleWriter
                 _generationMode);
 
             scopeWriter.WriteUpdateState(plan, scope, context);
+            scopeWriter.WriteRefreshCallbackClosures(plan);
 
             if (usesStructuralHotReload)
             {

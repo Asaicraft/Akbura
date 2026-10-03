@@ -569,7 +569,7 @@ internal sealed partial class CSharpProbeBuilder
         return null;
     }
 
-    private static ImmutableArray<CSharp.StatementSyntax> GetPrecedingLocalDeclarations(AkburaSyntax scope)
+    internal static ImmutableArray<CSharp.StatementSyntax> GetPrecedingLocalDeclarations(AkburaSyntax scope)
     {
         using var builder =
             ImmutableArrayBuilder<CSharp.StatementSyntax>.Rent();

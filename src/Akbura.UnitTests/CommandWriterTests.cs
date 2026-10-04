@@ -48,10 +48,10 @@ public sealed class CommandWriterTests
             StringComparison.Ordinal);
         Assert.Contains("ResetProperty =", output, StringComparison.Ordinal);
         Assert.Contains(
-            "global::Avalonia.AvaloniaProperty.Register<",
+            "global::Akbura.ComponentTree.CommandProperty.Create<",
             output,
             StringComparison.Ordinal);
-        Assert.Contains("global::Demo.Owner,", output, StringComparison.Ordinal);
+        Assert.Contains("global::Demo.Owner>(", output, StringComparison.Ordinal);
         Assert.Contains(
             "public global::Akbura.IAkburaCommand Reset",
             output,

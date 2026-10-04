@@ -122,11 +122,10 @@ internal readonly ref struct CommandWriter
         _writer.WriteLine("}");
         _writer.WriteLine("#endif");
         _writer.WriteLine();
-        _writer.WriteLine("return global::Avalonia.AvaloniaProperty.Register<");
+        _writer.WriteLine("return global::Akbura.ComponentTree.CommandProperty.Create<");
         _writer.CurrentIndent += _writer.TabSize;
         _writer.Write(_ownerTypeName);
-        _writer.WriteLine(",");
-        _writer.WriteLine("global::Akbura.IAkburaCommand>(");
+        _writer.WriteLine(">(");
         _writer.CurrentIndent += _writer.TabSize;
         _writer.WriteStringLiteral(plan.Name);
         _writer.WriteLine(");");

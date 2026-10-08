@@ -1413,6 +1413,19 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                 canBind: false,
                 canOut: false,
                 canUsePropertyElement: false);
+
+            AddMemberItem(
+                items,
+                ownerName,
+                "x.DataType",
+                AkburaCompletionKind.Property,
+                "Specifies the data type used by compiled bindings in this markup scope.",
+                propertyElements: false,
+                canSet: true,
+                canBind: false,
+                canOut: false,
+                canUsePropertyElement: false,
+                triggerCompletionAfterInsert: true);
         }
 
         if (target.AkburaComponent != null)
@@ -1600,7 +1613,7 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
         }
     }
 
-    private static void AddMemberItem(Dictionary<string, CompletionMemberCandidate> items, string ownerName, string memberName, AkburaCompletionKind kind, string typeDisplay, bool propertyElements, bool canSet, bool canBind, bool canOut, bool canUsePropertyElement)
+    private static void AddMemberItem(Dictionary<string, CompletionMemberCandidate> items, string ownerName, string memberName, AkburaCompletionKind kind, string typeDisplay, bool propertyElements, bool canSet, bool canBind, bool canOut, bool canUsePropertyElement, bool triggerCompletionAfterInsert = false)
     {
         var displayName = propertyElements
             ? ownerName + "." + memberName
@@ -1613,7 +1626,6 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
 
         var insertText = displayName;
         var caretOffsetFromEnd = 0;
-        var triggerCompletionAfterInsert = false;
 
         if (!propertyElements)
         {

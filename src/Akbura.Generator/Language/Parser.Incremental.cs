@@ -947,11 +947,9 @@ internal sealed partial class Parser
 
     private GreenMarkupAttributeSyntax ParseIncrementalMarkupAttributeSyntax()
     {
-        if (TryReadReusableIncrementalNode<GreenMarkupAttributeSyntax>(out var attribute))
-        {
-            return attribute;
-        }
-
+        // Classify using the new lookahead before reusing an attribute. Typing
+        // '=' after x.DataType can turn an earlier utility into an attached
+        // property even though the old utility itself is outside the edit.
         if (IsIncrementalMarkupPrefixedAttributeStart())
         {
             return ParseIncrementalMarkupPrefixedAttributeSyntax();

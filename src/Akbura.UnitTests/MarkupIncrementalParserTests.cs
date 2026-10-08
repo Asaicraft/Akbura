@@ -6,6 +6,31 @@ namespace Akbura.UnitTests;
 
 public sealed class MarkupIncrementalParserTests
 {
+    [Theory]
+    [InlineData("x.DataType")]
+    [InlineData("Grid.Row")]
+    [InlineData("Avalonia.Controls.Grid.Row")]
+    public void AttachedPropertyAssignment_ReclassifiesPreviouslyParsedUtilities(string attributeName)
+    {
+        var oldCode = "<Border " + attributeName + " bg-red-300 p-4 Child=${Binding Content}/>";
+        const string inserted = "=\"Model\"";
+        var insertPosition = "<Border ".Length + attributeName.Length;
+        var newCode = oldCode.Insert(insertPosition, inserted);
+        var (oldMarkup, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            insertPosition,
+            oldLength: 0,
+            newLength: inserted.Length);
+        var attributes = newMarkup.Element.StartTag!.Attributes;
+        var fullMarkup = Assert.IsType<GreenMarkupRootSyntax>(Parse(newCode).Members[0]);
+
+        Assert.False(newMarkup.ContainsDiagnostics);
+        Assert.IsType<GreenMarkupAttachedPropertyAttributeSyntax>(attributes[0]);
+        AssertSameTree(fullMarkup, newMarkup);
+        Assert.Same(oldMarkup.Element.StartTag!.Attributes[^1], attributes[^1]);
+    }
+
     [Fact]
     public void LiteralAttributeValueEdit_ReusesSiblingAttributes()
     {

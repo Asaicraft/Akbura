@@ -7,6 +7,30 @@ namespace Akbura.UnitTests;
 public sealed class MarkupIncrementalParserTests
 {
     [Theory]
+    [InlineData("x.DataType", '"', "MyContentableComponent")]
+    [InlineData("x.DataType", '\'', "MyContentableComponent")]
+    [InlineData("Text", '"', "Hello")]
+    [InlineData("Text", '\'', "Hello")]
+    public void CompletingQuotedAttributeAtEndOfFile_ReparsesValueAndReusesSibling(string attributeName, char quote, string value)
+    {
+        var oldCode = "<Border p-4 " + attributeName + "=" + quote + value;
+        var inserted = quote + " bg-red-300>\r\n</Border>";
+        var newCode = oldCode + inserted;
+        var (oldMarkup, newMarkup) = ParseMarkupIncremental(
+            newCode,
+            oldCode,
+            oldCode.Length,
+            oldLength: 0,
+            newLength: inserted.Length);
+        var fullMarkup = Assert.IsType<GreenMarkupRootSyntax>(Parse(newCode).Members[0]);
+
+        Assert.False(newMarkup.ContainsDiagnostics);
+        AssertSameTree(fullMarkup, newMarkup);
+        Assert.Same(oldMarkup.Element.StartTag!.Attributes[0], newMarkup.Element.StartTag!.Attributes[0]);
+        Assert.NotSame(oldMarkup.Element.StartTag.Attributes[1], newMarkup.Element.StartTag.Attributes[1]);
+    }
+
+    [Theory]
     [InlineData("x.DataType")]
     [InlineData("Grid.Row")]
     [InlineData("Avalonia.Controls.Grid.Row")]

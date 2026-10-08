@@ -13,6 +13,63 @@ public sealed class WorkspaceDataTypeTests
         "param Control Content;\r\n\r\n" +
         "<Border x.DataType=\"MyContentableComponent\" bg-red-300 p-4 Child=${Binding Content}/>";
 
+    [Theory]
+    [InlineData("\r\n")]
+    [InlineData("\n")]
+    public void DataType_PairedTagHasNoSyntaxErrorsInWorkspaceDiagnostics(string newLine)
+    {
+        var source = "param Control Content;" + newLine + newLine + newLine +
+            "<Border x.DataType=\"MyContentableComponent\" bg-red-300 p-4>" +
+            newLine + newLine + newLine + newLine + "</Border>";
+        using var workspace = CreateWorkspace();
+        var context = Open(workspace, source);
+        var document = AkburaSyntacticDocument.Create(context.Document);
+        var span = new TextSpan(0, source.Length);
+
+        Assert.Empty(workspace.LanguageServices.Diagnostics.GetSyntacticDiagnostics(document, span));
+        Assert.DoesNotContain(workspace.LanguageServices.Diagnostics.GetDiagnostics(context, span),
+            static diagnostic => diagnostic.Code == ErrorCodes.ERR_SyntaxError);
+    }
+
+    [Theory]
+    [InlineData("\r\n")]
+    [InlineData("\n")]
+    public void DataType_PairedTagTypingMatchesFullParse(string newLine)
+    {
+        var prefix = "param Control Content;" + newLine + newLine + newLine;
+        var markup = "<Border x.DataType=\"MyContentableComponent\" bg-red-300 p-4>" +
+            newLine + newLine + newLine + newLine + "</Border>";
+        using var workspace = CreateWorkspace();
+        var text = SourceText.From(prefix);
+        var document = AkburaSyntacticDocument.Parse(text, FileName);
+        var context = Open(workspace, text);
+
+        foreach (var character in markup)
+        {
+            text = text.WithChanges(new TextChange(new TextSpan(text.Length, 0), character.ToString()));
+            document = document.WithText(text);
+            context = Open(workspace, text);
+            var full = AkburaSyntacticDocument.Parse(text, FileName);
+            var span = new TextSpan(0, text.Length);
+            var incrementalDiagnostics = workspace.LanguageServices.Diagnostics.GetSyntacticDiagnostics(document, span);
+            var fullDiagnostics = workspace.LanguageServices.Diagnostics.GetSyntacticDiagnostics(full, span);
+
+            Assert.True(
+                fullDiagnostics.Select(static diagnostic => (diagnostic.Code, diagnostic.Span, diagnostic.Message)).SequenceEqual(
+                    incrementalDiagnostics.Select(static diagnostic => (diagnostic.Code, diagnostic.Span, diagnostic.Message))),
+                $"Incremental diagnostics differ after typing '{text}': " +
+                string.Join("; ", incrementalDiagnostics.Select(static diagnostic => diagnostic.ToString())));
+        }
+
+        Assert.Empty(workspace.LanguageServices.Diagnostics.GetSyntacticDiagnostics(document, new TextSpan(0, text.Length)));
+        Assert.DoesNotContain(workspace.LanguageServices.Diagnostics.GetDiagnostics(context, new TextSpan(0, text.Length)),
+            static diagnostic => diagnostic.Code == ErrorCodes.ERR_SyntaxError);
+        var typeSpan = new TextSpan(text.ToString().IndexOf("MyContentableComponent", StringComparison.Ordinal), "MyContentableComponent".Length);
+        var classifications = workspace.LanguageServices.Classification.GetClassifications(context, typeSpan);
+        Assert.Contains(classifications, classification =>
+            classification.Span == typeSpan && classification.Kind == AkburaClassificationKind.ClassName);
+    }
+
     [Fact]
     public void DataType_WithUtilitiesAndBindingHasNoSyntaxErrors()
     {

@@ -1,6 +1,7 @@
 using Akbura.Language.Syntax;
 using Akbura.Language.Syntax.Green;
 using Microsoft.CodeAnalysis.Text;
+using System;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 
@@ -224,9 +225,9 @@ internal readonly partial struct Blender
                 underlyingNode.GetLastTerminal();
 
             // A boundary edit can extend a markup-extension literal through its
-            // argument/value owner. Ordinary quoted attributes use the same
-            // AkTextLiteral token kind, but must retain their existing reuse rules.
-            if (lastTerminal?.Kind == SyntaxKind.AkTextLiteral)
+            // argument/value owner. Completed quoted attributes use the same
+            // AkTextLiteral token kind, but retain their existing reuse rules.
+            if (lastTerminal is GreenSyntaxToken { Kind: SyntaxKind.AkTextLiteral } literalToken)
             {
                 var isExtensionLiteralOwner =
                     underlyingNode is GreenMarkupExtensionArgumentSyntax or
@@ -235,6 +236,18 @@ internal readonly partial struct Blender
                         nodeOrToken.Parent is MarkupExtensionLiteralValueSyntax);
 
                 if (isExtensionLiteralOwner)
+                {
+                    return true;
+                }
+
+                // An unterminated quoted value can extend at EOF, including
+                // when its closing quote is typed. Its parser-created token
+                // does not retain the missing quote's diagnostics.
+                var isAttributeLiteralOwner =
+                    underlyingNode is GreenMarkupLiteralAttributeValueSyntax or GreenMarkupAttributeSyntax ||
+                    (underlyingNode is GreenMarkupTextLiteralSyntax &&
+                        nodeOrToken.Parent is MarkupLiteralAttributeValueSyntax);
+                if (isAttributeLiteralOwner && IsUnterminatedQuotedText(literalToken.Text))
                 {
                     return true;
                 }
@@ -395,6 +408,13 @@ internal readonly partial struct Blender
 
             return SyntaxFacts.IsIdentifierPartCharacter(
                 insertedCharacter);
+        }
+
+        private static bool IsUnterminatedQuotedText(string text)
+        {
+            var content = text.AsSpan().TrimStart();
+            return content.Length > 0 && content[0] is '\'' or '"' &&
+                content.Slice(1).IndexOf(content[0]) < 0;
         }
 
         private static bool CanCombineWithInsertedCharacter(

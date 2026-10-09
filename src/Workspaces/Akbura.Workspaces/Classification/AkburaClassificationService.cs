@@ -62,6 +62,30 @@ internal sealed class AkburaClassificationService : IAkburaClassificationService
             cancellationToken);
     }
 
+    public ImmutableArray<AkburaClassifiedSpan> GetDeclarationClassifications(AkburaDocumentContext context, TextSpan requestedSpan, CancellationToken cancellationToken = default)
+    {
+        if (context == null)
+        {
+            throw new ArgumentNullException(nameof(context));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var document = context.Document;
+        var span = ClampSpan(requestedSpan, document.Text.Length);
+        if (span.Length == 0)
+        {
+            return [];
+        }
+
+        var root = document.SyntaxTree.GetRootSyntax();
+        var syntactic = GetSyntacticClassifications(root, document.Text.Length, span, cancellationToken);
+        using var semantic = ImmutableArrayBuilder<AkburaClassifiedSpan>.Rent();
+        var model = context.Project.Compilation.GetSemanticModel(document.SyntaxTree);
+        _semanticAkcss.AddDeclarationClassifications(model, root, span, semantic, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        return MergeClassifications(syntactic, semantic.ToImmutable());
+    }
+
     public ImmutableArray<AkburaClassifiedSpan> GetClassifications(AkburaDocumentContext context, TextSpan requestedSpan, CancellationToken cancellationToken = default)
     {
         if (context == null)

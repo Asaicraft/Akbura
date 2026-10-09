@@ -1,8 +1,10 @@
+using Akbura.Language;
 using Akbura.Workspaces;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Threading;
+using System.Collections.Immutable;
 #if DEBUG
 using System.Diagnostics;
 #endif
@@ -13,7 +15,8 @@ namespace Akbura.VisualStudio.Editor;
 /// Synchronizes one Visual Studio text buffer with one Akbura document.
 ///
 /// Editor callbacks only publish immutable update requests. One background
-/// worker publishes a fast syntactic state first and a semantic state later.
+/// worker publishes syntax, AKCSS declarations, semantic colors and diagnostics
+/// progressively, without making type colors wait for all expression binding.
 /// Each completed stage is published atomically and read without locks.
 /// </summary>
 internal sealed class AkburaTextBufferContext : IDisposable
@@ -71,7 +74,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
     /// <summary>
     /// Stores the newest classification state. It can contain either the
-    /// fast syntactic pass or the completed semantic pass.
+    /// syntactic pass, AKCSS declarations or the completed semantic pass.
     /// </summary>
     private AkburaClassifiedBufferState? _publishedClassificationState;
 
@@ -786,9 +789,10 @@ internal sealed class AkburaTextBufferContext : IDisposable
             {
 #endif
                 state = await Task.Run(
-                        () => TryCreateParsedState(
+                        () => TryCreateParsedStateAsync(
                             request,
                             projectId,
+                            syntacticState?.Diagnostics ?? ImmutableArray<AkburaDiagnosticSpan>.Empty,
                             cancellationToken))
                     .ConfigureAwait(false);
 #if DEBUG
@@ -900,7 +904,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 request.Text,
                 classifications,
                 diagnostics,
-                includesSemanticClassifications: false);
+                stage: AkburaClassificationStage.Syntax);
         }
         catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested)
@@ -918,9 +922,10 @@ internal sealed class AkburaTextBufferContext : IDisposable
         }
     }
 
-    private AkburaParsedBufferState? TryCreateParsedState(
+    private async Task<AkburaParsedBufferState?> TryCreateParsedStateAsync(
         UpdateRequest request,
         AkburaProjectId? projectId,
+        ImmutableArray<AkburaDiagnosticSpan> syntacticDiagnostics,
         CancellationToken cancellationToken)
     {
 #if DEBUG
@@ -995,6 +1000,23 @@ internal sealed class AkburaTextBufferContext : IDisposable
                     request.Snapshot,
                     context));
 
+            var requestedSpan = new TextSpan(0, request.Text.Length);
+            if (context.Document.SyntaxTree is AkcssSyntaxTree)
+            {
+#if DEBUG
+                activeStage = "GetDeclarationClassifications";
+                stageTimer.Restart();
+#endif
+                var declarations = _classificationService.GetDeclarationClassifications(
+                    context, requestedSpan, cancellationToken);
+#if DEBUG
+                WriteSemanticStateStage(request, activeStage, stageTimer.Elapsed, "spans", declarations.Length);
+#endif
+                await PublishClassificationProgressAsync(request, declarations, syntacticDiagnostics,
+                        AkburaClassificationStage.Declarations, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
 #if DEBUG
             activeStage = "GetClassifications";
             stageTimer.Restart();
@@ -1002,9 +1024,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
             var classifications =
                 _classificationService.GetClassifications(
                     context,
-                    new TextSpan(
-                        start: 0,
-                        length: request.Text.Length),
+                    requestedSpan,
                     cancellationToken);
 
 #if DEBUG
@@ -1016,15 +1036,21 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 "spans",
                 classifications.Length);
 
+#endif
+            // Diagnostics can bind additional expressions. Publish completed
+            // colors before starting that work, not after it has finished.
+            await PublishClassificationProgressAsync(request, classifications, syntacticDiagnostics,
+                    AkburaClassificationStage.Semantic, cancellationToken)
+                .ConfigureAwait(false);
+
+#if DEBUG
             activeStage = "GetDiagnostics";
             stageTimer.Restart();
 #endif
             var diagnostics =
                 _diagnosticService.GetDiagnostics(
                     context,
-                    new TextSpan(
-                        start: 0,
-                        length: request.Text.Length),
+                    requestedSpan,
                     cancellationToken);
 
 #if DEBUG
@@ -1084,6 +1110,20 @@ internal sealed class AkburaTextBufferContext : IDisposable
                 $"diagnostics={diagnosticCount}.");
         }
 #endif
+    }
+
+    private async Task PublishClassificationProgressAsync(UpdateRequest request, ImmutableArray<AkburaClassifiedSpan> classifications, ImmutableArray<AkburaDiagnosticSpan> diagnostics, AkburaClassificationStage stage, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!IsCurrentRequest(request.RequestVersion))
+        {
+            return;
+        }
+
+        var state = new AkburaClassifiedBufferState(request.RequestVersion, request.Snapshot,
+            request.Text, classifications, diagnostics, stage);
+        PublishClassificationState(state);
+        await RaiseChangedAsync(state, cancellationToken).ConfigureAwait(false);
     }
 
 #if DEBUG
@@ -1191,8 +1231,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
                 if (previous.RequestVersion ==
                         state.RequestVersion &&
-                    (previous.IncludesSemanticClassifications ||
-                     !state.IncludesSemanticClassifications))
+                    previous.Stage >= state.Stage)
                 {
                     return;
                 }
@@ -1210,6 +1249,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
                     $"Classification state published: " +
                     $"request={state.RequestVersion}, " +
                     $"snapshot={state.Snapshot.Version.VersionNumber}, " +
+                    $"stage={state.Stage}, " +
                     $"semantic={state.IncludesSemanticClassifications}, " +
                     $"spans={state.Classifications.Length}.");
                 return;

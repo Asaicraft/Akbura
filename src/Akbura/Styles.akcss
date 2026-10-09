@@ -344,6 +344,3478 @@
 		Background: Amx.DynamicResource<IBrush>("--color-" + color + "-" + shade);
 	}
 
+	// Named background colors for Panel completion; keys mirror Styles.axaml.
+	Panel.bg-transparent {
+		Background: Amx.DynamicResource<IBrush>("--color-transparent");
+	}
+
+	Panel.bg-black {
+		Background: Amx.DynamicResource<IBrush>("--color-black");
+	}
+
+	Panel.bg-white {
+		Background: Amx.DynamicResource<IBrush>("--color-white");
+	}
+
+	Panel.bg-red-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-50");
+	}
+
+	Panel.bg-red-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-100");
+	}
+
+	Panel.bg-red-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-200");
+	}
+
+	Panel.bg-red-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-300");
+	}
+
+	Panel.bg-red-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-400");
+	}
+
+	Panel.bg-red-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-500");
+	}
+
+	Panel.bg-red-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-600");
+	}
+
+	Panel.bg-red-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-700");
+	}
+
+	Panel.bg-red-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-800");
+	}
+
+	Panel.bg-red-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-900");
+	}
+
+	Panel.bg-red-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-950");
+	}
+
+	Panel.bg-orange-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-50");
+	}
+
+	Panel.bg-orange-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-100");
+	}
+
+	Panel.bg-orange-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-200");
+	}
+
+	Panel.bg-orange-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-300");
+	}
+
+	Panel.bg-orange-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-400");
+	}
+
+	Panel.bg-orange-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-500");
+	}
+
+	Panel.bg-orange-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-600");
+	}
+
+	Panel.bg-orange-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-700");
+	}
+
+	Panel.bg-orange-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-800");
+	}
+
+	Panel.bg-orange-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-900");
+	}
+
+	Panel.bg-orange-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-950");
+	}
+
+	Panel.bg-amber-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-50");
+	}
+
+	Panel.bg-amber-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-100");
+	}
+
+	Panel.bg-amber-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-200");
+	}
+
+	Panel.bg-amber-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-300");
+	}
+
+	Panel.bg-amber-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-400");
+	}
+
+	Panel.bg-amber-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-500");
+	}
+
+	Panel.bg-amber-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-600");
+	}
+
+	Panel.bg-amber-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-700");
+	}
+
+	Panel.bg-amber-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-800");
+	}
+
+	Panel.bg-amber-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-900");
+	}
+
+	Panel.bg-amber-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-950");
+	}
+
+	Panel.bg-yellow-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-50");
+	}
+
+	Panel.bg-yellow-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-100");
+	}
+
+	Panel.bg-yellow-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-200");
+	}
+
+	Panel.bg-yellow-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-300");
+	}
+
+	Panel.bg-yellow-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-400");
+	}
+
+	Panel.bg-yellow-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-500");
+	}
+
+	Panel.bg-yellow-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-600");
+	}
+
+	Panel.bg-yellow-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-700");
+	}
+
+	Panel.bg-yellow-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-800");
+	}
+
+	Panel.bg-yellow-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-900");
+	}
+
+	Panel.bg-yellow-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-950");
+	}
+
+	Panel.bg-lime-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-50");
+	}
+
+	Panel.bg-lime-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-100");
+	}
+
+	Panel.bg-lime-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-200");
+	}
+
+	Panel.bg-lime-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-300");
+	}
+
+	Panel.bg-lime-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-400");
+	}
+
+	Panel.bg-lime-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-500");
+	}
+
+	Panel.bg-lime-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-600");
+	}
+
+	Panel.bg-lime-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-700");
+	}
+
+	Panel.bg-lime-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-800");
+	}
+
+	Panel.bg-lime-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-900");
+	}
+
+	Panel.bg-lime-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-950");
+	}
+
+	Panel.bg-green-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-50");
+	}
+
+	Panel.bg-green-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-100");
+	}
+
+	Panel.bg-green-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-200");
+	}
+
+	Panel.bg-green-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-300");
+	}
+
+	Panel.bg-green-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-400");
+	}
+
+	Panel.bg-green-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-500");
+	}
+
+	Panel.bg-green-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-600");
+	}
+
+	Panel.bg-green-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-700");
+	}
+
+	Panel.bg-green-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-800");
+	}
+
+	Panel.bg-green-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-900");
+	}
+
+	Panel.bg-green-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-950");
+	}
+
+	Panel.bg-emerald-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-50");
+	}
+
+	Panel.bg-emerald-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-100");
+	}
+
+	Panel.bg-emerald-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-200");
+	}
+
+	Panel.bg-emerald-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-300");
+	}
+
+	Panel.bg-emerald-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-400");
+	}
+
+	Panel.bg-emerald-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-500");
+	}
+
+	Panel.bg-emerald-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-600");
+	}
+
+	Panel.bg-emerald-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-700");
+	}
+
+	Panel.bg-emerald-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-800");
+	}
+
+	Panel.bg-emerald-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-900");
+	}
+
+	Panel.bg-emerald-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-950");
+	}
+
+	Panel.bg-teal-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-50");
+	}
+
+	Panel.bg-teal-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-100");
+	}
+
+	Panel.bg-teal-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-200");
+	}
+
+	Panel.bg-teal-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-300");
+	}
+
+	Panel.bg-teal-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-400");
+	}
+
+	Panel.bg-teal-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-500");
+	}
+
+	Panel.bg-teal-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-600");
+	}
+
+	Panel.bg-teal-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-700");
+	}
+
+	Panel.bg-teal-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-800");
+	}
+
+	Panel.bg-teal-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-900");
+	}
+
+	Panel.bg-teal-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-950");
+	}
+
+	Panel.bg-cyan-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-50");
+	}
+
+	Panel.bg-cyan-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-100");
+	}
+
+	Panel.bg-cyan-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-200");
+	}
+
+	Panel.bg-cyan-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-300");
+	}
+
+	Panel.bg-cyan-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-400");
+	}
+
+	Panel.bg-cyan-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-500");
+	}
+
+	Panel.bg-cyan-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-600");
+	}
+
+	Panel.bg-cyan-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-700");
+	}
+
+	Panel.bg-cyan-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-800");
+	}
+
+	Panel.bg-cyan-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-900");
+	}
+
+	Panel.bg-cyan-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-950");
+	}
+
+	Panel.bg-sky-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-50");
+	}
+
+	Panel.bg-sky-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-100");
+	}
+
+	Panel.bg-sky-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-200");
+	}
+
+	Panel.bg-sky-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-300");
+	}
+
+	Panel.bg-sky-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-400");
+	}
+
+	Panel.bg-sky-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-500");
+	}
+
+	Panel.bg-sky-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-600");
+	}
+
+	Panel.bg-sky-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-700");
+	}
+
+	Panel.bg-sky-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-800");
+	}
+
+	Panel.bg-sky-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-900");
+	}
+
+	Panel.bg-sky-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-950");
+	}
+
+	Panel.bg-blue-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-50");
+	}
+
+	Panel.bg-blue-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-100");
+	}
+
+	Panel.bg-blue-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-200");
+	}
+
+	Panel.bg-blue-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-300");
+	}
+
+	Panel.bg-blue-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-400");
+	}
+
+	Panel.bg-blue-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-500");
+	}
+
+	Panel.bg-blue-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-600");
+	}
+
+	Panel.bg-blue-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-700");
+	}
+
+	Panel.bg-blue-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-800");
+	}
+
+	Panel.bg-blue-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-900");
+	}
+
+	Panel.bg-blue-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-950");
+	}
+
+	Panel.bg-indigo-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-50");
+	}
+
+	Panel.bg-indigo-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-100");
+	}
+
+	Panel.bg-indigo-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-200");
+	}
+
+	Panel.bg-indigo-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-300");
+	}
+
+	Panel.bg-indigo-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-400");
+	}
+
+	Panel.bg-indigo-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-500");
+	}
+
+	Panel.bg-indigo-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-600");
+	}
+
+	Panel.bg-indigo-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-700");
+	}
+
+	Panel.bg-indigo-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-800");
+	}
+
+	Panel.bg-indigo-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-900");
+	}
+
+	Panel.bg-indigo-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-950");
+	}
+
+	Panel.bg-violet-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-50");
+	}
+
+	Panel.bg-violet-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-100");
+	}
+
+	Panel.bg-violet-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-200");
+	}
+
+	Panel.bg-violet-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-300");
+	}
+
+	Panel.bg-violet-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-400");
+	}
+
+	Panel.bg-violet-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-500");
+	}
+
+	Panel.bg-violet-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-600");
+	}
+
+	Panel.bg-violet-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-700");
+	}
+
+	Panel.bg-violet-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-800");
+	}
+
+	Panel.bg-violet-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-900");
+	}
+
+	Panel.bg-violet-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-950");
+	}
+
+	Panel.bg-purple-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-50");
+	}
+
+	Panel.bg-purple-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-100");
+	}
+
+	Panel.bg-purple-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-200");
+	}
+
+	Panel.bg-purple-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-300");
+	}
+
+	Panel.bg-purple-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-400");
+	}
+
+	Panel.bg-purple-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-500");
+	}
+
+	Panel.bg-purple-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-600");
+	}
+
+	Panel.bg-purple-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-700");
+	}
+
+	Panel.bg-purple-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-800");
+	}
+
+	Panel.bg-purple-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-900");
+	}
+
+	Panel.bg-purple-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-950");
+	}
+
+	Panel.bg-fuchsia-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-50");
+	}
+
+	Panel.bg-fuchsia-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-100");
+	}
+
+	Panel.bg-fuchsia-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-200");
+	}
+
+	Panel.bg-fuchsia-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-300");
+	}
+
+	Panel.bg-fuchsia-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-400");
+	}
+
+	Panel.bg-fuchsia-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-500");
+	}
+
+	Panel.bg-fuchsia-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-600");
+	}
+
+	Panel.bg-fuchsia-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-700");
+	}
+
+	Panel.bg-fuchsia-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-800");
+	}
+
+	Panel.bg-fuchsia-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-900");
+	}
+
+	Panel.bg-fuchsia-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-950");
+	}
+
+	Panel.bg-pink-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-50");
+	}
+
+	Panel.bg-pink-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-100");
+	}
+
+	Panel.bg-pink-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-200");
+	}
+
+	Panel.bg-pink-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-300");
+	}
+
+	Panel.bg-pink-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-400");
+	}
+
+	Panel.bg-pink-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-500");
+	}
+
+	Panel.bg-pink-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-600");
+	}
+
+	Panel.bg-pink-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-700");
+	}
+
+	Panel.bg-pink-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-800");
+	}
+
+	Panel.bg-pink-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-900");
+	}
+
+	Panel.bg-pink-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-950");
+	}
+
+	Panel.bg-rose-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-50");
+	}
+
+	Panel.bg-rose-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-100");
+	}
+
+	Panel.bg-rose-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-200");
+	}
+
+	Panel.bg-rose-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-300");
+	}
+
+	Panel.bg-rose-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-400");
+	}
+
+	Panel.bg-rose-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-500");
+	}
+
+	Panel.bg-rose-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-600");
+	}
+
+	Panel.bg-rose-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-700");
+	}
+
+	Panel.bg-rose-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-800");
+	}
+
+	Panel.bg-rose-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-900");
+	}
+
+	Panel.bg-rose-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-950");
+	}
+
+	Panel.bg-slate-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-50");
+	}
+
+	Panel.bg-slate-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-100");
+	}
+
+	Panel.bg-slate-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-200");
+	}
+
+	Panel.bg-slate-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-300");
+	}
+
+	Panel.bg-slate-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-400");
+	}
+
+	Panel.bg-slate-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-500");
+	}
+
+	Panel.bg-slate-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-600");
+	}
+
+	Panel.bg-slate-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-700");
+	}
+
+	Panel.bg-slate-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-800");
+	}
+
+	Panel.bg-slate-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-900");
+	}
+
+	Panel.bg-slate-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-950");
+	}
+
+	Panel.bg-gray-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-50");
+	}
+
+	Panel.bg-gray-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-100");
+	}
+
+	Panel.bg-gray-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-200");
+	}
+
+	Panel.bg-gray-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-300");
+	}
+
+	Panel.bg-gray-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-400");
+	}
+
+	Panel.bg-gray-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-500");
+	}
+
+	Panel.bg-gray-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-600");
+	}
+
+	Panel.bg-gray-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-700");
+	}
+
+	Panel.bg-gray-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-800");
+	}
+
+	Panel.bg-gray-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-900");
+	}
+
+	Panel.bg-gray-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-950");
+	}
+
+	Panel.bg-zinc-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-50");
+	}
+
+	Panel.bg-zinc-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-100");
+	}
+
+	Panel.bg-zinc-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-200");
+	}
+
+	Panel.bg-zinc-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-300");
+	}
+
+	Panel.bg-zinc-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-400");
+	}
+
+	Panel.bg-zinc-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-500");
+	}
+
+	Panel.bg-zinc-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-600");
+	}
+
+	Panel.bg-zinc-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-700");
+	}
+
+	Panel.bg-zinc-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-800");
+	}
+
+	Panel.bg-zinc-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-900");
+	}
+
+	Panel.bg-zinc-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-950");
+	}
+
+	Panel.bg-neutral-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-50");
+	}
+
+	Panel.bg-neutral-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-100");
+	}
+
+	Panel.bg-neutral-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-200");
+	}
+
+	Panel.bg-neutral-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-300");
+	}
+
+	Panel.bg-neutral-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-400");
+	}
+
+	Panel.bg-neutral-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-500");
+	}
+
+	Panel.bg-neutral-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-600");
+	}
+
+	Panel.bg-neutral-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-700");
+	}
+
+	Panel.bg-neutral-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-800");
+	}
+
+	Panel.bg-neutral-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-900");
+	}
+
+	Panel.bg-neutral-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-950");
+	}
+
+	Panel.bg-stone-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-50");
+	}
+
+	Panel.bg-stone-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-100");
+	}
+
+	Panel.bg-stone-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-200");
+	}
+
+	Panel.bg-stone-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-300");
+	}
+
+	Panel.bg-stone-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-400");
+	}
+
+	Panel.bg-stone-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-500");
+	}
+
+	Panel.bg-stone-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-600");
+	}
+
+	Panel.bg-stone-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-700");
+	}
+
+	Panel.bg-stone-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-800");
+	}
+
+	Panel.bg-stone-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-900");
+	}
+
+	Panel.bg-stone-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-950");
+	}
+
+	Panel.bg-mauve-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-50");
+	}
+
+	Panel.bg-mauve-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-100");
+	}
+
+	Panel.bg-mauve-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-200");
+	}
+
+	Panel.bg-mauve-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-300");
+	}
+
+	Panel.bg-mauve-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-400");
+	}
+
+	Panel.bg-mauve-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-500");
+	}
+
+	Panel.bg-mauve-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-600");
+	}
+
+	Panel.bg-mauve-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-700");
+	}
+
+	Panel.bg-mauve-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-800");
+	}
+
+	Panel.bg-mauve-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-900");
+	}
+
+	Panel.bg-mauve-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-950");
+	}
+
+	Panel.bg-olive-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-50");
+	}
+
+	Panel.bg-olive-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-100");
+	}
+
+	Panel.bg-olive-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-200");
+	}
+
+	Panel.bg-olive-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-300");
+	}
+
+	Panel.bg-olive-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-400");
+	}
+
+	Panel.bg-olive-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-500");
+	}
+
+	Panel.bg-olive-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-600");
+	}
+
+	Panel.bg-olive-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-700");
+	}
+
+	Panel.bg-olive-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-800");
+	}
+
+	Panel.bg-olive-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-900");
+	}
+
+	Panel.bg-olive-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-950");
+	}
+
+	Panel.bg-mist-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-50");
+	}
+
+	Panel.bg-mist-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-100");
+	}
+
+	Panel.bg-mist-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-200");
+	}
+
+	Panel.bg-mist-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-300");
+	}
+
+	Panel.bg-mist-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-400");
+	}
+
+	Panel.bg-mist-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-500");
+	}
+
+	Panel.bg-mist-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-600");
+	}
+
+	Panel.bg-mist-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-700");
+	}
+
+	Panel.bg-mist-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-800");
+	}
+
+	Panel.bg-mist-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-900");
+	}
+
+	Panel.bg-mist-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-950");
+	}
+
+	Panel.bg-taupe-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-50");
+	}
+
+	Panel.bg-taupe-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-100");
+	}
+
+	Panel.bg-taupe-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-200");
+	}
+
+	Panel.bg-taupe-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-300");
+	}
+
+	Panel.bg-taupe-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-400");
+	}
+
+	Panel.bg-taupe-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-500");
+	}
+
+	Panel.bg-taupe-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-600");
+	}
+
+	Panel.bg-taupe-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-700");
+	}
+
+	Panel.bg-taupe-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-800");
+	}
+
+	Panel.bg-taupe-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-900");
+	}
+
+	Panel.bg-taupe-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-950");
+	}
+
+	// Named background colors for Border completion; keys mirror Styles.axaml.
+	Border.bg-transparent {
+		Background: Amx.DynamicResource<IBrush>("--color-transparent");
+	}
+
+	Border.bg-black {
+		Background: Amx.DynamicResource<IBrush>("--color-black");
+	}
+
+	Border.bg-white {
+		Background: Amx.DynamicResource<IBrush>("--color-white");
+	}
+
+	Border.bg-red-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-50");
+	}
+
+	Border.bg-red-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-100");
+	}
+
+	Border.bg-red-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-200");
+	}
+
+	Border.bg-red-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-300");
+	}
+
+	Border.bg-red-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-400");
+	}
+
+	Border.bg-red-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-500");
+	}
+
+	Border.bg-red-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-600");
+	}
+
+	Border.bg-red-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-700");
+	}
+
+	Border.bg-red-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-800");
+	}
+
+	Border.bg-red-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-900");
+	}
+
+	Border.bg-red-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-950");
+	}
+
+	Border.bg-orange-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-50");
+	}
+
+	Border.bg-orange-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-100");
+	}
+
+	Border.bg-orange-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-200");
+	}
+
+	Border.bg-orange-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-300");
+	}
+
+	Border.bg-orange-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-400");
+	}
+
+	Border.bg-orange-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-500");
+	}
+
+	Border.bg-orange-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-600");
+	}
+
+	Border.bg-orange-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-700");
+	}
+
+	Border.bg-orange-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-800");
+	}
+
+	Border.bg-orange-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-900");
+	}
+
+	Border.bg-orange-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-950");
+	}
+
+	Border.bg-amber-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-50");
+	}
+
+	Border.bg-amber-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-100");
+	}
+
+	Border.bg-amber-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-200");
+	}
+
+	Border.bg-amber-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-300");
+	}
+
+	Border.bg-amber-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-400");
+	}
+
+	Border.bg-amber-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-500");
+	}
+
+	Border.bg-amber-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-600");
+	}
+
+	Border.bg-amber-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-700");
+	}
+
+	Border.bg-amber-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-800");
+	}
+
+	Border.bg-amber-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-900");
+	}
+
+	Border.bg-amber-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-950");
+	}
+
+	Border.bg-yellow-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-50");
+	}
+
+	Border.bg-yellow-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-100");
+	}
+
+	Border.bg-yellow-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-200");
+	}
+
+	Border.bg-yellow-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-300");
+	}
+
+	Border.bg-yellow-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-400");
+	}
+
+	Border.bg-yellow-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-500");
+	}
+
+	Border.bg-yellow-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-600");
+	}
+
+	Border.bg-yellow-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-700");
+	}
+
+	Border.bg-yellow-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-800");
+	}
+
+	Border.bg-yellow-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-900");
+	}
+
+	Border.bg-yellow-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-950");
+	}
+
+	Border.bg-lime-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-50");
+	}
+
+	Border.bg-lime-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-100");
+	}
+
+	Border.bg-lime-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-200");
+	}
+
+	Border.bg-lime-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-300");
+	}
+
+	Border.bg-lime-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-400");
+	}
+
+	Border.bg-lime-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-500");
+	}
+
+	Border.bg-lime-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-600");
+	}
+
+	Border.bg-lime-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-700");
+	}
+
+	Border.bg-lime-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-800");
+	}
+
+	Border.bg-lime-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-900");
+	}
+
+	Border.bg-lime-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-950");
+	}
+
+	Border.bg-green-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-50");
+	}
+
+	Border.bg-green-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-100");
+	}
+
+	Border.bg-green-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-200");
+	}
+
+	Border.bg-green-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-300");
+	}
+
+	Border.bg-green-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-400");
+	}
+
+	Border.bg-green-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-500");
+	}
+
+	Border.bg-green-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-600");
+	}
+
+	Border.bg-green-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-700");
+	}
+
+	Border.bg-green-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-800");
+	}
+
+	Border.bg-green-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-900");
+	}
+
+	Border.bg-green-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-950");
+	}
+
+	Border.bg-emerald-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-50");
+	}
+
+	Border.bg-emerald-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-100");
+	}
+
+	Border.bg-emerald-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-200");
+	}
+
+	Border.bg-emerald-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-300");
+	}
+
+	Border.bg-emerald-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-400");
+	}
+
+	Border.bg-emerald-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-500");
+	}
+
+	Border.bg-emerald-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-600");
+	}
+
+	Border.bg-emerald-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-700");
+	}
+
+	Border.bg-emerald-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-800");
+	}
+
+	Border.bg-emerald-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-900");
+	}
+
+	Border.bg-emerald-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-950");
+	}
+
+	Border.bg-teal-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-50");
+	}
+
+	Border.bg-teal-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-100");
+	}
+
+	Border.bg-teal-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-200");
+	}
+
+	Border.bg-teal-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-300");
+	}
+
+	Border.bg-teal-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-400");
+	}
+
+	Border.bg-teal-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-500");
+	}
+
+	Border.bg-teal-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-600");
+	}
+
+	Border.bg-teal-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-700");
+	}
+
+	Border.bg-teal-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-800");
+	}
+
+	Border.bg-teal-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-900");
+	}
+
+	Border.bg-teal-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-950");
+	}
+
+	Border.bg-cyan-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-50");
+	}
+
+	Border.bg-cyan-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-100");
+	}
+
+	Border.bg-cyan-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-200");
+	}
+
+	Border.bg-cyan-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-300");
+	}
+
+	Border.bg-cyan-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-400");
+	}
+
+	Border.bg-cyan-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-500");
+	}
+
+	Border.bg-cyan-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-600");
+	}
+
+	Border.bg-cyan-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-700");
+	}
+
+	Border.bg-cyan-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-800");
+	}
+
+	Border.bg-cyan-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-900");
+	}
+
+	Border.bg-cyan-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-950");
+	}
+
+	Border.bg-sky-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-50");
+	}
+
+	Border.bg-sky-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-100");
+	}
+
+	Border.bg-sky-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-200");
+	}
+
+	Border.bg-sky-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-300");
+	}
+
+	Border.bg-sky-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-400");
+	}
+
+	Border.bg-sky-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-500");
+	}
+
+	Border.bg-sky-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-600");
+	}
+
+	Border.bg-sky-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-700");
+	}
+
+	Border.bg-sky-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-800");
+	}
+
+	Border.bg-sky-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-900");
+	}
+
+	Border.bg-sky-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-950");
+	}
+
+	Border.bg-blue-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-50");
+	}
+
+	Border.bg-blue-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-100");
+	}
+
+	Border.bg-blue-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-200");
+	}
+
+	Border.bg-blue-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-300");
+	}
+
+	Border.bg-blue-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-400");
+	}
+
+	Border.bg-blue-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-500");
+	}
+
+	Border.bg-blue-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-600");
+	}
+
+	Border.bg-blue-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-700");
+	}
+
+	Border.bg-blue-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-800");
+	}
+
+	Border.bg-blue-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-900");
+	}
+
+	Border.bg-blue-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-950");
+	}
+
+	Border.bg-indigo-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-50");
+	}
+
+	Border.bg-indigo-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-100");
+	}
+
+	Border.bg-indigo-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-200");
+	}
+
+	Border.bg-indigo-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-300");
+	}
+
+	Border.bg-indigo-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-400");
+	}
+
+	Border.bg-indigo-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-500");
+	}
+
+	Border.bg-indigo-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-600");
+	}
+
+	Border.bg-indigo-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-700");
+	}
+
+	Border.bg-indigo-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-800");
+	}
+
+	Border.bg-indigo-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-900");
+	}
+
+	Border.bg-indigo-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-950");
+	}
+
+	Border.bg-violet-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-50");
+	}
+
+	Border.bg-violet-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-100");
+	}
+
+	Border.bg-violet-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-200");
+	}
+
+	Border.bg-violet-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-300");
+	}
+
+	Border.bg-violet-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-400");
+	}
+
+	Border.bg-violet-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-500");
+	}
+
+	Border.bg-violet-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-600");
+	}
+
+	Border.bg-violet-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-700");
+	}
+
+	Border.bg-violet-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-800");
+	}
+
+	Border.bg-violet-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-900");
+	}
+
+	Border.bg-violet-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-950");
+	}
+
+	Border.bg-purple-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-50");
+	}
+
+	Border.bg-purple-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-100");
+	}
+
+	Border.bg-purple-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-200");
+	}
+
+	Border.bg-purple-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-300");
+	}
+
+	Border.bg-purple-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-400");
+	}
+
+	Border.bg-purple-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-500");
+	}
+
+	Border.bg-purple-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-600");
+	}
+
+	Border.bg-purple-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-700");
+	}
+
+	Border.bg-purple-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-800");
+	}
+
+	Border.bg-purple-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-900");
+	}
+
+	Border.bg-purple-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-950");
+	}
+
+	Border.bg-fuchsia-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-50");
+	}
+
+	Border.bg-fuchsia-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-100");
+	}
+
+	Border.bg-fuchsia-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-200");
+	}
+
+	Border.bg-fuchsia-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-300");
+	}
+
+	Border.bg-fuchsia-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-400");
+	}
+
+	Border.bg-fuchsia-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-500");
+	}
+
+	Border.bg-fuchsia-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-600");
+	}
+
+	Border.bg-fuchsia-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-700");
+	}
+
+	Border.bg-fuchsia-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-800");
+	}
+
+	Border.bg-fuchsia-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-900");
+	}
+
+	Border.bg-fuchsia-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-950");
+	}
+
+	Border.bg-pink-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-50");
+	}
+
+	Border.bg-pink-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-100");
+	}
+
+	Border.bg-pink-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-200");
+	}
+
+	Border.bg-pink-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-300");
+	}
+
+	Border.bg-pink-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-400");
+	}
+
+	Border.bg-pink-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-500");
+	}
+
+	Border.bg-pink-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-600");
+	}
+
+	Border.bg-pink-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-700");
+	}
+
+	Border.bg-pink-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-800");
+	}
+
+	Border.bg-pink-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-900");
+	}
+
+	Border.bg-pink-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-950");
+	}
+
+	Border.bg-rose-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-50");
+	}
+
+	Border.bg-rose-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-100");
+	}
+
+	Border.bg-rose-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-200");
+	}
+
+	Border.bg-rose-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-300");
+	}
+
+	Border.bg-rose-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-400");
+	}
+
+	Border.bg-rose-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-500");
+	}
+
+	Border.bg-rose-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-600");
+	}
+
+	Border.bg-rose-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-700");
+	}
+
+	Border.bg-rose-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-800");
+	}
+
+	Border.bg-rose-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-900");
+	}
+
+	Border.bg-rose-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-950");
+	}
+
+	Border.bg-slate-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-50");
+	}
+
+	Border.bg-slate-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-100");
+	}
+
+	Border.bg-slate-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-200");
+	}
+
+	Border.bg-slate-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-300");
+	}
+
+	Border.bg-slate-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-400");
+	}
+
+	Border.bg-slate-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-500");
+	}
+
+	Border.bg-slate-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-600");
+	}
+
+	Border.bg-slate-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-700");
+	}
+
+	Border.bg-slate-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-800");
+	}
+
+	Border.bg-slate-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-900");
+	}
+
+	Border.bg-slate-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-950");
+	}
+
+	Border.bg-gray-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-50");
+	}
+
+	Border.bg-gray-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-100");
+	}
+
+	Border.bg-gray-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-200");
+	}
+
+	Border.bg-gray-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-300");
+	}
+
+	Border.bg-gray-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-400");
+	}
+
+	Border.bg-gray-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-500");
+	}
+
+	Border.bg-gray-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-600");
+	}
+
+	Border.bg-gray-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-700");
+	}
+
+	Border.bg-gray-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-800");
+	}
+
+	Border.bg-gray-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-900");
+	}
+
+	Border.bg-gray-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-950");
+	}
+
+	Border.bg-zinc-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-50");
+	}
+
+	Border.bg-zinc-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-100");
+	}
+
+	Border.bg-zinc-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-200");
+	}
+
+	Border.bg-zinc-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-300");
+	}
+
+	Border.bg-zinc-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-400");
+	}
+
+	Border.bg-zinc-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-500");
+	}
+
+	Border.bg-zinc-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-600");
+	}
+
+	Border.bg-zinc-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-700");
+	}
+
+	Border.bg-zinc-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-800");
+	}
+
+	Border.bg-zinc-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-900");
+	}
+
+	Border.bg-zinc-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-950");
+	}
+
+	Border.bg-neutral-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-50");
+	}
+
+	Border.bg-neutral-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-100");
+	}
+
+	Border.bg-neutral-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-200");
+	}
+
+	Border.bg-neutral-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-300");
+	}
+
+	Border.bg-neutral-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-400");
+	}
+
+	Border.bg-neutral-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-500");
+	}
+
+	Border.bg-neutral-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-600");
+	}
+
+	Border.bg-neutral-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-700");
+	}
+
+	Border.bg-neutral-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-800");
+	}
+
+	Border.bg-neutral-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-900");
+	}
+
+	Border.bg-neutral-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-950");
+	}
+
+	Border.bg-stone-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-50");
+	}
+
+	Border.bg-stone-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-100");
+	}
+
+	Border.bg-stone-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-200");
+	}
+
+	Border.bg-stone-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-300");
+	}
+
+	Border.bg-stone-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-400");
+	}
+
+	Border.bg-stone-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-500");
+	}
+
+	Border.bg-stone-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-600");
+	}
+
+	Border.bg-stone-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-700");
+	}
+
+	Border.bg-stone-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-800");
+	}
+
+	Border.bg-stone-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-900");
+	}
+
+	Border.bg-stone-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-950");
+	}
+
+	Border.bg-mauve-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-50");
+	}
+
+	Border.bg-mauve-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-100");
+	}
+
+	Border.bg-mauve-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-200");
+	}
+
+	Border.bg-mauve-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-300");
+	}
+
+	Border.bg-mauve-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-400");
+	}
+
+	Border.bg-mauve-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-500");
+	}
+
+	Border.bg-mauve-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-600");
+	}
+
+	Border.bg-mauve-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-700");
+	}
+
+	Border.bg-mauve-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-800");
+	}
+
+	Border.bg-mauve-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-900");
+	}
+
+	Border.bg-mauve-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-950");
+	}
+
+	Border.bg-olive-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-50");
+	}
+
+	Border.bg-olive-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-100");
+	}
+
+	Border.bg-olive-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-200");
+	}
+
+	Border.bg-olive-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-300");
+	}
+
+	Border.bg-olive-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-400");
+	}
+
+	Border.bg-olive-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-500");
+	}
+
+	Border.bg-olive-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-600");
+	}
+
+	Border.bg-olive-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-700");
+	}
+
+	Border.bg-olive-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-800");
+	}
+
+	Border.bg-olive-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-900");
+	}
+
+	Border.bg-olive-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-950");
+	}
+
+	Border.bg-mist-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-50");
+	}
+
+	Border.bg-mist-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-100");
+	}
+
+	Border.bg-mist-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-200");
+	}
+
+	Border.bg-mist-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-300");
+	}
+
+	Border.bg-mist-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-400");
+	}
+
+	Border.bg-mist-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-500");
+	}
+
+	Border.bg-mist-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-600");
+	}
+
+	Border.bg-mist-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-700");
+	}
+
+	Border.bg-mist-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-800");
+	}
+
+	Border.bg-mist-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-900");
+	}
+
+	Border.bg-mist-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-950");
+	}
+
+	Border.bg-taupe-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-50");
+	}
+
+	Border.bg-taupe-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-100");
+	}
+
+	Border.bg-taupe-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-200");
+	}
+
+	Border.bg-taupe-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-300");
+	}
+
+	Border.bg-taupe-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-400");
+	}
+
+	Border.bg-taupe-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-500");
+	}
+
+	Border.bg-taupe-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-600");
+	}
+
+	Border.bg-taupe-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-700");
+	}
+
+	Border.bg-taupe-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-800");
+	}
+
+	Border.bg-taupe-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-900");
+	}
+
+	Border.bg-taupe-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-950");
+	}
+
+	// Named background colors for TemplatedControl completion; keys mirror Styles.axaml.
+	TemplatedControl.bg-transparent {
+		Background: Amx.DynamicResource<IBrush>("--color-transparent");
+	}
+
+	TemplatedControl.bg-black {
+		Background: Amx.DynamicResource<IBrush>("--color-black");
+	}
+
+	TemplatedControl.bg-white {
+		Background: Amx.DynamicResource<IBrush>("--color-white");
+	}
+
+	TemplatedControl.bg-red-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-50");
+	}
+
+	TemplatedControl.bg-red-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-100");
+	}
+
+	TemplatedControl.bg-red-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-200");
+	}
+
+	TemplatedControl.bg-red-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-300");
+	}
+
+	TemplatedControl.bg-red-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-400");
+	}
+
+	TemplatedControl.bg-red-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-500");
+	}
+
+	TemplatedControl.bg-red-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-600");
+	}
+
+	TemplatedControl.bg-red-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-700");
+	}
+
+	TemplatedControl.bg-red-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-800");
+	}
+
+	TemplatedControl.bg-red-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-900");
+	}
+
+	TemplatedControl.bg-red-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-red-950");
+	}
+
+	TemplatedControl.bg-orange-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-50");
+	}
+
+	TemplatedControl.bg-orange-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-100");
+	}
+
+	TemplatedControl.bg-orange-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-200");
+	}
+
+	TemplatedControl.bg-orange-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-300");
+	}
+
+	TemplatedControl.bg-orange-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-400");
+	}
+
+	TemplatedControl.bg-orange-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-500");
+	}
+
+	TemplatedControl.bg-orange-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-600");
+	}
+
+	TemplatedControl.bg-orange-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-700");
+	}
+
+	TemplatedControl.bg-orange-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-800");
+	}
+
+	TemplatedControl.bg-orange-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-900");
+	}
+
+	TemplatedControl.bg-orange-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-orange-950");
+	}
+
+	TemplatedControl.bg-amber-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-50");
+	}
+
+	TemplatedControl.bg-amber-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-100");
+	}
+
+	TemplatedControl.bg-amber-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-200");
+	}
+
+	TemplatedControl.bg-amber-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-300");
+	}
+
+	TemplatedControl.bg-amber-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-400");
+	}
+
+	TemplatedControl.bg-amber-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-500");
+	}
+
+	TemplatedControl.bg-amber-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-600");
+	}
+
+	TemplatedControl.bg-amber-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-700");
+	}
+
+	TemplatedControl.bg-amber-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-800");
+	}
+
+	TemplatedControl.bg-amber-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-900");
+	}
+
+	TemplatedControl.bg-amber-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-amber-950");
+	}
+
+	TemplatedControl.bg-yellow-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-50");
+	}
+
+	TemplatedControl.bg-yellow-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-100");
+	}
+
+	TemplatedControl.bg-yellow-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-200");
+	}
+
+	TemplatedControl.bg-yellow-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-300");
+	}
+
+	TemplatedControl.bg-yellow-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-400");
+	}
+
+	TemplatedControl.bg-yellow-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-500");
+	}
+
+	TemplatedControl.bg-yellow-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-600");
+	}
+
+	TemplatedControl.bg-yellow-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-700");
+	}
+
+	TemplatedControl.bg-yellow-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-800");
+	}
+
+	TemplatedControl.bg-yellow-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-900");
+	}
+
+	TemplatedControl.bg-yellow-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-yellow-950");
+	}
+
+	TemplatedControl.bg-lime-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-50");
+	}
+
+	TemplatedControl.bg-lime-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-100");
+	}
+
+	TemplatedControl.bg-lime-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-200");
+	}
+
+	TemplatedControl.bg-lime-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-300");
+	}
+
+	TemplatedControl.bg-lime-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-400");
+	}
+
+	TemplatedControl.bg-lime-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-500");
+	}
+
+	TemplatedControl.bg-lime-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-600");
+	}
+
+	TemplatedControl.bg-lime-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-700");
+	}
+
+	TemplatedControl.bg-lime-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-800");
+	}
+
+	TemplatedControl.bg-lime-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-900");
+	}
+
+	TemplatedControl.bg-lime-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-lime-950");
+	}
+
+	TemplatedControl.bg-green-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-50");
+	}
+
+	TemplatedControl.bg-green-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-100");
+	}
+
+	TemplatedControl.bg-green-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-200");
+	}
+
+	TemplatedControl.bg-green-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-300");
+	}
+
+	TemplatedControl.bg-green-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-400");
+	}
+
+	TemplatedControl.bg-green-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-500");
+	}
+
+	TemplatedControl.bg-green-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-600");
+	}
+
+	TemplatedControl.bg-green-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-700");
+	}
+
+	TemplatedControl.bg-green-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-800");
+	}
+
+	TemplatedControl.bg-green-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-900");
+	}
+
+	TemplatedControl.bg-green-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-green-950");
+	}
+
+	TemplatedControl.bg-emerald-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-50");
+	}
+
+	TemplatedControl.bg-emerald-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-100");
+	}
+
+	TemplatedControl.bg-emerald-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-200");
+	}
+
+	TemplatedControl.bg-emerald-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-300");
+	}
+
+	TemplatedControl.bg-emerald-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-400");
+	}
+
+	TemplatedControl.bg-emerald-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-500");
+	}
+
+	TemplatedControl.bg-emerald-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-600");
+	}
+
+	TemplatedControl.bg-emerald-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-700");
+	}
+
+	TemplatedControl.bg-emerald-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-800");
+	}
+
+	TemplatedControl.bg-emerald-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-900");
+	}
+
+	TemplatedControl.bg-emerald-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-emerald-950");
+	}
+
+	TemplatedControl.bg-teal-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-50");
+	}
+
+	TemplatedControl.bg-teal-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-100");
+	}
+
+	TemplatedControl.bg-teal-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-200");
+	}
+
+	TemplatedControl.bg-teal-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-300");
+	}
+
+	TemplatedControl.bg-teal-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-400");
+	}
+
+	TemplatedControl.bg-teal-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-500");
+	}
+
+	TemplatedControl.bg-teal-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-600");
+	}
+
+	TemplatedControl.bg-teal-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-700");
+	}
+
+	TemplatedControl.bg-teal-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-800");
+	}
+
+	TemplatedControl.bg-teal-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-900");
+	}
+
+	TemplatedControl.bg-teal-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-teal-950");
+	}
+
+	TemplatedControl.bg-cyan-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-50");
+	}
+
+	TemplatedControl.bg-cyan-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-100");
+	}
+
+	TemplatedControl.bg-cyan-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-200");
+	}
+
+	TemplatedControl.bg-cyan-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-300");
+	}
+
+	TemplatedControl.bg-cyan-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-400");
+	}
+
+	TemplatedControl.bg-cyan-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-500");
+	}
+
+	TemplatedControl.bg-cyan-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-600");
+	}
+
+	TemplatedControl.bg-cyan-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-700");
+	}
+
+	TemplatedControl.bg-cyan-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-800");
+	}
+
+	TemplatedControl.bg-cyan-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-900");
+	}
+
+	TemplatedControl.bg-cyan-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-cyan-950");
+	}
+
+	TemplatedControl.bg-sky-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-50");
+	}
+
+	TemplatedControl.bg-sky-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-100");
+	}
+
+	TemplatedControl.bg-sky-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-200");
+	}
+
+	TemplatedControl.bg-sky-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-300");
+	}
+
+	TemplatedControl.bg-sky-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-400");
+	}
+
+	TemplatedControl.bg-sky-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-500");
+	}
+
+	TemplatedControl.bg-sky-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-600");
+	}
+
+	TemplatedControl.bg-sky-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-700");
+	}
+
+	TemplatedControl.bg-sky-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-800");
+	}
+
+	TemplatedControl.bg-sky-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-900");
+	}
+
+	TemplatedControl.bg-sky-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-sky-950");
+	}
+
+	TemplatedControl.bg-blue-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-50");
+	}
+
+	TemplatedControl.bg-blue-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-100");
+	}
+
+	TemplatedControl.bg-blue-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-200");
+	}
+
+	TemplatedControl.bg-blue-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-300");
+	}
+
+	TemplatedControl.bg-blue-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-400");
+	}
+
+	TemplatedControl.bg-blue-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-500");
+	}
+
+	TemplatedControl.bg-blue-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-600");
+	}
+
+	TemplatedControl.bg-blue-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-700");
+	}
+
+	TemplatedControl.bg-blue-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-800");
+	}
+
+	TemplatedControl.bg-blue-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-900");
+	}
+
+	TemplatedControl.bg-blue-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-blue-950");
+	}
+
+	TemplatedControl.bg-indigo-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-50");
+	}
+
+	TemplatedControl.bg-indigo-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-100");
+	}
+
+	TemplatedControl.bg-indigo-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-200");
+	}
+
+	TemplatedControl.bg-indigo-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-300");
+	}
+
+	TemplatedControl.bg-indigo-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-400");
+	}
+
+	TemplatedControl.bg-indigo-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-500");
+	}
+
+	TemplatedControl.bg-indigo-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-600");
+	}
+
+	TemplatedControl.bg-indigo-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-700");
+	}
+
+	TemplatedControl.bg-indigo-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-800");
+	}
+
+	TemplatedControl.bg-indigo-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-900");
+	}
+
+	TemplatedControl.bg-indigo-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-indigo-950");
+	}
+
+	TemplatedControl.bg-violet-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-50");
+	}
+
+	TemplatedControl.bg-violet-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-100");
+	}
+
+	TemplatedControl.bg-violet-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-200");
+	}
+
+	TemplatedControl.bg-violet-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-300");
+	}
+
+	TemplatedControl.bg-violet-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-400");
+	}
+
+	TemplatedControl.bg-violet-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-500");
+	}
+
+	TemplatedControl.bg-violet-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-600");
+	}
+
+	TemplatedControl.bg-violet-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-700");
+	}
+
+	TemplatedControl.bg-violet-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-800");
+	}
+
+	TemplatedControl.bg-violet-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-900");
+	}
+
+	TemplatedControl.bg-violet-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-violet-950");
+	}
+
+	TemplatedControl.bg-purple-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-50");
+	}
+
+	TemplatedControl.bg-purple-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-100");
+	}
+
+	TemplatedControl.bg-purple-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-200");
+	}
+
+	TemplatedControl.bg-purple-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-300");
+	}
+
+	TemplatedControl.bg-purple-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-400");
+	}
+
+	TemplatedControl.bg-purple-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-500");
+	}
+
+	TemplatedControl.bg-purple-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-600");
+	}
+
+	TemplatedControl.bg-purple-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-700");
+	}
+
+	TemplatedControl.bg-purple-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-800");
+	}
+
+	TemplatedControl.bg-purple-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-900");
+	}
+
+	TemplatedControl.bg-purple-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-purple-950");
+	}
+
+	TemplatedControl.bg-fuchsia-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-50");
+	}
+
+	TemplatedControl.bg-fuchsia-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-100");
+	}
+
+	TemplatedControl.bg-fuchsia-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-200");
+	}
+
+	TemplatedControl.bg-fuchsia-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-300");
+	}
+
+	TemplatedControl.bg-fuchsia-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-400");
+	}
+
+	TemplatedControl.bg-fuchsia-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-500");
+	}
+
+	TemplatedControl.bg-fuchsia-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-600");
+	}
+
+	TemplatedControl.bg-fuchsia-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-700");
+	}
+
+	TemplatedControl.bg-fuchsia-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-800");
+	}
+
+	TemplatedControl.bg-fuchsia-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-900");
+	}
+
+	TemplatedControl.bg-fuchsia-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-fuchsia-950");
+	}
+
+	TemplatedControl.bg-pink-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-50");
+	}
+
+	TemplatedControl.bg-pink-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-100");
+	}
+
+	TemplatedControl.bg-pink-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-200");
+	}
+
+	TemplatedControl.bg-pink-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-300");
+	}
+
+	TemplatedControl.bg-pink-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-400");
+	}
+
+	TemplatedControl.bg-pink-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-500");
+	}
+
+	TemplatedControl.bg-pink-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-600");
+	}
+
+	TemplatedControl.bg-pink-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-700");
+	}
+
+	TemplatedControl.bg-pink-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-800");
+	}
+
+	TemplatedControl.bg-pink-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-900");
+	}
+
+	TemplatedControl.bg-pink-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-pink-950");
+	}
+
+	TemplatedControl.bg-rose-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-50");
+	}
+
+	TemplatedControl.bg-rose-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-100");
+	}
+
+	TemplatedControl.bg-rose-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-200");
+	}
+
+	TemplatedControl.bg-rose-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-300");
+	}
+
+	TemplatedControl.bg-rose-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-400");
+	}
+
+	TemplatedControl.bg-rose-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-500");
+	}
+
+	TemplatedControl.bg-rose-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-600");
+	}
+
+	TemplatedControl.bg-rose-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-700");
+	}
+
+	TemplatedControl.bg-rose-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-800");
+	}
+
+	TemplatedControl.bg-rose-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-900");
+	}
+
+	TemplatedControl.bg-rose-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-rose-950");
+	}
+
+	TemplatedControl.bg-slate-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-50");
+	}
+
+	TemplatedControl.bg-slate-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-100");
+	}
+
+	TemplatedControl.bg-slate-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-200");
+	}
+
+	TemplatedControl.bg-slate-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-300");
+	}
+
+	TemplatedControl.bg-slate-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-400");
+	}
+
+	TemplatedControl.bg-slate-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-500");
+	}
+
+	TemplatedControl.bg-slate-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-600");
+	}
+
+	TemplatedControl.bg-slate-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-700");
+	}
+
+	TemplatedControl.bg-slate-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-800");
+	}
+
+	TemplatedControl.bg-slate-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-900");
+	}
+
+	TemplatedControl.bg-slate-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-slate-950");
+	}
+
+	TemplatedControl.bg-gray-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-50");
+	}
+
+	TemplatedControl.bg-gray-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-100");
+	}
+
+	TemplatedControl.bg-gray-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-200");
+	}
+
+	TemplatedControl.bg-gray-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-300");
+	}
+
+	TemplatedControl.bg-gray-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-400");
+	}
+
+	TemplatedControl.bg-gray-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-500");
+	}
+
+	TemplatedControl.bg-gray-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-600");
+	}
+
+	TemplatedControl.bg-gray-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-700");
+	}
+
+	TemplatedControl.bg-gray-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-800");
+	}
+
+	TemplatedControl.bg-gray-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-900");
+	}
+
+	TemplatedControl.bg-gray-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-gray-950");
+	}
+
+	TemplatedControl.bg-zinc-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-50");
+	}
+
+	TemplatedControl.bg-zinc-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-100");
+	}
+
+	TemplatedControl.bg-zinc-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-200");
+	}
+
+	TemplatedControl.bg-zinc-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-300");
+	}
+
+	TemplatedControl.bg-zinc-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-400");
+	}
+
+	TemplatedControl.bg-zinc-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-500");
+	}
+
+	TemplatedControl.bg-zinc-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-600");
+	}
+
+	TemplatedControl.bg-zinc-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-700");
+	}
+
+	TemplatedControl.bg-zinc-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-800");
+	}
+
+	TemplatedControl.bg-zinc-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-900");
+	}
+
+	TemplatedControl.bg-zinc-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-zinc-950");
+	}
+
+	TemplatedControl.bg-neutral-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-50");
+	}
+
+	TemplatedControl.bg-neutral-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-100");
+	}
+
+	TemplatedControl.bg-neutral-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-200");
+	}
+
+	TemplatedControl.bg-neutral-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-300");
+	}
+
+	TemplatedControl.bg-neutral-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-400");
+	}
+
+	TemplatedControl.bg-neutral-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-500");
+	}
+
+	TemplatedControl.bg-neutral-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-600");
+	}
+
+	TemplatedControl.bg-neutral-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-700");
+	}
+
+	TemplatedControl.bg-neutral-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-800");
+	}
+
+	TemplatedControl.bg-neutral-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-900");
+	}
+
+	TemplatedControl.bg-neutral-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-neutral-950");
+	}
+
+	TemplatedControl.bg-stone-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-50");
+	}
+
+	TemplatedControl.bg-stone-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-100");
+	}
+
+	TemplatedControl.bg-stone-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-200");
+	}
+
+	TemplatedControl.bg-stone-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-300");
+	}
+
+	TemplatedControl.bg-stone-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-400");
+	}
+
+	TemplatedControl.bg-stone-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-500");
+	}
+
+	TemplatedControl.bg-stone-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-600");
+	}
+
+	TemplatedControl.bg-stone-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-700");
+	}
+
+	TemplatedControl.bg-stone-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-800");
+	}
+
+	TemplatedControl.bg-stone-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-900");
+	}
+
+	TemplatedControl.bg-stone-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-stone-950");
+	}
+
+	TemplatedControl.bg-mauve-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-50");
+	}
+
+	TemplatedControl.bg-mauve-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-100");
+	}
+
+	TemplatedControl.bg-mauve-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-200");
+	}
+
+	TemplatedControl.bg-mauve-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-300");
+	}
+
+	TemplatedControl.bg-mauve-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-400");
+	}
+
+	TemplatedControl.bg-mauve-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-500");
+	}
+
+	TemplatedControl.bg-mauve-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-600");
+	}
+
+	TemplatedControl.bg-mauve-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-700");
+	}
+
+	TemplatedControl.bg-mauve-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-800");
+	}
+
+	TemplatedControl.bg-mauve-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-900");
+	}
+
+	TemplatedControl.bg-mauve-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-mauve-950");
+	}
+
+	TemplatedControl.bg-olive-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-50");
+	}
+
+	TemplatedControl.bg-olive-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-100");
+	}
+
+	TemplatedControl.bg-olive-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-200");
+	}
+
+	TemplatedControl.bg-olive-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-300");
+	}
+
+	TemplatedControl.bg-olive-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-400");
+	}
+
+	TemplatedControl.bg-olive-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-500");
+	}
+
+	TemplatedControl.bg-olive-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-600");
+	}
+
+	TemplatedControl.bg-olive-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-700");
+	}
+
+	TemplatedControl.bg-olive-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-800");
+	}
+
+	TemplatedControl.bg-olive-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-900");
+	}
+
+	TemplatedControl.bg-olive-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-olive-950");
+	}
+
+	TemplatedControl.bg-mist-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-50");
+	}
+
+	TemplatedControl.bg-mist-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-100");
+	}
+
+	TemplatedControl.bg-mist-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-200");
+	}
+
+	TemplatedControl.bg-mist-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-300");
+	}
+
+	TemplatedControl.bg-mist-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-400");
+	}
+
+	TemplatedControl.bg-mist-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-500");
+	}
+
+	TemplatedControl.bg-mist-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-600");
+	}
+
+	TemplatedControl.bg-mist-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-700");
+	}
+
+	TemplatedControl.bg-mist-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-800");
+	}
+
+	TemplatedControl.bg-mist-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-900");
+	}
+
+	TemplatedControl.bg-mist-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-mist-950");
+	}
+
+	TemplatedControl.bg-taupe-50 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-50");
+	}
+
+	TemplatedControl.bg-taupe-100 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-100");
+	}
+
+	TemplatedControl.bg-taupe-200 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-200");
+	}
+
+	TemplatedControl.bg-taupe-300 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-300");
+	}
+
+	TemplatedControl.bg-taupe-400 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-400");
+	}
+
+	TemplatedControl.bg-taupe-500 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-500");
+	}
+
+	TemplatedControl.bg-taupe-600 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-600");
+	}
+
+	TemplatedControl.bg-taupe-700 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-700");
+	}
+
+	TemplatedControl.bg-taupe-800 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-800");
+	}
+
+	TemplatedControl.bg-taupe-900 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-900");
+	}
+
+	TemplatedControl.bg-taupe-950 {
+		Background: Amx.DynamicResource<IBrush>("--color-taupe-950");
+	}
+
+
 	// Typography for text and templated controls.
 	TextBlock.text-left {
 		TextAlignment: Left;
@@ -428,6 +3900,1164 @@
 	TextBlock.text-(string color)-(int shade) {
 		Foreground: Amx.DynamicResource<IBrush>("--color-" + color + "-" + shade);
 	}
+
+	// Named foreground colors for completion; keys mirror Styles.axaml.
+	TextBlock.text-transparent {
+		Foreground: Amx.DynamicResource<IBrush>("--color-transparent");
+	}
+
+	TextBlock.text-black {
+		Foreground: Amx.DynamicResource<IBrush>("--color-black");
+	}
+
+	TextBlock.text-white {
+		Foreground: Amx.DynamicResource<IBrush>("--color-white");
+	}
+
+	TextBlock.text-red-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-red-50");
+	}
+
+	TextBlock.text-red-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-red-100");
+	}
+
+	TextBlock.text-red-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-red-200");
+	}
+
+	TextBlock.text-red-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-red-300");
+	}
+
+	TextBlock.text-red-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-red-400");
+	}
+
+	TextBlock.text-red-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-red-500");
+	}
+
+	TextBlock.text-red-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-red-600");
+	}
+
+	TextBlock.text-red-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-red-700");
+	}
+
+	TextBlock.text-red-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-red-800");
+	}
+
+	TextBlock.text-red-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-red-900");
+	}
+
+	TextBlock.text-red-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-red-950");
+	}
+
+	TextBlock.text-orange-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-orange-50");
+	}
+
+	TextBlock.text-orange-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-orange-100");
+	}
+
+	TextBlock.text-orange-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-orange-200");
+	}
+
+	TextBlock.text-orange-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-orange-300");
+	}
+
+	TextBlock.text-orange-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-orange-400");
+	}
+
+	TextBlock.text-orange-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-orange-500");
+	}
+
+	TextBlock.text-orange-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-orange-600");
+	}
+
+	TextBlock.text-orange-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-orange-700");
+	}
+
+	TextBlock.text-orange-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-orange-800");
+	}
+
+	TextBlock.text-orange-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-orange-900");
+	}
+
+	TextBlock.text-orange-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-orange-950");
+	}
+
+	TextBlock.text-amber-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-amber-50");
+	}
+
+	TextBlock.text-amber-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-amber-100");
+	}
+
+	TextBlock.text-amber-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-amber-200");
+	}
+
+	TextBlock.text-amber-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-amber-300");
+	}
+
+	TextBlock.text-amber-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-amber-400");
+	}
+
+	TextBlock.text-amber-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-amber-500");
+	}
+
+	TextBlock.text-amber-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-amber-600");
+	}
+
+	TextBlock.text-amber-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-amber-700");
+	}
+
+	TextBlock.text-amber-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-amber-800");
+	}
+
+	TextBlock.text-amber-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-amber-900");
+	}
+
+	TextBlock.text-amber-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-amber-950");
+	}
+
+	TextBlock.text-yellow-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-yellow-50");
+	}
+
+	TextBlock.text-yellow-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-yellow-100");
+	}
+
+	TextBlock.text-yellow-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-yellow-200");
+	}
+
+	TextBlock.text-yellow-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-yellow-300");
+	}
+
+	TextBlock.text-yellow-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-yellow-400");
+	}
+
+	TextBlock.text-yellow-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-yellow-500");
+	}
+
+	TextBlock.text-yellow-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-yellow-600");
+	}
+
+	TextBlock.text-yellow-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-yellow-700");
+	}
+
+	TextBlock.text-yellow-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-yellow-800");
+	}
+
+	TextBlock.text-yellow-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-yellow-900");
+	}
+
+	TextBlock.text-yellow-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-yellow-950");
+	}
+
+	TextBlock.text-lime-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-lime-50");
+	}
+
+	TextBlock.text-lime-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-lime-100");
+	}
+
+	TextBlock.text-lime-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-lime-200");
+	}
+
+	TextBlock.text-lime-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-lime-300");
+	}
+
+	TextBlock.text-lime-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-lime-400");
+	}
+
+	TextBlock.text-lime-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-lime-500");
+	}
+
+	TextBlock.text-lime-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-lime-600");
+	}
+
+	TextBlock.text-lime-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-lime-700");
+	}
+
+	TextBlock.text-lime-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-lime-800");
+	}
+
+	TextBlock.text-lime-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-lime-900");
+	}
+
+	TextBlock.text-lime-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-lime-950");
+	}
+
+	TextBlock.text-green-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-green-50");
+	}
+
+	TextBlock.text-green-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-green-100");
+	}
+
+	TextBlock.text-green-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-green-200");
+	}
+
+	TextBlock.text-green-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-green-300");
+	}
+
+	TextBlock.text-green-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-green-400");
+	}
+
+	TextBlock.text-green-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-green-500");
+	}
+
+	TextBlock.text-green-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-green-600");
+	}
+
+	TextBlock.text-green-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-green-700");
+	}
+
+	TextBlock.text-green-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-green-800");
+	}
+
+	TextBlock.text-green-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-green-900");
+	}
+
+	TextBlock.text-green-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-green-950");
+	}
+
+	TextBlock.text-emerald-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-emerald-50");
+	}
+
+	TextBlock.text-emerald-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-emerald-100");
+	}
+
+	TextBlock.text-emerald-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-emerald-200");
+	}
+
+	TextBlock.text-emerald-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-emerald-300");
+	}
+
+	TextBlock.text-emerald-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-emerald-400");
+	}
+
+	TextBlock.text-emerald-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-emerald-500");
+	}
+
+	TextBlock.text-emerald-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-emerald-600");
+	}
+
+	TextBlock.text-emerald-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-emerald-700");
+	}
+
+	TextBlock.text-emerald-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-emerald-800");
+	}
+
+	TextBlock.text-emerald-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-emerald-900");
+	}
+
+	TextBlock.text-emerald-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-emerald-950");
+	}
+
+	TextBlock.text-teal-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-teal-50");
+	}
+
+	TextBlock.text-teal-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-teal-100");
+	}
+
+	TextBlock.text-teal-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-teal-200");
+	}
+
+	TextBlock.text-teal-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-teal-300");
+	}
+
+	TextBlock.text-teal-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-teal-400");
+	}
+
+	TextBlock.text-teal-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-teal-500");
+	}
+
+	TextBlock.text-teal-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-teal-600");
+	}
+
+	TextBlock.text-teal-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-teal-700");
+	}
+
+	TextBlock.text-teal-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-teal-800");
+	}
+
+	TextBlock.text-teal-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-teal-900");
+	}
+
+	TextBlock.text-teal-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-teal-950");
+	}
+
+	TextBlock.text-cyan-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-cyan-50");
+	}
+
+	TextBlock.text-cyan-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-cyan-100");
+	}
+
+	TextBlock.text-cyan-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-cyan-200");
+	}
+
+	TextBlock.text-cyan-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-cyan-300");
+	}
+
+	TextBlock.text-cyan-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-cyan-400");
+	}
+
+	TextBlock.text-cyan-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-cyan-500");
+	}
+
+	TextBlock.text-cyan-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-cyan-600");
+	}
+
+	TextBlock.text-cyan-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-cyan-700");
+	}
+
+	TextBlock.text-cyan-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-cyan-800");
+	}
+
+	TextBlock.text-cyan-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-cyan-900");
+	}
+
+	TextBlock.text-cyan-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-cyan-950");
+	}
+
+	TextBlock.text-sky-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-sky-50");
+	}
+
+	TextBlock.text-sky-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-sky-100");
+	}
+
+	TextBlock.text-sky-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-sky-200");
+	}
+
+	TextBlock.text-sky-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-sky-300");
+	}
+
+	TextBlock.text-sky-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-sky-400");
+	}
+
+	TextBlock.text-sky-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-sky-500");
+	}
+
+	TextBlock.text-sky-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-sky-600");
+	}
+
+	TextBlock.text-sky-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-sky-700");
+	}
+
+	TextBlock.text-sky-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-sky-800");
+	}
+
+	TextBlock.text-sky-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-sky-900");
+	}
+
+	TextBlock.text-sky-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-sky-950");
+	}
+
+	TextBlock.text-blue-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-blue-50");
+	}
+
+	TextBlock.text-blue-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-blue-100");
+	}
+
+	TextBlock.text-blue-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-blue-200");
+	}
+
+	TextBlock.text-blue-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-blue-300");
+	}
+
+	TextBlock.text-blue-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-blue-400");
+	}
+
+	TextBlock.text-blue-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-blue-500");
+	}
+
+	TextBlock.text-blue-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-blue-600");
+	}
+
+	TextBlock.text-blue-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-blue-700");
+	}
+
+	TextBlock.text-blue-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-blue-800");
+	}
+
+	TextBlock.text-blue-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-blue-900");
+	}
+
+	TextBlock.text-blue-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-blue-950");
+	}
+
+	TextBlock.text-indigo-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-indigo-50");
+	}
+
+	TextBlock.text-indigo-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-indigo-100");
+	}
+
+	TextBlock.text-indigo-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-indigo-200");
+	}
+
+	TextBlock.text-indigo-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-indigo-300");
+	}
+
+	TextBlock.text-indigo-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-indigo-400");
+	}
+
+	TextBlock.text-indigo-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-indigo-500");
+	}
+
+	TextBlock.text-indigo-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-indigo-600");
+	}
+
+	TextBlock.text-indigo-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-indigo-700");
+	}
+
+	TextBlock.text-indigo-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-indigo-800");
+	}
+
+	TextBlock.text-indigo-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-indigo-900");
+	}
+
+	TextBlock.text-indigo-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-indigo-950");
+	}
+
+	TextBlock.text-violet-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-violet-50");
+	}
+
+	TextBlock.text-violet-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-violet-100");
+	}
+
+	TextBlock.text-violet-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-violet-200");
+	}
+
+	TextBlock.text-violet-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-violet-300");
+	}
+
+	TextBlock.text-violet-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-violet-400");
+	}
+
+	TextBlock.text-violet-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-violet-500");
+	}
+
+	TextBlock.text-violet-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-violet-600");
+	}
+
+	TextBlock.text-violet-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-violet-700");
+	}
+
+	TextBlock.text-violet-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-violet-800");
+	}
+
+	TextBlock.text-violet-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-violet-900");
+	}
+
+	TextBlock.text-violet-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-violet-950");
+	}
+
+	TextBlock.text-purple-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-purple-50");
+	}
+
+	TextBlock.text-purple-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-purple-100");
+	}
+
+	TextBlock.text-purple-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-purple-200");
+	}
+
+	TextBlock.text-purple-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-purple-300");
+	}
+
+	TextBlock.text-purple-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-purple-400");
+	}
+
+	TextBlock.text-purple-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-purple-500");
+	}
+
+	TextBlock.text-purple-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-purple-600");
+	}
+
+	TextBlock.text-purple-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-purple-700");
+	}
+
+	TextBlock.text-purple-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-purple-800");
+	}
+
+	TextBlock.text-purple-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-purple-900");
+	}
+
+	TextBlock.text-purple-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-purple-950");
+	}
+
+	TextBlock.text-fuchsia-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-fuchsia-50");
+	}
+
+	TextBlock.text-fuchsia-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-fuchsia-100");
+	}
+
+	TextBlock.text-fuchsia-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-fuchsia-200");
+	}
+
+	TextBlock.text-fuchsia-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-fuchsia-300");
+	}
+
+	TextBlock.text-fuchsia-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-fuchsia-400");
+	}
+
+	TextBlock.text-fuchsia-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-fuchsia-500");
+	}
+
+	TextBlock.text-fuchsia-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-fuchsia-600");
+	}
+
+	TextBlock.text-fuchsia-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-fuchsia-700");
+	}
+
+	TextBlock.text-fuchsia-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-fuchsia-800");
+	}
+
+	TextBlock.text-fuchsia-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-fuchsia-900");
+	}
+
+	TextBlock.text-fuchsia-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-fuchsia-950");
+	}
+
+	TextBlock.text-pink-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-pink-50");
+	}
+
+	TextBlock.text-pink-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-pink-100");
+	}
+
+	TextBlock.text-pink-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-pink-200");
+	}
+
+	TextBlock.text-pink-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-pink-300");
+	}
+
+	TextBlock.text-pink-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-pink-400");
+	}
+
+	TextBlock.text-pink-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-pink-500");
+	}
+
+	TextBlock.text-pink-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-pink-600");
+	}
+
+	TextBlock.text-pink-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-pink-700");
+	}
+
+	TextBlock.text-pink-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-pink-800");
+	}
+
+	TextBlock.text-pink-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-pink-900");
+	}
+
+	TextBlock.text-pink-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-pink-950");
+	}
+
+	TextBlock.text-rose-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-rose-50");
+	}
+
+	TextBlock.text-rose-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-rose-100");
+	}
+
+	TextBlock.text-rose-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-rose-200");
+	}
+
+	TextBlock.text-rose-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-rose-300");
+	}
+
+	TextBlock.text-rose-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-rose-400");
+	}
+
+	TextBlock.text-rose-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-rose-500");
+	}
+
+	TextBlock.text-rose-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-rose-600");
+	}
+
+	TextBlock.text-rose-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-rose-700");
+	}
+
+	TextBlock.text-rose-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-rose-800");
+	}
+
+	TextBlock.text-rose-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-rose-900");
+	}
+
+	TextBlock.text-rose-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-rose-950");
+	}
+
+	TextBlock.text-slate-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-slate-50");
+	}
+
+	TextBlock.text-slate-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-slate-100");
+	}
+
+	TextBlock.text-slate-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-slate-200");
+	}
+
+	TextBlock.text-slate-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-slate-300");
+	}
+
+	TextBlock.text-slate-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-slate-400");
+	}
+
+	TextBlock.text-slate-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-slate-500");
+	}
+
+	TextBlock.text-slate-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-slate-600");
+	}
+
+	TextBlock.text-slate-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-slate-700");
+	}
+
+	TextBlock.text-slate-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-slate-800");
+	}
+
+	TextBlock.text-slate-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-slate-900");
+	}
+
+	TextBlock.text-slate-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-slate-950");
+	}
+
+	TextBlock.text-gray-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-gray-50");
+	}
+
+	TextBlock.text-gray-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-gray-100");
+	}
+
+	TextBlock.text-gray-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-gray-200");
+	}
+
+	TextBlock.text-gray-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-gray-300");
+	}
+
+	TextBlock.text-gray-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-gray-400");
+	}
+
+	TextBlock.text-gray-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-gray-500");
+	}
+
+	TextBlock.text-gray-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-gray-600");
+	}
+
+	TextBlock.text-gray-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-gray-700");
+	}
+
+	TextBlock.text-gray-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-gray-800");
+	}
+
+	TextBlock.text-gray-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-gray-900");
+	}
+
+	TextBlock.text-gray-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-gray-950");
+	}
+
+	TextBlock.text-zinc-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-zinc-50");
+	}
+
+	TextBlock.text-zinc-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-zinc-100");
+	}
+
+	TextBlock.text-zinc-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-zinc-200");
+	}
+
+	TextBlock.text-zinc-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-zinc-300");
+	}
+
+	TextBlock.text-zinc-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-zinc-400");
+	}
+
+	TextBlock.text-zinc-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-zinc-500");
+	}
+
+	TextBlock.text-zinc-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-zinc-600");
+	}
+
+	TextBlock.text-zinc-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-zinc-700");
+	}
+
+	TextBlock.text-zinc-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-zinc-800");
+	}
+
+	TextBlock.text-zinc-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-zinc-900");
+	}
+
+	TextBlock.text-zinc-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-zinc-950");
+	}
+
+	TextBlock.text-neutral-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-neutral-50");
+	}
+
+	TextBlock.text-neutral-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-neutral-100");
+	}
+
+	TextBlock.text-neutral-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-neutral-200");
+	}
+
+	TextBlock.text-neutral-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-neutral-300");
+	}
+
+	TextBlock.text-neutral-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-neutral-400");
+	}
+
+	TextBlock.text-neutral-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-neutral-500");
+	}
+
+	TextBlock.text-neutral-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-neutral-600");
+	}
+
+	TextBlock.text-neutral-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-neutral-700");
+	}
+
+	TextBlock.text-neutral-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-neutral-800");
+	}
+
+	TextBlock.text-neutral-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-neutral-900");
+	}
+
+	TextBlock.text-neutral-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-neutral-950");
+	}
+
+	TextBlock.text-stone-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-stone-50");
+	}
+
+	TextBlock.text-stone-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-stone-100");
+	}
+
+	TextBlock.text-stone-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-stone-200");
+	}
+
+	TextBlock.text-stone-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-stone-300");
+	}
+
+	TextBlock.text-stone-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-stone-400");
+	}
+
+	TextBlock.text-stone-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-stone-500");
+	}
+
+	TextBlock.text-stone-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-stone-600");
+	}
+
+	TextBlock.text-stone-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-stone-700");
+	}
+
+	TextBlock.text-stone-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-stone-800");
+	}
+
+	TextBlock.text-stone-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-stone-900");
+	}
+
+	TextBlock.text-stone-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-stone-950");
+	}
+
+	TextBlock.text-mauve-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mauve-50");
+	}
+
+	TextBlock.text-mauve-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mauve-100");
+	}
+
+	TextBlock.text-mauve-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mauve-200");
+	}
+
+	TextBlock.text-mauve-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mauve-300");
+	}
+
+	TextBlock.text-mauve-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mauve-400");
+	}
+
+	TextBlock.text-mauve-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mauve-500");
+	}
+
+	TextBlock.text-mauve-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mauve-600");
+	}
+
+	TextBlock.text-mauve-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mauve-700");
+	}
+
+	TextBlock.text-mauve-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mauve-800");
+	}
+
+	TextBlock.text-mauve-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mauve-900");
+	}
+
+	TextBlock.text-mauve-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mauve-950");
+	}
+
+	TextBlock.text-olive-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-olive-50");
+	}
+
+	TextBlock.text-olive-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-olive-100");
+	}
+
+	TextBlock.text-olive-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-olive-200");
+	}
+
+	TextBlock.text-olive-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-olive-300");
+	}
+
+	TextBlock.text-olive-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-olive-400");
+	}
+
+	TextBlock.text-olive-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-olive-500");
+	}
+
+	TextBlock.text-olive-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-olive-600");
+	}
+
+	TextBlock.text-olive-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-olive-700");
+	}
+
+	TextBlock.text-olive-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-olive-800");
+	}
+
+	TextBlock.text-olive-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-olive-900");
+	}
+
+	TextBlock.text-olive-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-olive-950");
+	}
+
+	TextBlock.text-mist-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mist-50");
+	}
+
+	TextBlock.text-mist-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mist-100");
+	}
+
+	TextBlock.text-mist-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mist-200");
+	}
+
+	TextBlock.text-mist-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mist-300");
+	}
+
+	TextBlock.text-mist-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mist-400");
+	}
+
+	TextBlock.text-mist-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mist-500");
+	}
+
+	TextBlock.text-mist-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mist-600");
+	}
+
+	TextBlock.text-mist-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mist-700");
+	}
+
+	TextBlock.text-mist-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mist-800");
+	}
+
+	TextBlock.text-mist-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mist-900");
+	}
+
+	TextBlock.text-mist-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-mist-950");
+	}
+
+	TextBlock.text-taupe-50 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-taupe-50");
+	}
+
+	TextBlock.text-taupe-100 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-taupe-100");
+	}
+
+	TextBlock.text-taupe-200 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-taupe-200");
+	}
+
+	TextBlock.text-taupe-300 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-taupe-300");
+	}
+
+	TextBlock.text-taupe-400 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-taupe-400");
+	}
+
+	TextBlock.text-taupe-500 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-taupe-500");
+	}
+
+	TextBlock.text-taupe-600 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-taupe-600");
+	}
+
+	TextBlock.text-taupe-700 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-taupe-700");
+	}
+
+	TextBlock.text-taupe-800 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-taupe-800");
+	}
+
+	TextBlock.text-taupe-900 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-taupe-900");
+	}
+
+	TextBlock.text-taupe-950 {
+		Foreground: Amx.DynamicResource<IBrush>("--color-taupe-950");
+	}
+
 
 	TemplatedControl.text-xs {
 		FontSize: Amx.DynamicResource<double>("--text-xs");
@@ -593,6 +5223,1164 @@
 	Border.border-(string color)-(int shade) {
 		BorderBrush: Amx.DynamicResource<IBrush>("--color-" + color + "-" + shade);
 	}
+
+	// Named border colors for completion; keys mirror Styles.axaml.
+	Border.border-transparent {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-transparent");
+	}
+
+	Border.border-black {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-black");
+	}
+
+	Border.border-white {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-white");
+	}
+
+	Border.border-red-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-red-50");
+	}
+
+	Border.border-red-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-red-100");
+	}
+
+	Border.border-red-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-red-200");
+	}
+
+	Border.border-red-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-red-300");
+	}
+
+	Border.border-red-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-red-400");
+	}
+
+	Border.border-red-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-red-500");
+	}
+
+	Border.border-red-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-red-600");
+	}
+
+	Border.border-red-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-red-700");
+	}
+
+	Border.border-red-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-red-800");
+	}
+
+	Border.border-red-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-red-900");
+	}
+
+	Border.border-red-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-red-950");
+	}
+
+	Border.border-orange-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-orange-50");
+	}
+
+	Border.border-orange-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-orange-100");
+	}
+
+	Border.border-orange-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-orange-200");
+	}
+
+	Border.border-orange-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-orange-300");
+	}
+
+	Border.border-orange-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-orange-400");
+	}
+
+	Border.border-orange-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-orange-500");
+	}
+
+	Border.border-orange-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-orange-600");
+	}
+
+	Border.border-orange-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-orange-700");
+	}
+
+	Border.border-orange-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-orange-800");
+	}
+
+	Border.border-orange-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-orange-900");
+	}
+
+	Border.border-orange-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-orange-950");
+	}
+
+	Border.border-amber-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-amber-50");
+	}
+
+	Border.border-amber-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-amber-100");
+	}
+
+	Border.border-amber-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-amber-200");
+	}
+
+	Border.border-amber-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-amber-300");
+	}
+
+	Border.border-amber-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-amber-400");
+	}
+
+	Border.border-amber-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-amber-500");
+	}
+
+	Border.border-amber-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-amber-600");
+	}
+
+	Border.border-amber-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-amber-700");
+	}
+
+	Border.border-amber-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-amber-800");
+	}
+
+	Border.border-amber-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-amber-900");
+	}
+
+	Border.border-amber-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-amber-950");
+	}
+
+	Border.border-yellow-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-yellow-50");
+	}
+
+	Border.border-yellow-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-yellow-100");
+	}
+
+	Border.border-yellow-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-yellow-200");
+	}
+
+	Border.border-yellow-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-yellow-300");
+	}
+
+	Border.border-yellow-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-yellow-400");
+	}
+
+	Border.border-yellow-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-yellow-500");
+	}
+
+	Border.border-yellow-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-yellow-600");
+	}
+
+	Border.border-yellow-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-yellow-700");
+	}
+
+	Border.border-yellow-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-yellow-800");
+	}
+
+	Border.border-yellow-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-yellow-900");
+	}
+
+	Border.border-yellow-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-yellow-950");
+	}
+
+	Border.border-lime-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-lime-50");
+	}
+
+	Border.border-lime-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-lime-100");
+	}
+
+	Border.border-lime-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-lime-200");
+	}
+
+	Border.border-lime-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-lime-300");
+	}
+
+	Border.border-lime-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-lime-400");
+	}
+
+	Border.border-lime-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-lime-500");
+	}
+
+	Border.border-lime-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-lime-600");
+	}
+
+	Border.border-lime-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-lime-700");
+	}
+
+	Border.border-lime-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-lime-800");
+	}
+
+	Border.border-lime-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-lime-900");
+	}
+
+	Border.border-lime-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-lime-950");
+	}
+
+	Border.border-green-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-green-50");
+	}
+
+	Border.border-green-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-green-100");
+	}
+
+	Border.border-green-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-green-200");
+	}
+
+	Border.border-green-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-green-300");
+	}
+
+	Border.border-green-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-green-400");
+	}
+
+	Border.border-green-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-green-500");
+	}
+
+	Border.border-green-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-green-600");
+	}
+
+	Border.border-green-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-green-700");
+	}
+
+	Border.border-green-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-green-800");
+	}
+
+	Border.border-green-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-green-900");
+	}
+
+	Border.border-green-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-green-950");
+	}
+
+	Border.border-emerald-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-emerald-50");
+	}
+
+	Border.border-emerald-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-emerald-100");
+	}
+
+	Border.border-emerald-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-emerald-200");
+	}
+
+	Border.border-emerald-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-emerald-300");
+	}
+
+	Border.border-emerald-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-emerald-400");
+	}
+
+	Border.border-emerald-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-emerald-500");
+	}
+
+	Border.border-emerald-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-emerald-600");
+	}
+
+	Border.border-emerald-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-emerald-700");
+	}
+
+	Border.border-emerald-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-emerald-800");
+	}
+
+	Border.border-emerald-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-emerald-900");
+	}
+
+	Border.border-emerald-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-emerald-950");
+	}
+
+	Border.border-teal-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-teal-50");
+	}
+
+	Border.border-teal-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-teal-100");
+	}
+
+	Border.border-teal-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-teal-200");
+	}
+
+	Border.border-teal-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-teal-300");
+	}
+
+	Border.border-teal-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-teal-400");
+	}
+
+	Border.border-teal-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-teal-500");
+	}
+
+	Border.border-teal-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-teal-600");
+	}
+
+	Border.border-teal-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-teal-700");
+	}
+
+	Border.border-teal-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-teal-800");
+	}
+
+	Border.border-teal-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-teal-900");
+	}
+
+	Border.border-teal-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-teal-950");
+	}
+
+	Border.border-cyan-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-cyan-50");
+	}
+
+	Border.border-cyan-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-cyan-100");
+	}
+
+	Border.border-cyan-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-cyan-200");
+	}
+
+	Border.border-cyan-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-cyan-300");
+	}
+
+	Border.border-cyan-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-cyan-400");
+	}
+
+	Border.border-cyan-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-cyan-500");
+	}
+
+	Border.border-cyan-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-cyan-600");
+	}
+
+	Border.border-cyan-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-cyan-700");
+	}
+
+	Border.border-cyan-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-cyan-800");
+	}
+
+	Border.border-cyan-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-cyan-900");
+	}
+
+	Border.border-cyan-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-cyan-950");
+	}
+
+	Border.border-sky-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-sky-50");
+	}
+
+	Border.border-sky-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-sky-100");
+	}
+
+	Border.border-sky-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-sky-200");
+	}
+
+	Border.border-sky-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-sky-300");
+	}
+
+	Border.border-sky-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-sky-400");
+	}
+
+	Border.border-sky-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-sky-500");
+	}
+
+	Border.border-sky-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-sky-600");
+	}
+
+	Border.border-sky-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-sky-700");
+	}
+
+	Border.border-sky-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-sky-800");
+	}
+
+	Border.border-sky-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-sky-900");
+	}
+
+	Border.border-sky-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-sky-950");
+	}
+
+	Border.border-blue-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-blue-50");
+	}
+
+	Border.border-blue-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-blue-100");
+	}
+
+	Border.border-blue-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-blue-200");
+	}
+
+	Border.border-blue-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-blue-300");
+	}
+
+	Border.border-blue-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-blue-400");
+	}
+
+	Border.border-blue-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-blue-500");
+	}
+
+	Border.border-blue-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-blue-600");
+	}
+
+	Border.border-blue-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-blue-700");
+	}
+
+	Border.border-blue-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-blue-800");
+	}
+
+	Border.border-blue-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-blue-900");
+	}
+
+	Border.border-blue-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-blue-950");
+	}
+
+	Border.border-indigo-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-indigo-50");
+	}
+
+	Border.border-indigo-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-indigo-100");
+	}
+
+	Border.border-indigo-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-indigo-200");
+	}
+
+	Border.border-indigo-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-indigo-300");
+	}
+
+	Border.border-indigo-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-indigo-400");
+	}
+
+	Border.border-indigo-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-indigo-500");
+	}
+
+	Border.border-indigo-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-indigo-600");
+	}
+
+	Border.border-indigo-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-indigo-700");
+	}
+
+	Border.border-indigo-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-indigo-800");
+	}
+
+	Border.border-indigo-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-indigo-900");
+	}
+
+	Border.border-indigo-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-indigo-950");
+	}
+
+	Border.border-violet-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-violet-50");
+	}
+
+	Border.border-violet-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-violet-100");
+	}
+
+	Border.border-violet-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-violet-200");
+	}
+
+	Border.border-violet-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-violet-300");
+	}
+
+	Border.border-violet-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-violet-400");
+	}
+
+	Border.border-violet-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-violet-500");
+	}
+
+	Border.border-violet-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-violet-600");
+	}
+
+	Border.border-violet-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-violet-700");
+	}
+
+	Border.border-violet-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-violet-800");
+	}
+
+	Border.border-violet-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-violet-900");
+	}
+
+	Border.border-violet-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-violet-950");
+	}
+
+	Border.border-purple-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-purple-50");
+	}
+
+	Border.border-purple-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-purple-100");
+	}
+
+	Border.border-purple-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-purple-200");
+	}
+
+	Border.border-purple-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-purple-300");
+	}
+
+	Border.border-purple-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-purple-400");
+	}
+
+	Border.border-purple-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-purple-500");
+	}
+
+	Border.border-purple-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-purple-600");
+	}
+
+	Border.border-purple-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-purple-700");
+	}
+
+	Border.border-purple-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-purple-800");
+	}
+
+	Border.border-purple-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-purple-900");
+	}
+
+	Border.border-purple-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-purple-950");
+	}
+
+	Border.border-fuchsia-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-fuchsia-50");
+	}
+
+	Border.border-fuchsia-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-fuchsia-100");
+	}
+
+	Border.border-fuchsia-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-fuchsia-200");
+	}
+
+	Border.border-fuchsia-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-fuchsia-300");
+	}
+
+	Border.border-fuchsia-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-fuchsia-400");
+	}
+
+	Border.border-fuchsia-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-fuchsia-500");
+	}
+
+	Border.border-fuchsia-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-fuchsia-600");
+	}
+
+	Border.border-fuchsia-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-fuchsia-700");
+	}
+
+	Border.border-fuchsia-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-fuchsia-800");
+	}
+
+	Border.border-fuchsia-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-fuchsia-900");
+	}
+
+	Border.border-fuchsia-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-fuchsia-950");
+	}
+
+	Border.border-pink-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-pink-50");
+	}
+
+	Border.border-pink-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-pink-100");
+	}
+
+	Border.border-pink-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-pink-200");
+	}
+
+	Border.border-pink-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-pink-300");
+	}
+
+	Border.border-pink-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-pink-400");
+	}
+
+	Border.border-pink-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-pink-500");
+	}
+
+	Border.border-pink-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-pink-600");
+	}
+
+	Border.border-pink-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-pink-700");
+	}
+
+	Border.border-pink-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-pink-800");
+	}
+
+	Border.border-pink-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-pink-900");
+	}
+
+	Border.border-pink-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-pink-950");
+	}
+
+	Border.border-rose-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-rose-50");
+	}
+
+	Border.border-rose-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-rose-100");
+	}
+
+	Border.border-rose-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-rose-200");
+	}
+
+	Border.border-rose-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-rose-300");
+	}
+
+	Border.border-rose-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-rose-400");
+	}
+
+	Border.border-rose-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-rose-500");
+	}
+
+	Border.border-rose-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-rose-600");
+	}
+
+	Border.border-rose-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-rose-700");
+	}
+
+	Border.border-rose-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-rose-800");
+	}
+
+	Border.border-rose-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-rose-900");
+	}
+
+	Border.border-rose-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-rose-950");
+	}
+
+	Border.border-slate-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-slate-50");
+	}
+
+	Border.border-slate-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-slate-100");
+	}
+
+	Border.border-slate-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-slate-200");
+	}
+
+	Border.border-slate-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-slate-300");
+	}
+
+	Border.border-slate-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-slate-400");
+	}
+
+	Border.border-slate-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-slate-500");
+	}
+
+	Border.border-slate-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-slate-600");
+	}
+
+	Border.border-slate-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-slate-700");
+	}
+
+	Border.border-slate-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-slate-800");
+	}
+
+	Border.border-slate-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-slate-900");
+	}
+
+	Border.border-slate-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-slate-950");
+	}
+
+	Border.border-gray-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-gray-50");
+	}
+
+	Border.border-gray-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-gray-100");
+	}
+
+	Border.border-gray-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-gray-200");
+	}
+
+	Border.border-gray-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-gray-300");
+	}
+
+	Border.border-gray-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-gray-400");
+	}
+
+	Border.border-gray-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-gray-500");
+	}
+
+	Border.border-gray-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-gray-600");
+	}
+
+	Border.border-gray-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-gray-700");
+	}
+
+	Border.border-gray-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-gray-800");
+	}
+
+	Border.border-gray-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-gray-900");
+	}
+
+	Border.border-gray-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-gray-950");
+	}
+
+	Border.border-zinc-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-zinc-50");
+	}
+
+	Border.border-zinc-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-zinc-100");
+	}
+
+	Border.border-zinc-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-zinc-200");
+	}
+
+	Border.border-zinc-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-zinc-300");
+	}
+
+	Border.border-zinc-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-zinc-400");
+	}
+
+	Border.border-zinc-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-zinc-500");
+	}
+
+	Border.border-zinc-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-zinc-600");
+	}
+
+	Border.border-zinc-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-zinc-700");
+	}
+
+	Border.border-zinc-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-zinc-800");
+	}
+
+	Border.border-zinc-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-zinc-900");
+	}
+
+	Border.border-zinc-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-zinc-950");
+	}
+
+	Border.border-neutral-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-neutral-50");
+	}
+
+	Border.border-neutral-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-neutral-100");
+	}
+
+	Border.border-neutral-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-neutral-200");
+	}
+
+	Border.border-neutral-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-neutral-300");
+	}
+
+	Border.border-neutral-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-neutral-400");
+	}
+
+	Border.border-neutral-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-neutral-500");
+	}
+
+	Border.border-neutral-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-neutral-600");
+	}
+
+	Border.border-neutral-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-neutral-700");
+	}
+
+	Border.border-neutral-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-neutral-800");
+	}
+
+	Border.border-neutral-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-neutral-900");
+	}
+
+	Border.border-neutral-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-neutral-950");
+	}
+
+	Border.border-stone-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-stone-50");
+	}
+
+	Border.border-stone-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-stone-100");
+	}
+
+	Border.border-stone-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-stone-200");
+	}
+
+	Border.border-stone-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-stone-300");
+	}
+
+	Border.border-stone-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-stone-400");
+	}
+
+	Border.border-stone-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-stone-500");
+	}
+
+	Border.border-stone-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-stone-600");
+	}
+
+	Border.border-stone-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-stone-700");
+	}
+
+	Border.border-stone-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-stone-800");
+	}
+
+	Border.border-stone-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-stone-900");
+	}
+
+	Border.border-stone-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-stone-950");
+	}
+
+	Border.border-mauve-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mauve-50");
+	}
+
+	Border.border-mauve-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mauve-100");
+	}
+
+	Border.border-mauve-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mauve-200");
+	}
+
+	Border.border-mauve-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mauve-300");
+	}
+
+	Border.border-mauve-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mauve-400");
+	}
+
+	Border.border-mauve-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mauve-500");
+	}
+
+	Border.border-mauve-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mauve-600");
+	}
+
+	Border.border-mauve-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mauve-700");
+	}
+
+	Border.border-mauve-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mauve-800");
+	}
+
+	Border.border-mauve-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mauve-900");
+	}
+
+	Border.border-mauve-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mauve-950");
+	}
+
+	Border.border-olive-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-olive-50");
+	}
+
+	Border.border-olive-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-olive-100");
+	}
+
+	Border.border-olive-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-olive-200");
+	}
+
+	Border.border-olive-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-olive-300");
+	}
+
+	Border.border-olive-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-olive-400");
+	}
+
+	Border.border-olive-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-olive-500");
+	}
+
+	Border.border-olive-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-olive-600");
+	}
+
+	Border.border-olive-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-olive-700");
+	}
+
+	Border.border-olive-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-olive-800");
+	}
+
+	Border.border-olive-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-olive-900");
+	}
+
+	Border.border-olive-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-olive-950");
+	}
+
+	Border.border-mist-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mist-50");
+	}
+
+	Border.border-mist-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mist-100");
+	}
+
+	Border.border-mist-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mist-200");
+	}
+
+	Border.border-mist-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mist-300");
+	}
+
+	Border.border-mist-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mist-400");
+	}
+
+	Border.border-mist-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mist-500");
+	}
+
+	Border.border-mist-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mist-600");
+	}
+
+	Border.border-mist-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mist-700");
+	}
+
+	Border.border-mist-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mist-800");
+	}
+
+	Border.border-mist-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mist-900");
+	}
+
+	Border.border-mist-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-mist-950");
+	}
+
+	Border.border-taupe-50 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-taupe-50");
+	}
+
+	Border.border-taupe-100 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-taupe-100");
+	}
+
+	Border.border-taupe-200 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-taupe-200");
+	}
+
+	Border.border-taupe-300 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-taupe-300");
+	}
+
+	Border.border-taupe-400 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-taupe-400");
+	}
+
+	Border.border-taupe-500 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-taupe-500");
+	}
+
+	Border.border-taupe-600 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-taupe-600");
+	}
+
+	Border.border-taupe-700 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-taupe-700");
+	}
+
+	Border.border-taupe-800 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-taupe-800");
+	}
+
+	Border.border-taupe-900 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-taupe-900");
+	}
+
+	Border.border-taupe-950 {
+		BorderBrush: Amx.DynamicResource<IBrush>("--color-taupe-950");
+	}
+
 
 	Border.rounded-none {
 		CornerRadius: new CornerRadius(0);

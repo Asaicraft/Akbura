@@ -29,6 +29,29 @@ internal sealed class
             throw new ArgumentNullException(nameof(referenceResolver));
     }
 
+    public void AddDeclarationClassifications(AkburaSemanticModel semanticModel, AkburaSyntax root, TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder, CancellationToken cancellationToken)
+    {
+        var selectorTypes = new SelectorTypeResolver(semanticModel);
+        foreach (var node in root.DescendantNodes())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!node.FullSpan.OverlapsWith(requestedSpan))
+            {
+                continue;
+            }
+
+            switch (node)
+            {
+                case AkcssStyleRuleSyntax style:
+                    AddStyleClassifications(selectorTypes, style, requestedSpan, builder);
+                    break;
+                case AkcssUtilityDeclarationSyntax utility:
+                    AddUtilityClassifications(semanticModel, selectorTypes, utility, requestedSpan, builder);
+                    break;
+            }
+        }
+    }
+
     public void AddClassifications(
         AkburaDocumentContext context,
         AkburaSemanticModel semanticModel,
@@ -37,8 +60,8 @@ internal sealed class
         ImmutableArrayBuilder<AkburaClassifiedSpan> builder,
         CancellationToken cancellationToken)
     {
-        foreach (var node in
-                 root.DescendantNodes())
+        var selectorTypes = new SelectorTypeResolver(semanticModel);
+        foreach (var node in root.DescendantNodes())
         {
             cancellationToken
                 .ThrowIfCancellationRequested();
@@ -53,7 +76,7 @@ internal sealed class
             {
                 case AkcssStyleRuleSyntax style:
                     AddStyleClassifications(
-                        semanticModel,
+                        selectorTypes,
                         style,
                         requestedSpan,
                         builder);
@@ -62,6 +85,7 @@ internal sealed class
                 case AkcssUtilityDeclarationSyntax utility:
                     AddUtilityClassifications(
                         semanticModel,
+                        selectorTypes,
                         utility,
                         requestedSpan,
                         builder);
@@ -133,21 +157,22 @@ internal sealed class
     }
 
     private static void AddStyleClassifications(
-        AkburaSemanticModel semanticModel,
+        SelectorTypeResolver selectorTypes,
         AkcssStyleRuleSyntax style,
         TextSpan requestedSpan,
         ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
-        if (semanticModel.GetDeclaredSymbol(
-                style) is not
-            IAkcssSymbol symbol)
+        // GetDeclaredSymbol also binds every operation in the declaration.
+        // Resolving the selector is sufficient for coloring its header.
+        if (!style.Selector.Span.OverlapsWith(requestedSpan) ||
+            !selectorTypes.TryResolve(style.Selector.TargetType, out var targetType))
         {
             return;
         }
 
         AddSelectorTargetType(
             style.Selector.TargetType,
-            symbol.TargetType,
+            targetType,
             requestedSpan,
             builder);
 
@@ -164,13 +189,13 @@ internal sealed class
 
     private static void AddUtilityClassifications(
         AkburaSemanticModel semanticModel,
+        SelectorTypeResolver selectorTypes,
         AkcssUtilityDeclarationSyntax utility,
         TextSpan requestedSpan,
         ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
     {
-        if (semanticModel.GetDeclaredSymbol(
-                utility) is not
-            ITailwindUtilitySymbol symbol)
+        if (!utility.Selector.Span.OverlapsWith(requestedSpan) ||
+            !selectorTypes.TryResolve(utility.Selector.TargetType, out var targetType))
         {
             return;
         }
@@ -180,7 +205,7 @@ internal sealed class
 
         AddSelectorTargetType(
             selector.TargetType,
-            symbol.TargetType,
+            targetType,
             requestedSpan,
             builder);
 
@@ -193,17 +218,19 @@ internal sealed class
         var syntaxParameters =
             selector.Parameters;
 
-        var symbolParameters =
-            symbol.Parameters;
+        if (syntaxParameters.Count == 0 || !syntaxParameters.Span.OverlapsWith(requestedSpan))
+        {
+            return;
+        }
+
+        var symbolParameters = semanticModel.CreateTailwindUtilityParameters(utility);
 
         var count =
             Math.Min(
                 syntaxParameters.Count,
                 symbolParameters.Length);
 
-        for (var index = 0;
-             index < count;
-             index++)
+        for (var index = 0; index < count; index++)
         {
             var syntaxParameter =
                 syntaxParameters[index];
@@ -231,6 +258,49 @@ internal sealed class
                 AkburaClassificationKind
                     .ParameterName,
                 builder);
+        }
+    }
+
+    private readonly struct SelectorTypeResolver
+    {
+        private readonly AkburaSemanticModel _semanticModel;
+        private readonly Dictionary<(AkburaSyntax Scope, string TypeName), CSharpSymbolDefinition> _types;
+
+        public SelectorTypeResolver(AkburaSemanticModel semanticModel)
+        {
+            _semanticModel = semanticModel;
+            _types = new();
+        }
+
+        public bool TryResolve(CSharpTypeSyntax? syntax, out CSharpSymbolDefinition type)
+        {
+            type = default;
+            if (syntax == null)
+            {
+                return true;
+            }
+
+            // Imports are shared by a document or one inline AKCSS block.
+            // Never reuse symbols between models or different import scopes.
+            var scope = syntax.Root;
+            for (var node = syntax.Parent; node != null; node = node.Parent)
+            {
+                if (node is InlineAkcssBlockSyntax or AkcssDocumentSyntax)
+                {
+                    scope = node;
+                    break;
+                }
+            }
+
+            var key = (scope, syntax.ToString().Trim());
+            if (_types.TryGetValue(key, out type))
+            {
+                return !type.IsDefault;
+            }
+
+            var resolved = _semanticModel.TryResolveAkcssTargetType(syntax, out type);
+            _types.Add(key, type);
+            return resolved;
         }
     }
 
@@ -727,6 +797,26 @@ internal sealed class
             classification.Value,
             builder,
             seenSpans);
+
+        if (name is CSharp.GenericNameSyntax genericName && symbol is IMethodSymbol method)
+        {
+            var arguments = genericName.TypeArgumentList.Arguments;
+            var count = Math.Min(arguments.Count, method.TypeArguments.Length);
+            using var types = ImmutableArrayBuilder<AkburaClassifiedSpan>.Rent();
+            for (var index = 0; index < count; index++)
+            {
+                EmbeddedCSharpSemanticClassificationService.AddTypeClassifications(
+                    arguments[index], method.TypeArguments[index], sourceOffset, requestedSpan, types);
+            }
+
+            foreach (var type in types.WrittenSpan)
+            {
+                if (seenSpans.Add(type.Span))
+                {
+                    builder.Add(type);
+                }
+            }
+        }
     }
 
     private static void AddStaticReceiverType(

@@ -25,6 +25,16 @@ public interface IAkburaClassificationService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Adds semantic colors for AKCSS declaration headers to syntactic colors,
+    /// without binding assignment expressions or collecting semantic diagnostics.
+    /// Editors can publish this result before classifying the complete document.
+    /// </summary>
+    ImmutableArray<AkburaClassifiedSpan> GetDeclarationClassifications(
+        AkburaDocumentContext context,
+        TextSpan requestedSpan,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Classifies a document using both syntax and the project's semantic
     /// model. Semantic classifications replace syntactic classifications
     /// that cover the same source span.

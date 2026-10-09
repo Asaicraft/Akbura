@@ -8,7 +8,8 @@ namespace Akbura.VisualStudio.Editor;
 /// <summary>
 /// Represents one immutable classification result for an editor snapshot.
 /// A syntactic result can be published before a project semantic model is
-/// available and later be replaced by a semantic result for the same request.
+/// available and later be replaced by progressively more complete results
+/// for the same request.
 /// </summary>
 internal class AkburaClassifiedBufferState
 {
@@ -18,7 +19,7 @@ internal class AkburaClassifiedBufferState
         SourceText text,
         ImmutableArray<AkburaClassifiedSpan> classifications,
         ImmutableArray<AkburaDiagnosticSpan> diagnostics,
-        bool includesSemanticClassifications)
+        AkburaClassificationStage stage)
     {
         RequestVersion = requestVersion;
 
@@ -32,8 +33,7 @@ internal class AkburaClassifiedBufferState
 
         Classifications = classifications;
         Diagnostics = diagnostics;
-        IncludesSemanticClassifications =
-            includesSemanticClassifications;
+        Stage = stage;
     }
 
     public long RequestVersion { get; }
@@ -46,5 +46,7 @@ internal class AkburaClassifiedBufferState
 
     public ImmutableArray<AkburaDiagnosticSpan> Diagnostics { get; }
 
-    public bool IncludesSemanticClassifications { get; }
+    public AkburaClassificationStage Stage { get; }
+
+    public bool IncludesSemanticClassifications => Stage >= AkburaClassificationStage.Semantic;
 }

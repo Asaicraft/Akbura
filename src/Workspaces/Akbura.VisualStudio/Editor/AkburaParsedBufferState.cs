@@ -24,7 +24,7 @@ internal sealed class AkburaParsedBufferState :
             text,
             classifications,
             diagnostics,
-            includesSemanticClassifications: true)
+            stage: AkburaClassificationStage.Diagnostics)
     {
         Context = context ??
             throw new ArgumentNullException(

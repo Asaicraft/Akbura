@@ -108,7 +108,8 @@ internal sealed class AkburaCompletionCommitManager :
                 item,
                 currentSnapshot,
                 token,
-                out var rejectionDetails))
+                out var rejectionDetails,
+                out _))
         {
             AkburaWorkspaceDiagnostics.Write(
                 AkburaWorkspaceDiagnostics.Category.Completion,
@@ -129,6 +130,7 @@ internal sealed class AkburaCompletionCommitManager :
             return TryCommitRoslynCompletion(
                 session,
                 buffer,
+                item,
                 roslynData,
                 typedChar,
                 token);
@@ -329,8 +331,9 @@ internal sealed class AkburaCompletionCommitManager :
             : CommitResult.Handled;
     }
 
-    private bool IsCurrentCompletionContext(IAsyncCompletionSession session, ITextBuffer buffer, CompletionItem item, ITextSnapshot currentSnapshot, CancellationToken cancellationToken, out string rejectionDetails)
+    private bool IsCurrentCompletionContext(IAsyncCompletionSession session, ITextBuffer buffer, CompletionItem item, ITextSnapshot currentSnapshot, CancellationToken cancellationToken, out string rejectionDetails, out AkburaCSharpCompletionContext? validatedCSharpContext)
     {
+        validatedCSharpContext = null;
         var hasSyntacticContext = item.Properties.TryGetProperty(
             AkburaCompletionProperties.SyntacticContext,
             out AkburaSyntacticCompletionContext syntacticContext);
@@ -387,6 +390,7 @@ internal sealed class AkburaCompletionCommitManager :
             var matches = IsMatchingSyntacticContext(
                 item.ApplicableToSpan.Snapshot,
                 currentSnapshot,
+                document.Text,
                 syntacticContext,
                 currentContext);
             rejectionDetails = matches
@@ -405,13 +409,14 @@ internal sealed class AkburaCompletionCommitManager :
                 currentSnapshot,
                 csharpContext,
                 current: null,
-                "no-current-csharp-context");
+                AkburaCSharpCompletionRejectionReason.NoCurrentCSharpContext);
             return false;
         }
 
         if (!IsMatchingCSharpContext(
                 item.ApplicableToSpan.Snapshot,
                 currentSnapshot,
+                document.Text,
                 csharpContext,
                 currentCSharpContext,
                 out var reason))
@@ -426,10 +431,11 @@ internal sealed class AkburaCompletionCommitManager :
         }
 
         rejectionDetails = string.Empty;
+        validatedCSharpContext = currentCSharpContext;
         return true;
     }
 
-    private static bool IsMatchingSyntacticContext(ITextSnapshot sourceSnapshot, ITextSnapshot currentSnapshot, AkburaSyntacticCompletionContext source, AkburaSyntacticCompletionContext current)
+    private static bool IsMatchingSyntacticContext(ITextSnapshot sourceSnapshot, ITextSnapshot currentSnapshot, SourceText currentText, AkburaSyntacticCompletionContext source, AkburaSyntacticCompletionContext current)
     {
         if (source.Kind != current.Kind ||
             source.AttributeMode != current.AttributeMode ||
@@ -463,8 +469,22 @@ internal sealed class AkburaCompletionCommitManager :
                 sourceSnapshot,
                 currentSnapshot,
                 source.ApplicableSpan,
-                out var applicableSpan) ||
-            applicableSpan != current.ApplicableSpan ||
+                out var applicableSpan))
+        {
+            return false;
+        }
+
+        if (source.Kind == AkburaCompletionContextKind.MarkupExtensionType)
+        {
+            return AkburaMarkupExtensionCompletionFacts.IsMatchingTypeNameContext(
+                SourceText.From(sourceSnapshot.GetText()),
+                currentText,
+                source,
+                current,
+                applicableSpan);
+        }
+
+        if (applicableSpan != current.ApplicableSpan ||
             !TextOutsideSpanMatches(
                 sourceSnapshot,
                 currentSnapshot,
@@ -491,50 +511,17 @@ internal sealed class AkburaCompletionCommitManager :
             extensionSpan == current.MarkupExtensionSpan;
     }
 
-    private static bool IsMatchingCSharpContext(ITextSnapshot sourceSnapshot, ITextSnapshot currentSnapshot, AkburaCSharpCompletionContext source, AkburaCSharpCompletionContext current, out string reason)
+    private static bool IsMatchingCSharpContext(ITextSnapshot sourceSnapshot, ITextSnapshot currentSnapshot, SourceText currentText, AkburaCSharpCompletionContext source, AkburaCSharpCompletionContext current, out AkburaCSharpCompletionRejectionReason reason)
     {
-        if (source.Kind != current.Kind)
-        {
-            reason = "context-kind-changed";
-            return false;
-        }
-
-        var isDeclarationTypeSlot =
-            source.LogicalSlot ==
-                AkburaCSharpCompletionLogicalSlot.DeclarationType &&
-            current.LogicalSlot ==
-                AkburaCSharpCompletionLogicalSlot.DeclarationType;
-        if (source.LogicalSlot != current.LogicalSlot)
-        {
-            reason = "logical-slot-changed";
-            return false;
-        }
-
-        if (!isDeclarationTypeSlot &&
-            source.OwnerKind != current.OwnerKind)
-        {
-            reason = "owner-kind-changed";
-            return false;
-        }
-
         if (!TryTranslateSpan(
                 sourceSnapshot,
                 currentSnapshot,
-                isDeclarationTypeSlot
+                source.LogicalSlot == AkburaCSharpCompletionLogicalSlot.DeclarationType
                     ? source.LogicalOwnerSpan
                     : source.OwnerSpan,
                 out var ownerSpan))
         {
-            reason = "owner-span-translation-failed";
-            return false;
-        }
-
-        var currentOwnerSpan = isDeclarationTypeSlot
-            ? current.LogicalOwnerSpan
-            : current.OwnerSpan;
-        if (ownerSpan != currentOwnerSpan)
-        {
-            reason = "owner-changed";
+            reason = AkburaCSharpCompletionRejectionReason.OwnerSpanTranslationFailed;
             return false;
         }
 
@@ -544,31 +531,21 @@ internal sealed class AkburaCompletionCommitManager :
                 source.HostSpan,
                 out var hostSpan))
         {
-            reason = "host-span-translation-failed";
+            reason = AkburaCSharpCompletionRejectionReason.HostSpanTranslationFailed;
             return false;
         }
 
-        if (hostSpan != current.HostSpan)
-        {
-            reason = "host-span-changed";
-            return false;
-        }
-
-        if (!TextOutsideSpanMatches(
-                sourceSnapshot,
-                currentSnapshot,
-                source.HostSpan,
-                current.HostSpan))
-        {
-            reason = "text-outside-host-span-changed";
-            return false;
-        }
-
-        reason = string.Empty;
-        return true;
+        return AkburaCSharpCompletionCommitFacts.IsMatchingContext(
+            SourceText.From(sourceSnapshot.GetText()),
+            currentText,
+            source,
+            current,
+            ownerSpan,
+            hostSpan,
+            out reason);
     }
 
-    private static string CreateCSharpRejectionDetails(ITextSnapshot sourceSnapshot, ITextSnapshot currentSnapshot, AkburaCSharpCompletionContext source, AkburaCSharpCompletionContext? current, string reason)
+    private static string CreateCSharpRejectionDetails(ITextSnapshot sourceSnapshot, ITextSnapshot currentSnapshot, AkburaCSharpCompletionContext source, AkburaCSharpCompletionContext? current, AkburaCSharpCompletionRejectionReason reason)
     {
         var hasTranslatedOwner = TryTranslateSpan(
             sourceSnapshot,
@@ -682,7 +659,7 @@ internal sealed class AkburaCompletionCommitManager :
                 : null;
     }
 
-    private CommitResult TryCommitRoslynCompletion(IAsyncCompletionSession session, ITextBuffer buffer, AkburaRoslynCompletionItemData data, char typedChar, CancellationToken cancellationToken)
+    private CommitResult TryCommitRoslynCompletion(IAsyncCompletionSession session, ITextBuffer buffer, CompletionItem item, AkburaRoslynCompletionItemData data, char typedChar, CancellationToken cancellationToken)
     {
         if (!ReferenceEquals(
                 data.State.HostSnapshot.TextBuffer,
@@ -718,6 +695,20 @@ internal sealed class AkburaCompletionCommitManager :
         }
 
         var currentSnapshot = buffer.CurrentSnapshot;
+        // GetChangeAsync pumps the UI through JTF. Revalidate the live context
+        // before applying edits, including a } inserted while it was pending.
+        if (!IsCurrentCompletionContext(
+                session, buffer, item, currentSnapshot, cancellationToken,
+                out var rejectionDetails, out var validatedContext) ||
+            validatedContext is not { } currentContext)
+        {
+            AkburaWorkspaceDiagnostics.Write(
+                AkburaWorkspaceDiagnostics.Category.Completion,
+                $"C# completion commit rejected after computing edits: {rejectionDetails}.");
+            return new CommitResult(isHandled: true, CommitBehavior.CancelCommit);
+        }
+
+        var currentText = SourceText.From(currentSnapshot.GetText());
         var mappedChanges = new List<MappedCompletionChange>(
             mapped.Changes.Length);
 
@@ -741,10 +732,19 @@ internal sealed class AkburaCompletionCommitManager :
                 return CommitResult.Unhandled;
             }
 
+            var replacementSpan = new TextSpan(currentSpan.Start.Position, currentSpan.Length);
+            var isImport = IsImportChange(change, data.State.Projection);
+            if (!isImport && data.State.Projection.HostSpan.Contains(change.Span) &&
+                !AkburaCSharpCompletionCommitFacts.TryGetReplacementSpan(
+                    currentText, currentContext, replacementSpan, out replacementSpan))
+            {
+                return new CommitResult(isHandled: true, CommitBehavior.CancelCommit);
+            }
+
             mappedChanges.Add(new MappedCompletionChange(
-                currentSpan.Span,
+                new Span(replacementSpan.Start, replacementSpan.Length),
                 change.NewText ?? string.Empty,
-                IsImportChange(change, data.State.Projection)));
+                isImport));
         }
 
         int? caretPosition = null;

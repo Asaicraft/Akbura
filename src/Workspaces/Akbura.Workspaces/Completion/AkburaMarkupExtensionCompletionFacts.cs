@@ -129,6 +129,76 @@ public static class AkburaMarkupExtensionCompletionFacts
         return sessionSpan.Start == nameSpan.Start && sessionSpan.End >= nameSpan.End;
     }
 
+    /// <summary>
+    /// Validates a type-name session against the current syntactic context.
+    /// The host supplies the inclusive range translated from the source snapshot.
+    /// Name edits and one paired } are allowed; all other text must be unchanged.
+    /// </summary>
+    public static bool IsMatchingTypeNameContext(
+        SourceText sourceText,
+        SourceText currentText,
+        AkburaSyntacticCompletionContext source,
+        AkburaSyntacticCompletionContext current,
+        TextSpan translatedSpan)
+    {
+        if (sourceText == null)
+        {
+            throw new ArgumentNullException(nameof(sourceText));
+        }
+
+        if (currentText == null)
+        {
+            throw new ArgumentNullException(nameof(currentText));
+        }
+
+        if (source.Kind != AkburaCompletionContextKind.MarkupExtensionType ||
+            current.Kind != AkburaCompletionContextKind.MarkupExtensionType ||
+            source.ApplicableSpan.Start != current.ApplicableSpan.Start ||
+            !TryGetNameReplacementSpan(sourceText, source.ApplicableSpan, out var sourceNameSpan) ||
+            sourceNameSpan != source.ApplicableSpan ||
+            !TryGetNameReplacementSpan(currentText, translatedSpan, out var currentNameSpan) ||
+            currentNameSpan != current.ApplicableSpan)
+        {
+            return false;
+        }
+
+        // VS may open the catalog between the user's { edit and the native
+        // brace session's } edit. Inclusive tracking then covers "St}", while
+        // the syntactic name context covers only "St". Compare the name itself
+        // and permit only that extra delimiter immediately after it.
+        var currentSuffixStart = currentNameSpan.End;
+        var sourceSuffixLength = sourceText.Length - sourceNameSpan.End;
+        var currentSuffixLength = currentText.Length - currentSuffixStart;
+        if (currentSuffixLength == sourceSuffixLength + 1 &&
+            currentText[currentSuffixStart] == '}' &&
+            translatedSpan.End > currentSuffixStart)
+        {
+            currentSuffixStart++;
+        }
+        else if (currentSuffixLength != sourceSuffixLength)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < source.ApplicableSpan.Start; index++)
+        {
+            if (sourceText[index] != currentText[index])
+            {
+                return false;
+            }
+        }
+
+        for (int sourceIndex = sourceNameSpan.End, currentIndex = currentSuffixStart; sourceIndex < sourceText.Length; sourceIndex++, currentIndex++)
+        {
+            if (sourceText[sourceIndex] != currentText[currentIndex])
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static bool IsNameCharacter(char character)
     {
         // Same name characters as the syntactic markup-completion context.

@@ -56,7 +56,7 @@
     "AkburaVersion": {
       "type": "parameter",
       "datatype": "text",
-      "defaultValue": "12.0.4-alpha.12",
+      "defaultValue": "12.0.4-beta.5",
       "replaces": "AkburaVersionTemplateParameter",
       "description": "Version used for Akbura and Akbura.Diagnostics."
     },

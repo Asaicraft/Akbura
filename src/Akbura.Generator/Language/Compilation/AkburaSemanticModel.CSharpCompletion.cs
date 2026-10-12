@@ -111,6 +111,13 @@ internal abstract partial class AkburaSemanticModel
                 {
                     expectedType = contentModel.DictionaryShape.KeyType;
                 }
+                else if (GetSymbolInfo(attribute).Symbol is Symbols.IRoutedEventSymbol
+                    { HandlerType.Symbol: ITypeSymbol eventHandlerType })
+                {
+                    // The real delegate supplies parameter types and the return
+                    // type for both CLR and routed-event handler expressions.
+                    expectedType = eventHandlerType;
+                }
                 else if (TryGetMarkupCommandHandlerTargetType(
                     attribute,
                     expression,

@@ -41,8 +41,12 @@ public sealed class StateWriterTests
         var fields = root.DescendantNodes().OfType<FieldDeclarationSyntax>()
             .SelectMany(field => field.Declaration.Variables)
             .Select(variable => variable.Identifier.ValueText)
-            .Where(name => name.StartsWith("__state_", StringComparison.Ordinal));
-        Assert.Equal(debug ? 0 : 2, fields.Count());
+            .ToArray();
+        Assert.Equal(debug ? 0 : 2, fields.Count(name => name.StartsWith("__state_", StringComparison.Ordinal)));
+        Assert.Equal(debug ? 0 : 2, fields.Count(name => name.StartsWith("s_stateInfo_", StringComparison.Ordinal)));
+        Assert.DoesNotContain(root.DescendantNodes().OfType<FieldDeclarationSyntax>(),
+            field => field.Modifiers.Any(Microsoft.CodeAnalysis.CSharp.SyntaxKind.StaticKeyword) &&
+                !field.Modifiers.Any(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ReadOnlyKeyword));
         var properties = root.DescendantNodes().OfType<PropertyDeclarationSyntax>().ToArray();
         Assert.Contains(properties, property => property.Identifier.ValueText == "count" &&
             property.AccessorList!.Accessors.Count == 2);
@@ -55,6 +59,8 @@ public sealed class StateWriterTests
         if (debug)
         {
             Assert.Contains(fixture.Plan.States[0].HotReloadKey, properties[0].ToString());
+            Assert.Contains("__AkburaCreateStateInfo_", properties[0].ToString());
+            Assert.DoesNotContain("s_stateInfo_", properties[0].ToString());
         }
     }
 

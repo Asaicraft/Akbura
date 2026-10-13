@@ -37,12 +37,28 @@ changes or running development application are required.
 - `FailedFrames_RestoreSnapshotsAndRetryRealHotReloadWithFreshHookAliases`: a
   failed ordinary render restores the exact committed snapshot; a failed CLR
   refresh discards provisional hook aliases and can retry against the updated IL.
+- `StateInfoFactories_UseUpdatedInitializersForNewOwnersWithoutStaticFields`:
+  repeated initializer updates preserve the original state and its metadata while
+  new owners receive the latest initializer and their own `StateInfo` instance.
+- `DescriptorManifest_IsCapturedBeforeFirstOwnerAndTracksRepeatedReloads`:
+  accessing a static descriptor captures the initial property manifest before any
+  owner exists; removal, addition and re-addition reconcile Avalonia registrations
+  while preserving retained properties and the live owner.
 
 Debug components store both hook aliases and their ordered snapshots in the
 runtime `StateCollection`. `BeginFrame`, `CommitFrame` and `AbortFrame` stage these
 bindings without generated instance fields. Hot Reload retains the old snapshot
 until a frame commits so removed states and their resources are reconciled only
 after new hooks have been prepared. Release components keep the direct field path.
+
+Debug state accessors create `StateInfo` through generated methods only when a
+new ordinary state is needed. They have no `s_stateInfo_*` fields; Release keeps
+its static readonly metadata. Last-applied descriptor/state shapes and the property
+manifest live in a runtime `ConditionalWeakTable<Type, AkburaHotReloadMetadata>`.
+The existing service-array initializer registers this metadata after the generated
+descriptors have initialized, without adding a field or a static constructor to
+the component. Descriptor rebuilds publish the new shape and manifest only after
+all descriptor and array assignments succeed.
 
 ## Harness and boundaries
 

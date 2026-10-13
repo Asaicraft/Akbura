@@ -16,6 +16,8 @@ namespace Akbura.HotReload;
 [Browsable(false)]
 public static class AkburaHotReloadRuntime
 {
+    private static readonly ConditionalWeakTable<Type, AkburaHotReloadMetadata>
+        s_componentMetadata = new();
     private static readonly object s_refreshGate = new();
     // Structural plans reconcile directly from the last applied definition to
     // the latest one, so only the newest callback per component type is kept.
@@ -26,6 +28,44 @@ public static class AkburaHotReloadRuntime
         AppliedComponentRefreshes> s_appliedRefreshes = new();
     private static long s_refreshRevision;
     private static long s_publishedRefreshRevision;
+
+    /// <summary>
+    /// Captures initial generated metadata during component static initialization.
+    /// Repeated registration retains the last applied snapshot.
+    /// </summary>
+    public static AkburaHotReloadMetadata RegisterComponentMetadata(
+        Type componentType,
+        string descriptorShape,
+        string stateShape,
+        ImmutableArray<AkburaHotReloadPropertyRegistration> properties)
+    {
+        ArgumentNullException.ThrowIfNull(componentType);
+        ArgumentNullException.ThrowIfNull(descriptorShape);
+        ArgumentNullException.ThrowIfNull(stateShape);
+        if (properties.IsDefault)
+        {
+            throw new ArgumentException("A property manifest must be initialized.", nameof(properties));
+        }
+
+        return s_componentMetadata.GetValue(componentType, _ =>
+            new AkburaHotReloadMetadata(descriptorShape, stateShape, properties));
+    }
+
+    /// <summary>
+    /// Gets the metadata captured by a generated component's static initializers.
+    /// </summary>
+    public static AkburaHotReloadMetadata GetComponentMetadata(Type componentType)
+    {
+        ArgumentNullException.ThrowIfNull(componentType);
+        RuntimeHelpers.RunClassConstructor(componentType.TypeHandle);
+        if (!s_componentMetadata.TryGetValue(componentType, out var metadata))
+        {
+            throw new InvalidOperationException(
+                $"Component '{componentType.FullName}' has not registered Hot Reload metadata.");
+        }
+
+        return metadata;
+    }
 
     /// <summary>
     /// Removes generated Avalonia properties that are absent from the current

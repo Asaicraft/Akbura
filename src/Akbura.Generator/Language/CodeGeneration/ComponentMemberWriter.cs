@@ -45,14 +45,14 @@ internal readonly ref struct ComponentMemberWriter
         }
     }
 
-    public void WriteDescriptors(in ComponentMemberPlan plan)
+    public void WriteDescriptors(in ComponentMemberPlan plan, bool initializeHotReloadMetadata = false)
     {
         var indent = _writer.CurrentIndent;
 
         try
         {
             var writer = new DescriptorArrayWriter(_writer);
-            writer.Write(plan);
+            writer.Write(plan, initializeHotReloadMetadata);
         }
         finally
         {

@@ -168,6 +168,14 @@ Descriptors include parameters, injected services, and commands. Their stable ke
 
 The descriptor fingerprint contains additional details that can affect a descriptor's behavior, including parameter flags and default-value syntax.
 
+The last applied descriptor and state fingerprints and property manifest are held
+by `AkburaHotReloadMetadata` in a runtime `ConditionalWeakTable` keyed by the
+component type. Generated Debug components do not have `s_akburaApplied*Shape` or
+`s_akburaHotReloadProperties` fields. The existing service-array initializer
+registers the initial snapshot after the generated descriptor fields initialize,
+including when a static descriptor is accessed before any instance is created.
+Reading the runtime metadata explicitly ensures that static initialization has run.
+
 When the descriptor shape changes, generated code:
 
 1. Saves the previous property manifest and computes the current descriptor keys.
@@ -199,20 +207,28 @@ state int count = 100;
 
 does not overwrite an already-created compatible `State<int>` object with `100`.
 
-Generated state access is lazy, conceptually:
+Generated Debug state access is lazy, conceptually:
 
 ```csharp
-private State<int>? _countState;
-
 private State<int> CountState =>
-    _countState ??= CreateState(s_countInfo);
+    RuntimeStates.GetOrCreate(
+        "state:count:System.Int32:value:None:",
+        () => CreateState(__AkburaCreateStateInfo_count()));
 ```
 
-The real member names include generated identity information. The important behavior is the `??=`: an existing compatible field keeps its `State<T>` instance and current value.
+The real member names include generated identity information. `GetOrCreate`
+retains an existing compatible state and its current value. Its factory creates
+the `StateInfo` only when a new state is needed, so new instances use the updated
+initializer without a static metadata field. Release retains direct state fields
+and static readonly `StateInfo` fields.
 
-When the state shape changes, `__AkburaHotReloadRebuildStateInfos()` recreates the static state descriptions, and the instance preparation callback clears `__states` so the cached state list can be rebuilt.
+When the state shape changes, the instance preparation callback invalidates the
+runtime collection's snapshot. Hook aliases are staged in a runtime transaction;
+commit installs the new aliases and reconciles removed state resources, while
+abort restores the previous cached snapshot. The old Hot Reload snapshot remains
+available until a frame commits successfully.
 
-> **Important:** Despite its name, `__AkburaHotReloadResetStates()` does not clear every individual state field. It clears the cached list. Compatible state objects can survive; new or incompatible identities do not receive automatic value migration.
+> **Important:** Despite its name, `__AkburaHotReloadResetStates()` does not clear ordinary runtime states. It invalidates the cached snapshot. Compatible state objects can survive; new or incompatible identities do not receive automatic value migration.
 
 Renaming a state or changing its type is therefore different from editing its initializer. Such changes also remain subject to the host's ability to apply the resulting CLR metadata edits.
 

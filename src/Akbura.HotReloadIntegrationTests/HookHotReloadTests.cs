@@ -165,9 +165,11 @@ public sealed class HookHotReloadTests
         owner.GetType().GetProperty("ThrowFromRender")!.SetValue(owner, value);
 
     private static void AssertNoStateFields(Type type) => Assert.DoesNotContain(
-        type.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly),
+        type.GetFields(BindingFlags.Instance | BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.DeclaredOnly),
         field => field.Name is "__states" or "__previousHookStates" ||
             field.Name.StartsWith("__state_", StringComparison.Ordinal) ||
+            field.Name.StartsWith("s_stateInfo_", StringComparison.Ordinal) ||
+            field.Name is "s_akburaAppliedDescriptorShape" or "s_akburaAppliedStateShape" or "s_akburaHotReloadProperties" ||
             field.Name.StartsWith("__previousHookState_", StringComparison.Ordinal));
 
     private static string CreateSource(int? multiplier, bool includeSecond = false)

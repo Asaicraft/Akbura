@@ -36,6 +36,10 @@ public sealed class StateHotReloadTests
                 count.Value = 42;
                 Assert.Equal("before:42", text.Text);
                 Assert.Equal(1, ReadInitializations(owner));
+                var originalStaticFields = hotReload.ComponentType
+                    .GetFields(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+                    .Select(field => field.Name).OrderBy(name => name, StringComparer.Ordinal).ToArray();
+                Assert.DoesNotContain(originalStaticFields, name => name.StartsWith("s_stateInfo_", StringComparison.Ordinal));
                 Assert.DoesNotContain(hotReload.ComponentType.GetFields(BindingFlags.Instance | BindingFlags.NonPublic),
                     field => field.Name.StartsWith("__state_", StringComparison.Ordinal));
 
@@ -45,6 +49,9 @@ public sealed class StateHotReloadTests
                 hotReload.DispatchMetadataUpdateHandlers();
 
                 var newStates = GetStates(owner);
+                Assert.Equal(originalStaticFields, hotReload.ComponentType
+                    .GetFields(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+                    .Select(field => field.Name).OrderBy(name => name, StringComparer.Ordinal).ToArray());
                 Assert.Equal(2, newStates.Length);
                 Assert.Same(count, newStates[0]);
                 Assert.Equal(42, count.Value);

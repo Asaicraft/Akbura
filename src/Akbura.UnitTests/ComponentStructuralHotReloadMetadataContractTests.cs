@@ -9,6 +9,31 @@ namespace Akbura.UnitTests;
 public sealed class ComponentStructuralHotReloadMetadataContractTests
 {
     [Theory]
+    [InlineData("state int count = 0; state bool visible = true;")]
+    [InlineData("state string count = \"changed type\";")]
+    [InlineData("state int renamed = 0;")]
+    [InlineData("")]
+    [InlineData("state int count = 0; state int doubled = useSelect(count, value => value * 2);")]
+    public void DebugStateEdits_PreserveComponentFieldsWithoutStateMetadataSnapshots(string declarations)
+    {
+        const string prefix = "using Avalonia.Controls; using Akbura.Hooks; namespace Demo; ";
+        const string suffix = " <TextBlock Text=\"fixed root\" />";
+        var original = GenerateEmitAndReadContract(
+            "StatesPage.akbura", prefix + "state int count = 0;" + suffix, "", "Demo.StatesPage");
+        var updated = GenerateEmitAndReadContract(
+            "StatesPage.akbura", prefix + declarations + suffix, "", "Demo.StatesPage");
+        var originalFields = original.Where(static member => member.StartsWith("F|Demo.StatesPage|", StringComparison.Ordinal)).ToArray();
+        var updatedFields = updated.Where(static member => member.StartsWith("F|Demo.StatesPage|", StringComparison.Ordinal)).ToArray();
+
+        AssertContractEqual(originalFields, updatedFields);
+        Assert.DoesNotContain(updatedFields, static field =>
+            field.Contains("s_stateInfo_", StringComparison.Ordinal) ||
+            field.Contains("__state_", StringComparison.Ordinal) ||
+            field.Contains("s_akburaApplied", StringComparison.Ordinal) ||
+            field.Contains("s_akburaHotReloadProperties", StringComparison.Ordinal));
+    }
+
+    [Theory]
     [InlineData("$if (ready) { <TextBlock Text=\"A\" /> } $else if (other) { <Border /> } $else { <Button /> }")]
     [InlineData("$if (ready) { <TextBlock Text=\"A\" /> }")]
     [InlineData("$if (ready) { <CheckBox /> } $else { <Button /> }")]

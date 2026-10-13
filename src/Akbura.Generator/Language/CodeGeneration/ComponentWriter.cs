@@ -151,7 +151,7 @@ internal sealed class ComponentWriter : IDisposable
         }
     }
 
-    public void WriteDescriptorMembers()
+    public void WriteDescriptorMembers(bool initializeHotReloadMetadata = false)
     {
         var indent = _writer.CurrentIndent;
 
@@ -162,7 +162,7 @@ internal sealed class ComponentWriter : IDisposable
                 in _stateBindingEnvironment,
                 _sourceMap,
                 _ownerTypeName);
-            writer.WriteDescriptors(_memberPlan);
+            writer.WriteDescriptors(_memberPlan, initializeHotReloadMetadata);
         }
         finally
         {

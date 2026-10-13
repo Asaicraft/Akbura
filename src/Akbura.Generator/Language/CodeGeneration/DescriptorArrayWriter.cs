@@ -25,13 +25,13 @@ internal readonly ref struct DescriptorArrayWriter
         _valueWriter = new CSharpValueWriter(writer!);
     }
 
-    public void Write(in ComponentMemberPlan plan)
+    public void Write(in ComponentMemberPlan plan, bool initializeHotReloadMetadata = false)
     {
         WriteParameterArray(plan.Parameters.AsSpan());
         _writer.WriteLine();
         WriteCommandArray(plan.Commands.AsSpan());
         _writer.WriteLine();
-        WriteServiceArray(plan.Services.AsSpan());
+        WriteServiceArray(plan.Services.AsSpan(), initializeHotReloadMetadata);
         _writer.WriteLine();
         WriteStateCache(plan.States.AsSpan());
         _writer.WriteLine();
@@ -70,8 +70,33 @@ internal readonly ref struct DescriptorArrayWriter
         WriteArrayEnd();
     }
 
-    private void WriteServiceArray(ReadOnlySpan<ComponentInjectServicePlan> services)
+    private void WriteServiceArray(
+        ReadOnlySpan<ComponentInjectServicePlan> services,
+        bool initializeHotReloadMetadata)
     {
+        if (initializeHotReloadMetadata)
+        {
+            _writer.WriteLine("#if DEBUG");
+            WriteStaticArrayDeclaration(ServiceType, "s_services", isReadOnly: false);
+            // Reuse an existing fixed field initializer so partial components do
+            // not need another field or a generated static constructor.
+            _writer.Write(ComponentHotReloadWriter.MetadataInitializerMethodName);
+            _writer.WriteLine("(");
+            _writer.WriteLine("[");
+            _writer.CurrentIndent += _writer.TabSize;
+            WriteDescriptorNames(services);
+            _writer.CurrentIndent -= _writer.TabSize;
+            _writer.WriteLine("]);");
+            _writer.WriteLine("#else");
+            WriteStaticArrayDeclaration(ServiceType, "s_services", isReadOnly: true);
+            _writer.WriteLine("[");
+            _writer.CurrentIndent += _writer.TabSize;
+            WriteDescriptorNames(services);
+            WriteArrayEnd();
+            _writer.WriteLine("#endif");
+            return;
+        }
+
         WriteStaticArrayStart(ServiceType, "s_services");
         WriteDescriptorNames(services);
         WriteArrayEnd();

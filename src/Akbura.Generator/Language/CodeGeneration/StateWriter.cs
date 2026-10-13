@@ -68,45 +68,22 @@ internal readonly ref struct StateWriter
         WriteFactory(plan);
     }
 
-    public void WriteHotReloadAssignment(in ComponentStatePlan plan)
-    {
-        GeneratedMemberNameWriter.WriteStateInfoField(
-            _writer,
-            plan.GeneratedName);
-        _writer.Write(" = ");
-        GeneratedMemberNameWriter.WriteStateInfoFactory(
-            _writer,
-            plan.GeneratedName);
-        _writer.WriteLine("();");
-    }
-
     private void WriteStateInfo(in ComponentStatePlan plan)
     {
-        _writer.WriteLine("#if DEBUG");
-        WriteStateInfoDeclaration(plan, isReadOnly: false);
-        _writer.WriteLine("#else");
-        WriteStateInfoDeclaration(plan, isReadOnly: true);
-        _writer.WriteLine("#endif");
+        _writer.WriteLine("#if !DEBUG");
+        WriteStateInfoDeclaration(plan);
         _writer.CurrentIndent += _writer.TabSize;
         GeneratedMemberNameWriter.WriteStateInfoFactory(
             _writer,
             plan.GeneratedName);
         _writer.WriteLine("();");
         _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("#endif");
     }
 
-    private void WriteStateInfoDeclaration(
-        in ComponentStatePlan plan,
-        bool isReadOnly)
+    private void WriteStateInfoDeclaration(in ComponentStatePlan plan)
     {
-        _writer.Write("private static ");
-
-        if (isReadOnly)
-        {
-            _writer.Write("readonly ");
-        }
-
-        _writer.Write("global::Akbura.ComponentTree.StateInfo<");
+        _writer.Write("private static readonly global::Akbura.ComponentTree.StateInfo<");
         WriteValueType(plan);
         _writer.Write("> ");
         GeneratedMemberNameWriter.WriteStateInfoField(
@@ -257,8 +234,8 @@ internal readonly ref struct StateWriter
         else
         {
             _writer.Write(", () => CreateState(");
-            GeneratedMemberNameWriter.WriteStateInfoField(_writer, plan.GeneratedName);
-            _writer.WriteLine("));");
+            GeneratedMemberNameWriter.WriteStateInfoFactory(_writer, plan.GeneratedName);
+            _writer.WriteLine("()));");
         }
 
         _writer.WriteLine("#else");

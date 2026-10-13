@@ -44,12 +44,51 @@ changes or running development application are required.
   accessing a static descriptor captures the initial property manifest before any
   owner exists; removal, addition and re-addition reconcile Avalonia registrations
   while preserving retained properties and the live owner.
+- `TwentyObservableHookReloads_KeepOneSubscriptionAndRejectStaleCallbacks`:
+  twenty real updates and declaration reorders keep exactly one active source
+  subscription and bounded state-store entries; removal, re-addition and visual
+  detach/reattach dispose subscriptions exactly once and ignore stale callbacks.
+- `FailedHookPreparation_DiscardsPartialAliasesAndRetriesTheSameDelta`: a hook
+  factory failure after an earlier alias is staged aborts the runtime transaction
+  without activating provisional subscriptions; retry uses the already applied IL.
+- `NewDeltaAfterFailedReload_PrunesProvisionalOrdinaryBindingResources`: a binding
+  created by an aborted reload is removed by a later delta, loses its subscription
+  and owner, cannot trigger the old component, and is not reused on re-addition.
+- `DetachedOwner_CatchesUpWithLatestStateShapeAfterMultipleDeltas`: an existing
+  detached owner skips intermediate state/hook shapes, applies the latest one on
+  reattachment, preserves ordinary values and resumes only current subscriptions.
+- `HookTypeChangeRenameAndReorder_ReleaseOldAliasesAndKeepOrdinaryValue`: an
+  observable `State<int>` becomes a derived `State<string>`, is renamed and
+  reordered around an independent ordinary state; retired aliases cannot notify the
+  owner, while the retained counter and current hook remain reactive.
+
+## State compatibility matrix
+
+| Contract | Coverage |
+| --- | --- |
+| State addition, including an initially empty owner | `StateSurvivesRealHotReload`, `EmptyComponent_AddsItsFirstOrdinaryAndHookStatesToTheSameOwner` |
+| Removal, rename and type changes | `TypeChangeRenameAndRemoval_ReconcileTheSameLiveComponent`, `HookTypeChangeRenameAndReorder_ReleaseOldAliasesAndKeepOrdinaryValue`; retired states lose ownership |
+| Initializer edits and declaration order | `TwentyUpdates_PreserveStatesAcrossInitializerEditsAndReordering`, `StateInfoFactories_UseUpdatedInitializersForNewOwnersWithoutStaticFields` |
+| Hook changes and chained state aliases | `HookAdditionChangesAndRemoval_PreserveTheOwnerAndOrdinaryState` |
+| Failed preparation, failed rendering and retry | `FailedHookPreparation_DiscardsPartialAliasesAndRetriesTheSameDelta`, `FailedFrames_RestoreSnapshotsAndRetryRealHotReloadWithFreshHookAliases` |
+| Another delta after an aborted reload | `NewDeltaAfterFailedReload_PrunesProvisionalOrdinaryBindingResources` |
+| Repeated updates, resource counts and stale callbacks | `TwentyObservableHookReloads_KeepOneSubscriptionAndRejectStaleCallbacks` |
+| Detached owners and missed revisions | `DetachedOwner_CatchesUpWithLatestStateShapeAfterMultipleDeltas` |
+| Release generation retains direct fields and lifecycle behavior | Unit `StateWriterTests` and both variants of `ComposableHookIntegrationTests` |
+| Debug components can use a Release-built runtime | Run this CLR project with `-c Release`; generated components still define `DEBUG` |
+
+Reordering scenarios keep hook dependencies declared before their consumers.
+They check state identity across valid edits, not forward-declaration support.
 
 Debug components store both hook aliases and their ordered snapshots in the
 runtime `StateCollection`. `BeginFrame`, `CommitFrame` and `AbortFrame` stage these
 bindings without generated instance fields. Hot Reload retains the old snapshot
 until a frame commits so removed states and their resources are reconciled only
 after new hooks have been prepared. Release components keep the direct field path.
+Removed ordinary states are detached from their owner as well as suspended and
+pruned, including states created in an aborted frame and absent from the last
+committed snapshot. Keeping an external reference to such a state must not let
+later value changes schedule an update of the former owner.
 
 Debug state accessors create `StateInfo` through generated methods only when a
 new ordinary state is needed. They have no `s_stateInfo_*` fields; Release keeps

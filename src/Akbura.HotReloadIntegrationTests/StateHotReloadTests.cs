@@ -241,6 +241,7 @@ public sealed class StateHotReloadTests
                 var changedValue = Assert.IsType<State<int>>(GetStates(owner)[1]);
                 Assert.Same(count, GetStates(owner)[0]);
                 Assert.NotSame(originalValue, changedValue);
+                Assert.False(originalValue.IsAttached);
                 Assert.Equal("42:7", text.Text);
                 changedValue.Value = 8;
                 Assert.Equal("42:8", text.Text);
@@ -250,11 +251,13 @@ public sealed class StateHotReloadTests
                 var renamedValue = Assert.IsType<State<int>>(GetStates(owner)[1]);
                 Assert.Equal("renamed", renamedValue.Info!.Name);
                 Assert.NotSame(changedValue, renamedValue);
+                Assert.False(changedValue.IsAttached);
                 Assert.Equal("42:9", text.Text);
 
                 hotReload.ApplyUpdate(compilation.Update(CreateSource(string.Empty, null)));
                 hotReload.DispatchMetadataUpdateHandlers();
                 Assert.Same(count, Assert.Single(GetStates(owner)));
+                Assert.False(renamedValue.IsAttached);
                 Assert.Equal("42", text.Text);
                 Assert.Same(owner, window.Content);
                 Assert.Same(text, owner.Child);

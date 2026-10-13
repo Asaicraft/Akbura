@@ -1,4 +1,8 @@
 using Akbura.ComponentTree;
+using Akbura.Engine;
+using Avalonia;
+using Avalonia.Controls;
+using System.Collections.Immutable;
 
 namespace Akbura.UnitTests;
 
@@ -236,11 +240,58 @@ public sealed class StateCollectionTests
         states.BeginFrame();
         var current = states.GetSnapshot(() => [count]);
         states.CommitFrame();
-        states.PruneOrdinaryStates(current);
+        states.PruneOrdinaryStates(current, new StorageOwner());
         states.CompleteHotReloadReconciliation();
 
         Assert.Same(count, states.GetOrCreate("count", () => new State<int>(0)));
         Assert.NotSame(removed, states.GetOrCreate("temporary", () => new State<string>("New declaration")));
         Assert.True(current == states.GetSnapshot(() => throw new Exception("Snapshot should be cached.")));
+    }
+
+    [Fact]
+    public void HotReload_PruneDetachesRemovedStatesButPreservesRetainedAndForeignOwnership()
+    {
+        var owner = new StorageOwner();
+        var otherOwner = new StorageOwner();
+        var states = new StateCollection();
+        var count = states.GetOrCreate("count", () =>
+            new StateInfo<int>("count", static _ => 42).CreateTypedState(owner));
+        var removed = states.GetOrCreate("removed", () =>
+            new StateInfo<int>("removed", static _ => 1).CreateTypedState(owner));
+        var foreign = states.GetOrCreate("foreign", () =>
+            new StateInfo<int>("foreign", static _ => 2).CreateTypedState(otherOwner));
+
+        states.PruneOrdinaryStates([count], owner);
+
+        Assert.True(count.IsOwnedBy(owner));
+        Assert.False(removed.IsAttached);
+        Assert.True(foreign.IsOwnedBy(otherOwner));
+        Assert.Same(count, states.GetOrCreate<int>("count", () => throw new Exception("Retained state must not be recreated.")));
+        Assert.NotSame(removed, states.GetOrCreate("removed", () => new State<int>(0)));
+        Assert.NotSame(foreign, states.GetOrCreate("foreign", () => new State<int>(0)));
+    }
+
+    [Fact]
+    public void HotReload_PruneRejectsNullOwnerWithoutRemovingStates()
+    {
+        var states = new StateCollection();
+        var state = states.GetOrCreate("count", () => new State<int>(42));
+
+        Assert.Throws<ArgumentNullException>(() => states.PruneOrdinaryStates([], null!));
+        Assert.Same(state, states.GetOrCreate<int>("count", () => throw new Exception("State must remain registered.")));
+    }
+
+    private sealed class StorageOwner : AkburaControl
+    {
+        public StorageOwner() : base(AkburaEngine.Empty)
+        {
+        }
+
+        protected override Control FirstUpdate() => new Border();
+        protected override Control Update() => new Border();
+        protected override ImmutableArray<Parameter> GetParameters() => [];
+        protected override ImmutableArray<AvaloniaProperty<IAkburaCommand>> GetCommands() => [];
+        protected override ImmutableArray<InjectService> GetServices() => [];
+        protected override ImmutableArray<State> GetStates() => [];
     }
 }

@@ -483,8 +483,16 @@ public abstract partial class AkburaControl : Control, IComponentTree
 
             if (!retained)
             {
-                previous[previousIndex].SuspendResources();
-                _runtimeStates?.Remove(previous[previousIndex]);
+                var removed = previous[previousIndex];
+                if (removed.IsOwnedBy(this))
+                {
+                    removed.Detach(this);
+                }
+                else
+                {
+                    removed.SuspendResources();
+                }
+                _runtimeStates?.Remove(removed);
             }
         }
     }
@@ -887,7 +895,7 @@ public abstract partial class AkburaControl : Control, IComponentTree
         {
             var current = GetStates();
             ReconcileStateResourcesForHotReload(states.PreviousSnapshotForHotReload, current);
-            states.PruneOrdinaryStates(current);
+            states.PruneOrdinaryStates(current, this);
             states.CompleteHotReloadReconciliation();
         }
 

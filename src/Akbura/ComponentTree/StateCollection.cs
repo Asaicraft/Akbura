@@ -184,14 +184,22 @@ public sealed class StateCollection
         HasPendingReconciliation = false;
     }
 
-    internal void PruneOrdinaryStates(ImmutableArray<State> current)
+    internal void PruneOrdinaryStates(ImmutableArray<State> current, AkburaControl owner)
     {
+        ArgumentNullException.ThrowIfNull(owner);
         var retained = new HashSet<State>(current, ReferenceEqualityComparer.Instance);
         foreach (var entry in _states)
         {
             if (!retained.Contains(entry.Value))
             {
-                entry.Value.SuspendResources();
+                if (entry.Value.IsOwnedBy(owner))
+                {
+                    entry.Value.Detach(owner);
+                }
+                else
+                {
+                    entry.Value.SuspendResources();
+                }
                 _states.Remove(entry.Key);
             }
         }

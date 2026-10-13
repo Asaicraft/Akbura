@@ -191,6 +191,20 @@ public sealed class DirectionalStateBindingLifecycleTests
     }
 
     [Fact]
+    public void HotReloadReconciliation_DetachesRemovedOrdinaryStatesButRetainsCurrentOwnership()
+    {
+        var component = new ReconciliationComponent();
+        var removed = new StateInfo<int>("removed", static _ => 1).CreateTypedState(component);
+        var retained = new StateInfo<int>("retained", static _ => 42).CreateTypedState(component);
+
+        component.Reconcile([removed, retained], [retained]);
+
+        Assert.False(removed.IsAttached);
+        Assert.True(retained.IsOwnedBy(component));
+        Assert.Equal(42, retained.Value);
+    }
+
+    [Fact]
     public void HotReloadReconciliation_RemovesRuntimeStatesAndSuspendsTheirSubscriptions()
     {
         var vm = new CountingVm { Name = "Previous" };

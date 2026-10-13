@@ -5,11 +5,59 @@ using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Akbura.UnitTests;
 
 public sealed class StateWriterTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Write_OrdinaryStatesUseRuntimeStorageOnlyInDebug(bool debug)
+    {
+        var fixture = CreateFixture("state int count = 0;\nstate bool isExpanded = true;");
+        using var codeWriter = new CodeWriter("\r\n");
+        var bindingEnvironment = fixture.BindingEnvironment;
+        var writer = new StateWriter(
+            codeWriter,
+            in bindingEnvironment,
+            fixture.SourceMap,
+            "global::Demo.PlannerView");
+        codeWriter.WriteLine("class GeneratedStates {");
+        foreach (ref readonly var state in fixture.Plan.States.AsSpan())
+        {
+            writer.Write(state);
+        }
+        codeWriter.WriteLine("}");
+
+        var options = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+        if (debug)
+        {
+            options = options.WithPreprocessorSymbols("DEBUG");
+        }
+
+        var root = CSharpSyntaxTree.ParseText(codeWriter.GetText().ToString(), options).GetRoot();
+        var fields = root.DescendantNodes().OfType<FieldDeclarationSyntax>()
+            .SelectMany(field => field.Declaration.Variables)
+            .Select(variable => variable.Identifier.ValueText)
+            .Where(name => name.StartsWith("__state_", StringComparison.Ordinal));
+        Assert.Equal(debug ? 0 : 2, fields.Count());
+        var properties = root.DescendantNodes().OfType<PropertyDeclarationSyntax>().ToArray();
+        Assert.Contains(properties, property => property.Identifier.ValueText == "count" &&
+            property.AccessorList!.Accessors.Count == 2);
+        Assert.Contains(properties, property => property.Identifier.ValueText == "isExpanded" &&
+            property.AccessorList!.Accessors.Count == 2);
+        foreach (var accessor in properties.Where(property => property.Identifier.ValueText.StartsWith("__State_")))
+        {
+            Assert.Equal(debug, accessor.ExpressionBody!.Expression.ToString().Contains("RuntimeStates.GetOrCreate"));
+        }
+        if (debug)
+        {
+            Assert.Contains(fixture.Plan.States[0].HotReloadKey, properties[0].ToString());
+        }
+    }
+
     [Fact]
     public void Write_FactoryMapsInitializerExpressionInsteadOfStateDeclaration()
     {
@@ -237,8 +285,10 @@ public sealed class StateWriterTests
         Assert.Equal(4, codeWriter.CurrentIndent);
     }
 
-    [Fact]
-    public void GeneratedStateAndDescriptorMembers_Compile()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GeneratedStateAndDescriptorMembers_Compile(bool debug)
     {
         var fixture = CreateFixture("state int count = 0;");
         using var codeWriter = new CodeWriter("\r\n");
@@ -272,7 +322,8 @@ public sealed class StateWriterTests
 
         AssertCompiles(
             fixture.SemanticFixture.CSharpCompilation,
-            codeWriter.GetText().ToString());
+            codeWriter.GetText().ToString(),
+            debug);
     }
 
     private static WriterFixture CreateFixture(
@@ -312,11 +363,17 @@ public sealed class StateWriterTests
 
     private static void AssertCompiles(
         CSharpCompilation compilation,
-        string generatedSource)
+        string generatedSource,
+        bool debug)
     {
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+        if (debug)
+        {
+            parseOptions = parseOptions.WithPreprocessorSymbols("DEBUG");
+        }
         var syntaxTree = CSharpSyntaxTree.ParseText(
             generatedSource,
-            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview),
+            parseOptions,
             path: "StateWriterOutput.g.cs");
         var diagnostics = compilation.AddSyntaxTrees(syntaxTree).GetDiagnostics()
             .Where(static diagnostic => diagnostic.Severity is

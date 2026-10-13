@@ -190,6 +190,33 @@ public sealed class DirectionalStateBindingLifecycleTests
         Assert.Equal(1, currentVm.PropertyChangedSubscriberCount);
     }
 
+    [Fact]
+    public void HotReloadReconciliation_RemovesRuntimeStatesAndSuspendsTheirSubscriptions()
+    {
+        var vm = new CountingVm { Name = "Previous" };
+        var component = new ReconciliationComponent();
+        var previous = component.GetOrCreate("name", () => StateBindings.CreateOut(
+            static value => (string)value!,
+            () => vm,
+            static () => s_countingVmNamePath,
+            pathLength: 1,
+            requiresNonNullSource: true));
+        var retained = component.GetOrCreate("count", () => new State<int>(1));
+        retained.Value = 42;
+
+        component.Reconcile([previous, retained], [retained]);
+
+        Assert.Equal(0, vm.PropertyChangedSubscriberCount);
+        Assert.Same(retained, component.GetOrCreate("count", () => new State<int>(0)));
+        Assert.Equal(42, retained.Value);
+        var replacement = component.GetOrCreate("name", () => new State<int>(2));
+        Assert.NotSame(previous, replacement);
+        Assert.Equal(2, replacement.Value);
+
+        component.Reconcile([retained, replacement], []);
+        Assert.NotSame(retained, component.GetOrCreate("count", () => new State<int>(0)));
+    }
+
     private static CompiledBindingPath CreatePropertyPath<TSource, TValue>(string name, Func<TSource, TValue> getter)
         where TSource : class
     {
@@ -318,6 +345,9 @@ public sealed class DirectionalStateBindingLifecycleTests
         {
             ReconcileStateResourcesForHotReload(previous, current);
         }
+
+        public State<T> GetOrCreate<T>(string key, Func<State<T>> factory) =>
+            RuntimeStates.GetOrCreate(key, factory);
 
         protected override Control FirstUpdate() => _root;
 

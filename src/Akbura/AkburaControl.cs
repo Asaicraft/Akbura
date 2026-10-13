@@ -215,6 +215,7 @@ public abstract partial class AkburaControl : Control, IComponentTree
     private long _hotReloadRequestGeneration;
     private long _pendingHotReloadRequestGeneration;
     private readonly UseHookRuntime _useHooks;
+    private StateCollection? _runtimeStates;
     private readonly ControlEventLifecycleBridge _controlEventLifecycle;
     private readonly long _hotReloadCreationRevision;
 
@@ -392,6 +393,13 @@ public abstract partial class AkburaControl : Control, IComponentTree
     }
 
     /// <summary>
+    /// Gets the ordinary state storage used by generated Debug components.
+    /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    protected StateCollection RuntimeStates => _runtimeStates ??= new StateCollection();
+
+    /// <summary>
     /// Suppresses component updates until the returned scope is disposed.
     /// </summary>
     /// <returns>An update suppression scope.</returns>
@@ -443,7 +451,7 @@ public abstract partial class AkburaControl : Control, IComponentTree
         ImmutableArray<State> previous,
         ImmutableArray<State> current)
     {
-        for (var previousIndex = 0; previousIndex < previous.Length; previousIndex++)
+        for (var previousIndex = 0; !previous.IsDefault && previousIndex < previous.Length; previousIndex++)
         {
             var retained = false;
             for (var currentIndex = 0; currentIndex < current.Length; currentIndex++)
@@ -458,6 +466,7 @@ public abstract partial class AkburaControl : Control, IComponentTree
             if (!retained)
             {
                 previous[previousIndex].SuspendResources();
+                _runtimeStates?.Remove(previous[previousIndex]);
             }
         }
     }

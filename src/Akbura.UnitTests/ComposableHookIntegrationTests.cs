@@ -67,6 +67,11 @@ public sealed class ComposableHookIntegrationTests
     public async Task GeneratedHooks_RunEveryFrameWithStableAliasesAndInitializedUi(bool debugStructural)
     {
         var ownerType = CompileRuntimeComponent(debugStructural);
+        var stateFields = ownerType.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+            .Where(field => field.Name.StartsWith("__state_", StringComparison.Ordinal))
+            .ToArray();
+        Assert.Equal(debugStructural ? 2 : 3, stateFields.Length);
+        Assert.Equal(!debugStructural, stateFields.Any(field => field.Name.StartsWith("__state_count_", StringComparison.Ordinal)));
         await OnDispatcher(() =>
         {
             var owner = CreateOwner(ownerType);

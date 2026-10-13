@@ -49,8 +49,12 @@ public abstract class InputStateMarkupExtension
     /// <summary>
     /// Observes the state represented by this extension.
     /// </summary>
-    /// <param name="target">The utility target.</param>
-    /// <returns>The state observable.</returns>
+    /// <param name="target">
+    /// The utility target.
+    /// </param>
+    /// <returns>
+    /// The state observable.
+    /// </returns>
     protected abstract IObservable<bool> Observe(InputElement target);
 }
 
@@ -66,7 +70,9 @@ public abstract class ThemeVariantMarkupExtension
     /// <summary>
     /// Initializes a new instance for the requested theme variant.
     /// </summary>
-    /// <param name="themeVariant">The theme that activates this extension.</param>
+    /// <param name="themeVariant">
+    /// The theme that activates this extension.
+    /// </param>
     protected ThemeVariantMarkupExtension(ThemeVariant themeVariant)
     {
         _themeVariant = themeVariant ??

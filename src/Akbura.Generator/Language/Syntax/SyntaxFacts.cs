@@ -7,13 +7,21 @@ using System.Text;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Akbura.Language.Syntax;
-/// <summary>Provides helper methods for working with syntax kinds.</summary>
+/// <summary>
+/// Provides helper methods for working with syntax kinds.
+/// </summary>
 public static partial class SyntaxFacts
 {
 
-    /// <summary>Gets the textual representation of a given syntax kind.</summary>
-    /// <param name="kind">The syntax kind.</param>
-    /// <return>The text representation of the syntax kind.</return>
+    /// <summary>
+    /// Gets the textual representation of a given syntax kind.
+    /// </summary>
+    /// <param name="kind">
+    /// The syntax kind.
+    /// </param>
+    /// <return>
+    /// The text representation of the syntax kind.
+    /// </return>
     public static partial string GetText(SyntaxKind kind);
 
     public static partial bool IsAnyToken(SyntaxKind kind);

@@ -12,7 +12,9 @@ namespace Akbura.Language;
 
 internal abstract partial class AkburaSemanticModel
 {
-    /// <summary>Returns the locals declared by this statement through the existing bound tree.</summary>
+    /// <summary>
+    /// Returns the locals declared by this statement through the existing bound tree.
+    /// </summary>
     public ImmutableArray<CSharpLocalSymbol> GetCSharpDeclaredLocals(CSharpStatementSyntax syntax)
     {
         ValidateSyntaxTreeOwnership(syntax);
@@ -42,7 +44,9 @@ internal abstract partial class AkburaSemanticModel
         return locals.ToImmutable();
     }
 
-    /// <summary>Returns declarations from the already-bound real markup condition.</summary>
+    /// <summary>
+    /// Returns declarations from the already-bound real markup condition.
+    /// </summary>
     public ImmutableArray<CSharpLocalSymbol> GetCSharpDeclaredLocals(CSharpExpressionSyntax syntax)
     {
         ValidateSyntaxTreeOwnership(syntax);

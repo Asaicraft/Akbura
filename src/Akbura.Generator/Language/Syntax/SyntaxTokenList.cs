@@ -47,7 +47,9 @@ internal readonly partial struct SyntaxTokenList : IEquatable<SyntaxTokenList>, 
     /// <summary>
     /// Creates a list of tokens.
     /// </summary>
-    /// <param name="tokens">An array of tokens.</param>
+    /// <param name="tokens">
+    /// An array of tokens.
+    /// </param>
     public SyntaxTokenList(params SyntaxToken[] tokens)
         : this(null, CreateNodeFromSpan(tokens), 0, 0)
     {
@@ -122,8 +124,12 @@ internal readonly partial struct SyntaxTokenList : IEquatable<SyntaxTokenList>, 
     /// <summary>
     /// Gets the token at the specified index.
     /// </summary>
-    /// <param name="index">The zero-based index of the token to get.</param>
-    /// <returns>The token at the specified index.</returns>
+    /// <param name="index">
+    /// The zero-based index of the token to get.
+    /// </param>
+    /// <returns>
+    /// The token at the specified index.
+    /// </returns>
     /// <exception cref="ArgumentOutOfRangeException">
     /// <paramref name="index" /> is less than 0.-or-<paramref name="index" /> is equal to or greater than <see cref="Count" />. </exception>
     public SyntaxToken this[int index]
@@ -211,8 +217,12 @@ internal readonly partial struct SyntaxTokenList : IEquatable<SyntaxTokenList>, 
     /// <summary>
     /// Returns the first token in the list.
     /// </summary>
-    /// <returns>The first token in the list.</returns>
-    /// <exception cref="InvalidOperationException">The list is empty.</exception>        
+    /// <returns>
+    /// The first token in the list.
+    /// </returns>
+    /// <exception cref="InvalidOperationException">
+    /// The list is empty.
+    /// </exception>
     public SyntaxToken First()
     {
         if (Any())
@@ -226,8 +236,12 @@ internal readonly partial struct SyntaxTokenList : IEquatable<SyntaxTokenList>, 
     /// <summary>
     /// Returns the last token in the list.
     /// </summary>
-    /// <returns> The last token in the list.</returns>
-    /// <exception cref="InvalidOperationException">The list is empty.</exception>        
+    /// <returns>
+    /// The last token in the list.
+    /// </returns>
+    /// <exception cref="InvalidOperationException">
+    /// The list is empty.
+    /// </exception>
     public SyntaxToken Last()
     {
         if (Any())
@@ -241,7 +255,9 @@ internal readonly partial struct SyntaxTokenList : IEquatable<SyntaxTokenList>, 
     /// <summary>
     /// Tests whether the list is non-empty.
     /// </summary>
-    /// <returns>True if the list contains any tokens.</returns>
+    /// <returns>
+    /// True if the list contains any tokens.
+    /// </returns>
     public bool Any()
     {
         return Node != null;
@@ -306,7 +322,9 @@ internal readonly partial struct SyntaxTokenList : IEquatable<SyntaxTokenList>, 
     /// <summary>
     /// Creates a new <see cref="SyntaxTokenList"/> with the specified token added to the end.
     /// </summary>
-    /// <param name="token">The token to add.</param>
+    /// <param name="token">
+    /// The token to add.
+    /// </param>
     public SyntaxTokenList Add(SyntaxToken token)
     {
         return Insert(Count, token);
@@ -315,7 +333,9 @@ internal readonly partial struct SyntaxTokenList : IEquatable<SyntaxTokenList>, 
     /// <summary>
     /// Creates a new <see cref="SyntaxTokenList"/> with the specified tokens added to the end.
     /// </summary>
-    /// <param name="tokens">The tokens to add.</param>
+    /// <param name="tokens">
+    /// The tokens to add.
+    /// </param>
     public SyntaxTokenList AddRange(IEnumerable<SyntaxToken> tokens)
     {
         return InsertRange(Count, tokens);
@@ -324,8 +344,12 @@ internal readonly partial struct SyntaxTokenList : IEquatable<SyntaxTokenList>, 
     /// <summary>
     /// Creates a new <see cref="SyntaxTokenList"/> with the specified token insert at the index.
     /// </summary>
-    /// <param name="index">The index to insert the new token.</param>
-    /// <param name="token">The token to insert.</param>
+    /// <param name="index">
+    /// The index to insert the new token.
+    /// </param>
+    /// <param name="token">
+    /// The token to insert.
+    /// </param>
     public SyntaxTokenList Insert(int index, SyntaxToken token)
     {
         if(token == default)
@@ -339,8 +363,12 @@ internal readonly partial struct SyntaxTokenList : IEquatable<SyntaxTokenList>, 
     /// <summary>
     /// Creates a new <see cref="SyntaxTokenList"/> with the specified tokens insert at the index.
     /// </summary>
-    /// <param name="index">The index to insert the new tokens.</param>
-    /// <param name="tokens">The tokens to insert.</param>
+    /// <param name="index">
+    /// The index to insert the new tokens.
+    /// </param>
+    /// <param name="tokens">
+    /// The tokens to insert.
+    /// </param>
     public SyntaxTokenList InsertRange(int index, IEnumerable<SyntaxToken> tokens)
     {
         if (index < 0 || index > Count)
@@ -373,7 +401,9 @@ internal readonly partial struct SyntaxTokenList : IEquatable<SyntaxTokenList>, 
     /// <summary>
     /// Creates a new <see cref="SyntaxTokenList"/> with the token at the specified index removed.
     /// </summary>
-    /// <param name="index">The index of the token to remove.</param>
+    /// <param name="index">
+    /// The index of the token to remove.
+    /// </param>
     public SyntaxTokenList RemoveAt(int index)
     {
         if (index < 0 || index >= Count)
@@ -389,7 +419,9 @@ internal readonly partial struct SyntaxTokenList : IEquatable<SyntaxTokenList>, 
     /// <summary>
     /// Creates a new <see cref="SyntaxTokenList"/> with the specified token removed.
     /// </summary>
-    /// <param name="tokenInList">The token to remove.</param>
+    /// <param name="tokenInList">
+    /// The token to remove.
+    /// </param>
     public SyntaxTokenList Remove(SyntaxToken tokenInList)
     {
         var index = IndexOf(tokenInList);
@@ -404,8 +436,12 @@ internal readonly partial struct SyntaxTokenList : IEquatable<SyntaxTokenList>, 
     /// <summary>
     /// Creates a new <see cref="SyntaxTokenList"/> with the specified token replaced with a new token.
     /// </summary>
-    /// <param name="tokenInList">The token to replace.</param>
-    /// <param name="newToken">The new token.</param>
+    /// <param name="tokenInList">
+    /// The token to replace.
+    /// </param>
+    /// <param name="newToken">
+    /// The new token.
+    /// </param>
     public SyntaxTokenList Replace(SyntaxToken tokenInList, SyntaxToken newToken)
     {
         Debug.Assert(newToken != default);
@@ -416,8 +452,12 @@ internal readonly partial struct SyntaxTokenList : IEquatable<SyntaxTokenList>, 
     /// <summary>
     /// Creates a new <see cref="SyntaxTokenList"/> with the specified token replaced with new tokens.
     /// </summary>
-    /// <param name="tokenInList">The token to replace.</param>
-    /// <param name="newTokens">The new tokens.</param>
+    /// <param name="tokenInList">
+    /// The token to replace.
+    /// </param>
+    /// <param name="newTokens">
+    /// The new tokens.
+    /// </param>
     public SyntaxTokenList ReplaceRange(SyntaxToken tokenInList, IEnumerable<SyntaxToken> newTokens)
     {
         var index = IndexOf(tokenInList);
@@ -464,9 +504,13 @@ internal readonly partial struct SyntaxTokenList : IEquatable<SyntaxTokenList>, 
     /// <summary>
     /// Compares <paramref name="left"/> and <paramref name="right"/> for equality.
     /// </summary>
-    /// <param name="left"></param>
-    /// <param name="right"></param>
-    /// <returns>True if the two <see cref="SyntaxTokenList"/>s are equal.</returns>
+    /// <param name="left">
+    /// </param>
+    /// <param name="right">
+    /// </param>
+    /// <returns>
+    /// True if the two <see cref="SyntaxTokenList"/>s are equal.
+    /// </returns>
     public static bool operator ==(SyntaxTokenList left, SyntaxTokenList right)
     {
         return left.Equals(right);
@@ -475,9 +519,13 @@ internal readonly partial struct SyntaxTokenList : IEquatable<SyntaxTokenList>, 
     /// <summary>
     /// Compares <paramref name="left"/> and <paramref name="right"/> for inequality.
     /// </summary>
-    /// <param name="left"></param>
-    /// <param name="right"></param>
-    /// <returns>True if the two <see cref="SyntaxTokenList"/>s are not equal.</returns>
+    /// <param name="left">
+    /// </param>
+    /// <param name="right">
+    /// </param>
+    /// <returns>
+    /// True if the two <see cref="SyntaxTokenList"/>s are not equal.
+    /// </returns>
     public static bool operator !=(SyntaxTokenList left, SyntaxTokenList right)
     {
         return !left.Equals(right);
@@ -491,7 +539,9 @@ internal readonly partial struct SyntaxTokenList : IEquatable<SyntaxTokenList>, 
     /// <summary>
     /// Compares this <see cref=" SyntaxTokenList"/> with the <paramref name="obj"/> for equality.
     /// </summary>
-    /// <returns>True if the two objects are equal.</returns>
+    /// <returns>
+    /// True if the two objects are equal.
+    /// </returns>
     public override bool Equals(object? obj)
     {
         return obj is SyntaxTokenList list && Equals(list);
@@ -509,7 +559,9 @@ internal readonly partial struct SyntaxTokenList : IEquatable<SyntaxTokenList>, 
     /// <summary>
     /// Create a new Token List
     /// </summary>
-    /// <param name="token">Element of the return Token List</param>
+    /// <param name="token">
+    /// Element of the return Token List
+    /// </param>
     public static SyntaxTokenList Create(SyntaxToken token)
     {
         return new SyntaxTokenList(token);

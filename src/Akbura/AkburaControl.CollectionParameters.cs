@@ -9,7 +9,9 @@ namespace Akbura;
 
 public abstract partial class AkburaControl
 {
-    /// <summary>Used by generated list parameters, once per owned backing list.</summary>
+    /// <summary>
+    /// Used by generated list parameters, once per owned backing list.
+    /// </summary>
     [EditorBrowsable(EditorBrowsableState.Never)]
     [Browsable(false)]
     protected CollectionParameterBinding<T> CreateCollectionParameterBinding<T>(
@@ -61,7 +63,9 @@ public abstract partial class AkburaControl
         return binding;
     }
 
-    /// <summary>Applies marker semantics before updating a generated collection source binding.</summary>
+    /// <summary>
+    /// Applies marker semantics before updating a generated collection source binding.
+    /// </summary>
     [EditorBrowsable(EditorBrowsableState.Never)]
     [Browsable(false)]
     protected static void ApplyCollectionParameterSource<T>(

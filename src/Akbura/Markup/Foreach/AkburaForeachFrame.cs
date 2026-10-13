@@ -34,7 +34,9 @@ internal interface IAkburaForeachRegion : IDisposable
     void Resume();
 }
 
-/// <summary>Retains declaration-local renderer ownership for one source occurrence.</summary>
+/// <summary>
+/// Retains declaration-local renderer ownership for one source occurrence.
+/// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
 [Browsable(false)]
 public sealed class AkburaForeachFrame<TItem, TChild> : IDisposable
@@ -67,7 +69,9 @@ public sealed class AkburaForeachFrame<TItem, TChild> : IDisposable
     public AkburaRenderState RenderState => GetRenderState(0);
     public bool NameScopeChanged => _update is { NameScope: { } scope } && !ReferenceEquals(scope, _nameScope);
 
-    /// <summary>Shares one native lexical scope across all root declarations in this occurrence.</summary>
+    /// <summary>
+    /// Shares one native lexical scope across all root declarations in this occurrence.
+    /// </summary>
     public INameScope GetNameScope(INameScope? parent)
     {
         var update = GetUpdate();
@@ -85,7 +89,9 @@ public sealed class AkburaForeachFrame<TItem, TChild> : IDisposable
         return update.NameScope;
     }
 
-    /// <summary>Gets an independent tree only when this root declaration is reached.</summary>
+    /// <summary>
+    /// Gets an independent tree only when this root declaration is reached.
+    /// </summary>
     public AkburaRenderState GetRenderState(int declarationSlot) => GetRenderStateCore(declarationSlot, null);
 
     public AkburaRenderState GetRenderState<TKey>(int declarationSlot, TKey key,
@@ -131,7 +137,9 @@ public sealed class AkburaForeachFrame<TItem, TChild> : IDisposable
         return state;
     }
 
-    /// <summary>Retains a simple generated node by declaration slot, never source index.</summary>
+    /// <summary>
+    /// Retains a simple generated node by declaration slot, never source index.
+    /// </summary>
     public TNode GetOrCreate<TNode>(int declarationSlot, Func<TNode> factory) where TNode : class
     {
         ArgumentNullException.ThrowIfNull(factory);
@@ -153,7 +161,9 @@ public sealed class AkburaForeachFrame<TItem, TChild> : IDisposable
 
     public void Emit(TChild child) => GetUpdate().Children.Add(child);
 
-    /// <summary>Registers an explicitly owned resource; source items are never disposed.</summary>
+    /// <summary>
+    /// Registers an explicitly owned resource; source items are never disposed.
+    /// </summary>
     public void Own(int declarationSlot, IDisposable resource)
     {
         ArgumentNullException.ThrowIfNull(resource);

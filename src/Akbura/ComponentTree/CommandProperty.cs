@@ -3,15 +3,25 @@ using System.ComponentModel;
 
 namespace Akbura.ComponentTree;
 
-/// <summary>Creates reactive command properties declared by generated components.</summary>
+/// <summary>
+/// Creates reactive command properties declared by generated components.
+/// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
 [Browsable(false)]
 public static class CommandProperty
 {
-    /// <summary>Registers a command property that requests a component update when its value changes.</summary>
-    /// <typeparam name="TOwner">The component type that declares the command.</typeparam>
-    /// <param name="name">The command and styled property name.</param>
-    /// <returns>The command property. The caller should cache this registration.</returns>
+    /// <summary>
+    /// Registers a command property that requests a component update when its value changes.
+    /// </summary>
+    /// <typeparam name="TOwner">
+    /// The component type that declares the command.
+    /// </typeparam>
+    /// <param name="name">
+    /// The command and styled property name.
+    /// </param>
+    /// <returns>
+    /// The command property. The caller should cache this registration.
+    /// </returns>
     public static StyledProperty<IAkburaCommand> Create<TOwner>(string name)
         where TOwner : AkburaControl
     {

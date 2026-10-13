@@ -7,7 +7,9 @@ public sealed partial class AkburaRenderState
     private Dictionary<RenderSlotKey, ForeachOwnerEntry>? _foreachRegions;
     private ForeachOwnerFrame? _foreachFrame;
 
-    /// <summary>Starts visitation of variable-width contributions in one owner frame.</summary>
+    /// <summary>
+    /// Starts visitation of variable-width contributions in one owner frame.
+    /// </summary>
     public void BeginForeachFrame()
     {
         if (_foreachFrame != null)
@@ -18,7 +20,9 @@ public sealed partial class AkburaRenderState
         _foreachFrame = new ForeachOwnerFrame();
     }
 
-    /// <summary>Gets a region by retained owner identity and a stable declaration slot.</summary>
+    /// <summary>
+    /// Gets a region by retained owner identity and a stable declaration slot.
+    /// </summary>
     public AkburaForeachRegion<TItem, TChild> GetForeachRegion<TItem, TChild>(
         int ownerLocalId, string slot, Action invalidate)
     {
@@ -60,7 +64,9 @@ public sealed partial class AkburaRenderState
         return region;
     }
 
-    /// <summary>Acknowledges regions after every shared owner collection has reconciled successfully.</summary>
+    /// <summary>
+    /// Acknowledges regions after every shared owner collection has reconciled successfully.
+    /// </summary>
     public void CompleteForeachFrame()
     {
         if (_foreachFrame is not { } frame)
@@ -100,7 +106,9 @@ public sealed partial class AkburaRenderState
         ThrowForeachCleanupFailures(failures);
     }
 
-    /// <summary>Discards candidates without acknowledging collection packets or releasing applied regions.</summary>
+    /// <summary>
+    /// Discards candidates without acknowledging collection packets or releasing applied regions.
+    /// </summary>
     public void AbortForeachFrame()
     {
         if (_foreachFrame is not { } frame)
@@ -136,7 +144,9 @@ public sealed partial class AkburaRenderState
         }
     }
 
-    /// <summary>Suspends source leases without removing retained occurrence nodes.</summary>
+    /// <summary>
+    /// Suspends source leases without removing retained occurrence nodes.
+    /// </summary>
     public void SuspendForeachRegions()
     {
         AbortForeachFrame();

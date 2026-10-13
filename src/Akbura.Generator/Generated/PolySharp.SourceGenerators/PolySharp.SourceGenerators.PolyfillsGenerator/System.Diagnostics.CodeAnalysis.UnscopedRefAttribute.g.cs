@@ -18,9 +18,15 @@ namespace System.Diagnostics.CodeAnalysis
     /// <para>
     /// For example:
     /// <list type="number">
-    ///     <item><see langword="this"/> for <see langword="struct"/> instance methods.</item>
-    ///     <item><see langword="ref"/> parameters that refer to <see langword="ref"/> <see langword="struct"/> types.</item>
-    ///     <item><see langword="out"/> parameters.</item>
+    /// <item>
+    /// <see langword="this"/> for <see langword="struct"/> instance methods.
+    /// </item>
+    /// <item>
+    /// <see langword="ref"/> parameters that refer to <see langword="ref"/> <see langword="struct"/> types.
+    /// </item>
+    /// <item>
+    /// <see langword="out"/> parameters.
+    /// </item>
     /// </list>
     /// </para>
     /// <para>

@@ -31,8 +31,12 @@ partial class GreenSyntaxList
         /// <summary>
         /// Find the slot that contains the given offset.
         /// </summary>
-        /// <param name="offset">The target offset. Must be between 0 and <see cref="GreenNode.FullWidth"/>.</param>
-        /// <returns>The slot index of the slot containing the given offset.</returns>
+        /// <param name="offset">
+        /// The target offset. Must be between 0 and <see cref="GreenNode.FullWidth"/>.
+        /// </param>
+        /// <returns>
+        /// The slot index of the slot containing the given offset.
+        /// </returns>
         /// <remarks>
         /// This implementation uses a binary search to find the first slot that contains
         /// the given offset.

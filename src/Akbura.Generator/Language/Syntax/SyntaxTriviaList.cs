@@ -46,7 +46,9 @@ internal readonly partial struct SyntaxTriviaList : IEquatable<SyntaxTriviaList>
     /// <summary>
     /// Creates a list of trivia.
     /// </summary>
-    /// <param name="trivias">An array of trivia.</param>
+    /// <param name="trivias">
+    /// An array of trivia.
+    /// </param>
     public SyntaxTriviaList(params SyntaxTrivia[] trivias)
         : this(default, CreateNodeFromSpan(trivias), 0, 0)
     {
@@ -55,7 +57,9 @@ internal readonly partial struct SyntaxTriviaList : IEquatable<SyntaxTriviaList>
     /// <summary>
     /// Creates a list of trivia.
     /// </summary>
-    /// <param name="trivias">A sequence of trivia.</param>
+    /// <param name="trivias">
+    /// A sequence of trivia.
+    /// </param>
     public SyntaxTriviaList(IEnumerable<SyntaxTrivia>? trivias)
         : this(default, SyntaxTriviaListBuilder.Create(trivias).Node, 0, 0)
     {
@@ -124,8 +128,12 @@ internal readonly partial struct SyntaxTriviaList : IEquatable<SyntaxTriviaList>
     /// <summary>
     /// Gets the trivia at the specified index.
     /// </summary>
-    /// <param name="index">The zero-based index of the trivia to get.</param>
-    /// <returns>The token at the specified index.</returns>
+    /// <param name="index">
+    /// The zero-based index of the trivia to get.
+    /// </param>
+    /// <returns>
+    /// The token at the specified index.
+    /// </returns>
     /// <exception cref="ArgumentOutOfRangeException">
     /// <paramref name="index" /> is less than 0.-or-<paramref name="index" /> is equal to or greater than <see cref="Count" />. </exception>
     public SyntaxTrivia this[int index]
@@ -187,8 +195,12 @@ internal readonly partial struct SyntaxTriviaList : IEquatable<SyntaxTriviaList>
     /// <summary>
     /// Returns the first trivia in the list.
     /// </summary>
-    /// <returns>The first trivia in the list.</returns>
-    /// <exception cref="InvalidOperationException">The list is empty.</exception>        
+    /// <returns>
+    /// The first trivia in the list.
+    /// </returns>
+    /// <exception cref="InvalidOperationException">
+    /// The list is empty.
+    /// </exception>
     public SyntaxTrivia First()
     {
         if (Any())
@@ -202,8 +214,12 @@ internal readonly partial struct SyntaxTriviaList : IEquatable<SyntaxTriviaList>
     /// <summary>
     /// Returns the last trivia in the list.
     /// </summary>
-    /// <returns>The last trivia in the list.</returns>
-    /// <exception cref="InvalidOperationException">The list is empty.</exception>        
+    /// <returns>
+    /// The last trivia in the list.
+    /// </returns>
+    /// <exception cref="InvalidOperationException">
+    /// The list is empty.
+    /// </exception>
     public SyntaxTrivia Last()
     {
         if (Any())
@@ -292,7 +308,9 @@ internal readonly partial struct SyntaxTriviaList : IEquatable<SyntaxTriviaList>
     /// <summary>
     /// Creates a new <see cref="SyntaxTriviaList"/> with the specified trivia added to the end.
     /// </summary>
-    /// <param name="trivia">The trivia to add.</param>
+    /// <param name="trivia">
+    /// The trivia to add.
+    /// </param>
     public SyntaxTriviaList Add(SyntaxTrivia trivia)
     {
         return Insert(Count, trivia);
@@ -301,7 +319,9 @@ internal readonly partial struct SyntaxTriviaList : IEquatable<SyntaxTriviaList>
     /// <summary>
     /// Creates a new <see cref="SyntaxTriviaList"/> with the specified trivia added to the end.
     /// </summary>
-    /// <param name="trivia">The trivia to add.</param>
+    /// <param name="trivia">
+    /// The trivia to add.
+    /// </param>
     public SyntaxTriviaList AddRange(IEnumerable<SyntaxTrivia> trivia)
     {
         return InsertRange(Count, trivia);
@@ -310,8 +330,12 @@ internal readonly partial struct SyntaxTriviaList : IEquatable<SyntaxTriviaList>
     /// <summary>
     /// Creates a new <see cref="SyntaxTriviaList"/> with the specified trivia inserted at the index.
     /// </summary>
-    /// <param name="index">The index in the list to insert the trivia at.</param>
-    /// <param name="trivia">The trivia to insert.</param>
+    /// <param name="index">
+    /// The index in the list to insert the trivia at.
+    /// </param>
+    /// <param name="trivia">
+    /// The trivia to insert.
+    /// </param>
     public SyntaxTriviaList Insert(int index, SyntaxTrivia trivia)
     {
         if (trivia == default)
@@ -344,8 +368,12 @@ internal readonly partial struct SyntaxTriviaList : IEquatable<SyntaxTriviaList>
     /// <summary>
     /// Creates a new <see cref="SyntaxTriviaList"/> with the specified trivia inserted at the index.
     /// </summary>
-    /// <param name="index">The index in the list to insert the trivia at.</param>
-    /// <param name="trivia">The trivia to insert.</param>
+    /// <param name="index">
+    /// The index in the list to insert the trivia at.
+    /// </param>
+    /// <param name="trivia">
+    /// The trivia to insert.
+    /// </param>
     public SyntaxTriviaList InsertRange(int index, IEnumerable<SyntaxTrivia> trivia)
     {
         var thisCount = Count;
@@ -391,7 +419,9 @@ internal readonly partial struct SyntaxTriviaList : IEquatable<SyntaxTriviaList>
     /// <summary>
     /// Creates a new <see cref="SyntaxTriviaList"/> with the element at the specified index removed.
     /// </summary>
-    /// <param name="index">The index identifying the element to remove.</param>
+    /// <param name="index">
+    /// The index identifying the element to remove.
+    /// </param>
     public SyntaxTriviaList RemoveAt(int index)
     {
         if (index < 0 || index >= Count)
@@ -408,7 +438,9 @@ internal readonly partial struct SyntaxTriviaList : IEquatable<SyntaxTriviaList>
     /// <summary>
     /// Creates a new <see cref="SyntaxTriviaList"/> with the specified element removed.
     /// </summary>
-    /// <param name="triviaInList">The trivia element to remove.</param>
+    /// <param name="triviaInList">
+    /// The trivia element to remove.
+    /// </param>
     public SyntaxTriviaList Remove(SyntaxTrivia triviaInList)
     {
         var index = IndexOf(triviaInList);
@@ -423,8 +455,12 @@ internal readonly partial struct SyntaxTriviaList : IEquatable<SyntaxTriviaList>
     /// <summary>
     /// Creates a new <see cref="SyntaxTriviaList"/> with the specified element replaced with new trivia.
     /// </summary>
-    /// <param name="triviaInList">The trivia element to replace.</param>
-    /// <param name="newTrivia">The trivia to replace the element with.</param>
+    /// <param name="triviaInList">
+    /// The trivia element to replace.
+    /// </param>
+    /// <param name="newTrivia">
+    /// The trivia to replace the element with.
+    /// </param>
     public SyntaxTriviaList Replace(SyntaxTrivia triviaInList, SyntaxTrivia newTrivia)
     {
         if (newTrivia == default)
@@ -438,8 +474,12 @@ internal readonly partial struct SyntaxTriviaList : IEquatable<SyntaxTriviaList>
     /// <summary>
     /// Creates a new <see cref="SyntaxTriviaList"/> with the specified element replaced with new trivia.
     /// </summary>
-    /// <param name="triviaInList">The trivia element to replace.</param>
-    /// <param name="newTrivia">The trivia to replace the element with.</param>
+    /// <param name="triviaInList">
+    /// The trivia element to replace.
+    /// </param>
+    /// <param name="newTrivia">
+    /// The trivia to replace the element with.
+    /// </param>
     public SyntaxTriviaList ReplaceRange(SyntaxTrivia triviaInList, IEnumerable<SyntaxTrivia> newTrivia)
     {
         var index = IndexOf(triviaInList);

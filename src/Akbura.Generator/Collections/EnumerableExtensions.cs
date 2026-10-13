@@ -838,7 +838,8 @@ namespace Akbura.Collections
     /// <summary>
     /// Cached versions of commonly used delegates.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
+    /// <typeparam name="T">
+    /// </typeparam>
     public static class Functions<T>
     {
         public static readonly Func<T, T> Identity = t => t;
@@ -848,7 +849,8 @@ namespace Akbura.Collections
     /// <summary>
     /// Cached versions of commonly used delegates.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
+    /// <typeparam name="T">
+    /// </typeparam>
     public static class Predicates<T>
     {
         public static readonly Predicate<T> True = t => true;

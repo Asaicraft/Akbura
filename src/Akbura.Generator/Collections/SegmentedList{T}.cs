@@ -19,7 +19,9 @@ namespace Akbura.Collections;
 /// <para>This collection has the same performance characteristics as <see cref="List{T}"/>, but uses segmented
 /// arrays to avoid allocations in the Large Object Heap.</para>
 /// </remarks>
-/// <typeparam name="T">The type of elements in the list.</typeparam>
+/// <typeparam name="T">
+/// The type of elements in the list.
+/// </typeparam>
 [DebuggerTypeProxy(typeof(ICollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
 public class SegmentedList<T> : IList<T>, IList, IReadOnlyList<T>
@@ -483,8 +485,12 @@ public class SegmentedList<T> : IList<T>, IList, IReadOnlyList<T>
     /// If the current capacity of the list is less than specified <paramref name="capacity"/>,
     /// the capacity is increased by continuously twice current capacity until it is at least the specified <paramref name="capacity"/>.
     /// </summary>
-    /// <param name="capacity">The minimum capacity to ensure.</param>
-    /// <returns>The new capacity of this list.</returns>
+    /// <param name="capacity">
+    /// The minimum capacity to ensure.
+    /// </param>
+    /// <returns>
+    /// The new capacity of this list.
+    /// </returns>
     public int EnsureCapacity(int capacity)
     {
         ThrowHelper.ThrowIfNegative(capacity);
@@ -501,7 +507,9 @@ public class SegmentedList<T> : IList<T>, IList, IReadOnlyList<T>
     /// <summary>
     /// Increase the capacity of this list to at least the specified <paramref name="capacity"/>.
     /// </summary>
-    /// <param name="capacity">The minimum capacity to ensure.</param>
+    /// <param name="capacity">
+    /// The minimum capacity to ensure.
+    /// </param>
     public void Grow(int capacity)
     {
         AkburaDebug.Assert(_items.Length < capacity);
@@ -747,15 +755,23 @@ public class SegmentedList<T> : IList<T>, IList, IReadOnlyList<T>
     /// <summary>
     /// Creates a shallow copy of a range of elements in the source <see cref="SegmentedList{T}" />.
     /// </summary>
-    /// <param name="start">The zero-based <see cref="SegmentedList{T}" /> index at which the range starts.</param>
-    /// <param name="length">The length of the range.</param>
-    /// <returns>A shallow copy of a range of elements in the source <see cref="SegmentedList{T}" />.</returns>
+    /// <param name="start">
+    /// The zero-based <see cref="SegmentedList{T}" /> index at which the range starts.
+    /// </param>
+    /// <param name="length">
+    /// The length of the range.
+    /// </param>
+    /// <returns>
+    /// A shallow copy of a range of elements in the source <see cref="SegmentedList{T}" />.
+    /// </returns>
     /// <exception cref="ArgumentOutOfRangeException">
     /// <paramref name="start" /> is less than 0.
     /// -or-
     /// <paramref name="length" /> is less than 0.
     /// </exception>
-    /// <exception cref="ArgumentException"><paramref name="start" /> and <paramref name="length" /> do not denote a valid range of elements in the <see cref="SegmentedList{T}" />.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="start" /> and <paramref name="length" /> do not denote a valid range of elements in the <see cref="SegmentedList{T}" />.
+    /// </exception>
     public SegmentedList<T> Slice(int start, int length) => GetRange(start, length);
 
     // Returns the index of the first occurrence of a given value in a range of

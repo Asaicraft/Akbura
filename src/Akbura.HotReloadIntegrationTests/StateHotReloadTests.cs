@@ -72,6 +72,67 @@ public sealed class StateHotReloadTests
         }, CancellationToken.None);
     }
 
+    [Fact]
+    [Trait("Category", "ClrHotReload")]
+    public async Task EmptyComponent_AddsItsFirstOrdinaryAndHookStatesToTheSameOwner()
+    {
+        var testName = typeof(StateHotReloadTests).FullName + "." + nameof(EmptyComponent_AddsItsFirstOrdinaryAndHookStatesToTheSameOwner);
+        if (!HotReloadChildProcess.IsChild(testName))
+        {
+            await HotReloadChildProcess.RunAsync(testName);
+            return;
+        }
+
+        const string original = "using Avalonia.Controls;\nnamespace Demo;\n<TextBlock Text={EmptyTextForTest()} />";
+        const string updated =
+            """
+            using Avalonia.Controls;
+            using Akbura.Hooks;
+            namespace Demo;
+            state int count = CreateInitialCount();
+            state int doubled = useSelect(count, value => value * 2);
+            <TextBlock Text={count.ToString() + ":" + doubled.ToString()} />
+            """;
+        var compilation = new AkburaCompilationSession(original, OwnerSource);
+        using var reload = new ClrHotReloadSession(compilation.Compilation, "Demo.Counter");
+        var session = HeadlessUnitTestSession.GetOrStartForAssembly(typeof(StateHotReloadTests).Assembly);
+        await session.Dispatch(() =>
+        {
+            var owner = Assert.IsAssignableFrom<AkburaControl>(Activator.CreateInstance(reload.ComponentType));
+            var window = new Window { Content = owner };
+            try
+            {
+                window.Show();
+                var text = Assert.IsType<TextBlock>(owner.Child);
+                Assert.Empty(GetStates(owner));
+                Assert.Equal("empty", text.Text);
+                Assert.Equal(0, ReadInitializations(owner));
+
+                reload.ApplyUpdate(compilation.Update(updated));
+                reload.DispatchMetadataUpdateHandlers();
+                var states = GetStates(owner);
+                Assert.Equal(2, states.Length);
+                var updatedText = Assert.IsType<TextBlock>(owner.Child);
+                Assert.Equal("0:0", updatedText.Text);
+                Assert.Equal(1, ReadInitializations(owner));
+                Assert.IsType<State<int>>(states[0]).Value = 42;
+                Assert.Equal("42:84", updatedText.Text);
+                Assert.True(states == GetStates(owner));
+                Assert.Same(owner, window.Content);
+                Assert.Same(text, owner.Child);
+                Assert.Same(reload.Assembly, owner.GetType().Assembly);
+                Assert.DoesNotContain(reload.ComponentType.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly),
+                    field => field.Name is "__states" or "__previousHookStates" ||
+                        field.Name.StartsWith("__state_", StringComparison.Ordinal) ||
+                        field.Name.StartsWith("__previousHookState_", StringComparison.Ordinal));
+            }
+            finally
+            {
+                window.Close();
+            }
+        }, CancellationToken.None);
+    }
+
     private static ImmutableArray<State> GetStates(AkburaControl owner) =>
         Assert.IsType<ImmutableArray<State>>(owner.GetType().GetProperty("StatesForTest")!.GetValue(owner));
 
@@ -234,6 +295,7 @@ public sealed class StateHotReloadTests
             public Counter() : base(AkburaEngine.Empty) { }
             public int Initializations { get; private set; }
             public ImmutableArray<State> StatesForTest => GetStates();
+            private string EmptyTextForTest() => "empty";
             private int CreateInitialCount() { Initializations++; return 0; }
         }
         """;

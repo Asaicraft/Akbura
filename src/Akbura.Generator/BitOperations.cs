@@ -30,47 +30,63 @@ public static class BitOperations
     /// <summary>
     /// Evaluate whether a given integral value is a power of 2.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsPow2(int value) => (value & (value - 1)) == 0 && value > 0;
 
     /// <summary>
     /// Evaluate whether a given integral value is a power of 2.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsPow2(uint value) => (value & (value - 1)) == 0 && value != 0;
 
     /// <summary>
     /// Evaluate whether a given integral value is a power of 2.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsPow2(long value) => (value & (value - 1)) == 0 && value > 0;
 
     /// <summary>
     /// Evaluate whether a given integral value is a power of 2.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsPow2(ulong value) => (value & (value - 1)) == 0 && value != 0;
 
     /// <summary>
     /// Evaluate whether a given integral value is a power of 2.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsPow2(nint value) => (value & (value - 1)) == 0 && value > 0;
 
     /// <summary>
     /// Evaluate whether a given integral value is a power of 2.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsPow2(nuint value) => (value & (value - 1)) == 0 && value != 0;
 
-    /// <summary>Round the given integral value up to a power of 2.</summary>
-    /// <param name="value">The value.</param>
+    /// <summary>
+    /// Round the given integral value up to a power of 2.
+    /// </summary>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     /// <returns>
     /// The smallest power of 2 which is greater than or equal to <paramref name="value"/>.
     /// If <paramref name="value"/> is 0 or the result overflows, returns 0.
@@ -91,7 +107,9 @@ public static class BitOperations
     /// <summary>
     /// Round the given integral value up to a power of 2.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     /// <returns>
     /// The smallest power of 2 which is greater than or equal to <paramref name="value"/>.
     /// If <paramref name="value"/> is 0 or the result overflows, returns 0.
@@ -113,7 +131,9 @@ public static class BitOperations
     /// <summary>
     /// Round the given integral value up to a power of 2.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     /// <returns>
     /// The smallest power of 2 which is greater than or equal to <paramref name="value"/>.
     /// If <paramref name="value"/> is 0 or the result overflows, returns 0.
@@ -132,7 +152,9 @@ public static class BitOperations
     /// Count the number of leading zero bits in a mask.
     /// Similar in behavior to the x86 instruction LZCNT.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int LeadingZeroCount(uint value)
     {
@@ -150,7 +172,9 @@ public static class BitOperations
     /// Count the number of leading zero bits in a mask.
     /// Similar in behavior to the x86 instruction LZCNT.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int LeadingZeroCount(ulong value)
     {
@@ -169,7 +193,9 @@ public static class BitOperations
     /// Count the number of leading zero bits in a mask.
     /// Similar in behavior to the x86 instruction LZCNT.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int LeadingZeroCount(nuint value)
     {
@@ -184,7 +210,9 @@ public static class BitOperations
     /// Returns the integer (floor) log of the specified value, base 2.
     /// Note that by convention, input value 0 returns 0 since log(0) is undefined.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Log2(uint value)
     {
@@ -200,7 +228,9 @@ public static class BitOperations
     /// Returns the integer (floor) log of the specified value, base 2.
     /// Note that by convention, input value 0 returns 0 since log(0) is undefined.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Log2(ulong value)
     {
@@ -220,7 +250,9 @@ public static class BitOperations
     /// Returns the integer (floor) log of the specified value, base 2.
     /// Note that by convention, input value 0 returns 0 since log(0) is undefined.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Log2(nuint value)
     {
@@ -236,7 +268,9 @@ public static class BitOperations
     /// Note that by convention, input value 0 returns 0 since Log(0) is undefined.
     /// Does not directly use any hardware intrinsics, nor does it incur branching.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     private static int Log2SoftwareFallback(uint value)
     {
         // No AggressiveInlining due to large method size
@@ -253,8 +287,12 @@ public static class BitOperations
         return Log2DeBruijn[(int)((value * 0x07C4ACDDu) >> 27)];
     }
 
-    /// <summary>Returns the integer (ceiling) log of the specified value, base 2.</summary>
-    /// <param name="value">The value.</param>
+    /// <summary>
+    /// Returns the integer (ceiling) log of the specified value, base 2.
+    /// </summary>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static int Log2Ceiling(uint value)
     {
@@ -266,8 +304,12 @@ public static class BitOperations
         return result;
     }
 
-    /// <summary>Returns the integer (ceiling) log of the specified value, base 2.</summary>
-    /// <param name="value">The value.</param>
+    /// <summary>
+    /// Returns the integer (ceiling) log of the specified value, base 2.
+    /// </summary>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static int Log2Ceiling(ulong value)
     {
@@ -283,7 +325,9 @@ public static class BitOperations
     /// Returns the population count (number of bits set) of a mask.
     /// Similar in behavior to the x86 instruction POPCNT.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int PopCount(uint value)
     {
@@ -308,7 +352,9 @@ public static class BitOperations
     /// Returns the population count (number of bits set) of a mask.
     /// Similar in behavior to the x86 instruction POPCNT.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int PopCount(ulong value)
     {
@@ -338,7 +384,9 @@ public static class BitOperations
     /// Returns the population count (number of bits set) of a mask.
     /// Similar in behavior to the x86 instruction POPCNT.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int PopCount(nuint value)
     {
@@ -353,7 +401,9 @@ public static class BitOperations
     /// Count the number of trailing zero bits in an integer value.
     /// Similar in behavior to the x86 instruction TZCNT.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int TrailingZeroCount(int value)
         => TrailingZeroCount((uint)value);
@@ -362,7 +412,9 @@ public static class BitOperations
     /// Count the number of trailing zero bits in an integer value.
     /// Similar in behavior to the x86 instruction TZCNT.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int TrailingZeroCount(uint value)
     {
@@ -384,7 +436,9 @@ public static class BitOperations
     /// Count the number of trailing zero bits in a mask.
     /// Similar in behavior to the x86 instruction TZCNT.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int TrailingZeroCount(long value)
         => TrailingZeroCount((ulong)value);
@@ -393,7 +447,9 @@ public static class BitOperations
     /// Count the number of trailing zero bits in a mask.
     /// Similar in behavior to the x86 instruction TZCNT.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int TrailingZeroCount(ulong value)
     {
@@ -411,7 +467,9 @@ public static class BitOperations
     /// Count the number of trailing zero bits in a mask.
     /// Similar in behavior to the x86 instruction TZCNT.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int TrailingZeroCount(nint value)
     {
@@ -426,7 +484,9 @@ public static class BitOperations
     /// Count the number of trailing zero bits in a mask.
     /// Similar in behavior to the x86 instruction TZCNT.
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int TrailingZeroCount(nuint value)
     {
@@ -441,10 +501,14 @@ public static class BitOperations
     /// Rotates the specified value left by the specified number of bits.
     /// Similar in behavior to the x86 instruction ROL.
     /// </summary>
-    /// <param name="value">The value to rotate.</param>
+    /// <param name="value">
+    /// The value to rotate.
+    /// </param>
     /// <param name="offset">The number of bits to rotate by.
     /// Any value outside the range [0..31] is treated as congruent mod 32.</param>
-    /// <returns>The rotated value.</returns>
+    /// <returns>
+    /// The rotated value.
+    /// </returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static uint RotateLeft(uint value, int offset)
         => (value << offset) | (value >> (32 - offset));
@@ -453,10 +517,14 @@ public static class BitOperations
     /// Rotates the specified value left by the specified number of bits.
     /// Similar in behavior to the x86 instruction ROL.
     /// </summary>
-    /// <param name="value">The value to rotate.</param>
+    /// <param name="value">
+    /// The value to rotate.
+    /// </param>
     /// <param name="offset">The number of bits to rotate by.
     /// Any value outside the range [0..63] is treated as congruent mod 64.</param>
-    /// <returns>The rotated value.</returns>
+    /// <returns>
+    /// The rotated value.
+    /// </returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ulong RotateLeft(ulong value, int offset)
         => (value << offset) | (value >> (64 - offset));
@@ -465,11 +533,15 @@ public static class BitOperations
     /// Rotates the specified value left by the specified number of bits.
     /// Similar in behavior to the x86 instruction ROL.
     /// </summary>
-    /// <param name="value">The value to rotate.</param>
+    /// <param name="value">
+    /// The value to rotate.
+    /// </param>
     /// <param name="offset">The number of bits to rotate by.
     /// Any value outside the range [0..31] is treated as congruent mod 32 on a 32-bit process,
     /// and any value outside the range [0..63] is treated as congruent mod 64 on a 64-bit process.</param>
-    /// <returns>The rotated value.</returns>
+    /// <returns>
+    /// The rotated value.
+    /// </returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static nuint RotateLeft(nuint value, int offset)
     {
@@ -484,10 +556,14 @@ public static class BitOperations
     /// Rotates the specified value right by the specified number of bits.
     /// Similar in behavior to the x86 instruction ROR.
     /// </summary>
-    /// <param name="value">The value to rotate.</param>
+    /// <param name="value">
+    /// The value to rotate.
+    /// </param>
     /// <param name="offset">The number of bits to rotate by.
     /// Any value outside the range [0..31] is treated as congruent mod 32.</param>
-    /// <returns>The rotated value.</returns>
+    /// <returns>
+    /// The rotated value.
+    /// </returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static uint RotateRight(uint value, int offset)
         => (value >> offset) | (value << (32 - offset));
@@ -496,10 +572,14 @@ public static class BitOperations
     /// Rotates the specified value right by the specified number of bits.
     /// Similar in behavior to the x86 instruction ROR.
     /// </summary>
-    /// <param name="value">The value to rotate.</param>
+    /// <param name="value">
+    /// The value to rotate.
+    /// </param>
     /// <param name="offset">The number of bits to rotate by.
     /// Any value outside the range [0..63] is treated as congruent mod 64.</param>
-    /// <returns>The rotated value.</returns>
+    /// <returns>
+    /// The rotated value.
+    /// </returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ulong RotateRight(ulong value, int offset)
         => (value >> offset) | (value << (64 - offset));
@@ -508,11 +588,15 @@ public static class BitOperations
     /// Rotates the specified value right by the specified number of bits.
     /// Similar in behavior to the x86 instruction ROR.
     /// </summary>
-    /// <param name="value">The value to rotate.</param>
+    /// <param name="value">
+    /// The value to rotate.
+    /// </param>
     /// <param name="offset">The number of bits to rotate by.
     /// Any value outside the range [0..31] is treated as congruent mod 32 on a 32-bit process,
     /// and any value outside the range [0..63] is treated as congruent mod 64 on a 64-bit process.</param>
-    /// <returns>The rotated value.</returns>
+    /// <returns>
+    /// The rotated value.
+    /// </returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static nuint RotateRight(nuint value, int offset)
     {
@@ -548,10 +632,14 @@ public static class BitOperations
     /// Flip the bit at a specific position in a given value.
     /// Similar in behavior to the x86 instruction BTC (Bit Test and Complement).
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     /// <param name="index">The zero-based index of the bit to flip.
     /// Any value outside the range [0..31] is treated as congruent mod 32.</param>
-    /// <returns>The new value.</returns>
+    /// <returns>
+    /// The new value.
+    /// </returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static uint FlipBit(uint value, int index)
     {
@@ -562,10 +650,14 @@ public static class BitOperations
     /// Flip the bit at a specific position in a given value.
     /// Similar in behavior to the x86 instruction BTC (Bit Test and Complement).
     /// </summary>
-    /// <param name="value">The value.</param>
+    /// <param name="value">
+    /// The value.
+    /// </param>
     /// <param name="index">The zero-based index of the bit to flip.
     /// Any value outside the range [0..63] is treated as congruent mod 64.</param>
-    /// <returns>The new value.</returns>
+    /// <returns>
+    /// The new value.
+    /// </returns>
     internal static ulong FlipBit(ulong value, int index)
     {
         return value ^ (1ul << index);

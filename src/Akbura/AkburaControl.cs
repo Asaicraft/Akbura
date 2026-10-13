@@ -339,7 +339,9 @@ public abstract partial class AkburaControl : Control, IComponentTree
 
     protected abstract Control FirstUpdate();
 
-    /// <summary>Lets the generated structural renderer initialize and update in one hook frame pass.</summary>
+    /// <summary>
+    /// Lets the generated structural renderer initialize and update in one hook frame pass.
+    /// </summary>
     [EditorBrowsable(EditorBrowsableState.Never)]
     [Browsable(false)]
     protected virtual bool __AkburaUsesSinglePassRender => false;
@@ -382,9 +384,15 @@ public abstract partial class AkburaControl : Control, IComponentTree
     /// <summary>
     /// Creates an instance state from a state description.
     /// </summary>
-    /// <typeparam name="T">The state value type.</typeparam>
-    /// <param name="info">The static state description.</param>
-    /// <returns>A state attached to this component.</returns>
+    /// <typeparam name="T">
+    /// The state value type.
+    /// </typeparam>
+    /// <param name="info">
+    /// The static state description.
+    /// </param>
+    /// <returns>
+    /// A state attached to this component.
+    /// </returns>
     protected State<T> CreateState<T>(StateInfo<T> info)
     {
         ArgumentNullException.ThrowIfNull(info);
@@ -402,7 +410,9 @@ public abstract partial class AkburaControl : Control, IComponentTree
     /// <summary>
     /// Suppresses component updates until the returned scope is disposed.
     /// </summary>
-    /// <returns>An update suppression scope.</returns>
+    /// <returns>
+    /// An update suppression scope.
+    /// </returns>
     protected IDisposable SuppressUpdates()
     {
         _updateSuppressionDepth++;
@@ -415,7 +425,9 @@ public abstract partial class AkburaControl : Control, IComponentTree
     /// <remarks>
     /// Implementations must cache and return the same immutable array instance on every call.
     /// </remarks>
-    /// <returns>The component parameter descriptors.</returns>
+    /// <returns>
+    /// The component parameter descriptors.
+    /// </returns>
     protected abstract ImmutableArray<Parameter> GetParameters();
 
     /// <summary>
@@ -424,7 +436,9 @@ public abstract partial class AkburaControl : Control, IComponentTree
     /// <remarks>
     /// Implementations must cache and return the same immutable array instance on every call.
     /// </remarks>
-    /// <returns>The component command properties.</returns>
+    /// <returns>
+    /// The component command properties.
+    /// </returns>
     protected abstract ImmutableArray<AvaloniaProperty<IAkburaCommand>> GetCommands();
 
     /// <summary>
@@ -433,7 +447,9 @@ public abstract partial class AkburaControl : Control, IComponentTree
     /// <remarks>
     /// Implementations must cache and return the same immutable array instance on every call.
     /// </remarks>
-    /// <returns>The component injected-service descriptors.</returns>
+    /// <returns>
+    /// The component injected-service descriptors.
+    /// </returns>
     protected abstract ImmutableArray<InjectService> GetServices();
 
     /// <summary>
@@ -442,7 +458,9 @@ public abstract partial class AkburaControl : Control, IComponentTree
     /// <remarks>
     /// Implementations must cache and return the same immutable array instance on every call.
     /// </remarks>
-    /// <returns>The component states.</returns>
+    /// <returns>
+    /// The component states.
+    /// </returns>
     protected abstract ImmutableArray<State> GetStates();
 
     [EditorBrowsable(EditorBrowsableState.Never)]
@@ -639,13 +657,27 @@ public abstract partial class AkburaControl : Control, IComponentTree
     /// <summary>
     /// Registers one invocation of a render use hook in the current frame.
     /// </summary>
-    /// <typeparam name="TState">The persistent runtime state owned by this hook slot.</typeparam>
-    /// <typeparam name="TArguments">The arguments captured for the current frame.</typeparam>
-    /// <param name="key">The reference identity of a compatible hook contract.</param>
-    /// <param name="arguments">The arguments for the current frame.</param>
-    /// <param name="createState">Creates the slot state on the first completed frame.</param>
-    /// <param name="apply">Applies the current arguments after each completed frame.</param>
-    /// <param name="detach">Stops resources owned by the slot when the component detaches.</param>
+    /// <typeparam name="TState">
+    /// The persistent runtime state owned by this hook slot.
+    /// </typeparam>
+    /// <typeparam name="TArguments">
+    /// The arguments captured for the current frame.
+    /// </typeparam>
+    /// <param name="key">
+    /// The reference identity of a compatible hook contract.
+    /// </param>
+    /// <param name="arguments">
+    /// The arguments for the current frame.
+    /// </param>
+    /// <param name="createState">
+    /// Creates the slot state on the first completed frame.
+    /// </param>
+    /// <param name="apply">
+    /// Applies the current arguments after each completed frame.
+    /// </param>
+    /// <param name="detach">
+    /// Stops resources owned by the slot when the component detaches.
+    /// </param>
     /// <remarks>
     /// Hook calls must remain in the same order and count between completed render frames.
     /// Methods marked with <see cref="CompilerAnotations.UseHookAttribute"/> can use this
@@ -851,6 +883,14 @@ public abstract partial class AkburaControl : Control, IComponentTree
     private void CommitUseHookFrame()
     {
         CommitHookStates();
+        if (_runtimeStates is { HasPendingReconciliation: true } states)
+        {
+            var current = GetStates();
+            ReconcileStateResourcesForHotReload(states.PreviousSnapshotForHotReload, current);
+            states.PruneOrdinaryStates(current);
+            states.CompleteHotReloadReconciliation();
+        }
+
         if (_diagnosticStatesChangedPending)
         {
             _diagnosticStatesChangedPending = false;
@@ -1098,7 +1138,9 @@ public abstract partial class AkburaControl : Control, IComponentTree
     /// <summary>
     /// Called when the <see cref="Child"/> property changes.
     /// </summary>
-    /// <param name="e">The event args.</param>
+    /// <param name="e">
+    /// The event args.
+    /// </param>
     private void ChildChanged(AvaloniaPropertyChangedEventArgs e)
     {
         var oldChild = (Control?)e.OldValue;

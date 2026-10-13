@@ -222,10 +222,7 @@ internal readonly ref struct StateWriter
 
     private void WriteStateField(in ComponentStatePlan plan)
     {
-        if (!plan.IsComposable)
-        {
-            _writer.WriteLine("#if !DEBUG");
-        }
+        _writer.WriteLine("#if !DEBUG");
 
         _writer.Write("private global::Akbura.ComponentTree.State<");
         WriteValueType(plan);
@@ -235,10 +232,7 @@ internal readonly ref struct StateWriter
             plan.GeneratedName);
         _writer.WriteLine(";");
 
-        if (!plan.IsComposable)
-        {
-            _writer.WriteLine("#endif");
-        }
+        _writer.WriteLine("#endif");
     }
 
     private void WriteStateAccessor(in ComponentStatePlan plan)
@@ -251,32 +245,35 @@ internal readonly ref struct StateWriter
             plan.GeneratedName);
         _writer.WriteLine(" =>");
         _writer.CurrentIndent += _writer.TabSize;
-        if (plan.IsComposable)
-        {
-            GeneratedMemberNameWriter.WriteStateField(
-                _writer,
-                plan.GeneratedName);
-            _writer.WriteLine(" ?? throw new global::System.InvalidOperationException(");
-            _writer.CurrentIndent += _writer.TabSize;
-            _writer.WriteLine("\"The composed hook state is not prepared for this frame.\");");
-            _writer.CurrentIndent -= _writer.TabSize * 2;
-            return;
-        }
-
         _writer.WriteLine("#if DEBUG");
-        _writer.Write("RuntimeStates.GetOrCreate<");
+        _writer.Write(plan.IsComposable ? "RuntimeStates.GetRequiredHook<" : "RuntimeStates.GetOrCreate<");
         WriteValueType(plan);
         _writer.Write(">(");
         _writer.WriteStringLiteral(plan.HotReloadKey);
-        _writer.Write(", () => CreateState(");
-        GeneratedMemberNameWriter.WriteStateInfoField(
-            _writer,
-            plan.GeneratedName);
-        _writer.WriteLine("));");
+        if (plan.IsComposable)
+        {
+            _writer.WriteLine(");");
+        }
+        else
+        {
+            _writer.Write(", () => CreateState(");
+            GeneratedMemberNameWriter.WriteStateInfoField(_writer, plan.GeneratedName);
+            _writer.WriteLine("));");
+        }
+
         _writer.WriteLine("#else");
-        GeneratedMemberNameWriter.WriteStateField(
-            _writer,
-            plan.GeneratedName);
+        GeneratedMemberNameWriter.WriteStateField(_writer, plan.GeneratedName);
+        if (plan.IsComposable)
+        {
+            _writer.WriteLine(" ?? throw new global::System.InvalidOperationException(");
+            _writer.CurrentIndent += _writer.TabSize;
+            _writer.WriteLine("\"The composed hook state is not prepared for this frame.\");");
+            _writer.CurrentIndent -= _writer.TabSize;
+            _writer.WriteLine("#endif");
+            _writer.CurrentIndent -= _writer.TabSize;
+            return;
+        }
+
         _writer.Write(" ??= CreateState(");
         GeneratedMemberNameWriter.WriteStateInfoField(
             _writer,

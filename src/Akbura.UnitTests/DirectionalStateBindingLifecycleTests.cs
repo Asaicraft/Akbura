@@ -217,6 +217,38 @@ public sealed class DirectionalStateBindingLifecycleTests
         Assert.NotSame(retained, component.GetOrCreate("count", () => new State<int>(0)));
     }
 
+    [Fact]
+    public async Task RuntimeReconciliation_RetainsRemovedBindingResourcesUntilAFrameCommits()
+    {
+        var session = AvaloniaHeadlessTestSession.GetSession();
+        await session.Dispatch(() =>
+        {
+            var vm = new CountingVm { Name = "Initial" };
+            var component = new TransactionalReconciliationComponent(vm);
+            var window = new Window { Content = component };
+            try
+            {
+                window.Show();
+                var previous = component.NameState;
+                Assert.Equal(1, vm.PropertyChangedSubscriberCount);
+                component.ThrowOnUpdate = true;
+
+                Assert.Throws<InvalidOperationException>(component.RemoveBindingForHotReload);
+
+                Assert.Equal(1, vm.PropertyChangedSubscriberCount);
+                Assert.Same(previous, component.NameState);
+                component.ThrowOnUpdate = false;
+                component.InvalidState();
+                Assert.Equal(0, vm.PropertyChangedSubscriberCount);
+                Assert.NotSame(previous, component.CreateReplacementForTest());
+            }
+            finally
+            {
+                window.Close();
+            }
+        }, CancellationToken.None);
+    }
+
     private static CompiledBindingPath CreatePropertyPath<TSource, TValue>(string name, Func<TSource, TValue> getter)
         where TSource : class
     {
@@ -360,6 +392,68 @@ public sealed class DirectionalStateBindingLifecycleTests
         protected override ImmutableArray<InjectService> GetServices() => s_services;
 
         protected override ImmutableArray<State> GetStates() => s_states;
+    }
+
+    private sealed class TransactionalReconciliationComponent(CountingVm vm) : AkburaControl(AkburaEngine.Empty)
+    {
+        private readonly Border _root = new();
+        private bool _includeBinding = true;
+
+        public bool ThrowOnUpdate { get; set; }
+
+        public State<string> NameState => RuntimeStates.GetOrCreate("name", () => CreateState(
+            StateInfo<string>.FromState("name", _ => StateBindings.CreateOut(
+                static value => (string)value!,
+                () => vm,
+                static () => s_countingVmNamePath,
+                pathLength: 1,
+                requiresNonNullSource: true))));
+
+        public void RemoveBindingForHotReload()
+        {
+            _includeBinding = false;
+            RuntimeStates.InvalidateSnapshotForHotReload();
+            ApplyHotReload(static _ => { });
+        }
+
+        public State<string> CreateReplacementForTest() =>
+            RuntimeStates.GetOrCreate("name", () => new State<string>("Replacement"));
+
+        protected override void PrepareHookStates()
+        {
+            RuntimeStates.BeginFrame();
+            if (_includeBinding)
+            {
+                _ = NameState;
+            }
+        }
+
+        protected override void CommitHookStates() => RuntimeStates.CommitFrame();
+
+        protected override void AbortHookStates() => RuntimeStates.AbortFrame();
+
+        protected override void ResetHookStatesForHotReload() => RuntimeStates.ResetHookBindingsForHotReload();
+
+        protected override Control FirstUpdate() => _root;
+
+        protected override Control Update()
+        {
+            if (ThrowOnUpdate)
+            {
+                throw new InvalidOperationException("Frame failed.");
+            }
+
+            return _root;
+        }
+
+        protected override ImmutableArray<Parameter> GetParameters() => [];
+
+        protected override ImmutableArray<AvaloniaProperty<IAkburaCommand>> GetCommands() => [];
+
+        protected override ImmutableArray<InjectService> GetServices() => [];
+
+        protected override ImmutableArray<State> GetStates() =>
+            RuntimeStates.GetSnapshot(() => _includeBinding ? [NameState] : []);
     }
 
     private sealed class TestSubject<T> : IObservable<T>

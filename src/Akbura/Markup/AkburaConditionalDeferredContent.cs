@@ -5,7 +5,9 @@ using System.ComponentModel;
 
 namespace Akbura.Markup;
 
-/// <summary>Preserves native deferred services without freezing a conditional factory's parent name scope.</summary>
+/// <summary>
+/// Preserves native deferred services without freezing a conditional factory's parent name scope.
+/// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
 [Browsable(false)]
 public sealed class AkburaConditionalDeferredContent<T> : IDeferredContent where T : Control

@@ -7,7 +7,9 @@ public sealed partial class AkburaRenderState
 {
     private Dictionary<long, ConditionalNameScope>? _conditionalNameScopes;
 
-    /// <summary>Gets the native name scope owned by the selected lexical branch.</summary>
+    /// <summary>
+    /// Gets the native name scope owned by the selected lexical branch.
+    /// </summary>
     public INameScope GetConditionalNameScope(int regionId, int branchId, INameScope? parent)
     {
         var regions = _pendingRevision?.ConditionalRegions ?? _conditionalRegions;
@@ -23,13 +25,17 @@ public sealed partial class AkburaRenderState
         return GetConditionalNameScopeCore(key, parent);
     }
 
-    /// <summary>Gets the storage-local base name scope.</summary>
+    /// <summary>
+    /// Gets the storage-local base name scope.
+    /// </summary>
     public INameScope GetLocalNameScope(INameScope? parent)
     {
         return GetConditionalNameScopeCore(0, parent);
     }
 
-    /// <summary>Supplies the current lexical scope to a retained local factory.</summary>
+    /// <summary>
+    /// Supplies the current lexical scope to a retained local factory.
+    /// </summary>
     public AkburaRetainedFactoryServiceProvider CreateRetainedFactoryServiceProvider(
         INameScope nativeScope, IServiceProvider fallback)
     {
@@ -57,7 +63,9 @@ public sealed partial class AkburaRenderState
             : null;
     }
 
-    /// <summary>Finds the current lexical scope of an actual enclosing render owner.</summary>
+    /// <summary>
+    /// Finds the current lexical scope of an actual enclosing render owner.
+    /// </summary>
     public INameScope? GetNameScopeForNode(object ownerInstance)
     {
         ArgumentNullException.ThrowIfNull(ownerInstance);

@@ -3,7 +3,9 @@ using System.ComponentModel;
 
 namespace Akbura.HotReload;
 
-/// <summary>Validates an indexed destination before a loop enumerates or constructs children.</summary>
+/// <summary>
+/// Validates an indexed destination before a loop enumerates or constructs children.
+/// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
 [Browsable(false)]
 public static class AkburaForeachDestination

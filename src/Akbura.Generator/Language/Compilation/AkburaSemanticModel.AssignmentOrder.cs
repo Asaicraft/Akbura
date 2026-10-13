@@ -13,7 +13,9 @@ namespace Akbura.Language;
 
 internal abstract partial class AkburaSemanticModel
 {
-    /// <summary>Orders attributes, property elements and implicit content in one object-local graph.</summary>
+    /// <summary>
+    /// Orders attributes, property elements and implicit content in one object-local graph.
+    /// </summary>
     internal ImmutableArray<AkburaSyntax> GetMarkupAssignmentOrder(
         MarkupElementSyntax element, out ImmutableArray<AkburaSemanticDiagnostic> diagnostics)
     {

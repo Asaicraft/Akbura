@@ -130,6 +130,8 @@ public enum AkburaCSharpCompletionContextKind
     /// </summary>
     CommandParameterList,
 
-    /// <summary>A synchronous foreach declaration and source header embedded in markup.</summary>
+    /// <summary>
+    /// A synchronous foreach declaration and source header embedded in markup.
+    /// </summary>
     ForeachHeader,
 }

@@ -31,8 +31,12 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
     /// <summary>
     /// Initializes a new instance of the <see cref="SyntaxNodeOrTokenList"/> structure.
     /// </summary>
-    /// <param name="node">The underlying syntax node.</param>
-    /// <param name="index">The index.</param>
+    /// <param name="node">
+    /// The underlying syntax node.
+    /// </param>
+    /// <param name="index">
+    /// The index.
+    /// </param>
     public SyntaxNodeOrTokenList(AkburaSyntax? node, int index)
         : this()
     {
@@ -47,7 +51,9 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
     /// <summary>
     /// Create a <see cref="SyntaxNodeOrTokenList"/> from a sequence of <see cref="SyntaxNodeOrToken"/>.
     /// </summary>
-    /// <param name="nodesAndTokens">The sequence of nodes and tokens</param>
+    /// <param name="nodesAndTokens">
+    /// The sequence of nodes and tokens
+    /// </param>
     public SyntaxNodeOrTokenList(IEnumerable<SyntaxNodeOrToken> nodesAndTokens)
         : this(CreateNode(nodesAndTokens), 0)
     {
@@ -56,7 +62,9 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
     /// <summary>
     /// Create a <see cref="SyntaxNodeOrTokenList"/> from one or more <see cref="SyntaxNodeOrToken"/>.
     /// </summary>
-    /// <param name="nodesAndTokens">The nodes and tokens</param>
+    /// <param name="nodesAndTokens">
+    /// The nodes and tokens
+    /// </param>
     public SyntaxNodeOrTokenList(params SyntaxNodeOrToken[] nodesAndTokens)
         : this(CreateNodeFromSpan(nodesAndTokens), 0)
     {
@@ -130,7 +138,9 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
     /// <summary>
     /// Gets the <see cref="SyntaxNodeOrToken"/> at the specified index. 
     /// </summary>
-    /// <exception cref="IndexOutOfRangeException"><paramref name="index"/> is out of range.</exception>
+    /// <exception cref="IndexOutOfRangeException">
+    /// <paramref name="index"/> is out of range.
+    /// </exception>
     public SyntaxNodeOrToken this[int index]
     {
         get
@@ -242,8 +252,12 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
     /// <summary>
     /// Returns the index from the list for the given <see cref="SyntaxNodeOrToken"/>.
     /// </summary>
-    /// <param name="nodeOrToken">The node or token to search for in the list.</param>
-    /// <returns>The index of the found nodeOrToken, or -1 if it wasn't found</returns>
+    /// <param name="nodeOrToken">
+    /// The node or token to search for in the list.
+    /// </param>
+    /// <returns>
+    /// The index of the found nodeOrToken, or -1 if it wasn't found
+    /// </returns>
     public int IndexOf(SyntaxNodeOrToken nodeOrToken)
     {
         var i = 0;
@@ -263,7 +277,9 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
     /// <summary>
     /// Indicates whether there is any element in the list.
     /// </summary>
-    /// <returns><c>true</c> if there are any elements in the list, else <c>false</c>.</returns>
+    /// <returns>
+    /// <c>true</c> if there are any elements in the list, else <c>false</c>.
+    /// </returns>
     public bool Any()
     {
         return _node != null;
@@ -272,10 +288,18 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
     /// <summary>
     /// Copies a given count of elements into the given array at specified offsets.
     /// </summary>
-    /// <param name="offset">The offset to start copying from.</param>
-    /// <param name="array">The array to copy the elements into.</param>
-    /// <param name="arrayOffset">The array offset to start writing to.</param>
-    /// <param name="count">The count of elements to copy.</param>
+    /// <param name="offset">
+    /// The offset to start copying from.
+    /// </param>
+    /// <param name="array">
+    /// The array to copy the elements into.
+    /// </param>
+    /// <param name="arrayOffset">
+    /// The array offset to start writing to.
+    /// </param>
+    /// <param name="count">
+    /// The count of elements to copy.
+    /// </param>
     public void CopyTo(int offset, GreenNode?[] array, int arrayOffset, int count)
     {
         for (var i = 0; i < count; i++)
@@ -287,7 +311,9 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
     /// <summary>
     /// Creates a new <see cref="SyntaxNodeOrTokenList"/> with the specified node or token added to the end.
     /// </summary>
-    /// <param name="nodeOrToken">The node or token to add.</param>
+    /// <param name="nodeOrToken">
+    /// The node or token to add.
+    /// </param>
     public SyntaxNodeOrTokenList Add(SyntaxNodeOrToken nodeOrToken)
     {
         return Insert(Count, nodeOrToken);
@@ -296,7 +322,9 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
     /// <summary>
     /// Creates a new <see cref="SyntaxNodeOrTokenList"/> with the specified nodes or tokens added to the end.
     /// </summary>
-    /// <param name="nodesOrTokens">The nodes or tokens to add.</param>
+    /// <param name="nodesOrTokens">
+    /// The nodes or tokens to add.
+    /// </param>
     public SyntaxNodeOrTokenList AddRange(IEnumerable<SyntaxNodeOrToken> nodesOrTokens)
     {
         return InsertRange(Count, nodesOrTokens);
@@ -305,8 +333,12 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
     /// <summary>
     /// Creates a new <see cref="SyntaxNodeOrTokenList"/> with the specified node or token inserted at the index.
     /// </summary>
-    /// <param name="index">The index to insert at.</param>
-    /// <param name="nodeOrToken">The node or token to insert.</param>
+    /// <param name="index">
+    /// The index to insert at.
+    /// </param>
+    /// <param name="nodeOrToken">
+    /// The node or token to insert.
+    /// </param>
     public SyntaxNodeOrTokenList Insert(int index, SyntaxNodeOrToken nodeOrToken)
     {
         if(nodeOrToken == default)
@@ -320,8 +352,12 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
     /// <summary>
     /// Creates a new <see cref="SyntaxNodeOrTokenList"/> with the specified nodes or tokens inserted at the index.
     /// </summary>
-    /// <param name="index">The index to insert at.</param>
-    /// <param name="nodesAndTokens">The nodes or tokens to insert.</param>
+    /// <param name="index">
+    /// The index to insert at.
+    /// </param>
+    /// <param name="nodesAndTokens">
+    /// The nodes or tokens to insert.
+    /// </param>
     public SyntaxNodeOrTokenList InsertRange(int index, IEnumerable<SyntaxNodeOrToken> nodesAndTokens)
     {
         if (index < 0 || index > Count)
@@ -366,7 +402,9 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
     /// <summary>
     /// Creates a new <see cref="SyntaxNodeOrTokenList"/> with the element at the specified index removed.
     /// </summary>
-    /// <param name="index">The index of the element to remove.</param>
+    /// <param name="index">
+    /// The index of the element to remove.
+    /// </param>
     public SyntaxNodeOrTokenList RemoveAt(int index)
     {
         if (index < 0 || index >= Count)
@@ -382,7 +420,9 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
     /// <summary>
     /// Creates a new <see cref="SyntaxNodeOrTokenList"/> with the specified element removed.
     /// </summary>
-    /// <param name="nodeOrTokenInList">The element to remove.</param>
+    /// <param name="nodeOrTokenInList">
+    /// The element to remove.
+    /// </param>
     public SyntaxNodeOrTokenList Remove(SyntaxNodeOrToken nodeOrTokenInList)
     {
         var index = IndexOf(nodeOrTokenInList);
@@ -397,8 +437,12 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
     /// <summary>
     /// Creates a new <see cref="SyntaxNodeOrTokenList"/> with the specified element replaced with a new node or token.
     /// </summary>
-    /// <param name="nodeOrTokenInList">The element to replace.</param>
-    /// <param name="newNodeOrToken">The new node or token.</param>
+    /// <param name="nodeOrTokenInList">
+    /// The element to replace.
+    /// </param>
+    /// <param name="newNodeOrToken">
+    /// The new node or token.
+    /// </param>
     public SyntaxNodeOrTokenList Replace(SyntaxNodeOrToken nodeOrTokenInList, SyntaxNodeOrToken newNodeOrToken)
     {
         if(nodeOrTokenInList == default)
@@ -412,8 +456,12 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
     /// <summary>
     /// Creates a new <see cref="SyntaxNodeOrTokenList"/> with the specified element replaced with a new nodes and tokens.
     /// </summary>
-    /// <param name="nodeOrTokenInList">The element to replace.</param>
-    /// <param name="newNodesAndTokens">The new nodes and tokens.</param>
+    /// <param name="nodeOrTokenInList">
+    /// The element to replace.
+    /// </param>
+    /// <param name="newNodesAndTokens">
+    /// The new nodes and tokens.
+    /// </param>
     public SyntaxNodeOrTokenList ReplaceRange(SyntaxNodeOrToken nodeOrTokenInList, IEnumerable<SyntaxNodeOrToken> newNodesAndTokens)
     {
         var index = IndexOf(nodeOrTokenInList);
@@ -470,8 +518,12 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
     /// <summary>
     /// Implements the operator ==.
     /// </summary>
-    /// <param name="left">The left SyntaxNodeOrTokenList</param>
-    /// <param name="right">The right SyntaxNodeOrTokenList</param>
+    /// <param name="left">
+    /// The left SyntaxNodeOrTokenList
+    /// </param>
+    /// <param name="right">
+    /// The right SyntaxNodeOrTokenList
+    /// </param>
     /// <returns>
     /// <c>true</c> if both lists equal, else <c>false</c>.
     /// </returns>
@@ -483,8 +535,12 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
     /// <summary>
     /// Implements the operator !=.
     /// </summary>
-    /// <param name="left">The left SyntaxNodeOrTokenList</param>
-    /// <param name="right">The right SyntaxNodeOrTokenList</param>
+    /// <param name="left">
+    /// The left SyntaxNodeOrTokenList
+    /// </param>
+    /// <param name="right">
+    /// The right SyntaxNodeOrTokenList
+    /// </param>
     /// <returns>
     /// <c>true</c> if both lists not equal, else <c>false</c>.
     /// </returns>
@@ -496,7 +552,9 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
     /// <summary>
     /// Indicates whether the current object is equal to another object of the same type.
     /// </summary>
-    /// <param name="other">An object to compare with this object.</param>
+    /// <param name="other">
+    /// An object to compare with this object.
+    /// </param>
     /// <returns>
     /// <c>true</c> if the current object is equal to the <paramref name="other"/> parameter; otherwise,
     /// <c>false</c>.
@@ -509,7 +567,9 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
     /// <summary>
     /// Determines whether the specified <see cref="object"/> is equal to this instance.
     /// </summary>
-    /// <param name="obj">The <see cref="object"/> to compare with this instance.</param>
+    /// <param name="obj">
+    /// The <see cref="object"/> to compare with this instance.
+    /// </param>
     /// <returns>
     ///   <c>true</c> if the specified <see cref="object"/> is equal to this instance; otherwise, <c>false</c>.
     /// </returns>
@@ -573,7 +633,9 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
         /// <returns>
         /// true if the enumerator was successfully advanced to the next element; false if the enumerator has passed the end of the collection.
         /// </returns>
-        /// <exception cref="InvalidOperationException">The collection was modified after the enumerator was created. </exception>
+        /// <exception cref="InvalidOperationException">
+        /// The collection was modified after the enumerator was created.
+        /// </exception>
         public bool MoveNext()
         {
             if (_index < _list.Count)
@@ -597,7 +659,9 @@ internal readonly struct SyntaxNodeOrTokenList : IEquatable<SyntaxNodeOrTokenLis
         /// <summary>
         /// Sets the enumerator to its initial position, which is before the first element in the collection.
         /// </summary>
-        /// <exception cref="InvalidOperationException">The collection was modified after the enumerator was created. </exception>
+        /// <exception cref="InvalidOperationException">
+        /// The collection was modified after the enumerator was created.
+        /// </exception>
         readonly void IEnumerator.Reset()
         {
             throw new NotSupportedException();

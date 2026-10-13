@@ -7,7 +7,9 @@ using System.Text;
 
 namespace Akbura.HotReloadIntegrationTests;
 
-/// <summary>Runs the production incremental generator over successive versions of one additional file.</summary>
+/// <summary>
+/// Runs the production incremental generator over successive versions of one additional file.
+/// </summary>
 internal sealed class AkburaCompilationSession
 {
     private readonly CSharpCompilation _baseCompilation;

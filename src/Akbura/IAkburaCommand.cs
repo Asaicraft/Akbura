@@ -14,15 +14,25 @@ namespace Akbura;
 /// </remarks>
 public interface IAkburaCommand: ICommand
 {
-    /// <summary>Gets an observable that reports whether one or more executions are running.</summary>
+    /// <summary>
+    /// Gets an observable that reports whether one or more executions are running.
+    /// </summary>
     public IObservable<bool> IsExecuting { get; }
 
-    /// <summary>Gets an observable that reports whether the command is currently available.</summary>
+    /// <summary>
+    /// Gets an observable that reports whether the command is currently available.
+    /// </summary>
     public new IObservable<bool> CanExecute { get; }
 
-    /// <summary>Executes the command asynchronously with the supplied arguments.</summary>
-    /// <param name="args">The command arguments in declaration order.</param>
-    /// <returns>The logical command result, or <see langword="null"/> when no result is exposed.</returns>
+    /// <summary>
+    /// Executes the command asynchronously with the supplied arguments.
+    /// </summary>
+    /// <param name="args">
+    /// The command arguments in declaration order.
+    /// </param>
+    /// <returns>
+    /// The logical command result, or <see langword="null"/> when no result is exposed.
+    /// </returns>
     public ValueTask<object?> Execute(params object[] args);
 }
 

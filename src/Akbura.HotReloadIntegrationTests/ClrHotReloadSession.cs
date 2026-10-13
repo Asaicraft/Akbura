@@ -8,7 +8,9 @@ using System.Reflection.PortableExecutable;
 
 namespace Akbura.HotReloadIntegrationTests;
 
-/// <summary>Loads one assembly and applies real metadata, IL and PDB deltas to that assembly.</summary>
+/// <summary>
+/// Loads one assembly and applies real metadata, IL and PDB deltas to that assembly.
+/// </summary>
 internal sealed class ClrHotReloadSession : IDisposable
 {
     private readonly ModuleMetadata _module;

@@ -43,7 +43,9 @@ public abstract partial class Parameter
     /// <summary>
     /// Determines whether this parameter has a value suitable for component initialization.
     /// </summary>
-    /// <param name="control">The component that owns the parameter.</param>
+    /// <param name="control">
+    /// The component that owns the parameter.
+    /// </param>
     /// <returns>
     /// <see langword="true"/> when the parameter is output-only, has a default value,
     /// or its styled property has been set; otherwise, <see langword="false"/>.
@@ -66,15 +68,27 @@ public abstract partial class Parameter
     /// <summary>
     /// Creates a component parameter backed by an Avalonia styled property.
     /// </summary>
-    /// <typeparam name="TOwner">The component type that declares the parameter.</typeparam>
-    /// <typeparam name="TValue">The parameter value type.</typeparam>
-    /// <param name="name">The parameter and styled property name.</param>
-    /// <param name="defaultValue">The optional default value.</param>
-    /// <param name="parameterBinding">The direction in which the parameter is bound.</param>
+    /// <typeparam name="TOwner">
+    /// The component type that declares the parameter.
+    /// </typeparam>
+    /// <typeparam name="TValue">
+    /// The parameter value type.
+    /// </typeparam>
+    /// <param name="name">
+    /// The parameter and styled property name.
+    /// </param>
+    /// <param name="defaultValue">
+    /// The optional default value.
+    /// </param>
+    /// <param name="parameterBinding">
+    /// The direction in which the parameter is bound.
+    /// </param>
     /// <param name="changed">
     /// An optional callback invoked before the component update is requested.
     /// </param>
-    /// <returns>The parameter descriptor. The caller should cache this instance.</returns>
+    /// <returns>
+    /// The parameter descriptor. The caller should cache this instance.
+    /// </returns>
     public static Parameter<TOwner, TValue> Create<TOwner, TValue>(
         string name,
         Optional<TValue> defaultValue = default,
@@ -103,20 +117,32 @@ public abstract partial class Parameter
     /// Recreates a component parameter for Hot Reload while preserving a compatible
     /// Avalonia property registration.
     /// </summary>
-    /// <typeparam name="TOwner">The component type that declares the parameter.</typeparam>
-    /// <typeparam name="TValue">The parameter value type.</typeparam>
+    /// <typeparam name="TOwner">
+    /// The component type that declares the parameter.
+    /// </typeparam>
+    /// <typeparam name="TValue">
+    /// The parameter value type.
+    /// </typeparam>
     /// <param name="property">
     /// The compatible styled property from the previous generated descriptor manifest,
     /// or <see langword="null"/> when a new property must be registered.
     /// </param>
-    /// <param name="name">The parameter and styled property name.</param>
-    /// <param name="defaultValue">The current optional default value.</param>
-    /// <param name="parameterBinding">The current parameter binding direction.</param>
+    /// <param name="name">
+    /// The parameter and styled property name.
+    /// </param>
+    /// <param name="defaultValue">
+    /// The current optional default value.
+    /// </param>
+    /// <param name="parameterBinding">
+    /// The current parameter binding direction.
+    /// </param>
     /// <param name="changed">
     /// An optional callback used when a new property is registered. A reused property
     /// retains its existing class handler.
     /// </param>
-    /// <returns>A new parameter descriptor around the compatible property.</returns>
+    /// <returns>
+    /// A new parameter descriptor around the compatible property.
+    /// </returns>
     [EditorBrowsable(EditorBrowsableState.Never)]
     [Browsable(false)]
     public static Parameter<TOwner, TValue> RecreateForHotReload<TOwner, TValue>(
@@ -163,11 +189,21 @@ public abstract partial class Parameter
     /// <summary>
     /// Creates a readonly component parameter backed by an Avalonia direct property.
     /// </summary>
-    /// <typeparam name="TOwner">The component type that declares the parameter.</typeparam>
-    /// <typeparam name="TValue">The parameter value type.</typeparam>
-    /// <param name="name">The parameter and direct property name.</param>
-    /// <param name="getter">Reads the per-component value.</param>
-    /// <returns>The readonly parameter descriptor. The caller should cache this instance.</returns>
+    /// <typeparam name="TOwner">
+    /// The component type that declares the parameter.
+    /// </typeparam>
+    /// <typeparam name="TValue">
+    /// The parameter value type.
+    /// </typeparam>
+    /// <param name="name">
+    /// The parameter and direct property name.
+    /// </param>
+    /// <param name="getter">
+    /// Reads the per-component value.
+    /// </param>
+    /// <returns>
+    /// The readonly parameter descriptor. The caller should cache this instance.
+    /// </returns>
     public static ReadOnlyParameter<TOwner, TValue> CreateReadOnly<TOwner, TValue>(
         string name,
         Func<TOwner, TValue> getter)
@@ -189,15 +225,25 @@ public abstract partial class Parameter
     /// Recreates a readonly component parameter for Hot Reload while preserving a
     /// compatible Avalonia direct property registration.
     /// </summary>
-    /// <typeparam name="TOwner">The component type that declares the parameter.</typeparam>
-    /// <typeparam name="TValue">The parameter value type.</typeparam>
+    /// <typeparam name="TOwner">
+    /// The component type that declares the parameter.
+    /// </typeparam>
+    /// <typeparam name="TValue">
+    /// The parameter value type.
+    /// </typeparam>
     /// <param name="property">
     /// The compatible direct property from the previous generated descriptor manifest,
     /// or <see langword="null"/> when a new property must be registered.
     /// </param>
-    /// <param name="name">The parameter and direct property name.</param>
-    /// <param name="getter">Reads the per-component value when registering a new property.</param>
-    /// <returns>A new readonly parameter descriptor around the compatible property.</returns>
+    /// <param name="name">
+    /// The parameter and direct property name.
+    /// </param>
+    /// <param name="getter">
+    /// Reads the per-component value when registering a new property.
+    /// </param>
+    /// <returns>
+    /// A new readonly parameter descriptor around the compatible property.
+    /// </returns>
     [EditorBrowsable(EditorBrowsableState.Never)]
     [Browsable(false)]
     public static ReadOnlyParameter<TOwner, TValue> RecreateReadOnlyForHotReload<TOwner, TValue>(

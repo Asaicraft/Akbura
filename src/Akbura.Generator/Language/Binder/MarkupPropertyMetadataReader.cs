@@ -24,7 +24,9 @@ internal readonly struct MarkupPropertyMetadata
     public ImmutableArray<string> InvalidDependencies { get; }
 }
 
-/// <summary>Reads metadata from one Roslyn compilation snapshot.</summary>
+/// <summary>
+/// Reads metadata from one Roslyn compilation snapshot.
+/// </summary>
 internal sealed class MarkupPropertyMetadataReader
 {
     private readonly ConcurrentDictionary<ISymbol, MarkupPropertyMetadata> _cache =

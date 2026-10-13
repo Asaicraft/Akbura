@@ -13,8 +13,12 @@ public readonly struct AkburaHotReloadPropertyRegistration
     /// <summary>
     /// Initializes a generated descriptor registration.
     /// </summary>
-    /// <param name="key">The stable descriptor identity.</param>
-    /// <param name="property">The Avalonia property registered for the descriptor.</param>
+    /// <param name="key">
+    /// The stable descriptor identity.
+    /// </param>
+    /// <param name="property">
+    /// The Avalonia property registered for the descriptor.
+    /// </param>
     public AkburaHotReloadPropertyRegistration(
         string key,
         AvaloniaProperty property)

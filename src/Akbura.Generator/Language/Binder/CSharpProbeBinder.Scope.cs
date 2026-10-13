@@ -21,15 +21,21 @@ internal sealed partial class CSharpProbeBinder
 {
     private static readonly Microsoft.CodeAnalysis.SyntaxTriviaList s_commandIsExecutingDocumentation =
         CSharpSyntaxFactory.ParseLeadingTrivia(
-            "/// <summary>" + CommandSymbolDocumentation.IsExecuting + "</summary>\r\n");
+            "/// <summary>\r\n" +
+            "/// " + CommandSymbolDocumentation.IsExecuting + "\r\n" +
+            "/// </summary>\r\n");
 
     private static readonly Microsoft.CodeAnalysis.SyntaxTriviaList s_commandCanExecuteDocumentation =
         CSharpSyntaxFactory.ParseLeadingTrivia(
-            "/// <summary>" + CommandSymbolDocumentation.CanExecute + "</summary>\r\n");
+            "/// <summary>\r\n" +
+            "/// " + CommandSymbolDocumentation.CanExecute + "\r\n" +
+            "/// </summary>\r\n");
 
     private static readonly Microsoft.CodeAnalysis.SyntaxTriviaList s_commandExecuteDocumentation =
         CSharpSyntaxFactory.ParseLeadingTrivia(
-            "/// <summary>" + CommandSymbolDocumentation.Execute + "</summary>\r\n");
+            "/// <summary>\r\n" +
+            "/// " + CommandSymbolDocumentation.Execute + "\r\n" +
+            "/// </summary>\r\n");
 
     internal const string StateCompletionAnnotationKind =
         "AkburaCSharpCompletionState";

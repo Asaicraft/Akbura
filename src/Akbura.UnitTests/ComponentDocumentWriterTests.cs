@@ -532,7 +532,7 @@ public sealed class ComponentDocumentWriterTests
             generatedSource,
             StringComparison.Ordinal);
         Assert.Contains(
-            "__component.__states = default;",
+            "__component.RuntimeStates.InvalidateSnapshotForHotReload();",
             generatedSource,
             StringComparison.Ordinal);
         Assert.Contains(

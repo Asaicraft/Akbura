@@ -2,7 +2,9 @@ namespace Akbura.HotReload;
 
 public sealed partial class AkburaRenderState
 {
-    /// <summary>Releases generated ownership; a later render may start a fresh session.</summary>
+    /// <summary>
+    /// Releases generated ownership; a later render may start a fresh session.
+    /// </summary>
     public void Dispose()
     {
         List<Exception>? failures = null;

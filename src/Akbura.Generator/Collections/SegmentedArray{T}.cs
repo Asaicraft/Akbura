@@ -13,7 +13,9 @@ namespace Akbura.Collections;
 /// single-dimensional zero-based array commonly represented in C# as <c>T[]</c>. The implementation of this
 /// collection uses segmented arrays to avoid placing objects on the Large Object Heap.
 /// </summary>
-/// <typeparam name="T">The type of elements stored in the array.</typeparam>
+/// <typeparam name="T">
+/// The type of elements stored in the array.
+/// </typeparam>
 public readonly partial struct SegmentedArray<T> : ICloneable, IList, IStructuralComparable, IStructuralEquatable, IList<T>, IReadOnlyList<T>, IEquatable<SegmentedArray<T>>
 {
     /// <summary>

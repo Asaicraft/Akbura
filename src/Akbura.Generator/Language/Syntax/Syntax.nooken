@@ -240,7 +240,9 @@ node NamespaceDeclarationSyntax : AkTopLevelMember {
 	Semicolon        : SemicolonToken;
 }
 
-/// <summary>inject ILogger&lt;ProfileWithTasks&gt; log;</summary>
+/// <summary>
+/// inject ILogger&lt;ProfileWithTasks&gt; log;
+/// </summary>
 node InjectDeclarationSyntax : AkTopLevelMember {
 	InjectKeyword : InjectKeyword;
 	Type          : CSharpTypeSyntax;
@@ -248,7 +250,9 @@ node InjectDeclarationSyntax : AkTopLevelMember {
 	Semicolon     : SemicolonToken;
 }
 
-/// <summary>param int UserId = 1; or param out Hello = 10;</summary>
+/// <summary>
+/// param int UserId = 1; or param out Hello = 10;
+/// </summary>
 node ParamDeclarationSyntax : AkTopLevelMember {
 	ParamKeyword    : ParamKeyword;
 	BindingKeyword? : OutToken | BindToken;
@@ -259,7 +263,9 @@ node ParamDeclarationSyntax : AkTopLevelMember {
 	Semicolon       : SemicolonToken;
 }
 
-/// <summary>state count = 0; / state ReactList tasks = [];</summary>
+/// <summary>
+/// state count = 0; / state ReactList tasks = [];
+/// </summary>
 node StateDeclarationSyntax : AkTopLevelMember {
 	StateKeyword : StateKeyword;
 	Type?        : CSharpTypeSyntax;

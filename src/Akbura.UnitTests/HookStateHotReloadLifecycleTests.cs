@@ -60,8 +60,6 @@ public sealed class HookStateHotReloadLifecycleTests
 
     private sealed class SuspendedRefreshComponent : AkburaControl
     {
-        private State<int>? _previousState;
-
         public SuspendedRefreshComponent() : base(AkburaEngine.Empty)
         {
         }
@@ -78,31 +76,29 @@ public sealed class HookStateHotReloadLifecycleTests
 
         public int AbortedFrames { get; private set; }
 
-        public State<int>? HookState { get; private set; }
+        public State<int>? HookState => RuntimeStates.GetBoundOrNull<int>("hook");
 
         protected override void PrepareHookStates()
         {
-            _previousState = HookState;
-            HookState = BindHookState(this.useHookState(1), _previousState);
+            RuntimeStates.BeginFrame();
+            RuntimeStates.StageHook("hook", BindHookState(this.useHookState(1), HookState));
         }
 
         protected override void CommitHookStates()
         {
-            _previousState = null;
+            RuntimeStates.CommitFrame();
             CommittedFrames++;
         }
 
         protected override void AbortHookStates()
         {
-            HookState = _previousState;
-            _previousState = null;
+            RuntimeStates.AbortFrame();
             AbortedFrames++;
         }
 
         protected override void ResetHookStatesForHotReload()
         {
-            HookState = null;
-            _previousState = null;
+            RuntimeStates.ResetHookBindingsForHotReload();
         }
 
         protected override Control FirstUpdate() => new Border();
@@ -130,6 +126,7 @@ public sealed class HookStateHotReloadLifecycleTests
 
         protected override ImmutableArray<InjectService> GetServices() => [];
 
-        protected override ImmutableArray<State> GetStates() => [];
+        protected override ImmutableArray<State> GetStates() =>
+            RuntimeStates.GetSnapshot(() => HookState is { } state ? [state] : []);
     }
 }

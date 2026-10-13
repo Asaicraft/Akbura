@@ -7,7 +7,9 @@ public sealed partial class AkburaRenderState
     private Dictionary<string, object>? _renderCaptures;
     private AkburaRenderState? _renderCaptureParent;
 
-    /// <summary>Connects an instance-local scope to its enclosing capture scope.</summary>
+    /// <summary>
+    /// Connects an instance-local scope to its enclosing capture scope.
+    /// </summary>
     public void SetRenderCaptureParent(AkburaRenderState parent)
     {
         ArgumentNullException.ThrowIfNull(parent);
@@ -27,7 +29,9 @@ public sealed partial class AkburaRenderState
         _renderCaptureParent = parent;
     }
 
-    /// <summary>Publishes a typed render local for retained template instances.</summary>
+    /// <summary>
+    /// Publishes a typed render local for retained template instances.
+    /// </summary>
     public void SetRenderCapture<T>(string key, T value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
@@ -58,7 +62,9 @@ public sealed partial class AkburaRenderState
         }
     }
 
-    /// <summary>Releases a capture owned by an inactive branch.</summary>
+    /// <summary>
+    /// Releases a capture owned by an inactive branch.
+    /// </summary>
     public void RemoveRenderCapture(string key)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
@@ -106,7 +112,9 @@ public sealed partial class AkburaRenderState
         public HashSet<string>? PublishedGeneratedCaptureKeys { get; set; }
     }
 
-    /// <summary>Reads the current parent's value rather than a factory's stale closure.</summary>
+    /// <summary>
+    /// Reads the current parent's value rather than a factory's stale closure.
+    /// </summary>
     public T GetRenderCapture<T>(string key)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);

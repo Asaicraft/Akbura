@@ -78,7 +78,9 @@ public sealed class CollectionParameterBinding<T> : IDisposable
         UpdateItems(() => Reconcile(values));
     }
 
-    /// <summary>Refreshes a non-notifying source explicitly, preserving Items.</summary>
+    /// <summary>
+    /// Refreshes a non-notifying source explicitly, preserving Items.
+    /// </summary>
     public void Refresh()
     {
         CheckAccess();
@@ -90,7 +92,9 @@ public sealed class CollectionParameterBinding<T> : IDisposable
         UpdateItems(() => Reconcile(Snapshot(_source), invalidateUnchanged: true));
     }
 
-    /// <summary>Disconnects event delivery while retaining the source and owned list.</summary>
+    /// <summary>
+    /// Disconnects event delivery while retaining the source and owned list.
+    /// </summary>
     public void Suspend()
     {
         CheckAccess();
@@ -99,7 +103,9 @@ public sealed class CollectionParameterBinding<T> : IDisposable
         _lease = null;
     }
 
-    /// <summary>The source is authoritative on reattachment; detached local edits are not replayed.</summary>
+    /// <summary>
+    /// The source is authoritative on reattachment; detached local edits are not replayed.
+    /// </summary>
     public void Resume()
     {
         CheckAccess();

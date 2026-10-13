@@ -8,7 +8,9 @@ using System.Runtime.CompilerServices;
 
 namespace Akbura.Markup;
 
-/// <summary>Preserves native deferred-template matching while supplying its actual host to each instance.</summary>
+/// <summary>
+/// Preserves native deferred-template matching while supplying its actual host to each instance.
+/// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
 [Browsable(false)]
 public sealed class AkburaConditionalDeferredTemplate : IDeferredContent

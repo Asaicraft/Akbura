@@ -94,8 +94,12 @@ internal static class HashCode
     /// Compute the hashcode of a string using FNV-1a
     /// See http://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
     /// </summary>
-    /// <param name="text">The input string</param>
-    /// <returns>The FNV-1a hash code of <paramref name="text"/></returns>
+    /// <param name="text">
+    /// The input string
+    /// </param>
+    /// <returns>
+    /// The FNV-1a hash code of <paramref name="text"/>
+    /// </returns>
     internal static int GetFNVHashCode(System.Text.StringBuilder text)
     {
         var hashCode = FnvOffsetBias;
@@ -129,9 +133,15 @@ internal static class HashCode
     /// Combine a char with an existing FNV-1a hash code
     /// See http://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
     /// </summary>
-    /// <param name="hashCode">The accumulated hash code</param>
-    /// <param name="ch">The new character to combine</param>
-    /// <returns>The result of combining <paramref name="hashCode"/> with <paramref name="ch"/> using the FNV-1a algorithm</returns>
+    /// <param name="hashCode">
+    /// The accumulated hash code
+    /// </param>
+    /// <param name="ch">
+    /// The new character to combine
+    /// </param>
+    /// <returns>
+    /// The result of combining <paramref name="hashCode"/> with <paramref name="ch"/> using the FNV-1a algorithm
+    /// </returns>
     internal static int CombineFNVHash(int hashCode, char ch)
     {
         return unchecked((hashCode ^ ch) * FnvPrime);

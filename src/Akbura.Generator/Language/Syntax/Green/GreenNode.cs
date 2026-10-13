@@ -622,8 +622,12 @@ internal abstract partial class GreenNode
     /// <summary>
     /// Find the slot that contains the given offset.
     /// </summary>
-    /// <param name="offset">The target offset. Must be between 0 and <see cref="FullWidth"/>.</param>
-    /// <returns>The slot index of the slot containing the given offset.</returns>
+    /// <param name="offset">
+    /// The target offset. Must be between 0 and <see cref="FullWidth"/>.
+    /// </param>
+    /// <returns>
+    /// The slot index of the slot containing the given offset.
+    /// </returns>
     /// <remarks>
     /// The base implementation is a linear search. This should be overridden
     /// if a derived class can implement it more efficiently.
@@ -674,7 +678,9 @@ internal abstract partial class GreenNode
     /// the use of <see cref="SmallSlotCount"/> is guaranteed to be safe here.
     /// </para>
     /// </summary>
-    /// <returns>A positive integer representing the computed hash code.</returns>
+    /// <returns>
+    /// A positive integer representing the computed hash code.
+    /// </returns>
     public int GetCacheHash()
     {
         Debug.Assert(IsCacheable);

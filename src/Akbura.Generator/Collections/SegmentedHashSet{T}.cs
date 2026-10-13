@@ -27,7 +27,9 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
 
     // This uses the same array-based implementation as Dictionary<TKey, TValue>.
 
-    /// <summary>Cutoff point for stackallocs. This corresponds to the number of ints.</summary>
+    /// <summary>
+    /// Cutoff point for stackallocs. This corresponds to the number of ints.
+    /// </summary>
     private const int StackAllocThreshold = 100;
 
     /// <summary>
@@ -138,7 +140,9 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
         }
     }
 
-    /// <summary>Initializes the SegmentedHashSet from another SegmentedHashSet with the same element type and equality comparer.</summary>
+    /// <summary>
+    /// Initializes the SegmentedHashSet from another SegmentedHashSet with the same element type and equality comparer.
+    /// </summary>
     private void ConstructFrom(SegmentedHashSet<T> source)
     {
         if (source.Count == 0)
@@ -185,7 +189,9 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
 
     void ICollection<T>.Add(T item) => AddIfNotPresent(item, out _);
 
-    /// <summary>Removes all elements from the <see cref="SegmentedHashSet{T}"/> object.</summary>
+    /// <summary>
+    /// Removes all elements from the <see cref="SegmentedHashSet{T}"/> object.
+    /// </summary>
     public void Clear()
     {
         var count = _count;
@@ -202,12 +208,20 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
         }
     }
 
-    /// <summary>Determines whether the <see cref="SegmentedHashSet{T}"/> contains the specified element.</summary>
-    /// <param name="item">The element to locate in the <see cref="SegmentedHashSet{T}"/> object.</param>
-    /// <returns>true if the <see cref="SegmentedHashSet{T}"/> object contains the specified element; otherwise, false.</returns>
+    /// <summary>
+    /// Determines whether the <see cref="SegmentedHashSet{T}"/> contains the specified element.
+    /// </summary>
+    /// <param name="item">
+    /// The element to locate in the <see cref="SegmentedHashSet{T}"/> object.
+    /// </param>
+    /// <returns>
+    /// true if the <see cref="SegmentedHashSet{T}"/> object contains the specified element; otherwise, false.
+    /// </returns>
     public bool Contains(T item) => FindItemIndex(item) >= 0;
 
-    /// <summary>Gets the index of the item in <see cref="_entries"/>, or -1 if it's not in the set.</summary>
+    /// <summary>
+    /// Gets the index of the item in <see cref="_entries"/>, or -1 if it's not in the set.
+    /// </summary>
     private int FindItemIndex(T item)
     {
         var buckets = _buckets;
@@ -270,7 +284,9 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
         return -1;
     }
 
-    /// <summary>Gets a reference to the specified hashcode's bucket, containing an index into <see cref="_entries"/>.</summary>
+    /// <summary>
+    /// Gets a reference to the specified hashcode's bucket, containing an index into <see cref="_entries"/>.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private ref int GetBucketRef(int hashCode)
     {
@@ -344,7 +360,9 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
         return false;
     }
 
-    /// <summary>Gets the number of elements that are contained in the set.</summary>
+    /// <summary>
+    /// Gets the number of elements that are contained in the set.
+    /// </summary>
     public int Count => _count - _freeCount;
 
     bool ICollection<T>.IsReadOnly => false;
@@ -370,15 +388,29 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
 
     #region SegmentedHashSet methods
 
-    /// <summary>Adds the specified element to the <see cref="SegmentedHashSet{T}"/>.</summary>
-    /// <param name="item">The element to add to the set.</param>
-    /// <returns>true if the element is added to the <see cref="SegmentedHashSet{T}"/> object; false if the element is already present.</returns>
+    /// <summary>
+    /// Adds the specified element to the <see cref="SegmentedHashSet{T}"/>.
+    /// </summary>
+    /// <param name="item">
+    /// The element to add to the set.
+    /// </param>
+    /// <returns>
+    /// true if the element is added to the <see cref="SegmentedHashSet{T}"/> object; false if the element is already present.
+    /// </returns>
     public bool Add(T item) => AddIfNotPresent(item, out _);
 
-    /// <summary>Searches the set for a given value and returns the equal value it finds, if any.</summary>
-    /// <param name="equalValue">The value to search for.</param>
-    /// <param name="actualValue">The value from the set that the search found, or the default value of <typeparamref name="T"/> when the search yielded no match.</param>
-    /// <returns>A value indicating whether the search was successful.</returns>
+    /// <summary>
+    /// Searches the set for a given value and returns the equal value it finds, if any.
+    /// </summary>
+    /// <param name="equalValue">
+    /// The value to search for.
+    /// </param>
+    /// <param name="actualValue">
+    /// The value from the set that the search found, or the default value of <typeparamref name="T"/> when the search yielded no match.
+    /// </param>
+    /// <returns>
+    /// A value indicating whether the search was successful.
+    /// </returns>
     /// <remarks>
     /// This can be useful when you want to reuse a previously stored reference instead of
     /// a newly constructed one (so that more sharing of references can occur) or to look up
@@ -401,8 +433,12 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
         return false;
     }
 
-    /// <summary>Modifies the current <see cref="SegmentedHashSet{T}"/> object to contain all elements that are present in itself, the specified collection, or both.</summary>
-    /// <param name="other">The collection to compare to the current <see cref="SegmentedHashSet{T}"/> object.</param>
+    /// <summary>
+    /// Modifies the current <see cref="SegmentedHashSet{T}"/> object to contain all elements that are present in itself, the specified collection, or both.
+    /// </summary>
+    /// <param name="other">
+    /// The collection to compare to the current <see cref="SegmentedHashSet{T}"/> object.
+    /// </param>
     public void UnionWith(IEnumerable<T> other)
     {
         if (other == null)
@@ -416,8 +452,12 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
         }
     }
 
-    /// <summary>Modifies the current <see cref="SegmentedHashSet{T}"/> object to contain only elements that are present in that object and in the specified collection.</summary>
-    /// <param name="other">The collection to compare to the current <see cref="SegmentedHashSet{T}"/> object.</param>
+    /// <summary>
+    /// Modifies the current <see cref="SegmentedHashSet{T}"/> object to contain only elements that are present in that object and in the specified collection.
+    /// </summary>
+    /// <param name="other">
+    /// The collection to compare to the current <see cref="SegmentedHashSet{T}"/> object.
+    /// </param>
     public void IntersectWith(IEnumerable<T> other)
     {
         if (other == null)
@@ -453,8 +493,12 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
         IntersectWithEnumerable(other);
     }
 
-    /// <summary>Removes all elements in the specified collection from the current <see cref="SegmentedHashSet{T}"/> object.</summary>
-    /// <param name="other">The collection to compare to the current <see cref="SegmentedHashSet{T}"/> object.</param>
+    /// <summary>
+    /// Removes all elements in the specified collection from the current <see cref="SegmentedHashSet{T}"/> object.
+    /// </summary>
+    /// <param name="other">
+    /// The collection to compare to the current <see cref="SegmentedHashSet{T}"/> object.
+    /// </param>
     public void ExceptWith(IEnumerable<T> other)
     {
         if (other == null)
@@ -482,8 +526,12 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
         }
     }
 
-    /// <summary>Modifies the current <see cref="SegmentedHashSet{T}"/> object to contain only elements that are present either in that object or in the specified collection, but not both.</summary>
-    /// <param name="other">The collection to compare to the current <see cref="SegmentedHashSet{T}"/> object.</param>
+    /// <summary>
+    /// Modifies the current <see cref="SegmentedHashSet{T}"/> object to contain only elements that are present either in that object or in the specified collection, but not both.
+    /// </summary>
+    /// <param name="other">
+    /// The collection to compare to the current <see cref="SegmentedHashSet{T}"/> object.
+    /// </param>
     public void SymmetricExceptWith(IEnumerable<T> other)
     {
         if (other == null)
@@ -520,9 +568,15 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
         }
     }
 
-    /// <summary>Determines whether a <see cref="SegmentedHashSet{T}"/> object is a subset of the specified collection.</summary>
-    /// <param name="other">The collection to compare to the current <see cref="SegmentedHashSet{T}"/> object.</param>
-    /// <returns>true if the <see cref="SegmentedHashSet{T}"/> object is a subset of <paramref name="other"/>; otherwise, false.</returns>
+    /// <summary>
+    /// Determines whether a <see cref="SegmentedHashSet{T}"/> object is a subset of the specified collection.
+    /// </summary>
+    /// <param name="other">
+    /// The collection to compare to the current <see cref="SegmentedHashSet{T}"/> object.
+    /// </param>
+    /// <returns>
+    /// true if the <see cref="SegmentedHashSet{T}"/> object is a subset of <paramref name="other"/>; otherwise, false.
+    /// </returns>
     public bool IsSubsetOf(IEnumerable<T> other)
     {
         if (other == null)
@@ -556,9 +610,15 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
         return uniqueCount == Count && unfoundCount >= 0;
     }
 
-    /// <summary>Determines whether a <see cref="SegmentedHashSet{T}"/> object is a proper subset of the specified collection.</summary>
-    /// <param name="other">The collection to compare to the current <see cref="SegmentedHashSet{T}"/> object.</param>
-    /// <returns>true if the <see cref="SegmentedHashSet{T}"/> object is a proper subset of <paramref name="other"/>; otherwise, false.</returns>
+    /// <summary>
+    /// Determines whether a <see cref="SegmentedHashSet{T}"/> object is a proper subset of the specified collection.
+    /// </summary>
+    /// <param name="other">
+    /// The collection to compare to the current <see cref="SegmentedHashSet{T}"/> object.
+    /// </param>
+    /// <returns>
+    /// true if the <see cref="SegmentedHashSet{T}"/> object is a proper subset of <paramref name="other"/>; otherwise, false.
+    /// </returns>
     public bool IsProperSubsetOf(IEnumerable<T> other)
     {
         if (other == null)
@@ -604,9 +664,15 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
         return uniqueCount == Count && unfoundCount > 0;
     }
 
-    /// <summary>Determines whether a <see cref="SegmentedHashSet{T}"/> object is a proper superset of the specified collection.</summary>
-    /// <param name="other">The collection to compare to the current <see cref="SegmentedHashSet{T}"/> object.</param>
-    /// <returns>true if the <see cref="SegmentedHashSet{T}"/> object is a superset of <paramref name="other"/>; otherwise, false.</returns>
+    /// <summary>
+    /// Determines whether a <see cref="SegmentedHashSet{T}"/> object is a proper superset of the specified collection.
+    /// </summary>
+    /// <param name="other">
+    /// The collection to compare to the current <see cref="SegmentedHashSet{T}"/> object.
+    /// </param>
+    /// <returns>
+    /// true if the <see cref="SegmentedHashSet{T}"/> object is a superset of <paramref name="other"/>; otherwise, false.
+    /// </returns>
     public bool IsSupersetOf(IEnumerable<T> other)
     {
         if (other == null)
@@ -649,9 +715,15 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
         return true;
     }
 
-    /// <summary>Determines whether a <see cref="SegmentedHashSet{T}"/> object is a proper superset of the specified collection.</summary>
-    /// <param name="other">The collection to compare to the current <see cref="SegmentedHashSet{T}"/> object.</param>
-    /// <returns>true if the <see cref="SegmentedHashSet{T}"/> object is a proper superset of <paramref name="other"/>; otherwise, false.</returns>
+    /// <summary>
+    /// Determines whether a <see cref="SegmentedHashSet{T}"/> object is a proper superset of the specified collection.
+    /// </summary>
+    /// <param name="other">
+    /// The collection to compare to the current <see cref="SegmentedHashSet{T}"/> object.
+    /// </param>
+    /// <returns>
+    /// true if the <see cref="SegmentedHashSet{T}"/> object is a proper superset of <paramref name="other"/>; otherwise, false.
+    /// </returns>
     public bool IsProperSupersetOf(IEnumerable<T> other)
     {
         if (other == null)
@@ -692,9 +764,15 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
         return uniqueCount < Count && unfoundCount == 0;
     }
 
-    /// <summary>Determines whether the current <see cref="SegmentedHashSet{T}"/> object and a specified collection share common elements.</summary>
-    /// <param name="other">The collection to compare to the current <see cref="SegmentedHashSet{T}"/> object.</param>
-    /// <returns>true if the <see cref="SegmentedHashSet{T}"/> object and <paramref name="other"/> share at least one common element; otherwise, false.</returns>
+    /// <summary>
+    /// Determines whether the current <see cref="SegmentedHashSet{T}"/> object and a specified collection share common elements.
+    /// </summary>
+    /// <param name="other">
+    /// The collection to compare to the current <see cref="SegmentedHashSet{T}"/> object.
+    /// </param>
+    /// <returns>
+    /// true if the <see cref="SegmentedHashSet{T}"/> object and <paramref name="other"/> share at least one common element; otherwise, false.
+    /// </returns>
     public bool Overlaps(IEnumerable<T> other)
     {
         if (other == null)
@@ -724,9 +802,15 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
         return false;
     }
 
-    /// <summary>Determines whether a <see cref="SegmentedHashSet{T}"/> object and the specified collection contain the same elements.</summary>
-    /// <param name="other">The collection to compare to the current <see cref="SegmentedHashSet{T}"/> object.</param>
-    /// <returns>true if the <see cref="SegmentedHashSet{T}"/> object is equal to <paramref name="other"/>; otherwise, false.</returns>
+    /// <summary>
+    /// Determines whether a <see cref="SegmentedHashSet{T}"/> object and the specified collection contain the same elements.
+    /// </summary>
+    /// <param name="other">
+    /// The collection to compare to the current <see cref="SegmentedHashSet{T}"/> object.
+    /// </param>
+    /// <returns>
+    /// true if the <see cref="SegmentedHashSet{T}"/> object is equal to <paramref name="other"/>; otherwise, false.
+    /// </returns>
     public bool SetEquals(IEnumerable<T> other)
     {
         if (other == null)
@@ -771,9 +855,15 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
 
     public void CopyTo(T[] array) => CopyTo(array, 0, Count);
 
-    /// <summary>Copies the elements of a <see cref="SegmentedHashSet{T}"/> object to an array, starting at the specified array index.</summary>
-    /// <param name="array">The destination array.</param>
-    /// <param name="arrayIndex">The zero-based index in array at which copying begins.</param>
+    /// <summary>
+    /// Copies the elements of a <see cref="SegmentedHashSet{T}"/> object to an array, starting at the specified array index.
+    /// </summary>
+    /// <param name="array">
+    /// The destination array.
+    /// </param>
+    /// <param name="arrayIndex">
+    /// The zero-based index in array at which copying begins.
+    /// </param>
     public void CopyTo(T[] array, int arrayIndex) => CopyTo(array, arrayIndex, Count);
 
     public void CopyTo(T[] array, int arrayIndex, int count)
@@ -815,7 +905,9 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
         }
     }
 
-    /// <summary>Removes all elements that match the conditions defined by the specified predicate from a <see cref="SegmentedHashSet{T}"/> collection.</summary>
+    /// <summary>
+    /// Removes all elements that match the conditions defined by the specified predicate from a <see cref="SegmentedHashSet{T}"/> collection.
+    /// </summary>
     public int RemoveWhere(Predicate<T> match)
     {
         if (match == null)
@@ -846,7 +938,9 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
         return numRemoved;
     }
 
-    /// <summary>Gets the <see cref="IEqualityComparer"/> object that is used to determine equality for the values in the set.</summary>
+    /// <summary>
+    /// Gets the <see cref="IEqualityComparer"/> object that is used to determine equality for the values in the set.
+    /// </summary>
     public IEqualityComparer<T> Comparer
     {
         get
@@ -855,7 +949,9 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
         }
     }
 
-    /// <summary>Ensures that this hash set can hold the specified number of elements without growing.</summary>
+    /// <summary>
+    /// Ensures that this hash set can hold the specified number of elements without growing.
+    /// </summary>
     public int EnsureCapacity(int capacity)
     {
         if (capacity < 0)
@@ -973,7 +1069,9 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
 
     #region Helper methods
 
-    /// <summary>Returns an <see cref="IEqualityComparer"/> object that can be used for equality testing of a <see cref="SegmentedHashSet{T}"/> object.</summary>
+    /// <summary>
+    /// Returns an <see cref="IEqualityComparer"/> object that can be used for equality testing of a <see cref="SegmentedHashSet{T}"/> object.
+    /// </summary>
     public static IEqualityComparer<SegmentedHashSet<T>> CreateSetComparer() => new SegmentedHashSetEqualityComparer<T>();
 
     /// <summary>
@@ -995,10 +1093,18 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
         return size;
     }
 
-    /// <summary>Adds the specified element to the set if it's not already contained.</summary>
-    /// <param name="value">The element to add to the set.</param>
-    /// <param name="location">The index into <see cref="_entries"/> of the element.</param>
-    /// <returns>true if the element is added to the <see cref="SegmentedHashSet{T}"/> object; false if the element is already present.</returns>
+    /// <summary>
+    /// Adds the specified element to the set if it's not already contained.
+    /// </summary>
+    /// <param name="value">
+    /// The element to add to the set.
+    /// </param>
+    /// <param name="location">
+    /// The index into <see cref="_entries"/> of the element.
+    /// </param>
+    /// <returns>
+    /// true if the element is added to the <see cref="SegmentedHashSet{T}"/> object; false if the element is already present.
+    /// </returns>
     private bool AddIfNotPresent(T value, out int location)
     {
         if (_buckets.Length == 0)
@@ -1195,7 +1301,8 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
     /// As with other methods, callers take care of ensuring that other is a hashset using the
     /// same equality comparer.
     /// </summary>
-    /// <param name="other"></param>
+    /// <param name="other">
+    /// </param>
     private void SymmetricExceptWithUniqueHashSet(SegmentedHashSet<T> other)
     {
         foreach (var item in other)
@@ -1223,7 +1330,8 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
     /// get marked as something not to remove.
     ///
     /// </summary>
-    /// <param name="other"></param>
+    /// <param name="other">
+    /// </param>
     private unsafe void SymmetricExceptWithEnumerable(IEnumerable<T> other)
     {
         var originalCount = _count;
@@ -1293,7 +1401,8 @@ internal class SegmentedHashSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollectio
     /// An earlier implementation used delegates to perform these checks rather than returning
     /// an ElementCount struct; however this was changed due to the perf overhead of delegates.
     /// </summary>
-    /// <param name="other"></param>
+    /// <param name="other">
+    /// </param>
     /// <param name="returnIfUnfound">Allows us to finish faster for equals and proper superset
     /// because unfoundCount must be 0.</param>
     private (int UniqueCount, int UnfoundCount) CheckUniqueAndUnfoundElements(IEnumerable<T> other, bool returnIfUnfound)

@@ -19,11 +19,21 @@ public static class ImmutableArrayExtensions
     /// <summary>
     /// Converts a sequence to an immutable array.
     /// </summary>
-    /// <typeparam name="T">Elemental type of the sequence.</typeparam>
-    /// <param name="items">The sequence to convert.</param>
-    /// <returns>An immutable copy of the contents of the sequence.</returns>
-    /// <exception cref="ArgumentNullException">If items is null (default)</exception>
-    /// <remarks>If the sequence is null, this will throw <see cref="ArgumentNullException"/></remarks>
+    /// <typeparam name="T">
+    /// Elemental type of the sequence.
+    /// </typeparam>
+    /// <param name="items">
+    /// The sequence to convert.
+    /// </param>
+    /// <returns>
+    /// An immutable copy of the contents of the sequence.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// If items is null (default)
+    /// </exception>
+    /// <remarks>
+    /// If the sequence is null, this will throw <see cref="ArgumentNullException"/>
+    /// </remarks>
     public static ImmutableArray<T> AsImmutable<T>(this IEnumerable<T> items)
     {
         return ImmutableArray.CreateRange<T>(items);
@@ -32,10 +42,18 @@ public static class ImmutableArrayExtensions
     /// <summary>
     /// Converts a sequence to an immutable array.
     /// </summary>
-    /// <typeparam name="T">Elemental type of the sequence.</typeparam>
-    /// <param name="items">The sequence to convert.</param>
-    /// <returns>An immutable copy of the contents of the sequence.</returns>
-    /// <remarks>If the sequence is null, this will return an empty array.</remarks>
+    /// <typeparam name="T">
+    /// Elemental type of the sequence.
+    /// </typeparam>
+    /// <param name="items">
+    /// The sequence to convert.
+    /// </param>
+    /// <returns>
+    /// An immutable copy of the contents of the sequence.
+    /// </returns>
+    /// <remarks>
+    /// If the sequence is null, this will return an empty array.
+    /// </remarks>
     public static ImmutableArray<T> AsImmutableOrEmpty<T>(this IEnumerable<T>? items)
     {
         if (items == null)
@@ -49,10 +67,18 @@ public static class ImmutableArrayExtensions
     /// <summary>
     /// Converts a sequence to an immutable array.
     /// </summary>
-    /// <typeparam name="T">Elemental type of the sequence.</typeparam>
-    /// <param name="items">The sequence to convert.</param>
-    /// <returns>An immutable copy of the contents of the sequence.</returns>
-    /// <remarks>If the sequence is null, this will return the default (null) array.</remarks>
+    /// <typeparam name="T">
+    /// Elemental type of the sequence.
+    /// </typeparam>
+    /// <param name="items">
+    /// The sequence to convert.
+    /// </param>
+    /// <returns>
+    /// An immutable copy of the contents of the sequence.
+    /// </returns>
+    /// <remarks>
+    /// If the sequence is null, this will return the default (null) array.
+    /// </remarks>
     public static ImmutableArray<T> AsImmutableOrNull<T>(this IEnumerable<T>? items)
     {
         if (items == null)
@@ -66,9 +92,13 @@ public static class ImmutableArrayExtensions
     /// <summary>
     /// Converts an array to an immutable array. The array must not be null.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <param name="items">The sequence to convert</param>
-    /// <returns></returns>
+    /// <typeparam name="T">
+    /// </typeparam>
+    /// <param name="items">
+    /// The sequence to convert
+    /// </param>
+    /// <returns>
+    /// </returns>
     public static ImmutableArray<T> AsImmutable<T>(this T[] items)
     {
         Debug.Assert(items != null);
@@ -78,10 +108,16 @@ public static class ImmutableArrayExtensions
     /// <summary>
     /// Converts a array to an immutable array.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <param name="items">The sequence to convert</param>
-    /// <returns></returns>
-    /// <remarks>If the sequence is null, this will return the default (null) array.</remarks>
+    /// <typeparam name="T">
+    /// </typeparam>
+    /// <param name="items">
+    /// The sequence to convert
+    /// </param>
+    /// <returns>
+    /// </returns>
+    /// <remarks>
+    /// If the sequence is null, this will return the default (null) array.
+    /// </remarks>
     public static ImmutableArray<T> AsImmutableOrNull<T>(this T[]? items)
     {
         if (items == null)
@@ -95,9 +131,14 @@ public static class ImmutableArrayExtensions
     /// <summary>
     /// Converts an array to an immutable array.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <param name="items">The sequence to convert</param>
-    /// <returns>If the array is null, this will return an empty immutable array.</returns>
+    /// <typeparam name="T">
+    /// </typeparam>
+    /// <param name="items">
+    /// The sequence to convert
+    /// </param>
+    /// <returns>
+    /// If the array is null, this will return an empty immutable array.
+    /// </returns>
     public static ImmutableArray<T> AsImmutableOrEmpty<T>(this T[]? items)
     {
         if (items == null)
@@ -111,8 +152,12 @@ public static class ImmutableArrayExtensions
     /// <summary>
     /// Reads bytes from specified <see cref="MemoryStream"/>.
     /// </summary>
-    /// <param name="stream">The stream.</param>
-    /// <returns>Read-only content of the stream.</returns>
+    /// <param name="stream">
+    /// The stream.
+    /// </param>
+    /// <returns>
+    /// Read-only content of the stream.
+    /// </returns>
     public static ImmutableArray<byte> ToImmutable(this MemoryStream stream)
     {
         return ImmutableArray.Create<byte>(stream.ToArray());
@@ -121,11 +166,19 @@ public static class ImmutableArrayExtensions
     /// <summary>
     /// Maps an immutable array to another immutable array.
     /// </summary>
-    /// <typeparam name="TItem"></typeparam>
-    /// <typeparam name="TResult"></typeparam>
-    /// <param name="items">The array to map</param>
-    /// <param name="map">The mapping delegate</param>
-    /// <returns>If the items's length is 0, this will return an empty immutable array</returns>
+    /// <typeparam name="TItem">
+    /// </typeparam>
+    /// <typeparam name="TResult">
+    /// </typeparam>
+    /// <param name="items">
+    /// The array to map
+    /// </param>
+    /// <param name="map">
+    /// The mapping delegate
+    /// </param>
+    /// <returns>
+    /// If the items's length is 0, this will return an empty immutable array
+    /// </returns>
     public static ImmutableArray<TResult> SelectAsArray<TItem, TResult>(this ImmutableArray<TItem> items, Func<TItem, TResult> map)
     {
         return ImmutableArray.CreateRange(items, map);
@@ -134,13 +187,24 @@ public static class ImmutableArrayExtensions
     /// <summary>
     /// Maps an immutable array to another immutable array.
     /// </summary>
-    /// <typeparam name="TItem"></typeparam>
-    /// <typeparam name="TArg"></typeparam>
-    /// <typeparam name="TResult"></typeparam>
-    /// <param name="items">The sequence to map</param>
-    /// <param name="map">The mapping delegate</param>
-    /// <param name="arg">The extra input used by mapping delegate</param>
-    /// <returns>If the items's length is 0, this will return an empty immutable array.</returns>
+    /// <typeparam name="TItem">
+    /// </typeparam>
+    /// <typeparam name="TArg">
+    /// </typeparam>
+    /// <typeparam name="TResult">
+    /// </typeparam>
+    /// <param name="items">
+    /// The sequence to map
+    /// </param>
+    /// <param name="map">
+    /// The mapping delegate
+    /// </param>
+    /// <param name="arg">
+    /// The extra input used by mapping delegate
+    /// </param>
+    /// <returns>
+    /// If the items's length is 0, this will return an empty immutable array.
+    /// </returns>
     public static ImmutableArray<TResult> SelectAsArray<TItem, TArg, TResult>(this ImmutableArray<TItem> items, Func<TItem, TArg, TResult> map, TArg arg)
     {
         return ImmutableArray.CreateRange(items, map, arg);
@@ -149,13 +213,24 @@ public static class ImmutableArrayExtensions
     /// <summary>
     ///  Maps an immutable array to another immutable array.
     /// </summary>
-    /// <typeparam name="TItem"></typeparam>
-    /// <typeparam name="TArg"></typeparam>
-    /// <typeparam name="TResult"></typeparam>
-    /// <param name="items">The sequence to map</param>
-    /// <param name="map">The mapping delegate</param>
-    /// <param name="arg">The extra input used by mapping delegate</param>
-    /// <returns>If the items's length is 0, this will return an empty immutable array.</returns>
+    /// <typeparam name="TItem">
+    /// </typeparam>
+    /// <typeparam name="TArg">
+    /// </typeparam>
+    /// <typeparam name="TResult">
+    /// </typeparam>
+    /// <param name="items">
+    /// The sequence to map
+    /// </param>
+    /// <param name="map">
+    /// The mapping delegate
+    /// </param>
+    /// <param name="arg">
+    /// The extra input used by mapping delegate
+    /// </param>
+    /// <returns>
+    /// If the items's length is 0, this will return an empty immutable array.
+    /// </returns>
     public static ImmutableArray<TResult> SelectAsArray<TItem, TArg, TResult>(this ImmutableArray<TItem> items, Func<TItem, int, TArg, TResult> map, TArg arg)
     {
         switch (items.Length)
@@ -189,12 +264,24 @@ public static class ImmutableArrayExtensions
     /// <summary>
     /// Maps a subset of immutable array to another immutable array.
     /// </summary>
-    /// <typeparam name="TItem">Type of the source array items</typeparam>
-    /// <typeparam name="TResult">Type of the transformed array items</typeparam>
-    /// <param name="array">The array to transform</param>
-    /// <param name="predicate">The condition to use for filtering the array content.</param>
-    /// <param name="selector">A transform function to apply to each element that is not filtered out by <paramref name="predicate"/>.</param>
-    /// <returns>If the items's length is 0, this will return an empty immutable array.</returns>
+    /// <typeparam name="TItem">
+    /// Type of the source array items
+    /// </typeparam>
+    /// <typeparam name="TResult">
+    /// Type of the transformed array items
+    /// </typeparam>
+    /// <param name="array">
+    /// The array to transform
+    /// </param>
+    /// <param name="predicate">
+    /// The condition to use for filtering the array content.
+    /// </param>
+    /// <param name="selector">
+    /// A transform function to apply to each element that is not filtered out by <paramref name="predicate"/>.
+    /// </param>
+    /// <returns>
+    /// If the items's length is 0, this will return an empty immutable array.
+    /// </returns>
     public static ImmutableArray<TResult> SelectAsArray<TItem, TResult>(this ImmutableArray<TItem> array, Func<TItem, bool> predicate, Func<TItem, TResult> selector)
     {
         if (array.Length == 0)
@@ -217,14 +304,30 @@ public static class ImmutableArrayExtensions
     /// <summary>
     /// Maps a subset of immutable array to another immutable array.
     /// </summary>
-    /// <typeparam name="TItem">Type of the source array items</typeparam>
-    /// <typeparam name="TResult">Type of the transformed array items</typeparam>
-    /// <typeparam name="TArg">Type of the extra argument</typeparam>
-    /// <param name="array">The array to transform</param>
-    /// <param name="predicate">The condition to use for filtering the array content.</param>
-    /// <param name="selector">A transform function to apply to each element that is not filtered out by <paramref name="predicate"/>.</param>
-    /// <param name="arg">The extra input used by <paramref name="predicate"/> and <paramref name="selector"/>.</param>
-    /// <returns>If the items's length is 0, this will return an empty immutable array.</returns>
+    /// <typeparam name="TItem">
+    /// Type of the source array items
+    /// </typeparam>
+    /// <typeparam name="TResult">
+    /// Type of the transformed array items
+    /// </typeparam>
+    /// <typeparam name="TArg">
+    /// Type of the extra argument
+    /// </typeparam>
+    /// <param name="array">
+    /// The array to transform
+    /// </param>
+    /// <param name="predicate">
+    /// The condition to use for filtering the array content.
+    /// </param>
+    /// <param name="selector">
+    /// A transform function to apply to each element that is not filtered out by <paramref name="predicate"/>.
+    /// </param>
+    /// <param name="arg">
+    /// The extra input used by <paramref name="predicate"/> and <paramref name="selector"/>.
+    /// </param>
+    /// <returns>
+    /// If the items's length is 0, this will return an empty immutable array.
+    /// </returns>
     public static ImmutableArray<TResult> SelectAsArray<TItem, TArg, TResult>(this ImmutableArray<TItem> array, Func<TItem, TArg, bool> predicate, Func<TItem, TArg, TResult> selector, TArg arg)
     {
         if (array.Length == 0)
@@ -247,11 +350,21 @@ public static class ImmutableArrayExtensions
     /// <summary>
     /// Maps and flattens a subset of immutable array to another immutable array.
     /// </summary>
-    /// <typeparam name="TItem">Type of the source array items</typeparam>
-    /// <typeparam name="TResult">Type of the transformed array items</typeparam>
-    /// <param name="array">The array to transform</param>
-    /// <param name="selector">A transform function to apply to each element.</param>
-    /// <returns>If the array's length is 0, this will return an empty immutable array.</returns>
+    /// <typeparam name="TItem">
+    /// Type of the source array items
+    /// </typeparam>
+    /// <typeparam name="TResult">
+    /// Type of the transformed array items
+    /// </typeparam>
+    /// <param name="array">
+    /// The array to transform
+    /// </param>
+    /// <param name="selector">
+    /// A transform function to apply to each element.
+    /// </param>
+    /// <returns>
+    /// If the array's length is 0, this will return an empty immutable array.
+    /// </returns>
     public static ImmutableArray<TResult> SelectManyAsArray<TItem, TResult>(this ImmutableArray<TItem> array, Func<TItem, IEnumerable<TResult>> selector)
     {
         if (array.Length == 0)
@@ -271,11 +384,21 @@ public static class ImmutableArrayExtensions
     /// <summary>
     /// Maps and flattens a subset of immutable array to another immutable array.
     /// </summary>
-    /// <typeparam name="TItem">Type of the source array items</typeparam>
-    /// <typeparam name="TResult">Type of the transformed array items</typeparam>
-    /// <param name="array">The array to transform</param>
-    /// <param name="selector">A transform function to apply to each element.</param>
-    /// <returns>If the array's length is 0, this will return an empty immutable array.</returns>
+    /// <typeparam name="TItem">
+    /// Type of the source array items
+    /// </typeparam>
+    /// <typeparam name="TResult">
+    /// Type of the transformed array items
+    /// </typeparam>
+    /// <param name="array">
+    /// The array to transform
+    /// </param>
+    /// <param name="selector">
+    /// A transform function to apply to each element.
+    /// </param>
+    /// <returns>
+    /// If the array's length is 0, this will return an empty immutable array.
+    /// </returns>
     public static ImmutableArray<TResult> SelectManyAsArray<TItem, TResult>(this ImmutableArray<TItem> array, Func<TItem, ImmutableArray<TResult>> selector)
     {
         if (array.Length == 0)
@@ -296,12 +419,24 @@ public static class ImmutableArrayExtensions
     /// <summary>
     /// Maps and flattens a subset of immutable array to another immutable array.
     /// </summary>
-    /// <typeparam name="TItem">Type of the source array items</typeparam>
-    /// <typeparam name="TResult">Type of the transformed array items</typeparam>
-    /// <param name="array">The array to transform</param>
-    /// <param name="predicate">The condition to use for filtering the array content.</param>
-    /// <param name="selector">A transform function to apply to each element that is not filtered out by <paramref name="predicate"/>.</param>
-    /// <returns>If the items's length is 0, this will return an empty immutable array.</returns>
+    /// <typeparam name="TItem">
+    /// Type of the source array items
+    /// </typeparam>
+    /// <typeparam name="TResult">
+    /// Type of the transformed array items
+    /// </typeparam>
+    /// <param name="array">
+    /// The array to transform
+    /// </param>
+    /// <param name="predicate">
+    /// The condition to use for filtering the array content.
+    /// </param>
+    /// <param name="selector">
+    /// A transform function to apply to each element that is not filtered out by <paramref name="predicate"/>.
+    /// </param>
+    /// <returns>
+    /// If the items's length is 0, this will return an empty immutable array.
+    /// </returns>
     public static ImmutableArray<TResult> SelectManyAsArray<TItem, TResult>(this ImmutableArray<TItem> array, Func<TItem, bool> predicate, Func<TItem, IEnumerable<TResult>> selector)
     {
         if (array.Length == 0)
@@ -324,12 +459,24 @@ public static class ImmutableArrayExtensions
     /// <summary>
     /// Maps and flattens a subset of immutable array to another immutable array.
     /// </summary>
-    /// <typeparam name="TItem">Type of the source array items</typeparam>
-    /// <typeparam name="TResult">Type of the transformed array items</typeparam>
-    /// <param name="array">The array to transform</param>
-    /// <param name="predicate">The condition to use for filtering the array content.</param>
-    /// <param name="selector">A transform function to apply to each element that is not filtered out by <paramref name="predicate"/>.</param>
-    /// <returns>If the items's length is 0, this will return an empty immutable array.</returns>
+    /// <typeparam name="TItem">
+    /// Type of the source array items
+    /// </typeparam>
+    /// <typeparam name="TResult">
+    /// Type of the transformed array items
+    /// </typeparam>
+    /// <param name="array">
+    /// The array to transform
+    /// </param>
+    /// <param name="predicate">
+    /// The condition to use for filtering the array content.
+    /// </param>
+    /// <param name="selector">
+    /// A transform function to apply to each element that is not filtered out by <paramref name="predicate"/>.
+    /// </param>
+    /// <returns>
+    /// If the items's length is 0, this will return an empty immutable array.
+    /// </returns>
     public static ImmutableArray<TResult> SelectManyAsArray<TItem, TResult>(this ImmutableArray<TItem> array, Func<TItem, bool> predicate, Func<TItem, ImmutableArray<TResult>> selector)
     {
         if (array.Length == 0)
@@ -419,7 +566,9 @@ public static class ImmutableArrayExtensions
     /// <summary>
     /// Zips two immutable arrays together through a mapping function, producing another immutable array.
     /// </summary>
-    /// <returns>If the items's length is 0, this will return an empty immutable array.</returns>
+    /// <returns>
+    /// If the items's length is 0, this will return an empty immutable array.
+    /// </returns>
     public static ImmutableArray<TResult> ZipAsArray<T1, T2, TResult>(this ImmutableArray<T1> self, ImmutableArray<T2> other, Func<T1, T2, TResult> map)
     {
         Debug.Assert(self.Length == other.Length);
@@ -470,16 +619,24 @@ public static class ImmutableArrayExtensions
     /// <summary>
     /// Creates a new immutable array based on filtered elements by the predicate. The array must not be null.
     /// </summary>
-    /// <param name="array">The array to process</param>
-    /// <param name="predicate">The delegate that defines the conditions of the element to search for.</param>
+    /// <param name="array">
+    /// The array to process
+    /// </param>
+    /// <param name="predicate">
+    /// The delegate that defines the conditions of the element to search for.
+    /// </param>
     public static ImmutableArray<T> WhereAsArray<T>(this ImmutableArray<T> array, Func<T, bool> predicate)
         => WhereAsArrayImpl<T, object?>(array, predicate, predicateWithArg: null, arg: null);
 
     /// <summary>
     /// Creates a new immutable array based on filtered elements by the predicate. The array must not be null.
     /// </summary>
-    /// <param name="array">The array to process</param>
-    /// <param name="predicate">The delegate that defines the conditions of the element to search for.</param>
+    /// <param name="array">
+    /// The array to process
+    /// </param>
+    /// <param name="predicate">
+    /// The delegate that defines the conditions of the element to search for.
+    /// </param>
     public static ImmutableArray<T> WhereAsArray<T, TArg>(this ImmutableArray<T> array, Func<T, TArg, bool> predicate, TArg arg)
         => WhereAsArrayImpl(array, predicateWithoutArg: null, predicate, arg);
 
@@ -681,11 +838,18 @@ public static class ImmutableArrayExtensions
     /// <summary>
     /// Determines whether this instance and another immutable array are equal.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <param name="array1"></param>
-    /// <param name="array2"></param>
-    /// <param name="comparer">The comparer to determine if the two arrays are equal.</param>
-    /// <returns>True if the two arrays are equal</returns>
+    /// <typeparam name="T">
+    /// </typeparam>
+    /// <param name="array1">
+    /// </param>
+    /// <param name="array2">
+    /// </param>
+    /// <param name="comparer">
+    /// The comparer to determine if the two arrays are equal.
+    /// </param>
+    /// <returns>
+    /// True if the two arrays are equal
+    /// </returns>
     public static bool SetEquals<T>(this ImmutableArray<T> array1, ImmutableArray<T> array2, IEqualityComparer<T> comparer)
     {
         if (array1.IsDefault)
@@ -947,8 +1111,12 @@ public static class ImmutableArrayExtensions
     /// <summary>
     /// Determines whether duplicates exist using default equality comparer.
     /// </summary>
-    /// <param name="array">Array to search for duplicates</param>
-    /// <returns>Whether duplicates were found</returns>
+    /// <param name="array">
+    /// Array to search for duplicates
+    /// </param>
+    /// <returns>
+    /// Whether duplicates were found
+    /// </returns>
     public static bool HasDuplicates<T>(this ImmutableArray<T> array)
     {
         switch (array.Length)
@@ -982,9 +1150,15 @@ public static class ImmutableArrayExtensions
     /// Determines whether duplicates exist using <paramref name="comparer"/>. Use other override
     /// if you don't need a custom comparer.
     /// </summary>
-    /// <param name="array">Array to search for duplicates</param>
-    /// <param name="comparer">Comparer to use in search</param>
-    /// <returns>Whether duplicates were found</returns>
+    /// <param name="array">
+    /// Array to search for duplicates
+    /// </param>
+    /// <param name="comparer">
+    /// Comparer to use in search
+    /// </param>
+    /// <returns>
+    /// Whether duplicates were found
+    /// </returns>
     public static bool HasDuplicates<T>(this ImmutableArray<T> array, IEqualityComparer<T> comparer)
     {
         switch (array.Length)

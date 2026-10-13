@@ -79,9 +79,11 @@ internal readonly ref struct DescriptorArrayWriter
 
     private void WriteStateCache(ReadOnlySpan<ComponentStatePlan> states)
     {
+        _writer.WriteLine("#if !DEBUG");
         _writer.Write("private global::System.Collections.Immutable.ImmutableArray<");
         _writer.Write(StateType);
         _writer.WriteLine("> __states;");
+        _writer.WriteLine("#endif");
         _writer.WriteLine();
         _writer.WriteHiddenApiAttributes();
         _writer.Write("private global::System.Collections.Immutable.ImmutableArray<");
@@ -89,6 +91,19 @@ internal readonly ref struct DescriptorArrayWriter
         _writer.WriteLine("> __GetStates()");
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine("#if DEBUG");
+        _writer.WriteLine("return RuntimeStates.GetSnapshot(() =>");
+        _writer.WriteLine("[");
+        _writer.CurrentIndent += _writer.TabSize;
+        foreach (ref readonly var state in states)
+        {
+            GeneratedMemberNameWriter.WriteStateAccessor(_writer, state.GeneratedName);
+            _writer.WriteLine(",");
+        }
+
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("]);");
+        _writer.WriteLine("#else");
         _writer.WriteLine("if (__states.IsDefault)");
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
@@ -111,6 +126,7 @@ internal readonly ref struct DescriptorArrayWriter
         _writer.WriteLine("}");
         _writer.WriteLine();
         _writer.WriteLine("return __states;");
+        _writer.WriteLine("#endif");
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");
     }

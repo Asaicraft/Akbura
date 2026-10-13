@@ -68,7 +68,8 @@ public class MarkdownFileBase
     /// <summary>
     /// Update Markdown File to latest version
     /// </summary>
-    /// <param name="newDoc"></param>
+    /// <param name="newDoc">
+    /// </param>
     public virtual void Update(MarkdownFileBase newDoc)
     {
         Layout = newDoc.Layout;

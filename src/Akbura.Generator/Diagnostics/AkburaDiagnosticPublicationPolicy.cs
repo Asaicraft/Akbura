@@ -9,7 +9,9 @@ public enum AkburaDiagnosticPublisher
     None,
 }
 
-/// <summary>Ownership of live diagnostics is independent from build diagnostics.</summary>
+/// <summary>
+/// Ownership of live diagnostics is independent from build diagnostics.
+/// </summary>
 public static class AkburaDiagnosticPublicationPolicy
 {
     public static bool ShouldPublishGenerator(

@@ -23,7 +23,9 @@ internal ref struct ImmutableArrayBuilder<T>
     /// <summary>
     /// Creates a <see cref="ImmutableArrayBuilder{T}"/> value with a pooled underlying data writer.
     /// </summary>
-    /// <returns>A <see cref="ImmutableArrayBuilder{T}"/> instance to write data to.</returns>
+    /// <returns>
+    /// A <see cref="ImmutableArrayBuilder{T}"/> instance to write data to.
+    /// </returns>
     public static ImmutableArrayBuilder<T> Rent()
     {
         return new(new Writer());
@@ -32,7 +34,9 @@ internal ref struct ImmutableArrayBuilder<T>
     /// <summary>
     /// Creates a <see cref="ImmutableArrayBuilder{T}"/> value with a pooled underlying data writer.
     /// </summary>
-    /// <returns>A <see cref="ImmutableArrayBuilder{T}"/> instance to write data to.</returns>
+    /// <returns>
+    /// A <see cref="ImmutableArrayBuilder{T}"/> instance to write data to.
+    /// </returns>
     public static ImmutableArrayBuilder<T> Rent(int initialCapacity)
     {
         return new(new Writer(initialCapacity));
@@ -43,7 +47,9 @@ internal ref struct ImmutableArrayBuilder<T>
     /// <summary>
     /// Creates a new <see cref="ImmutableArrayBuilder{T}"/> object with the specified parameters.
     /// </summary>
-    /// <param name="writer">The target data writer to use.</param>
+    /// <param name="writer">
+    /// The target data writer to use.
+    /// </param>
     private ImmutableArrayBuilder(Writer writer)
     {
         this.writer = writer;
@@ -81,7 +87,9 @@ internal ref struct ImmutableArrayBuilder<T>
     /// <summary>
     /// Adds the specified items to the end of the array.
     /// </summary>
-    /// <param name="items">The items to add at the end of the array.</param>
+    /// <param name="items">
+    /// The items to add at the end of the array.
+    /// </param>
     public readonly void AddRange(scoped ReadOnlySpan<T> items)
     {
         writer!.AddRange(items);
@@ -133,7 +141,9 @@ internal ref struct ImmutableArrayBuilder<T>
     /// <summary>
     /// Gets an <see cref="IEnumerable{T}"/> instance for the current builder.
     /// </summary>
-    /// <returns>An <see cref="IEnumerable{T}"/> instance for the current builder.</returns>
+    /// <returns>
+    /// An <see cref="IEnumerable{T}"/> instance for the current builder.
+    /// </returns>
     /// <remarks>
     /// The builder should not be mutated while an enumerator is in use.
     /// </remarks>
@@ -287,7 +297,9 @@ internal ref struct ImmutableArrayBuilder<T>
         /// <summary>
         /// Ensures that <see cref="array"/> has enough free space to contain a given number of new items.
         /// </summary>
-        /// <param name="requestedSize">The minimum number of items to ensure space for in <see cref="array"/>.</param>
+        /// <param name="requestedSize">
+        /// The minimum number of items to ensure space for in <see cref="array"/>.
+        /// </param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void EnsureCapacity(int requestedSize)
         {
@@ -300,7 +312,9 @@ internal ref struct ImmutableArrayBuilder<T>
         /// <summary>
         /// Resizes <see cref="array"/> to ensure it can fit the specified number of new items.
         /// </summary>
-        /// <param name="sizeHint">The minimum number of items to ensure space for in <see cref="array"/>.</param>
+        /// <param name="sizeHint">
+        /// The minimum number of items to ensure space for in <see cref="array"/>.
+        /// </param>
         [MethodImpl(MethodImplOptions.NoInlining)]
         private void ResizeBuffer(int sizeHint)
         {

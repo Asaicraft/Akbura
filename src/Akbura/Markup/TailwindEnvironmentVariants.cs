@@ -141,7 +141,9 @@ public abstract class ViewportMarkupExtension
             IsActive);
     }
 
-    /// <summary>Evaluates the current viewport size.</summary>
+    /// <summary>
+    /// Evaluates the current viewport size.
+    /// </summary>
     protected abstract bool IsActive(Size size);
 
     internal static TopLevel? ResolveTopLevel(
@@ -167,7 +169,9 @@ public abstract class ViewportMarkupExtension
 
 #pragma warning disable IDE1006 // Names intentionally match AKCSS prefixes.
 
-/// <summary>Activates for left-to-right flow direction.</summary>
+/// <summary>
+/// Activates for left-to-right flow direction.
+/// </summary>
 [UtilityVariant(
     10d,
     ConflictGroup = "Akbura.Tailwind.Direction",
@@ -188,7 +192,9 @@ public sealed class ltrExtension : StyledElementStateMarkupExtension
     }
 }
 
-/// <summary>Activates for right-to-left flow direction.</summary>
+/// <summary>
+/// Activates for right-to-left flow direction.
+/// </summary>
 [UtilityVariant(
     20d,
     ConflictGroup = "Akbura.Tailwind.Direction",
@@ -209,7 +215,9 @@ public sealed class rtlExtension : StyledElementStateMarkupExtension
     }
 }
 
-/// <summary>Activates when the viewport is portrait-oriented.</summary>
+/// <summary>
+/// Activates when the viewport is portrait-oriented.
+/// </summary>
 [UtilityVariant(
     10d,
     ConflictGroup = "Akbura.Tailwind.Orientation",
@@ -223,7 +231,9 @@ public sealed class portraitExtension : ViewportMarkupExtension
     }
 }
 
-/// <summary>Activates when the viewport is landscape-oriented.</summary>
+/// <summary>
+/// Activates when the viewport is landscape-oriented.
+/// </summary>
 [UtilityVariant(
     20d,
     ConflictGroup = "Akbura.Tailwind.Orientation",
@@ -248,7 +258,9 @@ public sealed class landscapeExtension : ViewportMarkupExtension
     UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
 public sealed class contrastMoreExtension
 {
-    /// <summary>Creates the reactive platform-contrast condition.</summary>
+    /// <summary>
+    /// Creates the reactive platform-contrast condition.
+    /// </summary>
     public IObservable<bool>? ProvideValue(IServiceProvider? serviceProvider)
     {
         if (serviceProvider?.GetService(typeof(IProvideValueTarget))
@@ -363,7 +375,9 @@ public sealed class contrastMoreExtension
     UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
 public sealed class minExtension : ViewportMarkupExtension
 {
-    /// <summary>Gets or sets the minimum width in device-independent pixels.</summary>
+    /// <summary>
+    /// Gets or sets the minimum width in device-independent pixels.
+    /// </summary>
     public double Width { get; set; } = double.NaN;
 
     /// <inheritdoc />
@@ -382,7 +396,9 @@ public sealed class minExtension : ViewportMarkupExtension
     UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
 public sealed class maxExtension : ViewportMarkupExtension
 {
-    /// <summary>Gets or sets the exclusive maximum width.</summary>
+    /// <summary>
+    /// Gets or sets the exclusive maximum width.
+    /// </summary>
     public double Width { get; set; } = double.NaN;
 
     /// <inheritdoc />

@@ -1345,7 +1345,9 @@ internal sealed partial class Lexer : IDisposable
 	/// <summary>
 	/// Scans all of the whitespace (not new-lines) into a trivia node until it runs out.
 	/// </summary>
-	/// <returns>A trivia node with the whitespace text</returns>
+	/// <returns>
+	/// A trivia node with the whitespace text
+	/// </returns>
 	private GreenSyntaxTrivia ScanWhitespace()
 	{
 		Debug.Assert(SyntaxFacts.IsWhitespace(TextWindow.PeekChar()));
@@ -1410,7 +1412,9 @@ internal sealed partial class Lexer : IDisposable
 	/// <summary>
 	/// Scans a new-line sequence (either a single new-line character or a CR-LF combo).
 	/// </summary>
-	/// <returns>A trivia node with the new-line text</returns>
+	/// <returns>
+	/// A trivia node with the new-line text
+	/// </returns>
 	private GreenNode? ScanEndOfLine()
 	{
 		char character;
@@ -1878,18 +1882,26 @@ internal sealed partial class Lexer : IDisposable
 
 	/// <summary>
 	/// Fast path for simple ASCII identifiers:
-	/// <c>[_a-zA-Z][_a-zA-Z0-9]*</c>
+	/// <c>
+	/// [_a-zA-Z][_a-zA-Z0-9]*
+	/// </c>
 	/// Works purely inside <see cref="SlidingTextWindow.CurrentWindowSpan"/>.
 	/// Returns <c>false</c> if:
 	/// <list type="bullet">
 	///   <item>
-	///     <description>The span is empty</description>
+	/// <description>
+	/// The span is empty
+	/// </description>
 	///   </item>
 	///   <item>
-	///     <description>The first char is not a valid identifier start</description>
+	/// <description>
+	/// The first char is not a valid identifier start
+	/// </description>
 	///   </item>
 	///   <item>
-	///     <description>The identifier reaches beyond the current window chunk</description>
+	/// <description>
+	/// The identifier reaches beyond the current window chunk
+	/// </description>
 	///   </item>
 	/// </list>
 	/// Will not allocate and will always intern the identifier text.
@@ -2001,19 +2013,29 @@ internal sealed partial class Lexer : IDisposable
 	/// Slow path for identifiers. Handles the following cases:
 	/// <list type="bullet">
 	///   <item>
-	///     <description>Unicode letters</description>
+	/// <description>
+	/// Unicode letters
+	/// </description>
 	///   </item>
 	///   <item>
-	///     <description>Unicode escape sequences (<c>\uXXXX</c>, <c>\UXXXXXXXX</c>)</description>
+	/// <description>
+	/// Unicode escape sequences (<c>\uXXXX</c>, <c>\UXXXXXXXX</c>)
+	/// </description>
 	///   </item>
 	///   <item>
-	///     <description>Surrogate pairs</description>
+	/// <description>
+	/// Surrogate pairs
+	/// </description>
 	///   </item>
 	///   <item>
-	///     <description>Formatting characters</description>
+	/// <description>
+	/// Formatting characters
+	/// </description>
 	///   </item>
 	///   <item>
-	///     <description>Escaped identifier sequences</description>
+	/// <description>
+	/// Escaped identifier sequences
+	/// </description>
 	///   </item>
 	/// </list>
 	/// Falls back here whenever FastPath cannot handle the case.

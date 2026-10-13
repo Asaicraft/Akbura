@@ -22,12 +22,27 @@ changes or running development application are required.
 - `StateSurvivesRealHotReload`: adding `visible` preserves the component, assembly,
   `State<int>` instance and value `42`, creates the new state, updates the existing
   UI element, and leaves both states reactive.
+- `EmptyComponent_AddsItsFirstOrdinaryAndHookStatesToTheSameOwner`: adding the first
+  states to a previously empty component rebuilds the cached snapshot and keeps
+  the existing UI owner and current root element reactive.
 - `TwentyUpdates_PreserveStatesAcrossInitializerEditsAndReordering`: twenty actual
   deltas retain state objects and edited values while initializers, declaration
   order and UI text change; the original initializer runs only once.
 - `TypeChangeRenameAndRemoval_ReconcileTheSameLiveComponent`: changing a state's
   type, renaming it and deleting it create or remove the expected state entries
   without replacing the retained counter or live component.
+- `HookAdditionChangesAndRemoval_PreserveTheOwnerAndOrdinaryState`: adding chained
+  composed hooks, changing a projection and removing hooks retain the ordinary
+  counter and UI owner, rebind hook states and detach the previous aliases.
+- `FailedFrames_RestoreSnapshotsAndRetryRealHotReloadWithFreshHookAliases`: a
+  failed ordinary render restores the exact committed snapshot; a failed CLR
+  refresh discards provisional hook aliases and can retry against the updated IL.
+
+Debug components store both hook aliases and their ordered snapshots in the
+runtime `StateCollection`. `BeginFrame`, `CommitFrame` and `AbortFrame` stage these
+bindings without generated instance fields. Hot Reload retains the old snapshot
+until a frame commits so removed states and their resources are reconciled only
+after new hooks have been prepared. Release components keep the direct field path.
 
 ## Harness and boundaries
 
@@ -52,6 +67,13 @@ It does not verify file watching, IDE edit classification, active statements,
 or the SDK's automatic handler discovery. A `dotnet watch` end-to-end fixture is
 a separate layer of coverage. The current harness handles one existing component
 type with fixed code-behind, not arbitrary edits across a whole solution.
+
+A separate property-reconciliation gap was observed while testing an empty
+component: changing `Text="empty"` to an expression using newly added states left
+the live `TextBlock.Text` null, although the state snapshot was initialized.
+The empty-component state test starts with `Text={EmptyTextForTest()}` to keep the
+property's assignment kind stable. Constant-to-expression property transitions
+need their own regression test and fix outside the state-storage migration.
 
 Add a scenario as a `[Fact]` with `[Trait("Category", "ClrHotReload")]`, delegate
 the parent run to `HotReloadChildProcess`, and perform the scenario on the

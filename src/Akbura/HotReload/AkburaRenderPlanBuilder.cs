@@ -18,7 +18,9 @@ public sealed class AkburaRenderPlanBuilder
     /// </summary>
     public int Count => _definitions.Count;
 
-    /// <summary>Adds a dense conditional definition independently of visual node definitions.</summary>
+    /// <summary>
+    /// Adds a dense conditional definition independently of visual node definitions.
+    /// </summary>
     public void AddConditional(AkburaRenderConditionalDefinition definition)
     {
         if (_isCompleted)
@@ -145,7 +147,9 @@ public sealed class AkburaRenderPlanBuilder
     /// <summary>
     /// Adds a node definition in dense local identifier order.
     /// </summary>
-    /// <param name="definition">The node definition to add.</param>
+    /// <param name="definition">
+    /// The node definition to add.
+    /// </param>
     public void Add(AkburaRenderNodeDefinition definition)
     {
         if (_isCompleted)

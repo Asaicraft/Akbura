@@ -14,7 +14,9 @@ internal static class StackGuard
     ///     Ensures that the remaining stack space is large enough to execute
     ///     the average function.
     /// </summary>
-    /// <param name="recursionDepth">how many times the calling function has recursed</param>
+    /// <param name="recursionDepth">
+    /// how many times the calling function has recursed
+    /// </param>
     /// <exception cref="InsufficientExecutionStackException">
     ///     The available stack space is insufficient to execute
     ///     the average function.

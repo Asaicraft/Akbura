@@ -7,7 +7,9 @@
 
 namespace System
 {
-    /// <summary>Represent a range has start and end indexes.</summary>
+    /// <summary>
+    /// Represent a range has start and end indexes.
+    /// </summary>
     /// <remarks>
     /// Range is used by the C# compiler to support the range syntax.
     /// <code>
@@ -19,55 +21,87 @@ namespace System
     [global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     internal readonly struct Range : global::System.IEquatable<global::System.Range>
     {
-        /// <summary>Represent the inclusive start index of the Range.</summary>
+        /// <summary>
+        /// Represent the inclusive start index of the Range.
+        /// </summary>
         public global::System.Index Start { get; }
 
-        /// <summary>Represent the exclusive end index of the Range.</summary>
+        /// <summary>
+        /// Represent the exclusive end index of the Range.
+        /// </summary>
         public global::System.Index End { get; }
 
-        /// <summary>Construct a Range object using the start and end indexes.</summary>
-        /// <param name="start">Represent the inclusive start index of the range.</param>
-        /// <param name="end">Represent the exclusive end index of the range.</param>
+        /// <summary>
+        /// Construct a Range object using the start and end indexes.
+        /// </summary>
+        /// <param name="start">
+        /// Represent the inclusive start index of the range.
+        /// </param>
+        /// <param name="end">
+        /// Represent the exclusive end index of the range.
+        /// </param>
         public Range(global::System.Index start, global::System.Index end)
         {
             Start = start;
             End = end;
         }
 
-        /// <summary>Indicates whether the current Range object is equal to another object of the same type.</summary>
-        /// <param name="value">An object to compare with this object</param>
+        /// <summary>
+        /// Indicates whether the current Range object is equal to another object of the same type.
+        /// </summary>
+        /// <param name="value">
+        /// An object to compare with this object
+        /// </param>
         public override bool Equals([global::System.Diagnostics.CodeAnalysis.NotNullWhen(true)] object? value) =>
             value is global::System.Range r &&
             r.Start.Equals(Start) &&
             r.End.Equals(End);
 
-        /// <summary>Indicates whether the current Range object is equal to another Range object.</summary>
-        /// <param name="other">An object to compare with this object</param>
+        /// <summary>
+        /// Indicates whether the current Range object is equal to another Range object.
+        /// </summary>
+        /// <param name="other">
+        /// An object to compare with this object
+        /// </param>
         public bool Equals(global::System.Range other) => other.Start.Equals(Start) && other.End.Equals(End);
 
-        /// <summary>Returns the hash code for this instance.</summary>
+        /// <summary>
+        /// Returns the hash code for this instance.
+        /// </summary>
         public override int GetHashCode()
         {
             return global::System.Range.HashHelpers.Combine(Start.GetHashCode(), End.GetHashCode());
         }
 
-        /// <summary>Converts the value of the current Range object to its equivalent string representation.</summary>
+        /// <summary>
+        /// Converts the value of the current Range object to its equivalent string representation.
+        /// </summary>
         public override string ToString()
         {
             return Start.ToString() + ".." + End.ToString();
         }
 
-        /// <summary>Create a Range object starting from start index to the end of the collection.</summary>
+        /// <summary>
+        /// Create a Range object starting from start index to the end of the collection.
+        /// </summary>
         public static global::System.Range StartAt(global::System.Index start) => new global::System.Range(start, global::System.Index.End);
 
-        /// <summary>Create a Range object starting from first element in the collection to the end Index.</summary>
+        /// <summary>
+        /// Create a Range object starting from first element in the collection to the end Index.
+        /// </summary>
         public static global::System.Range EndAt(global::System.Index end) => new global::System.Range(global::System.Index.Start, end);
 
-        /// <summary>Create a Range object starting from first element to the end.</summary>
+        /// <summary>
+        /// Create a Range object starting from first element to the end.
+        /// </summary>
         public static global::System.Range All => new global::System.Range(global::System.Index.Start, global::System.Index.End);
 
-        /// <summary>Calculate the start offset and length of range object using a collection length.</summary>
-        /// <param name="length">The length of the collection that the range will be used with. length has to be a positive value.</param>
+        /// <summary>
+        /// Calculate the start offset and length of range object using a collection length.
+        /// </summary>
+        /// <param name="length">
+        /// The length of the collection that the range will be used with. length has to be a positive value.
+        /// </param>
         /// <remarks>
         /// For performance reason, we don't validate the input length parameter against negative values.
         /// It is expected Range will be used with collections which always have non negative length/count.

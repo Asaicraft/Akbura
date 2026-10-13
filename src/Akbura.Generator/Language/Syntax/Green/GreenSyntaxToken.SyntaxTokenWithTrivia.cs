@@ -13,7 +13,9 @@ partial class GreenSyntaxToken
         protected readonly GreenNode? TrailingField;
 
 
-        /// <summary>Initializes a new instance of the SyntaxTokenWithTrivia class.</summary>
+        /// <summary>
+        /// Initializes a new instance of the SyntaxTokenWithTrivia class.
+        /// </summary>
         public SyntaxTokenWithTrivia(SyntaxKind kind, GreenNode? leading, GreenNode? trailing)
             : base(kind)
         {
@@ -36,7 +38,9 @@ partial class GreenSyntaxToken
             Flags = flags;
         }
 
-        /// <summary>Initializes a new instance with diagnostics and annotations.</summary>
+        /// <summary>
+        /// Initializes a new instance with diagnostics and annotations.
+        /// </summary>
         public SyntaxTokenWithTrivia(SyntaxKind kind, GreenNode? leading, GreenNode? trailing, ImmutableArray<AkburaDiagnostic>? diagnostics, ImmutableArray<AkburaSyntaxAnnotation>? annotations)
             : base(kind, diagnostics, annotations)
         {
@@ -58,13 +62,19 @@ partial class GreenSyntaxToken
             Flags = flags;
         }
 
-        /// <summary>Gets the leading trivia.</summary>
+        /// <summary>
+        /// Gets the leading trivia.
+        /// </summary>
         public override GreenNode? GetLeadingTrivia() => LeadingField;
 
-        /// <summary>Gets the trailing trivia.</summary>
+        /// <summary>
+        /// Gets the trailing trivia.
+        /// </summary>
         public override GreenNode? GetTrailingTrivia() => TrailingField;
 
-        /// <summary>Creates a new token with updated leading trivia.</summary>
+        /// <summary>
+        /// Creates a new token with updated leading trivia.
+        /// </summary>
         public override GreenSyntaxToken TokenWithLeadingTrivia(GreenNode? trivia)
         {
             return new SyntaxTokenWithTrivia(
@@ -75,7 +85,9 @@ partial class GreenSyntaxToken
                 GetAnnotations());
         }
 
-        /// <summary>Creates a new token with updated trailing trivia.</summary>
+        /// <summary>
+        /// Creates a new token with updated trailing trivia.
+        /// </summary>
         public override GreenSyntaxToken TokenWithTrailingTrivia(GreenNode? trivia)
         {
             return new SyntaxTokenWithTrivia(
@@ -86,7 +98,9 @@ partial class GreenSyntaxToken
                 GetAnnotations());
         }
 
-        /// <summary>Creates a new token with updated diagnostics.</summary>
+        /// <summary>
+        /// Creates a new token with updated diagnostics.
+        /// </summary>
         public override GreenNode WithDiagnostics(ImmutableArray<AkburaDiagnostic>? diagnostics)
         {
             return new SyntaxTokenWithTrivia(
@@ -97,7 +111,9 @@ partial class GreenSyntaxToken
                 GetAnnotations());
         }
 
-        /// <summary>Creates a new token with updated annotations.</summary>
+        /// <summary>
+        /// Creates a new token with updated annotations.
+        /// </summary>
         public override GreenNode WithAnnotations(ImmutableArray<AkburaSyntaxAnnotation>? annotations)
         {
             return new SyntaxTokenWithTrivia(

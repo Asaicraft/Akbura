@@ -191,8 +191,12 @@ public static class ArrayExtensions
     /// <summary>
     /// Search a sorted integer array for the target value in O(log N) time.
     /// </summary>
-    /// <param name="array">The array of integers which must be sorted in ascending order.</param>
-    /// <param name="value">The target value.</param>
+    /// <param name="array">
+    /// The array of integers which must be sorted in ascending order.
+    /// </param>
+    /// <param name="value">
+    /// The target value.
+    /// </param>
     /// <returns>An index in the array pointing to the position where <paramref name="value"/> should be
     /// inserted in order to maintain the sorted order. All values to the right of this position will be
     /// strictly greater than <paramref name="value"/>. Note that this may return a position off the end

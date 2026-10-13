@@ -439,7 +439,9 @@ internal abstract partial class AkburaSyntax
     /// <summary>
     /// Finds a descendant token of this node whose span includes the supplied position. 
     /// </summary>
-    /// <param name="position">The character position of the token relative to the beginning of the file.</param>
+    /// <param name="position">
+    /// The character position of the token relative to the beginning of the file.
+    /// </param>
     /// <param name="findInsideTrivia">
     /// True to return tokens that are part of trivia. If false finds the token whose full span (including trivia)
     /// includes the position.
@@ -452,7 +454,9 @@ internal abstract partial class AkburaSyntax
     /// <summary>
     /// Gets the first token of the tree rooted by this node. Skips zero-width tokens.
     /// </summary>
-    /// <returns>The first token or <c>default(SyntaxToken)</c> if it doesn't exist.</returns>
+    /// <returns>
+    /// The first token or <c>default(SyntaxToken)</c> if it doesn't exist.
+    /// </returns>
     public SyntaxToken GetFirstToken(bool includeZeroWidth = false)
     {
         return SyntaxNavigator.GetFirstToken(this, includeZeroWidth);
@@ -461,7 +465,9 @@ internal abstract partial class AkburaSyntax
     /// <summary>
     /// Gets the last token of the tree rooted by this node. Skips zero-width tokens.
     /// </summary>
-    /// <returns>The last token or <c>default(SyntaxToken)</c> if it doesn't exist.</returns>
+    /// <returns>
+    /// The last token or <c>default(SyntaxToken)</c> if it doesn't exist.
+    /// </returns>
     public SyntaxToken GetLastToken(bool includeZeroWidth = false)
     {
         return SyntaxNavigator.GetLastToken(this, includeZeroWidth);
@@ -546,7 +552,8 @@ internal abstract partial class AkburaSyntax
     /// </summary>
     /// <param name="position">The character position of the trivia relative to the beginning of
     /// the file.</param>
-    /// <returns></returns>
+    /// <returns>
+    /// </returns>
     public SyntaxTrivia FindTrivia(int position)
     {
         if (FullSpan.Contains(position))
@@ -637,7 +644,9 @@ internal abstract partial class AkburaSyntax
     /// <summary>
     /// Finds a descendant token of this node whose span includes the supplied position. 
     /// </summary>
-    /// <param name="position">The character position of the token relative to the beginning of the file.</param>
+    /// <param name="position">
+    /// The character position of the token relative to the beginning of the file.
+    /// </param>
     protected virtual SyntaxToken FindTokenCore(int position)
     {
         if (TryGetEofAt(position, out var EoF))
@@ -766,8 +775,12 @@ internal abstract partial class AkburaSyntax
     /// <summary>
     /// Gets a list of descendant nodes in prefix document order.
     /// </summary>
-    /// <param name="descendIntoChildren">An optional function that determines if the search descends into the argument node's children.</param>
-    /// <param name="descendIntoTrivia">Determines if nodes that are part of structured trivia are included in the list.</param>
+    /// <param name="descendIntoChildren">
+    /// An optional function that determines if the search descends into the argument node's children.
+    /// </param>
+    /// <param name="descendIntoTrivia">
+    /// Determines if nodes that are part of structured trivia are included in the list.
+    /// </param>
     public IEnumerable<AkburaSyntax> DescendantNodes(Func<AkburaSyntax, bool>? descendIntoChildren = null, bool descendIntoTrivia = false)
     {
         return DescendantNodesImpl(FullSpan, descendIntoChildren, descendIntoTrivia, includeSelf: false);
@@ -776,9 +789,15 @@ internal abstract partial class AkburaSyntax
     /// <summary>
     /// Gets a list of descendant nodes in prefix document order.
     /// </summary>
-    /// <param name="span">The span the node's full span must intersect.</param>
-    /// <param name="descendIntoChildren">An optional function that determines if the search descends into the argument node's children.</param>
-    /// <param name="descendIntoTrivia">Determines if nodes that are part of structured trivia are included in the list.</param>
+    /// <param name="span">
+    /// The span the node's full span must intersect.
+    /// </param>
+    /// <param name="descendIntoChildren">
+    /// An optional function that determines if the search descends into the argument node's children.
+    /// </param>
+    /// <param name="descendIntoTrivia">
+    /// Determines if nodes that are part of structured trivia are included in the list.
+    /// </param>
     public IEnumerable<AkburaSyntax> DescendantNodes(TextSpan span, Func<AkburaSyntax, bool>? descendIntoChildren = null, bool descendIntoTrivia = false)
     {
         return DescendantNodesImpl(span, descendIntoChildren, descendIntoTrivia, includeSelf: false);
@@ -787,8 +806,12 @@ internal abstract partial class AkburaSyntax
     /// <summary>
     /// Gets a list of descendant nodes (including this node) in prefix document order.
     /// </summary>
-    /// <param name="descendIntoChildren">An optional function that determines if the search descends into the argument node's children.</param>
-    /// <param name="descendIntoTrivia">Determines if nodes that are part of structured trivia are included in the list.</param>
+    /// <param name="descendIntoChildren">
+    /// An optional function that determines if the search descends into the argument node's children.
+    /// </param>
+    /// <param name="descendIntoTrivia">
+    /// Determines if nodes that are part of structured trivia are included in the list.
+    /// </param>
     public IEnumerable<AkburaSyntax> DescendantNodesAndSelf(Func<AkburaSyntax, bool>? descendIntoChildren = null, bool descendIntoTrivia = false)
     {
         return DescendantNodesImpl(FullSpan, descendIntoChildren, descendIntoTrivia, includeSelf: true);
@@ -797,9 +820,15 @@ internal abstract partial class AkburaSyntax
     /// <summary>
     /// Gets a list of descendant nodes (including this node) in prefix document order.
     /// </summary>
-    /// <param name="span">The span the node's full span must intersect.</param>
-    /// <param name="descendIntoChildren">An optional function that determines if the search descends into the argument node's children.</param>
-    /// <param name="descendIntoTrivia">Determines if nodes that are part of structured trivia are included in the list.</param>
+    /// <param name="span">
+    /// The span the node's full span must intersect.
+    /// </param>
+    /// <param name="descendIntoChildren">
+    /// An optional function that determines if the search descends into the argument node's children.
+    /// </param>
+    /// <param name="descendIntoTrivia">
+    /// Determines if nodes that are part of structured trivia are included in the list.
+    /// </param>
     public IEnumerable<AkburaSyntax> DescendantNodesAndSelf(TextSpan span, Func<AkburaSyntax, bool>? descendIntoChildren = null, bool descendIntoTrivia = false)
     {
         return DescendantNodesImpl(span, descendIntoChildren, descendIntoTrivia, includeSelf: true);
@@ -808,8 +837,12 @@ internal abstract partial class AkburaSyntax
     /// <summary>
     /// Gets a list of descendant nodes and tokens in prefix document order.
     /// </summary>
-    /// <param name="descendIntoChildren">An optional function that determines if the search descends into the argument node's children.</param>
-    /// <param name="descendIntoTrivia">Determines if nodes that are part of structured trivia are included in the list.</param>
+    /// <param name="descendIntoChildren">
+    /// An optional function that determines if the search descends into the argument node's children.
+    /// </param>
+    /// <param name="descendIntoTrivia">
+    /// Determines if nodes that are part of structured trivia are included in the list.
+    /// </param>
     public IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokens(Func<AkburaSyntax, bool>? descendIntoChildren = null, bool descendIntoTrivia = false)
     {
         return DescendantNodesAndTokensImpl(FullSpan, descendIntoChildren, descendIntoTrivia, includeSelf: false);
@@ -818,9 +851,15 @@ internal abstract partial class AkburaSyntax
     /// <summary>
     /// Gets a list of the descendant nodes and tokens in prefix document order.
     /// </summary>
-    /// <param name="span">The span the node's full span must intersect.</param>
-    /// <param name="descendIntoChildren">An optional function that determines if the search descends into the argument node's children.</param>
-    /// <param name="descendIntoTrivia">Determines if nodes that are part of structured trivia are included in the list.</param>
+    /// <param name="span">
+    /// The span the node's full span must intersect.
+    /// </param>
+    /// <param name="descendIntoChildren">
+    /// An optional function that determines if the search descends into the argument node's children.
+    /// </param>
+    /// <param name="descendIntoTrivia">
+    /// Determines if nodes that are part of structured trivia are included in the list.
+    /// </param>
     public IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokens(TextSpan span, Func<AkburaSyntax, bool>? descendIntoChildren = null, bool descendIntoTrivia = false)
     {
         return DescendantNodesAndTokensImpl(span, descendIntoChildren, descendIntoTrivia, includeSelf: false);
@@ -829,8 +868,12 @@ internal abstract partial class AkburaSyntax
     /// <summary>
     /// Gets a list of descendant nodes and tokens (including this node) in prefix document order.
     /// </summary>
-    /// <param name="descendIntoChildren">An optional function that determines if the search descends into the argument node's children.</param>
-    /// <param name="descendIntoTrivia">Determines if nodes that are part of structured trivia are included in the list.</param>
+    /// <param name="descendIntoChildren">
+    /// An optional function that determines if the search descends into the argument node's children.
+    /// </param>
+    /// <param name="descendIntoTrivia">
+    /// Determines if nodes that are part of structured trivia are included in the list.
+    /// </param>
     public IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensAndSelf(Func<AkburaSyntax, bool>? descendIntoChildren = null, bool descendIntoTrivia = false)
     {
         return DescendantNodesAndTokensImpl(FullSpan, descendIntoChildren, descendIntoTrivia, includeSelf: true);
@@ -839,9 +882,15 @@ internal abstract partial class AkburaSyntax
     /// <summary>
     /// Gets a list of the descendant nodes and tokens (including this node) in prefix document order.
     /// </summary>
-    /// <param name="span">The span the node's full span must intersect.</param>
-    /// <param name="descendIntoChildren">An optional function that determines if the search descends into the argument node's children.</param>
-    /// <param name="descendIntoTrivia">Determines if nodes that are part of structured trivia are included in the list.</param>
+    /// <param name="span">
+    /// The span the node's full span must intersect.
+    /// </param>
+    /// <param name="descendIntoChildren">
+    /// An optional function that determines if the search descends into the argument node's children.
+    /// </param>
+    /// <param name="descendIntoTrivia">
+    /// Determines if nodes that are part of structured trivia are included in the list.
+    /// </param>
     public IEnumerable<SyntaxNodeOrToken> DescendantNodesAndTokensAndSelf(TextSpan span, Func<AkburaSyntax, bool>? descendIntoChildren = null, bool descendIntoTrivia = false)
     {
         return DescendantNodesAndTokensImpl(span, descendIntoChildren, descendIntoTrivia, includeSelf: true);
@@ -856,7 +905,9 @@ internal abstract partial class AkburaSyntax
     /// <devdoc>
     /// TODO: This should probably be reimplemented with <see cref="ChildThatContainsPosition"/>
     /// </devdoc>
-    /// <exception cref="ArgumentOutOfRangeException">This exception is thrown if <see cref="FullSpan"/> doesn't contain the given span.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// This exception is thrown if <see cref="FullSpan"/> doesn't contain the given span.
+    /// </exception>
     public AkburaSyntax FindNode(TextSpan span, bool getInnermostNodeForTie = false)
     {
         if (!FullSpan.Contains(span))
@@ -1002,9 +1053,15 @@ internal abstract partial class AkburaSyntax
     /// <summary>
     /// Creates a new tree of nodes with the specified old token replaced with a new token.
     /// </summary>
-    /// <typeparam name="TRoot">The type of the root node.</typeparam>
-    /// <param name="root">The root node of the tree of nodes.</param>
-    /// <param name="oldToken">The token to be replaced.</param>
+    /// <typeparam name="TRoot">
+    /// The type of the root node.
+    /// </typeparam>
+    /// <param name="root">
+    /// The root node of the tree of nodes.
+    /// </param>
+    /// <param name="oldToken">
+    /// The token to be replaced.
+    /// </param>
     /// <param name="newToken">The new token to use in the new tree in place of the old
     /// token.</param>
     public AkburaSyntax? ReplaceToken(SyntaxToken oldToken, SyntaxToken newToken)
@@ -1015,9 +1072,15 @@ internal abstract partial class AkburaSyntax
     /// <summary>
     /// Creates a new tree of nodes with the specified trivia replaced with new trivia.
     /// </summary>
-    /// <typeparam name="TRoot">The type of the root node.</typeparam>
-    /// <param name="root">The root node of the tree of nodes.</param>
-    /// <param name="trivia">The trivia to be replaced; descendants of the root node.</param>
+    /// <typeparam name="TRoot">
+    /// The type of the root node.
+    /// </typeparam>
+    /// <param name="root">
+    /// The root node of the tree of nodes.
+    /// </param>
+    /// <param name="trivia">
+    /// The trivia to be replaced; descendants of the root node.
+    /// </param>
     /// <param name="computeReplacementTrivia">A function that computes replacement trivia for
     /// the specified arguments. The first argument is the original trivia. The second argument is
     /// the same trivia with potentially rewritten sub structure.</param>
@@ -1029,10 +1092,18 @@ internal abstract partial class AkburaSyntax
     /// <summary>
     /// Creates a new tree of nodes with the specified trivia replaced with new trivia.
     /// </summary>
-    /// <typeparam name="TRoot">The type of the root node.</typeparam>
-    /// <param name="root">The root node of the tree of nodes.</param>
-    /// <param name="trivia">The trivia to be replaced.</param>
-    /// <param name="newTrivia">The new trivia to use in the new tree in place of the old trivia.</param>
+    /// <typeparam name="TRoot">
+    /// The type of the root node.
+    /// </typeparam>
+    /// <param name="root">
+    /// The root node of the tree of nodes.
+    /// </param>
+    /// <param name="trivia">
+    /// The trivia to be replaced.
+    /// </param>
+    /// <param name="newTrivia">
+    /// The new trivia to use in the new tree in place of the old trivia.
+    /// </param>
     public AkburaSyntax ReplaceTrivia(SyntaxTrivia trivia, SyntaxTrivia newTrivia)
     {
         return Replace<AkburaSyntax>(trivia: [trivia], computeReplacementTrivia: (o, r) => newTrivia);

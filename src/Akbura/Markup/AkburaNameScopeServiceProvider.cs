@@ -3,7 +3,9 @@ using System.ComponentModel;
 
 namespace Akbura.Markup;
 
-/// <summary>Preserves the native XAML services while supplying a lexical name scope.</summary>
+/// <summary>
+/// Preserves the native XAML services while supplying a lexical name scope.
+/// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
 [Browsable(false)]
 public sealed class AkburaNameScopeServiceProvider(INameScope nameScope, IServiceProvider fallback) : IServiceProvider

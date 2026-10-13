@@ -73,17 +73,31 @@ public abstract class InjectService
     /// Recreates an injected-service descriptor for Hot Reload while preserving a
     /// compatible Avalonia direct property registration.
     /// </summary>
-    /// <typeparam name="TOwner">The component type that declares the service.</typeparam>
-    /// <typeparam name="TService">The injected service type.</typeparam>
+    /// <typeparam name="TOwner">
+    /// The component type that declares the service.
+    /// </typeparam>
+    /// <typeparam name="TService">
+    /// The injected service type.
+    /// </typeparam>
     /// <param name="property">
     /// The compatible direct property from the previous generated descriptor manifest,
     /// or <see langword="null"/> when a new property must be registered.
     /// </param>
-    /// <param name="name">The service and direct property name.</param>
-    /// <param name="getter">Reads the per-component service value.</param>
-    /// <param name="setter">Writes the per-component service value.</param>
-    /// <param name="isOptional">Whether a missing service is allowed.</param>
-    /// <returns>A new service descriptor around the compatible property.</returns>
+    /// <param name="name">
+    /// The service and direct property name.
+    /// </param>
+    /// <param name="getter">
+    /// Reads the per-component service value.
+    /// </param>
+    /// <param name="setter">
+    /// Writes the per-component service value.
+    /// </param>
+    /// <param name="isOptional">
+    /// Whether a missing service is allowed.
+    /// </param>
+    /// <returns>
+    /// A new service descriptor around the compatible property.
+    /// </returns>
     [EditorBrowsable(EditorBrowsableState.Never)]
     [Browsable(false)]
     public static InjectService<TOwner, TService> RecreateForHotReload<TOwner, TService>(

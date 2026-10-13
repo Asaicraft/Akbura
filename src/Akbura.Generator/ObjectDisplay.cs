@@ -16,9 +16,15 @@ internal static class ObjectDisplay
     /// <summary>
     /// Returns a string representation of an object of primitive type.
     /// </summary>
-    /// <param name="obj">A value to display as a string.</param>
-    /// <param name="options">Options used to customize formatting of an object value.</param>
-    /// <returns>A string representation of an object of primitive type (or null if the type is not supported).</returns>
+    /// <param name="obj">
+    /// A value to display as a string.
+    /// </param>
+    /// <param name="options">
+    /// Options used to customize formatting of an object value.
+    /// </param>
+    /// <returns>
+    /// A string representation of an object of primitive type (or null if the type is not supported).
+    /// </returns>
     /// <remarks>
     /// Handles <see cref="bool"/>, <see cref="string"/>, <see cref="char"/>, <see cref="sbyte"/>
     /// <see cref="byte"/>, <see cref="short"/>, <see cref="ushort"/>, <see cref="int"/>, <see cref="uint"/>,
@@ -194,9 +200,15 @@ internal static class ObjectDisplay
     /// <summary>
     /// Returns a C# string literal with the given value.
     /// </summary>
-    /// <param name="value">The value that the resulting string literal should have.</param>
-    /// <param name="options">Options used to customize formatting of an object value.</param>
-    /// <returns>A string literal with the given value.</returns>
+    /// <param name="value">
+    /// The value that the resulting string literal should have.
+    /// </param>
+    /// <param name="options">
+    /// Options used to customize formatting of an object value.
+    /// </param>
+    /// <returns>
+    /// A string literal with the given value.
+    /// </returns>
     /// <remarks>
     /// Optionally escapes non-printable characters.
     /// </remarks>
@@ -298,9 +310,15 @@ internal static class ObjectDisplay
     /// <summary>
     /// Returns a C# character literal with the given value.
     /// </summary>
-    /// <param name="c">The value that the resulting character literal should have.</param>
-    /// <param name="options">Options used to customize formatting of an object value.</param>
-    /// <returns>A character literal with the given value.</returns>
+    /// <param name="c">
+    /// The value that the resulting character literal should have.
+    /// </param>
+    /// <param name="options">
+    /// Options used to customize formatting of an object value.
+    /// </param>
+    /// <returns>
+    /// A character literal with the given value.
+    /// </returns>
     internal static string FormatLiteral(char c, ObjectDisplayOptions options)
     {
         const char quote = '\'';

@@ -3,7 +3,9 @@ using System.ComponentModel;
 
 namespace Akbura.HotReload;
 
-/// <summary>A non-visual contribution to its owner's shared collection ledger.</summary>
+/// <summary>
+/// A non-visual contribution to its owner's shared collection ledger.
+/// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
 [Browsable(false)]
 public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachRegion
@@ -104,7 +106,9 @@ public sealed partial class AkburaForeachRegion<TItem, TChild> : IAkburaForeachR
             evaluate, GetKeyContract(keySelector, keyRevision, comparer), environmentRevision);
     }
 
-    /// <summary>Invalidates generated instructions independently of source collection events.</summary>
+    /// <summary>
+    /// Invalidates generated instructions independently of source collection events.
+    /// </summary>
     public void Invalidate()
     {
         _invalidated = true;

@@ -31,14 +31,18 @@ public static class AkburaHotReloadRuntime
     /// Removes generated Avalonia properties that are absent from the current
     /// component descriptor shape.
     /// </summary>
-    /// <param name="ownerType">The generated component type.</param>
+    /// <param name="ownerType">
+    /// The generated component type.
+    /// </param>
     /// <param name="previousRegistrations">
     /// The descriptor manifest applied before the metadata update.
     /// </param>
     /// <param name="currentKeys">
     /// Stable descriptor identities produced by the updated component.
     /// </param>
-    /// <returns>A stack-friendly update scope for generated code.</returns>
+    /// <returns>
+    /// A stack-friendly update scope for generated code.
+    /// </returns>
     public static AkburaHotReloadPropertyUpdate BeginPropertyUpdate(
         Type ownerType,
         ImmutableArray<AkburaHotReloadPropertyRegistration>
@@ -103,10 +107,18 @@ public static class AkburaHotReloadRuntime
     /// <summary>
     /// Finds a compatible Avalonia property in a previous generated descriptor manifest.
     /// </summary>
-    /// <typeparam name="TProperty">The expected Avalonia property type.</typeparam>
-    /// <param name="registrations">The previous generated descriptor manifest.</param>
-    /// <param name="key">The stable descriptor identity.</param>
-    /// <returns>The compatible property, or <see langword="null"/> when it is absent.</returns>
+    /// <typeparam name="TProperty">
+    /// The expected Avalonia property type.
+    /// </typeparam>
+    /// <param name="registrations">
+    /// The previous generated descriptor manifest.
+    /// </param>
+    /// <param name="key">
+    /// The stable descriptor identity.
+    /// </param>
+    /// <returns>
+    /// The compatible property, or <see langword="null"/> when it is absent.
+    /// </returns>
     public static TProperty? FindProperty<TProperty>(
         ImmutableArray<AkburaHotReloadPropertyRegistration> registrations,
         string key)
@@ -146,7 +158,9 @@ public static class AkburaHotReloadRuntime
     /// <summary>
     /// Refreshes attached instances assignable to a generated component type.
     /// </summary>
-    /// <param name="componentType">The generated component type to refresh.</param>
+    /// <param name="componentType">
+    /// The generated component type to refresh.
+    /// </param>
     /// <remarks>
     /// The revision is retained for component instances that already exist but
     /// are detached. They catch up when they next attach to a non-excluded
@@ -173,7 +187,9 @@ public static class AkburaHotReloadRuntime
     /// <summary>
     /// Prepares and refreshes attached instances assignable to a generated component type.
     /// </summary>
-    /// <typeparam name="TComponent">The generated component type to refresh.</typeparam>
+    /// <typeparam name="TComponent">
+    /// The generated component type to refresh.
+    /// </typeparam>
     /// <param name="prepare">
     /// A generated callback that resets instance caches before runtime reinjection.
     /// </param>

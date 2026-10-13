@@ -17,7 +17,9 @@ namespace System.Runtime.CompilerServices
         /// <summary>
         /// Creates a new instance of the <see cref="global::System.Runtime.CompilerServices.CompilerFeatureRequiredAttribute"/> type.
         /// </summary>
-        /// <param name="featureName">The name of the feature to indicate.</param>
+        /// <param name="featureName">
+        /// The name of the feature to indicate.
+        /// </param>
         public CompilerFeatureRequiredAttribute(string featureName)
         {
             FeatureName = featureName;

@@ -485,18 +485,23 @@ public sealed class ComponentDocumentWriterTests
             CancellationToken.None);
         var generatedSource = generatedText.ToString();
 
-        Assert.Contains(
-            "private static string s_akburaAppliedDescriptorShape =",
+        Assert.DoesNotContain(
+            "s_akburaAppliedDescriptorShape",
             generatedSource,
             StringComparison.Ordinal);
-        Assert.Contains(
-            "private static string s_akburaAppliedStateShape =",
+        Assert.DoesNotContain(
+            "s_akburaAppliedStateShape",
             generatedSource,
             StringComparison.Ordinal);
-        Assert.Contains(
+        Assert.DoesNotContain(
             "s_akburaHotReloadProperties",
             generatedSource,
             StringComparison.Ordinal);
+        Assert.DoesNotContain("__AkburaHotReloadRebuildStateInfos", generatedSource, StringComparison.Ordinal);
+        Assert.Contains("__AkburaInitializeHotReloadMetadata(", generatedSource, StringComparison.Ordinal);
+        Assert.Contains("AkburaHotReloadRuntime.RegisterComponentMetadata(", generatedSource, StringComparison.Ordinal);
+        Assert.Contains("AkburaHotReloadRuntime.GetComponentMetadata(", generatedSource, StringComparison.Ordinal);
+        Assert.Contains("var __previousProperties = __metadata.Properties;", generatedSource, StringComparison.Ordinal);
         Assert.Contains(
             "\"param:Title:System.String:styled:normal\"",
             generatedSource,
@@ -532,7 +537,7 @@ public sealed class ComponentDocumentWriterTests
             generatedSource,
             StringComparison.Ordinal);
         Assert.Contains(
-            "__component.__states = default;",
+            "__component.RuntimeStates.InvalidateSnapshotForHotReload();",
             generatedSource,
             StringComparison.Ordinal);
         Assert.Contains(

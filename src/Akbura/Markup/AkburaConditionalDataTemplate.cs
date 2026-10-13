@@ -8,7 +8,9 @@ using System.Runtime.CompilerServices;
 
 namespace Akbura.Markup;
 
-/// <summary>Adopts a framework-owned presenter as a conditional template's stable sink.</summary>
+/// <summary>
+/// Adopts a framework-owned presenter as a conditional template's stable sink.
+/// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
 [Browsable(false)]
 public abstract class AkburaConditionalDataTemplate : IDataTemplate
@@ -318,7 +320,9 @@ public sealed class AkburaConditionalDataTemplate<T>(
         ContentPresenter host) => _builder((T)data!, nameScope, host);
 }
 
-/// <summary>Publishes a nullable template root without inserting a visual container.</summary>
+/// <summary>
+/// Publishes a nullable template root without inserting a visual container.
+/// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
 [Browsable(false)]
 public sealed class AkburaConditionalTemplateInstance : IDisposable

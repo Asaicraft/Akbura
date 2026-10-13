@@ -17,7 +17,9 @@ namespace System.Diagnostics.CodeAnalysis
         /// <summary>
         /// Initializes the attribute with the specified return value condition.
         /// </summary>
-        /// <param name="returnValue">The return value condition. If the method returns this value, the associated parameter may be null.</param>
+        /// <param name="returnValue">
+        /// The return value condition. If the method returns this value, the associated parameter may be null.
+        /// </param>
         public MaybeNullWhenAttribute(bool returnValue) => ReturnValue = returnValue;
 
         /// <summary>

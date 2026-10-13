@@ -54,9 +54,15 @@ public sealed partial class AkburaRenderState : IDisposable
     /// <summary>
     /// Begins a structural revision when it differs from the applied revision.
     /// </summary>
-    /// <param name="revision">The stable identity of the generated render plan.</param>
-    /// <param name="describe">The fixed callback that describes the current plan.</param>
-    /// <param name="factory">The fixed callback that creates a node by current local identifier.</param>
+    /// <param name="revision">
+    /// The stable identity of the generated render plan.
+    /// </param>
+    /// <param name="describe">
+    /// The fixed callback that describes the current plan.
+    /// </param>
+    /// <param name="factory">
+    /// The fixed callback that creates a node by current local identifier.
+    /// </param>
     /// <returns>
     /// <see langword="true"/> when a new revision was prepared; otherwise,
     /// <see langword="false"/> when the revision is already current.
@@ -120,8 +126,12 @@ public sealed partial class AkburaRenderState : IDisposable
     /// <summary>
     /// Gets the stable runtime identifier associated with a current local identifier.
     /// </summary>
-    /// <param name="localId">The dense current-plan identifier.</param>
-    /// <returns>The stable runtime node identifier.</returns>
+    /// <param name="localId">
+    /// The dense current-plan identifier.
+    /// </param>
+    /// <returns>
+    /// The stable runtime node identifier.
+    /// </returns>
     public long GetNodeId(int localId)
     {
         return GetNode(localId).NodeId;
@@ -130,9 +140,15 @@ public sealed partial class AkburaRenderState : IDisposable
     /// <summary>
     /// Gets a required live render node by its current local identifier.
     /// </summary>
-    /// <typeparam name="T">The required node type.</typeparam>
-    /// <param name="localId">The dense current-plan identifier.</param>
-    /// <returns>The live node instance.</returns>
+    /// <typeparam name="T">
+    /// The required node type.
+    /// </typeparam>
+    /// <param name="localId">
+    /// The dense current-plan identifier.
+    /// </param>
+    /// <returns>
+    /// The live node instance.
+    /// </returns>
     public T GetRequired<T>(int localId)
         where T : class
     {
@@ -150,8 +166,12 @@ public sealed partial class AkburaRenderState : IDisposable
     /// <summary>
     /// Determines whether a node was created for the pending revision.
     /// </summary>
-    /// <param name="localId">The dense current-plan identifier.</param>
-    /// <returns><see langword="true"/> when the node is new.</returns>
+    /// <param name="localId">
+    /// The dense current-plan identifier.
+    /// </param>
+    /// <returns>
+    /// <see langword="true"/> when the node is new.
+    /// </returns>
     public bool IsNew(int localId)
     {
         var pendingRevision = GetPendingRevision();
@@ -162,7 +182,9 @@ public sealed partial class AkburaRenderState : IDisposable
     /// <summary>
     /// Determines whether generated initial values must be applied to a node.
     /// </summary>
-    /// <param name="localId">The dense current-plan identifier.</param>
+    /// <param name="localId">
+    /// The dense current-plan identifier.
+    /// </param>
     /// <returns>
     /// <see langword="true"/> for a new node or a retained node whose own
     /// normalized syntax identity changed.
@@ -178,9 +200,15 @@ public sealed partial class AkburaRenderState : IDisposable
     /// Registers one generated operation for the pending node revision and
     /// determines whether its declaration changed.
     /// </summary>
-    /// <param name="localId">The dense current-plan node identifier.</param>
-    /// <param name="slot">The stable operation slot on the node.</param>
-    /// <param name="identity">The normalized declaration identity.</param>
+    /// <param name="localId">
+    /// The dense current-plan node identifier.
+    /// </param>
+    /// <param name="slot">
+    /// The stable operation slot on the node.
+    /// </param>
+    /// <param name="identity">
+    /// The normalized declaration identity.
+    /// </param>
     /// <returns>
     /// <see langword="true"/> for a new or changed operation; otherwise,
     /// <see langword="false"/> for an unchanged operation.
@@ -221,7 +249,9 @@ public sealed partial class AkburaRenderState : IDisposable
         return ShouldApplyOwnedOperation(localId, slot, identity, forceSourceReplacement: false);
     }
 
-    /// <summary>Rebinds a source-dependent resource when its lexical scope changes.</summary>
+    /// <summary>
+    /// Rebinds a source-dependent resource when its lexical scope changes.
+    /// </summary>
     public bool ShouldApplyOwnedOperation(
         int localId,
         string slot,
@@ -516,11 +546,21 @@ public sealed partial class AkburaRenderState : IDisposable
     /// <summary>
     /// Synchronizes one generated collection slot with its desired live nodes.
     /// </summary>
-    /// <typeparam name="T">The collection item type.</typeparam>
-    /// <param name="ownerLocalId">The current local identifier of the slot owner.</param>
-    /// <param name="slot">The stable semantic collection slot.</param>
-    /// <param name="collection">The target live collection.</param>
-    /// <param name="desiredItems">The desired generated items in source order.</param>
+    /// <typeparam name="T">
+    /// The collection item type.
+    /// </typeparam>
+    /// <param name="ownerLocalId">
+    /// The current local identifier of the slot owner.
+    /// </param>
+    /// <param name="slot">
+    /// The stable semantic collection slot.
+    /// </param>
+    /// <param name="collection">
+    /// The target live collection.
+    /// </param>
+    /// <param name="desiredItems">
+    /// The desired generated items in source order.
+    /// </param>
     public void ReconcileCollection<T>(
         int ownerLocalId,
         string slot,
@@ -539,12 +579,24 @@ public sealed partial class AkburaRenderState : IDisposable
     /// Synchronizes generated collection content on an Akbura component using
     /// its statically known generic item type.
     /// </summary>
-    /// <typeparam name="T">The collection item type.</typeparam>
-    /// <param name="ownerLocalId">The current local identifier of the component.</param>
-    /// <param name="slot">The stable semantic collection slot.</param>
-    /// <param name="component">The component that owns the content parameter.</param>
-    /// <param name="collection">The target live collection.</param>
-    /// <param name="desiredItems">The desired generated items in source order.</param>
+    /// <typeparam name="T">
+    /// The collection item type.
+    /// </typeparam>
+    /// <param name="ownerLocalId">
+    /// The current local identifier of the component.
+    /// </param>
+    /// <param name="slot">
+    /// The stable semantic collection slot.
+    /// </param>
+    /// <param name="component">
+    /// The component that owns the content parameter.
+    /// </param>
+    /// <param name="collection">
+    /// The target live collection.
+    /// </param>
+    /// <param name="desiredItems">
+    /// The desired generated items in source order.
+    /// </param>
     public void ReconcileComponentCollection<T>(
         int ownerLocalId,
         string slot,
@@ -698,10 +750,18 @@ public sealed partial class AkburaRenderState : IDisposable
     /// Synchronizes one generated collection slot when its static item type is
     /// unavailable to the generator.
     /// </summary>
-    /// <param name="ownerLocalId">The current local identifier of the slot owner.</param>
-    /// <param name="slot">The stable semantic collection slot.</param>
-    /// <param name="target">The target collection implementing non-generic <see cref="System.Collections.IList"/>.</param>
-    /// <param name="desiredItems">The desired generated items in source order.</param>
+    /// <param name="ownerLocalId">
+    /// The current local identifier of the slot owner.
+    /// </param>
+    /// <param name="slot">
+    /// The stable semantic collection slot.
+    /// </param>
+    /// <param name="target">
+    /// The target collection implementing non-generic <see cref="System.Collections.IList"/>.
+    /// </param>
+    /// <param name="desiredItems">
+    /// The desired generated items in source order.
+    /// </param>
     public void ReconcileCollection(
         int ownerLocalId,
         string slot,
@@ -720,11 +780,21 @@ public sealed partial class AkburaRenderState : IDisposable
     /// Synchronizes generated collection content on an Akbura component and
     /// keeps its logical children consistent on both commit and rollback.
     /// </summary>
-    /// <param name="ownerLocalId">The current local identifier of the component.</param>
-    /// <param name="slot">The stable semantic collection slot.</param>
-    /// <param name="component">The component that owns the content parameter.</param>
-    /// <param name="target">The content collection implementing non-generic <see cref="System.Collections.IList"/>.</param>
-    /// <param name="desiredItems">The desired generated items in source order.</param>
+    /// <param name="ownerLocalId">
+    /// The current local identifier of the component.
+    /// </param>
+    /// <param name="slot">
+    /// The stable semantic collection slot.
+    /// </param>
+    /// <param name="component">
+    /// The component that owns the content parameter.
+    /// </param>
+    /// <param name="target">
+    /// The content collection implementing non-generic <see cref="System.Collections.IList"/>.
+    /// </param>
+    /// <param name="desiredItems">
+    /// The desired generated items in source order.
+    /// </param>
     public void ReconcileComponentCollection(
         int ownerLocalId,
         string slot,
@@ -886,12 +956,24 @@ public sealed partial class AkburaRenderState : IDisposable
     /// <summary>
     /// Reconciles one generated scalar child written through a CLR property.
     /// </summary>
-    /// <param name="ownerLocalId">The current local identifier of the property owner.</param>
-    /// <param name="slot">The stable semantic property slot.</param>
-    /// <param name="target">The live property owner.</param>
-    /// <param name="declaringType">The semantic CLR property receiver type.</param>
-    /// <param name="propertyName">The CLR property name.</param>
-    /// <param name="desiredValue">The desired generated child.</param>
+    /// <param name="ownerLocalId">
+    /// The current local identifier of the property owner.
+    /// </param>
+    /// <param name="slot">
+    /// The stable semantic property slot.
+    /// </param>
+    /// <param name="target">
+    /// The live property owner.
+    /// </param>
+    /// <param name="declaringType">
+    /// The semantic CLR property receiver type.
+    /// </param>
+    /// <param name="propertyName">
+    /// The CLR property name.
+    /// </param>
+    /// <param name="desiredValue">
+    /// The desired generated child.
+    /// </param>
     public void ReconcileClrProperty(
         int ownerLocalId,
         string slot,
@@ -947,11 +1029,21 @@ public sealed partial class AkburaRenderState : IDisposable
     /// <summary>
     /// Reconciles one generated scalar child written through an Avalonia property.
     /// </summary>
-    /// <param name="ownerLocalId">The current local identifier of the property owner.</param>
-    /// <param name="slot">The stable semantic property slot.</param>
-    /// <param name="target">The live property owner.</param>
-    /// <param name="property">The Avalonia property receiving the child.</param>
-    /// <param name="desiredValue">The desired generated child.</param>
+    /// <param name="ownerLocalId">
+    /// The current local identifier of the property owner.
+    /// </param>
+    /// <param name="slot">
+    /// The stable semantic property slot.
+    /// </param>
+    /// <param name="target">
+    /// The live property owner.
+    /// </param>
+    /// <param name="property">
+    /// The Avalonia property receiving the child.
+    /// </param>
+    /// <param name="desiredValue">
+    /// The desired generated child.
+    /// </param>
     public void ReconcileAvaloniaProperty(
         int ownerLocalId,
         string slot,
@@ -1002,13 +1094,27 @@ public sealed partial class AkburaRenderState : IDisposable
     /// <summary>
     /// Reconciles one generated constant value written through a CLR property.
     /// </summary>
-    /// <param name="ownerLocalId">The current local identifier of the property owner.</param>
-    /// <param name="slot">The stable semantic property slot.</param>
-    /// <param name="target">The live property owner.</param>
-    /// <param name="declaringType">The semantic CLR property receiver type.</param>
-    /// <param name="propertyName">The CLR property name.</param>
-    /// <param name="identity">The normalized declaration identity.</param>
-    /// <param name="desiredValue">The generated value, including <see langword="null"/>.</param>
+    /// <param name="ownerLocalId">
+    /// The current local identifier of the property owner.
+    /// </param>
+    /// <param name="slot">
+    /// The stable semantic property slot.
+    /// </param>
+    /// <param name="target">
+    /// The live property owner.
+    /// </param>
+    /// <param name="declaringType">
+    /// The semantic CLR property receiver type.
+    /// </param>
+    /// <param name="propertyName">
+    /// The CLR property name.
+    /// </param>
+    /// <param name="identity">
+    /// The normalized declaration identity.
+    /// </param>
+    /// <param name="desiredValue">
+    /// The generated value, including <see langword="null"/>.
+    /// </param>
     public void ReconcileClrValue(
         int ownerLocalId,
         string slot,
@@ -1081,12 +1187,24 @@ public sealed partial class AkburaRenderState : IDisposable
     /// <summary>
     /// Reconciles one generated constant value written through an Avalonia property.
     /// </summary>
-    /// <param name="ownerLocalId">The current local identifier of the property owner.</param>
-    /// <param name="slot">The stable semantic property slot.</param>
-    /// <param name="target">The live property owner.</param>
-    /// <param name="property">The Avalonia property receiving the value.</param>
-    /// <param name="identity">The normalized declaration identity.</param>
-    /// <param name="desiredValue">The generated value, including <see langword="null"/>.</param>
+    /// <param name="ownerLocalId">
+    /// The current local identifier of the property owner.
+    /// </param>
+    /// <param name="slot">
+    /// The stable semantic property slot.
+    /// </param>
+    /// <param name="target">
+    /// The live property owner.
+    /// </param>
+    /// <param name="property">
+    /// The Avalonia property receiving the value.
+    /// </param>
+    /// <param name="identity">
+    /// The normalized declaration identity.
+    /// </param>
+    /// <param name="desiredValue">
+    /// The generated value, including <see langword="null"/>.
+    /// </param>
     public void ReconcileAvaloniaValue(
         int ownerLocalId,
         string slot,
@@ -1225,7 +1343,9 @@ public sealed partial class AkburaRenderState : IDisposable
     /// Aborts a pending revision while preserving the failure that caused the
     /// generated update to stop.
     /// </summary>
-    /// <param name="failure">The failure raised by the generated update.</param>
+    /// <param name="failure">
+    /// The failure raised by the generated update.
+    /// </param>
     public void AbortRevision(Exception failure)
     {
         ArgumentNullException.ThrowIfNull(failure);

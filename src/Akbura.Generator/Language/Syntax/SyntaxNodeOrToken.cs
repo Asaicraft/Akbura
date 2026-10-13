@@ -273,7 +273,9 @@ internal readonly struct SyntaxNodeOrToken : IEquatable<SyntaxNodeOrToken>
     /// <returns>
     /// The string representation of this node or token, not including its leading and trailing trivia.
     /// </returns>
-    /// <remarks>The length of the returned string is always the same as Span.Length</remarks>
+    /// <remarks>
+    /// The length of the returned string is always the same as Span.Length
+    /// </remarks>
     public override string ToString()
     {
         if (_token != null)
@@ -294,7 +296,9 @@ internal readonly struct SyntaxNodeOrToken : IEquatable<SyntaxNodeOrToken>
     /// </summary>
     /// <returns>The full string representation of this node or token including its leading and trailing
     /// trivia.</returns>
-    /// <remarks>The length of the returned string is always the same as FullSpan.Length</remarks>
+    /// <remarks>
+    /// The length of the returned string is always the same as FullSpan.Length
+    /// </remarks>
     public string ToFullString()
     {
         if (_token != null)
@@ -724,7 +728,9 @@ internal readonly struct SyntaxNodeOrToken : IEquatable<SyntaxNodeOrToken>
     /// <summary>
     /// Returns a new <see cref="SyntaxNodeOrToken"/> that wraps the supplied token.
     /// </summary>
-    /// <param name="token">The input token.</param>
+    /// <param name="token">
+    /// The input token.
+    /// </param>
     /// <returns>
     /// A <see cref="SyntaxNodeOrToken"/> that wraps the supplied token.
     /// </returns>
@@ -750,7 +756,9 @@ internal readonly struct SyntaxNodeOrToken : IEquatable<SyntaxNodeOrToken>
     /// <summary>
     /// Returns a new <see cref="SyntaxNodeOrToken"/> that wraps the supplied node.
     /// </summary>
-    /// <param name="node">The input node.</param>
+    /// <param name="node">
+    /// The input node.
+    /// </param>
     /// <returns>
     /// A <see cref="SyntaxNodeOrToken"/> that wraps the supplied node.
     /// </returns>

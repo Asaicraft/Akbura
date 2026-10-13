@@ -4,7 +4,9 @@ namespace Akbura.HotReload;
 
 public sealed partial class AkburaRenderState
 {
-    /// <summary>Updates active conditional content while retaining its original CLR baseline.</summary>
+    /// <summary>
+    /// Updates active conditional content while retaining its original CLR baseline.
+    /// </summary>
     public void ReconcileConditionalClrValue(int ownerLocalId, string slot, object target,
         Type? declaringType, string propertyName, string identity, object? desiredValue)
     {
@@ -25,7 +27,9 @@ public sealed partial class AkburaRenderState
         state.UpdateAppliedValue(desiredValue);
     }
 
-    /// <summary>Updates active conditional content without starting a source or activation transaction.</summary>
+    /// <summary>
+    /// Updates active conditional content without starting a source or activation transaction.
+    /// </summary>
     public void ReconcileConditionalAvaloniaValue(int ownerLocalId, string slot, AvaloniaObject target,
         AvaloniaProperty property, string identity, object? desiredValue)
     {

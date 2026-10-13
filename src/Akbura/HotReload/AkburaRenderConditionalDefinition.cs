@@ -2,12 +2,16 @@ using System.ComponentModel;
 
 namespace Akbura.HotReload;
 
-/// <summary>Describes one nonvisual conditional content region.</summary>
+/// <summary>
+/// Describes one nonvisual conditional content region.
+/// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
 [Browsable(false)]
 public readonly struct AkburaRenderConditionalDefinition
 {
-    /// <summary>Initializes a current-plan conditional region definition.</summary>
+    /// <summary>
+    /// Initializes a current-plan conditional region definition.
+    /// </summary>
     public AkburaRenderConditionalDefinition(
         int localId,
         int ownerLocalId,
@@ -37,33 +41,49 @@ public readonly struct AkburaRenderConditionalDefinition
         ParentBranchId = parentBranchId;
     }
 
-    /// <summary>Gets the dense current-plan region identifier.</summary>
+    /// <summary>
+    /// Gets the dense current-plan region identifier.
+    /// </summary>
     public int LocalId { get; }
 
-    /// <summary>Gets the real node owning the content destination.</summary>
+    /// <summary>
+    /// Gets the real node owning the content destination.
+    /// </summary>
     public int OwnerLocalId { get; }
 
-    /// <summary>Gets the semantic destination slot.</summary>
+    /// <summary>
+    /// Gets the semantic destination slot.
+    /// </summary>
     public string Slot { get; }
 
-    /// <summary>Gets the normalized declaration identity used as matching evidence.</summary>
+    /// <summary>
+    /// Gets the normalized declaration identity used as matching evidence.
+    /// </summary>
     public string SyntaxIdentity { get; }
 
-    /// <summary>Gets the containing region, or <c>-1</c>.</summary>
+    /// <summary>
+    /// Gets the containing region, or <c>-1</c>.
+    /// </summary>
     public int ParentRegionId { get; }
 
-    /// <summary>Gets the containing branch ordinal, or <c>-1</c>.</summary>
+    /// <summary>
+    /// Gets the containing branch ordinal, or <c>-1</c>.
+    /// </summary>
     public int ParentBranchId { get; }
 
     internal AkburaRenderConditionalBranchDefinition[] Branches { get; }
 }
 
-/// <summary>Describes matching evidence for one conditional alternative.</summary>
+/// <summary>
+/// Describes matching evidence for one conditional alternative.
+/// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
 [Browsable(false)]
 public readonly struct AkburaRenderConditionalBranchDefinition
 {
-    /// <summary>Initializes one branch without assigning it a runtime identity.</summary>
+    /// <summary>
+    /// Initializes one branch without assigning it a runtime identity.
+    /// </summary>
     public AkburaRenderConditionalBranchDefinition(string conditionIdentity, string shapeIdentity)
     {
         ArgumentNullException.ThrowIfNull(conditionIdentity);
@@ -72,9 +92,13 @@ public readonly struct AkburaRenderConditionalBranchDefinition
         ShapeIdentity = shapeIdentity;
     }
 
-    /// <summary>Gets the normalized condition; the empty string denotes an else branch.</summary>
+    /// <summary>
+    /// Gets the normalized condition; the empty string denotes an else branch.
+    /// </summary>
     public string ConditionIdentity { get; }
 
-    /// <summary>Gets structural matching evidence independent of literal property values.</summary>
+    /// <summary>
+    /// Gets structural matching evidence independent of literal property values.
+    /// </summary>
     public string ShapeIdentity { get; }
 }

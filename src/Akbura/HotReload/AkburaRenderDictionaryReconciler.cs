@@ -5,7 +5,9 @@ using System.Runtime.CompilerServices;
 
 namespace Akbura.HotReload;
 
-/// <summary>Reconciles the entries owned by one markup declaration without clearing external entries.</summary>
+/// <summary>
+/// Reconciles the entries owned by one markup declaration without clearing external entries.
+/// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
 [Browsable(false)]
 public sealed class AkburaRenderDictionaryReconciler<TKey, TValue> : IDisposable

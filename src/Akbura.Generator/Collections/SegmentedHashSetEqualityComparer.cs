@@ -7,7 +7,9 @@ using System.Text;
 
 namespace Akbura.Collections;
 
-/// <summary>Equality comparer for hashsets of hashsets</summary>
+/// <summary>
+/// Equality comparer for hashsets of hashsets
+/// </summary>
 internal sealed class SegmentedHashSetEqualityComparer<T> : IEqualityComparer<SegmentedHashSet<T>?>
 {
     public bool Equals(SegmentedHashSet<T>? x, SegmentedHashSet<T>? y)

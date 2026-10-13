@@ -65,7 +65,9 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates a trivia with kind EndOfLineTrivia containing the specified text.
     /// </summary>
-    /// <param name="text">The text of the end of line. Only CR and LF are recognized as actual EOL by the parser.</param>
+    /// <param name="text">
+    /// The text of the end of line. Only CR and LF are recognized as actual EOL by the parser.
+    /// </param>
     public static SyntaxTrivia EndOfLine(string text)
     {
         return GreenSyntaxFactory.EndOfLine(text, elastic: false);
@@ -74,7 +76,9 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates an elastic trivia with kind EndOfLineTrivia containing the specified text.
     /// </summary>
-    /// <param name="text">The text of the end of line. Only CR and LF are recognized as actual EOL by the parser.</param>
+    /// <param name="text">
+    /// The text of the end of line. Only CR and LF are recognized as actual EOL by the parser.
+    /// </param>
     public static SyntaxTrivia ElasticEndOfLine(string text)
     {
         return GreenSyntaxFactory.EndOfLine(text, elastic: true);
@@ -83,7 +87,9 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates a trivia with kind WhitespaceTrivia containing the specified text.
     /// </summary>
-    /// <param name="text">The text of the whitespace. Only certain characters are recognized as whitespace by the parser.</param>
+    /// <param name="text">
+    /// The text of the whitespace. Only certain characters are recognized as whitespace by the parser.
+    /// </param>
     public static SyntaxTrivia Whitespace(string text)
     {
         return GreenSyntaxFactory.Whitespace(text, elastic: false);
@@ -92,7 +98,9 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates an elastic trivia with kind WhitespaceTrivia containing the specified text.
     /// </summary>
-    /// <param name="text">The text of the whitespace. Only certain characters are recognized as whitespace by the parser.</param>
+    /// <param name="text">
+    /// The text of the whitespace. Only certain characters are recognized as whitespace by the parser.
+    /// </param>
     public static SyntaxTrivia ElasticWhitespace(string text)
     {
         return GreenSyntaxFactory.Whitespace(text, elastic: true);
@@ -101,7 +109,9 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates a token corresponding to a syntax kind with no explicit leading/trailing trivia. The token text is inferred from the kind.
     /// </summary>
-    /// <param name="kind">A syntax kind for tokens (e.g. SomethingToken, SomethingKeyword).</param>
+    /// <param name="kind">
+    /// A syntax kind for tokens (e.g. SomethingToken, SomethingKeyword).
+    /// </param>
     public static SyntaxToken Token(SyntaxKind kind)
     {
         return new SyntaxToken(GreenSyntaxFactory.Token(ElasticMarker.UnderlyingNode, kind, ElasticMarker.UnderlyingNode));
@@ -110,9 +120,15 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates a token corresponding to a syntax kind, with specified leading and trailing trivia.
     /// </summary>
-    /// <param name="leading">A list of trivia preceding the token.</param>
-    /// <param name="kind">A syntax kind for tokens (e.g. SomethingToken, SomethingKeyword).</param>
-    /// <param name="trailing">A list of trivia following the token.</param>
+    /// <param name="leading">
+    /// A list of trivia preceding the token.
+    /// </param>
+    /// <param name="kind">
+    /// A syntax kind for tokens (e.g. SomethingToken, SomethingKeyword).
+    /// </param>
+    /// <param name="trailing">
+    /// A list of trivia following the token.
+    /// </param>
     public static SyntaxToken Token(SyntaxTriviaList leading, SyntaxKind kind, SyntaxTriviaList trailing)
     {
         if (kind == SyntaxKind.IdentifierToken || kind == SyntaxKind.CharLiteralToken || kind == SyntaxKind.NumericLiteralToken || !SyntaxFacts.IsAnyToken(kind))
@@ -130,7 +146,9 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates an empty list of syntax nodes.
     /// </summary>
-    /// <typeparam name="TNode">The specific type of the element nodes.</typeparam>
+    /// <typeparam name="TNode">
+    /// The specific type of the element nodes.
+    /// </typeparam>
     public static SyntaxList<TNode> List<TNode>() where TNode : AkburaSyntax
     {
         return default;
@@ -139,9 +157,14 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates a singleton list of syntax nodes.
     /// </summary>
-    /// <typeparam name="TNode">The specific type of the element nodes.</typeparam>
-    /// <param name="node">The single element node.</param>
-    /// <returns></returns>
+    /// <typeparam name="TNode">
+    /// The specific type of the element nodes.
+    /// </typeparam>
+    /// <param name="node">
+    /// The single element node.
+    /// </param>
+    /// <returns>
+    /// </returns>
     public static SyntaxList<TNode> SingletonList<TNode>(TNode node) where TNode : AkburaSyntax
     {
         return new SyntaxList<TNode>(node);
@@ -150,8 +173,12 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates a list of syntax nodes.
     /// </summary>
-    /// <typeparam name="TNode">The specific type of the element nodes.</typeparam>
-    /// <param name="nodes">A sequence of element nodes.</param>
+    /// <typeparam name="TNode">
+    /// The specific type of the element nodes.
+    /// </typeparam>
+    /// <param name="nodes">
+    /// A sequence of element nodes.
+    /// </param>
     public static SyntaxList<TNode> List<TNode>(IEnumerable<TNode> nodes) where TNode : AkburaSyntax
     {
         return new SyntaxList<TNode>(nodes);
@@ -168,7 +195,9 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates a singleton list of tokens.
     /// </summary>
-    /// <param name="token">The single token.</param>
+    /// <param name="token">
+    /// The single token.
+    /// </param>
     public static SyntaxTokenList TokenList(SyntaxToken token)
     {
         return new SyntaxTokenList(token);
@@ -177,7 +206,9 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates a list of tokens.
     /// </summary>
-    /// <param name="tokens">An array of tokens.</param>
+    /// <param name="tokens">
+    /// An array of tokens.
+    /// </param>
     public static SyntaxTokenList TokenList(params SyntaxToken[] tokens)
     {
         return new SyntaxTokenList(tokens);
@@ -186,8 +217,10 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates a list of tokens.
     /// </summary>
-    /// <param name="tokens"></param>
-    /// <returns></returns>
+    /// <param name="tokens">
+    /// </param>
+    /// <returns>
+    /// </returns>
     public static SyntaxTokenList TokenList(IEnumerable<SyntaxToken> tokens)
     {
         return new SyntaxTokenList(tokens);
@@ -204,7 +237,9 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates a singleton list of trivia.
     /// </summary>
-    /// <param name="trivia">A single trivia.</param>
+    /// <param name="trivia">
+    /// A single trivia.
+    /// </param>
     public static SyntaxTriviaList TriviaList(SyntaxTrivia trivia)
     {
         return new SyntaxTriviaList(trivia);
@@ -213,19 +248,25 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates a list of trivia.
     /// </summary>
-    /// <param name="trivias">An array of trivia.</param>
+    /// <param name="trivias">
+    /// An array of trivia.
+    /// </param>
     public static SyntaxTriviaList TriviaList(params SyntaxTrivia[] trivias) => new(trivias);
 
     /// <summary>
     /// Creates a list of trivia.
     /// </summary>
-    /// <param name="trivias">A sequence of trivia.</param>
+    /// <param name="trivias">
+    /// A sequence of trivia.
+    /// </param>
     public static SyntaxTriviaList TriviaList(IEnumerable<SyntaxTrivia> trivias) => new(trivias);
 
     /// <summary>
     /// Creates an empty separated list.
     /// </summary>
-    /// <typeparam name="TNode">The specific type of the element nodes.</typeparam>
+    /// <typeparam name="TNode">
+    /// The specific type of the element nodes.
+    /// </typeparam>
     public static SeparatedSyntaxList<TNode> SeparatedList<TNode>() where TNode : AkburaSyntax
     {
         return default;
@@ -234,8 +275,12 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates a singleton separated list.
     /// </summary>
-    /// <typeparam name="TNode">The specific type of the element nodes.</typeparam>
-    /// <param name="node">A single node.</param>
+    /// <typeparam name="TNode">
+    /// The specific type of the element nodes.
+    /// </typeparam>
+    /// <param name="node">
+    /// A single node.
+    /// </param>
     public static SeparatedSyntaxList<TNode> SingletonSeparatedList<TNode>(TNode node) where TNode : AkburaSyntax
     {
         return new SeparatedSyntaxList<TNode>(new SyntaxNodeOrTokenList(node, index: 0));
@@ -244,8 +289,12 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates a separated list of nodes from a sequence of nodes, synthesizing comma separators in between.
     /// </summary>
-    /// <typeparam name="TNode">The specific type of the element nodes.</typeparam>
-    /// <param name="nodes">A sequence of syntax nodes.</param>
+    /// <typeparam name="TNode">
+    /// The specific type of the element nodes.
+    /// </typeparam>
+    /// <param name="nodes">
+    /// A sequence of syntax nodes.
+    /// </param>
     public static SeparatedSyntaxList<TNode> SeparatedList<TNode>(IEnumerable<TNode>? nodes) where TNode : AkburaSyntax
     {
         if (nodes == null)
@@ -292,8 +341,12 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates a separated list of nodes from a sequence of nodes and a sequence of separator tokens.
     /// </summary>
-    /// <typeparam name="TNode">The specific type of the element nodes.</typeparam>
-    /// <param name="nodes">A sequence of syntax nodes.</param>
+    /// <typeparam name="TNode">
+    /// The specific type of the element nodes.
+    /// </typeparam>
+    /// <param name="nodes">
+    /// A sequence of syntax nodes.
+    /// </param>
     /// <param name="separators">A sequence of token to be interleaved between the nodes. The number of tokens must
     /// be one less than the number of nodes.</param>
     public static SeparatedSyntaxList<TNode> SeparatedList<TNode>(IEnumerable<TNode>? nodes, IEnumerable<SyntaxToken>? separators) where TNode : AkburaSyntax
@@ -342,8 +395,12 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates a separated list from a sequence of nodes and tokens, starting with a node and alternating between additional nodes and separator tokens.
     /// </summary>
-    /// <typeparam name="TNode">The specific type of the element nodes.</typeparam>
-    /// <param name="nodesAndTokens">A sequence of nodes or tokens, alternating between nodes and separator tokens.</param>
+    /// <typeparam name="TNode">
+    /// The specific type of the element nodes.
+    /// </typeparam>
+    /// <param name="nodesAndTokens">
+    /// A sequence of nodes or tokens, alternating between nodes and separator tokens.
+    /// </param>
     public static SeparatedSyntaxList<TNode> SeparatedList<TNode>(IEnumerable<SyntaxNodeOrToken> nodesAndTokens) where TNode : AkburaSyntax
     {
         return SeparatedList<TNode>(NodeOrTokenList(nodesAndTokens));
@@ -353,8 +410,12 @@ internal static partial class SyntaxFactory
     /// Creates a separated list from a <see cref="SyntaxNodeOrTokenList"/>, where the list elements start with a node and then alternate between
     /// additional nodes and separator tokens.
     /// </summary>
-    /// <typeparam name="TNode">The specific type of the element nodes.</typeparam>
-    /// <param name="nodesAndTokens">The list of nodes and tokens.</param>
+    /// <typeparam name="TNode">
+    /// The specific type of the element nodes.
+    /// </typeparam>
+    /// <param name="nodesAndTokens">
+    /// The list of nodes and tokens.
+    /// </param>
     public static SeparatedSyntaxList<TNode> SeparatedList<TNode>(SyntaxNodeOrTokenList nodesAndTokens) where TNode : AkburaSyntax
     {
         if (!HasSeparatedNodeTokenPattern(nodesAndTokens))
@@ -409,7 +470,9 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Create a <see cref="SyntaxNodeOrTokenList"/> from a sequence of <see cref="SyntaxNodeOrToken"/>.
     /// </summary>
-    /// <param name="nodesAndTokens">The sequence of nodes and tokens</param>
+    /// <param name="nodesAndTokens">
+    /// The sequence of nodes and tokens
+    /// </param>
     public static SyntaxNodeOrTokenList NodeOrTokenList(IEnumerable<SyntaxNodeOrToken> nodesAndTokens)
     {
         return new SyntaxNodeOrTokenList(nodesAndTokens);
@@ -418,7 +481,9 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Create a <see cref="SyntaxNodeOrTokenList"/> from one or more <see cref="SyntaxNodeOrToken"/>.
     /// </summary>
-    /// <param name="nodesAndTokens">The nodes and tokens</param>
+    /// <param name="nodesAndTokens">
+    /// The nodes and tokens
+    /// </param>
     public static SyntaxNodeOrTokenList NodeOrTokenList(params SyntaxNodeOrToken[] nodesAndTokens)
     {
         return new SyntaxNodeOrTokenList(nodesAndTokens);
@@ -427,7 +492,9 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates an IdentifierNameSyntax node.
     /// </summary>
-    /// <param name="name">The identifier name.</param>
+    /// <param name="name">
+    /// The identifier name.
+    /// </param>
     public static IdentifierNameSyntax IdentifierName(string name)
     {
         return IdentifierName(Identifier(name));
@@ -436,10 +503,14 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates a token with kind IdentifierToken containing the specified text.
     /// </summary>
-    /// <param name="leading">A list of trivia immediately preceding the token.</param>
+    /// <param name="leading">
+    /// A list of trivia immediately preceding the token.
+    /// </param>
     /// <param name="text">The raw text of the identifier name, including any escapes or leading '@'
     /// character.</param>
-    /// <param name="trailing">A list of trivia immediately following the token.</param>
+    /// <param name="trailing">
+    /// A list of trivia immediately following the token.
+    /// </param>
     public static SyntaxToken Identifier(SyntaxTriviaList leading, string text, SyntaxTriviaList trailing)
     {
         return new SyntaxToken(GreenSyntaxFactory.Identifier(leading.Node, text, trailing.Node));
@@ -448,14 +519,21 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates a token with kind IdentifierToken containing the specified text.
     /// </summary>
-    /// <param name="leading">A list of trivia immediately preceding the token.</param>
+    /// <param name="leading">
+    /// A list of trivia immediately preceding the token.
+    /// </param>
     /// <param name="contextualKind">An alternative SyntaxKind that can be inferred for this token in special
     /// contexts. These are usually keywords.</param>
     /// <param name="text">The raw text of the identifier name, including any escapes or leading '@'
     /// character.</param>
-    /// <param name="valueText">The text of the identifier name without escapes or leading '@' character.</param>
-    /// <param name="trailing">A list of trivia immediately following the token.</param>
-    /// <returns></returns>
+    /// <param name="valueText">
+    /// The text of the identifier name without escapes or leading '@' character.
+    /// </param>
+    /// <param name="trailing">
+    /// A list of trivia immediately following the token.
+    /// </param>
+    /// <returns>
+    /// </returns>
     public static SyntaxToken Identifier(SyntaxTriviaList leading, SyntaxKind contextualKind, string text, string valueText, SyntaxTriviaList trailing)
     {
         return new SyntaxToken(GreenSyntaxFactory.Identifier(contextualKind, leading.Node, text, valueText, trailing.Node));
@@ -464,7 +542,9 @@ internal static partial class SyntaxFactory
     /// <summary>
     /// Creates a token with kind IdentifierToken containing the specified text.
     /// </summary>
-    /// <param name="text">The raw text of the identifier name, including any escapes or leading '@' character.</param>        
+    /// <param name="text">
+    /// The raw text of the identifier name, including any escapes or leading '@' character.
+    /// </param>
     public static SyntaxToken Identifier(string text)
     {
         return new SyntaxToken(GreenSyntaxFactory.Identifier(ElasticMarker.UnderlyingNode, text, ElasticMarker.UnderlyingNode));

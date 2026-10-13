@@ -107,7 +107,9 @@ internal static partial class GreenSyntaxFactory
         return GreenSyntaxToken.Create(kind, leading, trailing);
     }
 
-    /// <summary>Creates a token whose Text and ValueText are the same.</summary>
+    /// <summary>
+    /// Creates a token whose Text and ValueText are the same.
+    /// </summary>
     public static GreenSyntaxToken Token(GreenNode? leading, SyntaxKind kind, string text, GreenNode trailing)
     {
         return Token(leading, kind, text, text, trailing);

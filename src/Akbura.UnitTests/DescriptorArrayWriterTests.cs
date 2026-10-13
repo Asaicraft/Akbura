@@ -73,7 +73,7 @@ public sealed class DescriptorArrayWriterTests
     }
 
     [Fact]
-    public void Write_WithStatesUsesOneLazyInstanceArray()
+    public void Write_WithStatesUsesRuntimeSnapshotInDebugAndLazyInstanceArrayInRelease()
     {
         var plan = CreatePlan(
             """
@@ -91,6 +91,21 @@ public sealed class DescriptorArrayWriterTests
         var output = codeWriter.GetText().ToString();
         var firstName = plan.States.ItemRef(0).GeneratedName;
         var secondName = plan.States.ItemRef(1).GeneratedName;
+        Assert.Contains(
+            "#if !DEBUG\r\n" +
+            "    private global::System.Collections.Immutable.ImmutableArray<" +
+            "global::Akbura.ComponentTree.State> __states;\r\n" +
+            "    #endif",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "return RuntimeStates.GetSnapshot(() =>\r\n" +
+            "        [\r\n" +
+            "            __State_" + firstName + ",\r\n" +
+            "            __State_" + secondName + ",\r\n" +
+            "        ]);",
+            output,
+            StringComparison.Ordinal);
         Assert.Contains(
             "private global::System.Collections.Immutable.ImmutableArray<" +
             "global::Akbura.ComponentTree.State> __states;",
@@ -120,7 +135,7 @@ public sealed class DescriptorArrayWriterTests
     }
 
     [Fact]
-    public void Write_WithoutStatesUsesLazyInstanceArray()
+    public void Write_WithoutStatesUsesCachedEmptySnapshots()
     {
         var plan = CreatePlan("param int Value;");
         using var codeWriter = new CodeWriter("\r\n");
@@ -129,6 +144,7 @@ public sealed class DescriptorArrayWriterTests
         writer.Write(plan);
 
         var output = codeWriter.GetText().ToString();
+        Assert.Contains("return RuntimeStates.GetSnapshot(() =>", output, StringComparison.Ordinal);
         Assert.Contains(
             "private global::System.Collections.Immutable.ImmutableArray<" +
             "global::Akbura.ComponentTree.State> __states;",

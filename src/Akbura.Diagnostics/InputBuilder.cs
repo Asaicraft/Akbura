@@ -40,9 +40,15 @@ public abstract class InputBuilder : AvaloniaObject
     /// Creates a two-way binding between the input value of an editor and the
     /// input value exposed by another control.
     /// </summary>
-    /// <param name="input">The generated editor control.</param>
-    /// <param name="source">The control that owns the source input value.</param>
-    /// <returns>A subscription that removes the binding when disposed.</returns>
+    /// <param name="input">
+    /// The generated editor control.
+    /// </param>
+    /// <param name="source">
+    /// The control that owns the source input value.
+    /// </param>
+    /// <returns>
+    /// A subscription that removes the binding when disposed.
+    /// </returns>
     public static IDisposable BindInputValue(Control input, Control source)
     {
         ArgumentNullException.ThrowIfNull(input);

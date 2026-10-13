@@ -18,8 +18,12 @@ namespace System.Runtime.CompilerServices
         /// <summary>
         /// Initialize the attribute to refer to the <paramref name="methodName"/> method on the <paramref name="builderType"/> type.
         /// </summary>
-        /// <param name="builderType">The type of the builder to use to construct the collection.</param>
-        /// <param name="methodName">The name of the method on the builder to use to construct the collection.</param>
+        /// <param name="builderType">
+        /// The type of the builder to use to construct the collection.
+        /// </param>
+        /// <param name="methodName">
+        /// The name of the method on the builder to use to construct the collection.
+        /// </param>
         /// <remarks>
         /// <paramref name="methodName"/> must refer to a static method that accepts a single parameter of
         /// type <see cref="ReadOnlySpan{T}"/> and returns an instance of the collection being built containing

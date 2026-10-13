@@ -183,8 +183,12 @@ internal readonly struct SyntaxTrivia : IEquatable<SyntaxTrivia>
     /// Returns the string representation of this trivia. If this trivia is structured trivia then the returned string
     /// will not include any leading or trailing trivia present on the StructuredTriviaSyntax node of this trivia.
     /// </summary>
-    /// <returns>The string representation of this trivia.</returns>
-    /// <remarks>The length of the returned string is always the same as Span.Length</remarks>
+    /// <returns>
+    /// The string representation of this trivia.
+    /// </returns>
+    /// <remarks>
+    /// The length of the returned string is always the same as Span.Length
+    /// </remarks>
     public override string ToString()
     {
         return UnderlyingNode != null ? UnderlyingNode.ToString() : string.Empty;
@@ -194,8 +198,12 @@ internal readonly struct SyntaxTrivia : IEquatable<SyntaxTrivia>
     /// Returns the full string representation of this trivia. If this trivia is structured trivia then the returned string will
     /// include any leading or trailing trivia present on the StructuredTriviaSyntax node of this trivia.
     /// </summary>
-    /// <returns>The full string representation of this trivia.</returns>
-    /// <remarks>The length of the returned string is always the same as FullSpan.Length</remarks>
+    /// <returns>
+    /// The full string representation of this trivia.
+    /// </returns>
+    /// <remarks>
+    /// The length of the returned string is always the same as FullSpan.Length
+    /// </remarks>
     public string ToFullString()
     {
         return UnderlyingNode != null ? UnderlyingNode.ToFullString() : string.Empty;

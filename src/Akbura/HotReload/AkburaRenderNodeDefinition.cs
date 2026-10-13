@@ -9,7 +9,9 @@ namespace Akbura.HotReload;
 [Browsable(false)]
 public readonly struct AkburaRenderNodeDefinition
 {
-    /// <summary>Initializes an unconditional render node definition.</summary>
+    /// <summary>
+    /// Initializes an unconditional render node definition.
+    /// </summary>
     public AkburaRenderNodeDefinition(
         int localId,
         int parentId,
@@ -24,14 +26,30 @@ public readonly struct AkburaRenderNodeDefinition
     /// <summary>
     /// Initializes a render node definition.
     /// </summary>
-    /// <param name="localId">The dense identifier in the current render plan.</param>
-    /// <param name="parentId">The current-plan parent identifier, or <c>-1</c> for the root.</param>
-    /// <param name="slot">The stable semantic slot within the parent.</param>
-    /// <param name="type">The exact runtime type created for the node.</param>
-    /// <param name="explicitKey">An optional explicit source identity.</param>
-    /// <param name="syntaxIdentity">The normalized identity of the node declaration.</param>
-    /// <param name="conditionalRegionId">The containing conditional region, or <c>-1</c>.</param>
-    /// <param name="conditionalBranchId">The current-plan branch ordinal, or <c>-1</c>.</param>
+    /// <param name="localId">
+    /// The dense identifier in the current render plan.
+    /// </param>
+    /// <param name="parentId">
+    /// The current-plan parent identifier, or <c>-1</c> for the root.
+    /// </param>
+    /// <param name="slot">
+    /// The stable semantic slot within the parent.
+    /// </param>
+    /// <param name="type">
+    /// The exact runtime type created for the node.
+    /// </param>
+    /// <param name="explicitKey">
+    /// An optional explicit source identity.
+    /// </param>
+    /// <param name="syntaxIdentity">
+    /// The normalized identity of the node declaration.
+    /// </param>
+    /// <param name="conditionalRegionId">
+    /// The containing conditional region, or <c>-1</c>.
+    /// </param>
+    /// <param name="conditionalBranchId">
+    /// The current-plan branch ordinal, or <c>-1</c>.
+    /// </param>
     public AkburaRenderNodeDefinition(
         int localId,
         int parentId,
@@ -122,9 +140,13 @@ public readonly struct AkburaRenderNodeDefinition
     /// </summary>
     public string SyntaxIdentity { get; }
 
-    /// <summary>Gets the containing conditional region, or <c>-1</c>.</summary>
+    /// <summary>
+    /// Gets the containing conditional region, or <c>-1</c>.
+    /// </summary>
     public int ConditionalRegionId { get; }
 
-    /// <summary>Gets the branch ordinal in the current source plan, or <c>-1</c>.</summary>
+    /// <summary>
+    /// Gets the branch ordinal in the current source plan, or <c>-1</c>.
+    /// </summary>
     public int ConditionalBranchId { get; }
 }

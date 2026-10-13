@@ -2,7 +2,9 @@ namespace Akbura.Markup;
 
 #pragma warning disable IDE1006 // Names intentionally match AKCSS prefixes.
 
-/// <summary>Activates below the Tailwind <c>sm</c> width.</summary>
+/// <summary>
+/// Activates below the Tailwind <c>sm</c> width.
+/// </summary>
 [UtilityVariant(
     -10d,
     ConflictGroup = "BreakpointsGroup",
@@ -20,7 +22,9 @@ public sealed class maxSmExtension : BreakpointMarkupExtension
     private static bool IsActivated(double width) => width < 640d;
 }
 
-/// <summary>Activates below the Tailwind <c>md</c> width.</summary>
+/// <summary>
+/// Activates below the Tailwind <c>md</c> width.
+/// </summary>
 [UtilityVariant(
     -20d,
     ConflictGroup = "BreakpointsGroup",
@@ -38,7 +42,9 @@ public sealed class maxMdExtension : BreakpointMarkupExtension
     private static bool IsActivated(double width) => width < 768d;
 }
 
-/// <summary>Activates below the Tailwind <c>lg</c> width.</summary>
+/// <summary>
+/// Activates below the Tailwind <c>lg</c> width.
+/// </summary>
 [UtilityVariant(
     -30d,
     ConflictGroup = "BreakpointsGroup",
@@ -56,7 +62,9 @@ public sealed class maxLgExtension : BreakpointMarkupExtension
     private static bool IsActivated(double width) => width < 1024d;
 }
 
-/// <summary>Activates below the Tailwind <c>xl</c> width.</summary>
+/// <summary>
+/// Activates below the Tailwind <c>xl</c> width.
+/// </summary>
 [UtilityVariant(
     -40d,
     ConflictGroup = "BreakpointsGroup",
@@ -74,7 +82,9 @@ public sealed class maxXlExtension : BreakpointMarkupExtension
     private static bool IsActivated(double width) => width < 1280d;
 }
 
-/// <summary>Activates below the Tailwind <c>2xl</c> width.</summary>
+/// <summary>
+/// Activates below the Tailwind <c>2xl</c> width.
+/// </summary>
 [UtilityVariant(
     -50d,
     ConflictGroup = "BreakpointsGroup",

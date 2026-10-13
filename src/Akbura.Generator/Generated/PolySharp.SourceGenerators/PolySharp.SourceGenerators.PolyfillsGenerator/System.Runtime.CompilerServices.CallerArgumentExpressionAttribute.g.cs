@@ -17,7 +17,9 @@ namespace System.Runtime.CompilerServices
         /// <summary>
         /// Initializes a new instance of the <see cref="global::System.Runtime.CompilerServices.CallerArgumentExpressionAttribute"/> class.
         /// </summary>
-        /// <param name="parameterName">The condition parameter value.</param>
+        /// <param name="parameterName">
+        /// The condition parameter value.
+        /// </param>
         public CallerArgumentExpressionAttribute(string parameterName)
         {
             ParameterName = parameterName;

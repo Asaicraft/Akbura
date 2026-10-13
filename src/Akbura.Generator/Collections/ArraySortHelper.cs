@@ -387,7 +387,9 @@ public static class SegmentedGenericArraySortHelper<T>
         return ~lo;
     }
 
-    /// <summary>Swaps the values in the two references if the first is greater than the second.</summary>
+    /// <summary>
+    /// Swaps the values in the two references if the first is greater than the second.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void SwapIfGreater(ref T i, ref T j)
     {
@@ -397,7 +399,9 @@ public static class SegmentedGenericArraySortHelper<T>
         }
     }
 
-    /// <summary>Swaps the values in the two references, regardless of whether the two references are the same.</summary>
+    /// <summary>
+    /// Swaps the values in the two references, regardless of whether the two references are the same.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void Swap(ref T i, ref T j)
     {
@@ -1283,7 +1287,9 @@ public static class SegmentedGenericArraySortHelper<TKey, TValue>
 
 #endregion
 
-/// <summary>Helper methods for use in array/span sorting routines.</summary>
+/// <summary>
+/// Helper methods for use in array/span sorting routines.
+/// </summary>
 public static class SegmentedArraySortUtils
 {
 

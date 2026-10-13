@@ -251,7 +251,7 @@ internal static class ComponentDocumentWriter
         componentWriter.WriteLifecycleMembers();
         writer.WriteLine();
 
-        componentWriter.WriteDescriptorMembers();
+        componentWriter.WriteDescriptorMembers(initializeHotReloadMetadata: true);
         writer.WriteLine();
 
         componentWriter.WriteHotReloadMembers();

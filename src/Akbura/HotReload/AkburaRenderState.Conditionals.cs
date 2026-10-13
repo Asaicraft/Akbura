@@ -7,13 +7,19 @@ public sealed partial class AkburaRenderState
     private Func<int, object>? _nodeFactory;
     private long _nextConditionalIdentity = 1;
 
-    /// <summary>Gets whether source migration or conditional activation is pending.</summary>
+    /// <summary>
+    /// Gets whether source migration or conditional activation is pending.
+    /// </summary>
     public bool HasPendingRevision => _pendingRevision != null;
 
-    /// <summary>Gets whether the pending transaction changes the source declaration.</summary>
+    /// <summary>
+    /// Gets whether the pending transaction changes the source declaration.
+    /// </summary>
     public bool IsApplyingSourceRevision => _pendingRevision is { IsActivation: false };
 
-    /// <summary>Gets the selected current-plan branch ordinal, or <c>-1</c>.</summary>
+    /// <summary>
+    /// Gets the selected current-plan branch ordinal, or <c>-1</c>.
+    /// </summary>
     public int GetConditionalBranch(int regionId)
     {
         var regions = _pendingRevision?.ConditionalRegions ?? _conditionalRegions;
@@ -28,7 +34,9 @@ public sealed partial class AkburaRenderState
     /// Selects an alternative after its C# condition has been evaluated. Live nodes
     /// are prepared lazily; the applied branch remains unchanged until commit.
     /// </summary>
-    /// <returns>Whether this region requires structural content reconciliation.</returns>
+    /// <returns>
+    /// Whether this region requires structural content reconciliation.
+    /// </returns>
     public bool SelectConditionalBranch(int regionId, int branchId)
     {
         var definitions = _pendingRevision?.ConditionalDefinitions ?? _conditionalDefinitions;

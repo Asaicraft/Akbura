@@ -60,11 +60,19 @@ internal static class ArrayBuilderExtensions
     /// <summary>
     /// Maps an array builder to immutable array.
     /// </summary>
-    /// <typeparam name="TItem"></typeparam>
-    /// <typeparam name="TResult"></typeparam>
-    /// <param name="items">The array to map</param>
-    /// <param name="map">The mapping delegate</param>
-    /// <returns>If the items's length is 0, this will return an empty immutable array</returns>
+    /// <typeparam name="TItem">
+    /// </typeparam>
+    /// <typeparam name="TResult">
+    /// </typeparam>
+    /// <param name="items">
+    /// The array to map
+    /// </param>
+    /// <param name="map">
+    /// The mapping delegate
+    /// </param>
+    /// <returns>
+    /// If the items's length is 0, this will return an empty immutable array
+    /// </returns>
     public static ImmutableArray<TResult> SelectAsArray<TItem, TResult>(this ArrayBuilder<TItem> items, Func<TItem, TResult> map)
     {
         switch (items.Count)
@@ -98,13 +106,24 @@ internal static class ArrayBuilderExtensions
     /// <summary>
     /// Maps an array builder to immutable array.
     /// </summary>
-    /// <typeparam name="TItem"></typeparam>
-    /// <typeparam name="TArg"></typeparam>
-    /// <typeparam name="TResult"></typeparam>
-    /// <param name="items">The sequence to map</param>
-    /// <param name="map">The mapping delegate</param>
-    /// <param name="arg">The extra input used by mapping delegate</param>
-    /// <returns>If the items's length is 0, this will return an empty immutable array.</returns>
+    /// <typeparam name="TItem">
+    /// </typeparam>
+    /// <typeparam name="TArg">
+    /// </typeparam>
+    /// <typeparam name="TResult">
+    /// </typeparam>
+    /// <param name="items">
+    /// The sequence to map
+    /// </param>
+    /// <param name="map">
+    /// The mapping delegate
+    /// </param>
+    /// <param name="arg">
+    /// The extra input used by mapping delegate
+    /// </param>
+    /// <returns>
+    /// If the items's length is 0, this will return an empty immutable array.
+    /// </returns>
     public static ImmutableArray<TResult> SelectAsArray<TItem, TArg, TResult>(this ArrayBuilder<TItem> items, Func<TItem, TArg, TResult> map, TArg arg)
     {
         switch (items.Count)
@@ -138,13 +157,24 @@ internal static class ArrayBuilderExtensions
     /// <summary>
     /// Maps an array builder to immutable array.
     /// </summary>
-    /// <typeparam name="TItem"></typeparam>
-    /// <typeparam name="TArg"></typeparam>
-    /// <typeparam name="TResult"></typeparam>
-    /// <param name="items">The sequence to map</param>
-    /// <param name="map">The mapping delegate</param>
-    /// <param name="arg">The extra input used by mapping delegate</param>
-    /// <returns>If the items's length is 0, this will return an empty immutable array.</returns>
+    /// <typeparam name="TItem">
+    /// </typeparam>
+    /// <typeparam name="TArg">
+    /// </typeparam>
+    /// <typeparam name="TResult">
+    /// </typeparam>
+    /// <param name="items">
+    /// The sequence to map
+    /// </param>
+    /// <param name="map">
+    /// The mapping delegate
+    /// </param>
+    /// <param name="arg">
+    /// The extra input used by mapping delegate
+    /// </param>
+    /// <returns>
+    /// If the items's length is 0, this will return an empty immutable array.
+    /// </returns>
     public static ImmutableArray<TResult> SelectAsArrayWithIndex<TItem, TArg, TResult>(this ArrayBuilder<TItem> items, Func<TItem, int, TArg, TResult> map, TArg arg)
     {
         switch (items.Count)

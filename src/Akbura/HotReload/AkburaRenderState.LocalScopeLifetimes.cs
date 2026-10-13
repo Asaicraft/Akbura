@@ -4,7 +4,9 @@ public sealed partial class AkburaRenderState
 {
     private Dictionary<object, List<WeakReference<IDisposable>>>? _localScopeLifetimes;
 
-    /// <summary>Retires a replaced template only after its parent's revision commits.</summary>
+    /// <summary>
+    /// Retires a replaced template only after its parent's revision commits.
+    /// </summary>
     public void DeferLocalRenderScopeDisposal(IDisposable resource, Func<bool> stillDetached)
     {
         ArgumentNullException.ThrowIfNull(resource);
@@ -71,7 +73,9 @@ public sealed partial class AkburaRenderState
         public List<DeferredLocalScopeDisposal>? LocalScopeDisposals { get; set; }
     }
 
-    /// <summary>Links a built local scope to its live owning node, not to a mutable plan ordinal.</summary>
+    /// <summary>
+    /// Links a built local scope to its live owning node, not to a mutable plan ordinal.
+    /// </summary>
     public void RegisterLocalRenderScopeLifetime(object ownerInstance, IDisposable lease)
     {
         ArgumentNullException.ThrowIfNull(ownerInstance);

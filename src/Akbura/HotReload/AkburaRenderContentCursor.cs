@@ -1,6 +1,8 @@
 namespace Akbura.HotReload;
 
-/// <summary>Maps reserved virtual content slots to the current physical child count.</summary>
+/// <summary>
+/// Maps reserved virtual content slots to the current physical child count.
+/// </summary>
 [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
 [System.ComponentModel.Browsable(false)]
 public struct AkburaRenderContentCursor
@@ -27,7 +29,9 @@ public struct AkburaRenderContentCursor
         Delta += reservedCapacity - activeCount;
     }
 
-    /// <summary>Advances one variable-width contribution without imposing a maximum child count.</summary>
+    /// <summary>
+    /// Advances one variable-width contribution without imposing a maximum child count.
+    /// </summary>
     public void AdvanceDynamicRegion(int activeCount)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(activeCount);

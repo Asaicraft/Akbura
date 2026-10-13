@@ -5,7 +5,9 @@ using Avalonia.VisualTree;
 
 namespace Akbura.HotReload;
 
-/// <summary>Applies styles invalidated by replacing an owned style subtree.</summary>
+/// <summary>
+/// Applies styles invalidated by replacing an owned style subtree.
+/// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
 [Browsable(false)]
 public static class AkburaRenderStyleHelper

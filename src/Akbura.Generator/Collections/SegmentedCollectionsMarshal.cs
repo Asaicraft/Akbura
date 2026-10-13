@@ -15,8 +15,12 @@ public static class SegmentedCollectionsMarshal
     /// <summary>
     /// Gets the backing storage array for a <see cref="SegmentedArray{T}"/>.
     /// </summary>
-    /// <typeparam name="T">The type of elements stored in the array.</typeparam>
-    /// <param name="array">The segmented array.</param>
+    /// <typeparam name="T">
+    /// The type of elements stored in the array.
+    /// </typeparam>
+    /// <param name="array">
+    /// The segmented array.
+    /// </param>
     /// <returns>The backing storage array for the segmented array. Note that replacing segments within the returned
     /// value will invalidate the <see cref="SegmentedArray{T}"/> data structure.</returns>
     public static T[][] AsSegments<T>(SegmentedArray<T> array)
@@ -25,10 +29,18 @@ public static class SegmentedCollectionsMarshal
     /// <summary>
     /// Gets a <see cref="SegmentedArray{T}"/> value wrapping the input T[][].
     /// </summary>
-    /// <typeparam name="T">The type of elements in the input.</typeparam>
-    /// <param name="length">The combined length of the input arrays</param>
-    /// <param name="segments">The input array to wrap in the returned <see cref="SegmentedArray{T}"/> value.</param>
-    /// <returns>A <see cref="SegmentedArray{T}"/> value wrapping <paramref name="segments"/>.</returns>
+    /// <typeparam name="T">
+    /// The type of elements in the input.
+    /// </typeparam>
+    /// <param name="length">
+    /// The combined length of the input arrays
+    /// </param>
+    /// <param name="segments">
+    /// The input array to wrap in the returned <see cref="SegmentedArray{T}"/> value.
+    /// </param>
+    /// <returns>
+    /// A <see cref="SegmentedArray{T}"/> value wrapping <paramref name="segments"/>.
+    /// </returns>
     /// <remarks>
     /// <para>
     /// When using this method, callers should take extra care to ensure that they're the sole owners of the input
@@ -37,7 +49,9 @@ public static class SegmentedCollectionsMarshal
     /// <see cref="SegmentedArray{T}"/> values to change outside their control.
     /// </para>
     /// </remarks>
-    /// <exception cref="System.ArgumentNullException">Thrown when <paramref name="segments"/> is <see langword="null"/></exception>
+    /// <exception cref="System.ArgumentNullException">
+    /// Thrown when <paramref name="segments"/> is <see langword="null"/>
+    /// </exception>
     public static SegmentedArray<T> AsSegmentedArray<T>(int length, T[][] segments)
         => SegmentedArray<T>.PrivateMarshal.AsSegmentedArray(length, segments);
 

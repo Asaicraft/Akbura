@@ -21,7 +21,9 @@ public abstract class StyledElementStateMarkupExtension
     /// <summary>
     /// Creates an observable condition for the utility target.
     /// </summary>
-    /// <param name="serviceProvider">The markup service provider.</param>
+    /// <param name="serviceProvider">
+    /// The markup service provider.
+    /// </param>
     /// <returns>
     /// The state observable, or <see langword="null"/> when the target does
     /// not support the requested state.
@@ -397,7 +399,9 @@ public sealed class focusWithinExtension : InputStateMarkupExtension
     UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
 public sealed class focusVisibleExtension : PseudoClassMarkupExtension
 {
-    /// <summary>Initializes the focus-visible variant.</summary>
+    /// <summary>
+    /// Initializes the focus-visible variant.
+    /// </summary>
     public focusVisibleExtension()
         : base(":focus-visible")
     {
@@ -413,14 +417,18 @@ public sealed class focusVisibleExtension : PseudoClassMarkupExtension
     UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
 public sealed class activeExtension : PseudoClassMarkupExtension
 {
-    /// <summary>Initializes the active variant.</summary>
+    /// <summary>
+    /// Initializes the active variant.
+    /// </summary>
     public activeExtension()
         : base(":pressed")
     {
     }
 }
 
-/// <summary>Activates while the target is effectively enabled.</summary>
+/// <summary>
+/// Activates while the target is effectively enabled.
+/// </summary>
 [UtilityVariant(
     10d,
     ConflictGroup = "Akbura.Tailwind.Availability",
@@ -434,7 +442,9 @@ public sealed class enabledExtension : InputStateMarkupExtension
     }
 }
 
-/// <summary>Activates while the target is effectively disabled.</summary>
+/// <summary>
+/// Activates while the target is effectively disabled.
+/// </summary>
 [UtilityVariant(
     20d,
     ConflictGroup = "Akbura.Tailwind.Availability",
@@ -449,14 +459,18 @@ public sealed class disabledExtension : InputStateMarkupExtension
     }
 }
 
-/// <summary>Activates while a supported link is marked as visited.</summary>
+/// <summary>
+/// Activates while a supported link is marked as visited.
+/// </summary>
 [UtilityVariant(
     10d,
     ConflictGroup = "Akbura.Tailwind.LinkState",
     UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
 public sealed class visitedExtension : PseudoClassMarkupExtension
 {
-    /// <summary>Initializes the visited variant.</summary>
+    /// <summary>
+    /// Initializes the visited variant.
+    /// </summary>
     public visitedExtension()
         : base(":visited")
     {
@@ -472,49 +486,63 @@ public sealed class visitedExtension : PseudoClassMarkupExtension
     UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
 public sealed class openExtension : PseudoClassMarkupExtension
 {
-    /// <summary>Initializes the open variant.</summary>
+    /// <summary>
+    /// Initializes the open variant.
+    /// </summary>
     public openExtension()
         : base(":open", ":expanded", ":dropdownopen", ":flyout-open")
     {
     }
 }
 
-/// <summary>Activates while a toggle target is checked.</summary>
+/// <summary>
+/// Activates while a toggle target is checked.
+/// </summary>
 [UtilityVariant(
     10d,
     ConflictGroup = "Akbura.Tailwind.ToggleState",
     UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
 public sealed class checkedExtension : PseudoClassMarkupExtension
 {
-    /// <summary>Initializes the checked variant.</summary>
+    /// <summary>
+    /// Initializes the checked variant.
+    /// </summary>
     public checkedExtension()
         : base(":checked")
     {
     }
 }
 
-/// <summary>Activates while a three-state target is indeterminate.</summary>
+/// <summary>
+/// Activates while a three-state target is indeterminate.
+/// </summary>
 [UtilityVariant(
     20d,
     ConflictGroup = "Akbura.Tailwind.ToggleState",
     UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
 public sealed class indeterminateExtension : PseudoClassMarkupExtension
 {
-    /// <summary>Initializes the indeterminate variant.</summary>
+    /// <summary>
+    /// Initializes the indeterminate variant.
+    /// </summary>
     public indeterminateExtension()
         : base(":indeterminate")
     {
     }
 }
 
-/// <summary>Activates while an Avalonia item container is selected.</summary>
+/// <summary>
+/// Activates while an Avalonia item container is selected.
+/// </summary>
 [UtilityVariant(
     10d,
     ConflictGroup = "Akbura.Tailwind.Selection",
     UnprefixedPrecedence = UnprefixedUtilityPrecedence.Above)]
 public sealed class selectedExtension : PseudoClassMarkupExtension
 {
-    /// <summary>Initializes the selected variant.</summary>
+    /// <summary>
+    /// Initializes the selected variant.
+    /// </summary>
     public selectedExtension()
         : base(":selected")
     {

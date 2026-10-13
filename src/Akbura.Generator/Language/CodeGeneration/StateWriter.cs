@@ -68,45 +68,22 @@ internal readonly ref struct StateWriter
         WriteFactory(plan);
     }
 
-    public void WriteHotReloadAssignment(in ComponentStatePlan plan)
-    {
-        GeneratedMemberNameWriter.WriteStateInfoField(
-            _writer,
-            plan.GeneratedName);
-        _writer.Write(" = ");
-        GeneratedMemberNameWriter.WriteStateInfoFactory(
-            _writer,
-            plan.GeneratedName);
-        _writer.WriteLine("();");
-    }
-
     private void WriteStateInfo(in ComponentStatePlan plan)
     {
-        _writer.WriteLine("#if DEBUG");
-        WriteStateInfoDeclaration(plan, isReadOnly: false);
-        _writer.WriteLine("#else");
-        WriteStateInfoDeclaration(plan, isReadOnly: true);
-        _writer.WriteLine("#endif");
+        _writer.WriteLine("#if !DEBUG");
+        WriteStateInfoDeclaration(plan);
         _writer.CurrentIndent += _writer.TabSize;
         GeneratedMemberNameWriter.WriteStateInfoFactory(
             _writer,
             plan.GeneratedName);
         _writer.WriteLine("();");
         _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("#endif");
     }
 
-    private void WriteStateInfoDeclaration(
-        in ComponentStatePlan plan,
-        bool isReadOnly)
+    private void WriteStateInfoDeclaration(in ComponentStatePlan plan)
     {
-        _writer.Write("private static ");
-
-        if (isReadOnly)
-        {
-            _writer.Write("readonly ");
-        }
-
-        _writer.Write("global::Akbura.ComponentTree.StateInfo<");
+        _writer.Write("private static readonly global::Akbura.ComponentTree.StateInfo<");
         WriteValueType(plan);
         _writer.Write("> ");
         GeneratedMemberNameWriter.WriteStateInfoField(
@@ -222,6 +199,8 @@ internal readonly ref struct StateWriter
 
     private void WriteStateField(in ComponentStatePlan plan)
     {
+        _writer.WriteLine("#if !DEBUG");
+
         _writer.Write("private global::Akbura.ComponentTree.State<");
         WriteValueType(plan);
         _writer.Write(">? ");
@@ -229,6 +208,8 @@ internal readonly ref struct StateWriter
             _writer,
             plan.GeneratedName);
         _writer.WriteLine(";");
+
+        _writer.WriteLine("#endif");
     }
 
     private void WriteStateAccessor(in ComponentStatePlan plan)
@@ -241,15 +222,32 @@ internal readonly ref struct StateWriter
             plan.GeneratedName);
         _writer.WriteLine(" =>");
         _writer.CurrentIndent += _writer.TabSize;
-        GeneratedMemberNameWriter.WriteStateField(
-            _writer,
-            plan.GeneratedName);
+        _writer.WriteLine("#if DEBUG");
+        _writer.Write(plan.IsComposable ? "RuntimeStates.GetRequiredHook<" : "RuntimeStates.GetOrCreate<");
+        WriteValueType(plan);
+        _writer.Write(">(");
+        _writer.WriteStringLiteral(plan.HotReloadKey);
+        if (plan.IsComposable)
+        {
+            _writer.WriteLine(");");
+        }
+        else
+        {
+            _writer.Write(", () => CreateState(");
+            GeneratedMemberNameWriter.WriteStateInfoFactory(_writer, plan.GeneratedName);
+            _writer.WriteLine("()));");
+        }
+
+        _writer.WriteLine("#else");
+        GeneratedMemberNameWriter.WriteStateField(_writer, plan.GeneratedName);
         if (plan.IsComposable)
         {
             _writer.WriteLine(" ?? throw new global::System.InvalidOperationException(");
             _writer.CurrentIndent += _writer.TabSize;
             _writer.WriteLine("\"The composed hook state is not prepared for this frame.\");");
-            _writer.CurrentIndent -= _writer.TabSize * 2;
+            _writer.CurrentIndent -= _writer.TabSize;
+            _writer.WriteLine("#endif");
+            _writer.CurrentIndent -= _writer.TabSize;
             return;
         }
 
@@ -258,6 +256,7 @@ internal readonly ref struct StateWriter
             _writer,
             plan.GeneratedName);
         _writer.WriteLine(");");
+        _writer.WriteLine("#endif");
         _writer.CurrentIndent -= _writer.TabSize;
     }
 

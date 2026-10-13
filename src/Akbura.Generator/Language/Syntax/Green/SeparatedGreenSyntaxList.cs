@@ -43,8 +43,11 @@ internal readonly struct SeparatedGreenSyntaxList<TNode> : IEquatable<SeparatedG
     /// <summary>
     /// Gets the separator at the given index in this list.
     /// </summary>
-    /// <param name="index">The index.</param>
-    /// <returns></returns>
+    /// <param name="index">
+    /// The index.
+    /// </param>
+    /// <returns>
+    /// </returns>
     public GreenNode? GetSeparator(int index)
     {
         return _list[(index << 1) + 1];

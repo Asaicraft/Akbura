@@ -4,7 +4,9 @@ namespace Akbura.HotReload;
 
 public sealed partial class AkburaRenderState
 {
-    /// <summary>Reconciles only entries owned by one generated dictionary content slot.</summary>
+    /// <summary>
+    /// Reconciles only entries owned by one generated dictionary content slot.
+    /// </summary>
     public void ReconcileDictionary<TKey, TValue>(
         int ownerLocalId,
         string slot,
@@ -56,7 +58,9 @@ public sealed partial class AkburaRenderState
         }
     }
 
-    /// <summary>Reconciles an untyped dictionary without taking ownership of foreign entries.</summary>
+    /// <summary>
+    /// Reconciles an untyped dictionary without taking ownership of foreign entries.
+    /// </summary>
     public void ReconcileDictionary(
         int ownerLocalId,
         string slot,

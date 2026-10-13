@@ -50,7 +50,9 @@ internal readonly struct CSharpSymbolReference
 
     public ISymbol? AkburaSymbol { get; }
 
-    /// <summary>Gets the nullable flow state at this reference in its real C# lexical context.</summary>
+    /// <summary>
+    /// Gets the nullable flow state at this reference in its real C# lexical context.
+    /// </summary>
     public NullableFlowState NullableFlowState { get; }
 
     public bool IsNameOfOperand { get; }

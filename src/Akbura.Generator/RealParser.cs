@@ -25,9 +25,15 @@ internal static class RealParser
     /// using IEEE round-to-nearest-ties-to-even rounding mode. Behavior is not defined for inputs that are
     /// not valid C# floating-point literals.
     /// </summary>
-    /// <param name="s">The decimal floating-point constant's string</param>
-    /// <param name="d">The nearest double value, if conversion succeeds</param>
-    /// <returns>True if the input was converted; false if there was an overflow</returns>
+    /// <param name="s">
+    /// The decimal floating-point constant's string
+    /// </param>
+    /// <param name="d">
+    /// The nearest double value, if conversion succeeds
+    /// </param>
+    /// <returns>
+    /// True if the input was converted; false if there was an overflow
+    /// </returns>
     public static bool TryParseDouble(string s, out double d)
     {
         var str = DecimalFloatingPointString.FromSource(s);
@@ -42,9 +48,15 @@ internal static class RealParser
     /// using IEEE round-to-nearest-ties-to-even rounding mode. Behavior is not defined for inputs that are
     /// not valid C# floating-point literals.
     /// </summary>
-    /// <param name="s">The float floating-point constant's string</param>
-    /// <param name="f">The nearest float value, if conversion succeeds</param>
-    /// <returns>True if the input was converted; false if there was an overflow</returns>
+    /// <param name="s">
+    /// The float floating-point constant's string
+    /// </param>
+    /// <param name="f">
+    /// The nearest float value, if conversion succeeds
+    /// </param>
+    /// <returns>
+    /// True if the input was converted; false if there was an overflow
+    /// </returns>
     public static bool TryParseFloat(string s, out float f)
     {
         var str = DecimalFloatingPointString.FromSource(s);
@@ -95,11 +107,21 @@ internal static class RealParser
         /// precision than is required, to ensure that the mantissa is correctly rounded.  
         /// (The caller should not round the mantissa before calling this function.)  
         /// </summary>
-        /// <param name="initialMantissa">The bits of the mantissa</param>
-        /// <param name="initialExponent">The exponent</param>
-        /// <param name="hasZeroTail">Whether there are any nonzero bits past the supplied mantissa</param>
-        /// <param name="result">Where the bits of the floating-point number are stored</param>
-        /// <returns>A status indicating whether the conversion succeeded and why</returns>
+        /// <param name="initialMantissa">
+        /// The bits of the mantissa
+        /// </param>
+        /// <param name="initialExponent">
+        /// The exponent
+        /// </param>
+        /// <param name="hasZeroTail">
+        /// Whether there are any nonzero bits past the supplied mantissa
+        /// </param>
+        /// <param name="result">
+        /// Where the bits of the floating-point number are stored
+        /// </param>
+        /// <returns>
+        /// A status indicating whether the conversion succeeded and why
+        /// </returns>
         public Status AssembleFloatingPointValue(
             ulong initialMantissa,
             int initialExponent,
@@ -287,7 +309,9 @@ internal static class RealParser
         /// <summary>
         /// Create a DecimalFloatingPointString from a string representing a floating-point literal.
         /// </summary>
-        /// <param name="source">The text of the floating-point literal</param>
+        /// <param name="source">
+        /// The text of the floating-point literal
+        /// </param>
         public static DecimalFloatingPointString FromSource(string source)
         {
             var mantissaBuilder = new StringBuilder();
@@ -578,12 +602,24 @@ internal static class RealParser
     /// representable, +/-infinity is stored and overflow is reported (since this  
     /// function only deals with integers, underflow is impossible).  
     /// </summary>
-    /// <param name="integerValueAsBytes">the bits of the integer, least significant bits first</param>
-    /// <param name="integerBitsOfPrecision">the number of bits of precision in integerValueAsBytes</param>
-    /// <param name="hasNonzeroFractionalPart">whether there are nonzero digits after the decimal</param>
-    /// <param name="type">the kind of real number to build</param>
-    /// <param name="result">the result</param>
-    /// <returns>An indicator of the kind of result</returns>
+    /// <param name="integerValueAsBytes">
+    /// the bits of the integer, least significant bits first
+    /// </param>
+    /// <param name="integerBitsOfPrecision">
+    /// the number of bits of precision in integerValueAsBytes
+    /// </param>
+    /// <param name="hasNonzeroFractionalPart">
+    /// whether there are nonzero digits after the decimal
+    /// </param>
+    /// <param name="type">
+    /// the kind of real number to build
+    /// </param>
+    /// <param name="result">
+    /// the result
+    /// </param>
+    /// <returns>
+    /// An indicator of the kind of result
+    /// </returns>
     private static Status ConvertBigIntegerToFloatingPointBits(byte[] integerValueAsBytes, uint integerBitsOfPrecision, bool hasNonzeroFractionalPart, FloatingPointType type, out ulong result)
     {
         int baseExponent = type.DenormalMantissaBits;
@@ -619,10 +655,18 @@ internal static class RealParser
     /// <summary>
     /// Parse a sequence of digits into a BigInteger.
     /// </summary>
-    /// <param name="data">The DecimalFloatingPointString containing the digits in its Mantissa</param>
-    /// <param name="integer_first_index">The index of the first digit to convert</param>
-    /// <param name="integer_last_index">The index just past the last digit to convert</param>
-    /// <returns>The BigInteger result</returns>
+    /// <param name="data">
+    /// The DecimalFloatingPointString containing the digits in its Mantissa
+    /// </param>
+    /// <param name="integer_first_index">
+    /// The index of the first digit to convert
+    /// </param>
+    /// <param name="integer_last_index">
+    /// The index just past the last digit to convert
+    /// </param>
+    /// <returns>
+    /// The BigInteger result
+    /// </returns>
     private static BigInteger AccumulateDecimalDigitsIntoBigInteger(DecimalFloatingPointString data, uint integer_first_index, uint integer_last_index)
     {
         if (integer_first_index == integer_last_index)
@@ -702,10 +746,17 @@ internal static class RealParser
     /// discarded most digits.  The caller must pass true for has_zero_tail if  
     /// all discarded bits were zeroes.  
     /// </summary>
-    /// <param name="value">The value to shift</param>
-    /// <param name="shift">The amount of shift</param>
-    /// <param name="hasZeroTail">Whether there are any less significant nonzero bits in the value</param>
-    /// <returns></returns>
+    /// <param name="value">
+    /// The value to shift
+    /// </param>
+    /// <param name="shift">
+    /// The amount of shift
+    /// </param>
+    /// <param name="hasZeroTail">
+    /// Whether there are any less significant nonzero bits in the value
+    /// </param>
+    /// <returns>
+    /// </returns>
     private static ulong RightShiftWithRounding(ulong value, int shift, bool hasZeroTail)
     {
         // If we'd need to shift further than it is possible to shift, the answer  
@@ -738,10 +789,17 @@ internal static class RealParser
     /// For this function, "round up" is defined as "increase the magnitude" of the  
     /// mantissa.
     /// </summary>
-    /// <param name="lsbBit">the least-significant bit of the representable value</param>
-    /// <param name="roundBit">the bit following the least-significant bit</param>
-    /// <param name="hasTailBits">true if there are any (less significant) bits set following roundBit</param>
-    /// <returns></returns>
+    /// <param name="lsbBit">
+    /// the least-significant bit of the representable value
+    /// </param>
+    /// <param name="roundBit">
+    /// the bit following the least-significant bit
+    /// </param>
+    /// <param name="hasTailBits">
+    /// true if there are any (less significant) bits set following roundBit
+    /// </param>
+    /// <returns>
+    /// </returns>
     private static bool ShouldRoundUp(
         bool lsbBit,
         bool roundBit,
@@ -759,8 +817,12 @@ internal static class RealParser
     /// <summary>
     /// Multiply a BigInteger by the given power of two.
     /// </summary>
-    /// <param name="number">The BigInteger to multiply by a power of two and replace with the product</param>
-    /// <param name="shift">The power of two to multiply it by</param>
+    /// <param name="number">
+    /// The BigInteger to multiply by a power of two and replace with the product
+    /// </param>
+    /// <param name="shift">
+    /// The power of two to multiply it by
+    /// </param>
     private static void ShiftLeft(ref BigInteger number, uint shift)
     {
         var powerOfTwo = BigInteger.Pow(s_bigTwo, (int)shift);
@@ -770,8 +832,12 @@ internal static class RealParser
     /// <summary>
     /// Multiply a BigInteger by the given power of ten.
     /// </summary>
-    /// <param name="number">The BigInteger to multiply by a power of ten and replace with the product</param>
-    /// <param name="power">The power of ten to multiply it by</param>
+    /// <param name="number">
+    /// The BigInteger to multiply by a power of ten and replace with the product
+    /// </param>
+    /// <param name="power">
+    /// The power of ten to multiply it by
+    /// </param>
     private static void MultiplyByPowerOfTen(ref BigInteger number, uint power)
     {
         var powerOfTen = BigInteger.Pow(s_bigTen, (int)power);

@@ -4,7 +4,9 @@ using System.ComponentModel;
 
 namespace Akbura.Markup;
 
-/// <summary>Supplies the current native lexical scope without retaining an obsolete scope snapshot.</summary>
+/// <summary>
+/// Supplies the current native lexical scope without retaining an obsolete scope snapshot.
+/// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
 [Browsable(false)]
 public sealed class AkburaRetainedFactoryServiceProvider : IServiceProvider

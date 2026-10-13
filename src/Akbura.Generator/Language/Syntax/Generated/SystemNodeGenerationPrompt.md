@@ -511,7 +511,9 @@ node AkburaDocumentSyntax {
     EndOfFile : Token;
 }
 
-/// <summary>inject ILogger&lt;ProfileWithTasks&gt; log;</summary>
+/// <summary>
+/// inject ILogger&lt;ProfileWithTasks&gt; log;
+/// </summary>
 node InjectDeclarationSyntax : AkTopLevelMember {
     InjectKeyword : InjectKeyword;
     Type          : CSharpTypeSyntax;

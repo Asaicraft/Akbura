@@ -23,7 +23,9 @@ public sealed class ExportResourceForAkburaCompletionAttribute : Attribute
     /// The published dictionary path relative to the resource root of the
     /// assembly carrying this attribute.
     /// </param>
-    /// <param name="key">The exact resource key.</param>
+    /// <param name="key">
+    /// The exact resource key.
+    /// </param>
     /// <param name="resourceType">
     /// The declared type of the resource value or a compatible contract type.
     /// </param>

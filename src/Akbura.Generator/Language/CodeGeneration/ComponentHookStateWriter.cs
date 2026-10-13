@@ -36,6 +36,7 @@ internal readonly ref struct ComponentHookStateWriter
 
     private void WriteFields(ReadOnlySpan<ComponentStatePlan> states)
     {
+        _writer.WriteLine("#if !DEBUG");
         _writer.WriteLine(
             "private global::System.Collections.Immutable.ImmutableArray<" +
             "global::Akbura.ComponentTree.State> __previousHookStates;");
@@ -53,11 +54,16 @@ internal readonly ref struct ComponentHookStateWriter
             WritePrevious(state);
             _writer.WriteLine(";");
         }
+
+        _writer.WriteLine("#endif");
     }
 
     private void WritePrepare(ReadOnlySpan<ComponentStatePlan> states)
     {
         WriteMethodStart("PrepareHookStates");
+        _writer.WriteLine("#if DEBUG");
+        _writer.WriteLine("RuntimeStates.BeginFrame();");
+        _writer.WriteLine("#else");
         _writer.WriteLine("__previousHookStates = __states;");
         foreach (ref readonly var state in states)
         {
@@ -70,6 +76,8 @@ internal readonly ref struct ComponentHookStateWriter
             }
         }
 
+        _writer.WriteLine("#endif");
+
         foreach (ref readonly var state in states)
         {
             if (!state.IsComposable)
@@ -80,12 +88,26 @@ internal readonly ref struct ComponentHookStateWriter
                 continue;
             }
 
+            _writer.WriteLine("#if DEBUG");
+            _writer.Write("RuntimeStates.StageHook<");
+            _valueWriter.WriteTypeNameWithNullableAnnotation(state.ValueType);
+            _writer.Write(">(");
+            _writer.WriteStringLiteral(state.HotReloadKey);
+            _writer.Write(", BindHookState(");
+            GeneratedMemberNameWriter.WriteStateFactory(_writer, state.GeneratedName);
+            _writer.Write("(), RuntimeStates.GetBoundOrNull<");
+            _valueWriter.WriteTypeNameWithNullableAnnotation(state.ValueType);
+            _writer.Write(">(");
+            _writer.WriteStringLiteral(state.HotReloadKey);
+            _writer.WriteLine(")));");
+            _writer.WriteLine("#else");
             GeneratedMemberNameWriter.WriteStateField(_writer, state.GeneratedName);
             _writer.Write(" = BindHookState(");
             GeneratedMemberNameWriter.WriteStateFactory(_writer, state.GeneratedName);
             _writer.Write("(), ");
             WritePrevious(state);
             _writer.WriteLine(");");
+            _writer.WriteLine("#endif");
         }
 
         WriteMethodEnd();
@@ -94,13 +116,20 @@ internal readonly ref struct ComponentHookStateWriter
     private void WriteCommit(ReadOnlySpan<ComponentStatePlan> states)
     {
         WriteMethodStart("CommitHookStates");
+        _writer.WriteLine("#if DEBUG");
+        _writer.WriteLine("RuntimeStates.CommitFrame();");
+        _writer.WriteLine("#else");
         WriteClearPrevious(states);
+        _writer.WriteLine("#endif");
         WriteMethodEnd();
     }
 
     private void WriteAbort(ReadOnlySpan<ComponentStatePlan> states)
     {
         WriteMethodStart("AbortHookStates");
+        _writer.WriteLine("#if DEBUG");
+        _writer.WriteLine("RuntimeStates.AbortFrame();");
+        _writer.WriteLine("#else");
         _writer.WriteLine("__states = __previousHookStates;");
         foreach (ref readonly var state in states)
         {
@@ -114,12 +143,16 @@ internal readonly ref struct ComponentHookStateWriter
         }
 
         WriteClearPrevious(states);
+        _writer.WriteLine("#endif");
         WriteMethodEnd();
     }
 
     private void WriteReset(ReadOnlySpan<ComponentStatePlan> states)
     {
         WriteMethodStart("ResetHookStatesForHotReload");
+        _writer.WriteLine("#if DEBUG");
+        _writer.WriteLine("RuntimeStates.ResetHookBindingsForHotReload();");
+        _writer.WriteLine("#else");
         _writer.WriteLine("__states = default;");
         foreach (ref readonly var state in states)
         {
@@ -131,6 +164,7 @@ internal readonly ref struct ComponentHookStateWriter
         }
 
         WriteClearPrevious(states);
+        _writer.WriteLine("#endif");
         WriteMethodEnd();
     }
 

@@ -44,7 +44,9 @@ public static partial class UnicodeCharacterUtilities
     /// <summary>
     /// Returns true if the Unicode character can be a part of an identifier.
     /// </summary>
-    /// <param name="ch">The Unicode character.</param>
+    /// <param name="ch">
+    /// The Unicode character.
+    /// </param>
     public static bool IsIdentifierPartCharacter(char ch)
     {
         // identifier-part-character:
@@ -168,7 +170,9 @@ public static partial class UnicodeCharacterUtilities
     /// <summary>
     /// Returns true if the Unicode character is a formatting character (Unicode class Cf).
     /// </summary>
-    /// <param name="ch">The Unicode character.</param>
+    /// <param name="ch">
+    /// The Unicode character.
+    /// </param>
     public static bool IsFormattingChar(char ch)
     {
         // There are no FormattingChars in ASCII range
@@ -179,7 +183,9 @@ public static partial class UnicodeCharacterUtilities
     /// <summary>
     /// Returns true if the Unicode character is a formatting character (Unicode class Cf).
     /// </summary>
-    /// <param name="cat">The Unicode character.</param>
+    /// <param name="cat">
+    /// The Unicode character.
+    /// </param>
     private static bool IsFormattingChar(UnicodeCategory cat)
     {
         // formatting-character:  

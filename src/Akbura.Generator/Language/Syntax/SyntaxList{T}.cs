@@ -61,7 +61,9 @@ internal readonly partial struct SyntaxList<TNode> : IReadOnlyList<TNode>, IEqua
     /// <summary>
     /// Creates a singleton list of syntax nodes.
     /// </summary>
-    /// <param name="node">The single element node.</param>
+    /// <param name="node">
+    /// The single element node.
+    /// </param>
     public SyntaxList(TNode? node)
         : this((AkburaSyntax?)node)
     {
@@ -70,7 +72,9 @@ internal readonly partial struct SyntaxList<TNode> : IReadOnlyList<TNode>, IEqua
     /// <summary>
     /// Creates a list of syntax nodes.
     /// </summary>
-    /// <param name="nodes">A sequence of element nodes.</param>
+    /// <param name="nodes">
+    /// A sequence of element nodes.
+    /// </param>
     public SyntaxList(IEnumerable<TNode>? nodes)
         : this(CreateNode(nodes))
     {
@@ -103,8 +107,12 @@ internal readonly partial struct SyntaxList<TNode> : IReadOnlyList<TNode>, IEqua
     /// <summary>
     /// Gets the node at the specified index.
     /// </summary>
-    /// <param name="index">The zero-based index of the node to get or set.</param>
-    /// <returns>The node at the specified index.</returns>
+    /// <param name="index">
+    /// The zero-based index of the node to get or set.
+    /// </param>
+    /// <returns>
+    /// The node at the specified index.
+    /// </returns>
     public TNode this[int index]
     {
         get
@@ -204,7 +212,9 @@ internal readonly partial struct SyntaxList<TNode> : IReadOnlyList<TNode>, IEqua
     /// <summary>
     /// Creates a new list with the specified node added at the end.
     /// </summary>
-    /// <param name="node">The node to add.</param>
+    /// <param name="node">
+    /// The node to add.
+    /// </param>
     public SyntaxList<TNode> Add(TNode node)
     {
         return this.Insert(Count, node);
@@ -213,7 +223,9 @@ internal readonly partial struct SyntaxList<TNode> : IReadOnlyList<TNode>, IEqua
     /// <summary>
     /// Creates a new list with the specified nodes added at the end.
     /// </summary>
-    /// <param name="nodes">The nodes to add.</param>
+    /// <param name="nodes">
+    /// The nodes to add.
+    /// </param>
     public SyntaxList<TNode> AddRange(IEnumerable<TNode> nodes)
     {
         return InsertRange(Count, nodes);
@@ -222,8 +234,12 @@ internal readonly partial struct SyntaxList<TNode> : IReadOnlyList<TNode>, IEqua
     /// <summary>
     /// Creates a new list with the specified node inserted at the index.
     /// </summary>
-    /// <param name="index">The index to insert at.</param>
-    /// <param name="node">The node to insert.</param>
+    /// <param name="index">
+    /// The index to insert at.
+    /// </param>
+    /// <param name="node">
+    /// The node to insert.
+    /// </param>
     public SyntaxList<TNode> Insert(int index, TNode node)
     {
         if(node == null)
@@ -237,8 +253,12 @@ internal readonly partial struct SyntaxList<TNode> : IReadOnlyList<TNode>, IEqua
     /// <summary>
     /// Creates a new list with the specified nodes inserted at the index.
     /// </summary>
-    /// <param name="index">The index to insert at.</param>
-    /// <param name="nodes">The nodes to insert.</param>
+    /// <param name="index">
+    /// The index to insert at.
+    /// </param>
+    /// <param name="nodes">
+    /// The nodes to insert.
+    /// </param>
     public SyntaxList<TNode> InsertRange(int index, IEnumerable<TNode> nodes)
     {
         if (index < 0 || index > Count)
@@ -267,7 +287,9 @@ internal readonly partial struct SyntaxList<TNode> : IReadOnlyList<TNode>, IEqua
     /// <summary>
     /// Creates a new list with the element at specified index removed.
     /// </summary>
-    /// <param name="index">The index of the element to remove.</param>
+    /// <param name="index">
+    /// The index of the element to remove.
+    /// </param>
     public SyntaxList<TNode> RemoveAt(int index)
     {
         if (index < 0 || index > Count)
@@ -281,7 +303,9 @@ internal readonly partial struct SyntaxList<TNode> : IReadOnlyList<TNode>, IEqua
     /// <summary>
     /// Creates a new list with the element removed.
     /// </summary>
-    /// <param name="node">The element to remove.</param>
+    /// <param name="node">
+    /// The element to remove.
+    /// </param>
     public SyntaxList<TNode> Remove(TNode node)
     {
         return CreateList(this.Where(x => x != node).ToList());
@@ -290,8 +314,12 @@ internal readonly partial struct SyntaxList<TNode> : IReadOnlyList<TNode>, IEqua
     /// <summary>
     /// Creates a new list with the specified element replaced with the new node.
     /// </summary>
-    /// <param name="nodeInList">The element to replace.</param>
-    /// <param name="newNode">The new node.</param>
+    /// <param name="nodeInList">
+    /// The element to replace.
+    /// </param>
+    /// <param name="newNode">
+    /// The new node.
+    /// </param>
     public SyntaxList<TNode> Replace(TNode nodeInList, TNode newNode)
     {
         return ReplaceRange(nodeInList, [newNode]);
@@ -300,8 +328,12 @@ internal readonly partial struct SyntaxList<TNode> : IReadOnlyList<TNode>, IEqua
     /// <summary>
     /// Creates a new list with the specified element replaced with new nodes.
     /// </summary>
-    /// <param name="nodeInList">The element to replace.</param>
-    /// <param name="newNodes">The new nodes.</param>
+    /// <param name="nodeInList">
+    /// The element to replace.
+    /// </param>
+    /// <param name="newNodes">
+    /// The new nodes.
+    /// </param>
     public SyntaxList<TNode> ReplaceRange(TNode nodeInList, IEnumerable<TNode> newNodes)
     {
         if(nodeInList == null)

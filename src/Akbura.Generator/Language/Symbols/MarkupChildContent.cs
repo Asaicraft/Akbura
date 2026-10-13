@@ -56,7 +56,9 @@ internal readonly struct MarkupChildContent
     /// </summary>
     public bool IsDeferred { get; }
 
-    /// <summary>The statically selected content Add overload, when applicable.</summary>
+    /// <summary>
+    /// The statically selected content Add overload, when applicable.
+    /// </summary>
     public Microsoft.CodeAnalysis.IMethodSymbol? InsertionMethod { get; }
 
     public IMarkupIfOperation? ConditionalOperation { get; }

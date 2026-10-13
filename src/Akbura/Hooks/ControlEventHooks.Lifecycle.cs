@@ -11,77 +11,107 @@ public static partial class ControlEventHooks
     private static readonly UseHookKey s_detachedFromVisualTreeKey = new();
     private static readonly UseHookKey s_unloadedKey = new();
 
-    /// <summary>Runs once when initialization completes, or catches up after commit when initialization already completed.</summary>
+    /// <summary>
+    /// Runs once when initialization completes, or catches up after commit when initialization already completed.
+    /// </summary>
     [UseHook]
     public static void useInitialized([Self] this AkburaControl control, Action action, bool invokeIfAlreadyInitialized = true) =>
         useInitializedCore(control, (_, _) => action(), invokeIfAlreadyInitialized);
 
-    /// <summary>Runs once with initialization arguments, including an optional late-registration catch-up.</summary>
+    /// <summary>
+    /// Runs once with initialization arguments, including an optional late-registration catch-up.
+    /// </summary>
     [UseHook]
     public static void useInitialized([Self] this AkburaControl control, Action<EventArgs> action, bool invokeIfAlreadyInitialized = true) =>
         useInitializedCore(control, (_, args) => action(args), invokeIfAlreadyInitialized);
 
-    /// <summary>Runs once with the component sender and initialization arguments, including an optional late-registration catch-up.</summary>
+    /// <summary>
+    /// Runs once with the component sender and initialization arguments, including an optional late-registration catch-up.
+    /// </summary>
     [UseHook]
     public static void useInitialized([Self] this AkburaControl control, EventHandler listener, bool invokeIfAlreadyInitialized = true) =>
         useInitializedCore(control, listener, invokeIfAlreadyInitialized);
 
-    /// <summary>Runs when the component is attached to a visual tree after the hook is registered.</summary>
+    /// <summary>
+    /// Runs when the component is attached to a visual tree after the hook is registered.
+    /// </summary>
     [UseHook]
     public static void useAttachedToVisualTree([Self] this AkburaControl control, Action action) =>
         useEvent<VisualTreeAttachmentEventArgs>(control, handler => control.AttachedToVisualTree += handler, handler => control.AttachedToVisualTree -= handler, action);
 
-    /// <summary>Runs with the visual-tree attachment arguments.</summary>
+    /// <summary>
+    /// Runs with the visual-tree attachment arguments.
+    /// </summary>
     [UseHook]
     public static void useAttachedToVisualTree([Self] this AkburaControl control, Action<VisualTreeAttachmentEventArgs> action) =>
         useEvent(control, handler => control.AttachedToVisualTree += handler, handler => control.AttachedToVisualTree -= handler, action);
 
-    /// <summary>Runs with the event sender and visual-tree attachment arguments.</summary>
+    /// <summary>
+    /// Runs with the event sender and visual-tree attachment arguments.
+    /// </summary>
     [UseHook]
     public static void useAttachedToVisualTree([Self] this AkburaControl control, EventHandler<VisualTreeAttachmentEventArgs> listener) =>
         useEvent(control, handler => control.AttachedToVisualTree += handler, handler => control.AttachedToVisualTree -= handler, listener);
 
-    /// <summary>Runs exactly once for each real visual-tree detachment committed before the transition.</summary>
+    /// <summary>
+    /// Runs exactly once for each real visual-tree detachment committed before the transition.
+    /// </summary>
     [UseHook]
     public static void useDetachedFromVisualTree([Self] this AkburaControl control, Action action) =>
         useTerminalEvent<VisualTreeAttachmentEventArgs>(control, s_detachedFromVisualTreeKey, TerminalControlEvent.DetachedFromVisualTree, (_, _) => action());
 
-    /// <summary>Runs with the actual visual-tree detachment arguments.</summary>
+    /// <summary>
+    /// Runs with the actual visual-tree detachment arguments.
+    /// </summary>
     [UseHook]
     public static void useDetachedFromVisualTree([Self] this AkburaControl control, Action<VisualTreeAttachmentEventArgs> action) =>
         useTerminalEvent<VisualTreeAttachmentEventArgs>(control, s_detachedFromVisualTreeKey, TerminalControlEvent.DetachedFromVisualTree, (_, args) => action(args));
 
-    /// <summary>Runs with the actual event sender and visual-tree detachment arguments.</summary>
+    /// <summary>
+    /// Runs with the actual event sender and visual-tree detachment arguments.
+    /// </summary>
     [UseHook]
     public static void useDetachedFromVisualTree([Self] this AkburaControl control, EventHandler<VisualTreeAttachmentEventArgs> listener) =>
         useTerminalEvent(control, s_detachedFromVisualTreeKey, TerminalControlEvent.DetachedFromVisualTree, listener);
 
-    /// <summary>Runs for the routed Loaded event after the hook is registered.</summary>
+    /// <summary>
+    /// Runs for the routed Loaded event after the hook is registered.
+    /// </summary>
     [UseHook]
     public static void useLoaded([Self] this AkburaControl control, Action action, RoutingStrategies routes = RoutingStrategies.Direct | RoutingStrategies.Bubble, bool handledEventsToo = false) =>
         control.useRoutedEvent(Control.LoadedEvent, (_, _) => action(), routes, handledEventsToo);
 
-    /// <summary>Runs with the routed Loaded event arguments.</summary>
+    /// <summary>
+    /// Runs with the routed Loaded event arguments.
+    /// </summary>
     [UseHook]
     public static void useLoaded([Self] this AkburaControl control, Action<RoutedEventArgs> action, RoutingStrategies routes = RoutingStrategies.Direct | RoutingStrategies.Bubble, bool handledEventsToo = false) =>
         control.useRoutedEvent(Control.LoadedEvent, (_, args) => action(args), routes, handledEventsToo);
 
-    /// <summary>Runs with the Loaded event sender and routed arguments.</summary>
+    /// <summary>
+    /// Runs with the Loaded event sender and routed arguments.
+    /// </summary>
     [UseHook]
     public static void useLoaded([Self] this AkburaControl control, EventHandler<RoutedEventArgs> listener, RoutingStrategies routes = RoutingStrategies.Direct | RoutingStrategies.Bubble, bool handledEventsToo = false) =>
         control.useRoutedEvent(Control.LoadedEvent, listener, routes, handledEventsToo);
 
-    /// <summary>Runs exactly once for each real Unloaded transition committed before detachment.</summary>
+    /// <summary>
+    /// Runs exactly once for each real Unloaded transition committed before detachment.
+    /// </summary>
     [UseHook]
     public static void useUnloaded([Self] this AkburaControl control, Action action, RoutingStrategies routes = RoutingStrategies.Direct | RoutingStrategies.Bubble, bool handledEventsToo = false) =>
         useUnloadedCore(control, (_, _) => action(), routes, handledEventsToo);
 
-    /// <summary>Runs with the actual routed Unloaded event arguments.</summary>
+    /// <summary>
+    /// Runs with the actual routed Unloaded event arguments.
+    /// </summary>
     [UseHook]
     public static void useUnloaded([Self] this AkburaControl control, Action<RoutedEventArgs> action, RoutingStrategies routes = RoutingStrategies.Direct | RoutingStrategies.Bubble, bool handledEventsToo = false) =>
         useUnloadedCore(control, (_, args) => action(args), routes, handledEventsToo);
 
-    /// <summary>Runs with the actual Unloaded event sender and routed arguments.</summary>
+    /// <summary>
+    /// Runs with the actual Unloaded event sender and routed arguments.
+    /// </summary>
     [UseHook]
     public static void useUnloaded([Self] this AkburaControl control, EventHandler<RoutedEventArgs> listener, RoutingStrategies routes = RoutingStrategies.Direct | RoutingStrategies.Bubble, bool handledEventsToo = false) =>
         useUnloadedCore(control, listener, routes, handledEventsToo);

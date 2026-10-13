@@ -2,6 +2,7 @@ using Akbura.Language;
 using Akbura.Language.CodeGeneration;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.HotReload;
 using Avalonia.Controls;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -73,8 +74,9 @@ public sealed class CommandPropagationTests
             var originalProperty = commandField.GetValue(null);
             var rebuild = childType.GetMethod("__AkburaHotReloadRebuildDescriptors", BindingFlags.NonPublic | BindingFlags.Static)!;
 
-            rebuild.Invoke(null, null);
-            rebuild.Invoke(null, null);
+            var metadata = AkburaHotReloadRuntime.GetComponentMetadata(childType);
+            rebuild.Invoke(null, [metadata, metadata.DescriptorShape]);
+            rebuild.Invoke(null, [metadata, metadata.DescriptorShape]);
             Assert.Same(originalProperty, commandField.GetValue(null));
 
             var renderCountProperty = childType.GetProperty("RenderCount")!;

@@ -5,7 +5,9 @@ namespace Akbura.HotReload;
 
 public sealed partial class AkburaRenderState
 {
-    /// <summary>Refreshes a branch-local event closure without recreating its control.</summary>
+    /// <summary>
+    /// Refreshes a branch-local event closure without recreating its control.
+    /// </summary>
     public void RefreshClrEventOperation(int localId, string slot, string identity,
         object target, Type declaringType, string eventName, Delegate handler)
     {
@@ -23,7 +25,9 @@ public sealed partial class AkburaRenderState
         RefreshEventOperation(localId, slot, identity, target, new ClrEventOperation(target, eventInfo, handler));
     }
 
-    /// <summary>Refreshes the current branch's routed-event closure and preserves foreign handlers.</summary>
+    /// <summary>
+    /// Refreshes the current branch's routed-event closure and preserves foreign handlers.
+    /// </summary>
     public void RefreshRoutedEventOperation(int localId, string slot, string identity,
         Interactive target, RoutedEvent routedEvent, Delegate handler)
     {

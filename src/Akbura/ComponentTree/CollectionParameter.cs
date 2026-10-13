@@ -4,7 +4,9 @@ using System.ComponentModel;
 
 namespace Akbura.ComponentTree;
 
-/// <summary>A writable direct parameter whose getter exposes a per-owner collection.</summary>
+/// <summary>
+/// A writable direct parameter whose getter exposes a per-owner collection.
+/// </summary>
 public sealed class CollectionParameter<TOwner, TValue> : Parameter<TValue>
     where TOwner : AkburaControl
 {
@@ -26,10 +28,14 @@ public sealed class CollectionParameter<TOwner, TValue> : Parameter<TValue>
     public new DirectProperty<TOwner, TValue> AvaloniaProperty =>
         (DirectProperty<TOwner, TValue>)base.AvaloniaProperty;
 
-    /// <summary>The untyped input used to preserve the identity of an external collection source.</summary>
+    /// <summary>
+    /// The untyped input used to preserve the identity of an external collection source.
+    /// </summary>
     public DirectProperty<TOwner, object?> SourceProperty { get; }
 
-    /// <summary>Assigns an external collection source without weakening the typed parameter property.</summary>
+    /// <summary>
+    /// Assigns an external collection source without weakening the typed parameter property.
+    /// </summary>
     public void SetSource(TOwner owner, object? source)
     {
         ArgumentNullException.ThrowIfNull(owner);
@@ -38,7 +44,9 @@ public sealed class CollectionParameter<TOwner, TValue> : Parameter<TValue>
         _setSource(owner, source);
     }
 
-    /// <summary>Refreshes the snapshot of the currently assigned non-notifying source.</summary>
+    /// <summary>
+    /// Refreshes the snapshot of the currently assigned non-notifying source.
+    /// </summary>
     public void RefreshSource(TOwner owner)
     {
         ArgumentNullException.ThrowIfNull(owner);

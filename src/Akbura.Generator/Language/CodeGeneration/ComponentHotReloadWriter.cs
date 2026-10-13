@@ -4,8 +4,7 @@ namespace Akbura.Language.CodeGeneration;
 
 internal readonly ref struct ComponentHotReloadWriter
 {
-    private const string ManifestFieldName =
-        "s_akburaHotReloadProperties";
+    internal const string MetadataInitializerMethodName = "__AkburaInitializeHotReloadMetadata";
     private const string PrepareMethodName =
         "__AkburaHotReloadPrepare";
     private const string PreviousManifestName =
@@ -41,9 +40,7 @@ internal readonly ref struct ComponentHotReloadWriter
     {
         _writer.WriteLine("#if DEBUG");
         _writer.WriteLine();
-        WriteAppliedShapeFields();
-        _writer.WriteLine();
-        WriteManifestField();
+        WriteMetadataInitializer();
         _writer.WriteLine();
         WriteShapeMethod(
             "__AkburaCurrentDescriptorShape",
@@ -57,8 +54,6 @@ internal readonly ref struct ComponentHotReloadWriter
         _writer.WriteLine();
         WriteDescriptorRebuilder(memberPlan);
         _writer.WriteLine();
-        WriteStateInfoRebuilder(memberPlan);
-        _writer.WriteLine();
         WritePrepare();
         _writer.WriteLine();
         WriteStateReset();
@@ -68,33 +63,33 @@ internal readonly ref struct ComponentHotReloadWriter
         _writer.WriteLine("#endif");
     }
 
-    private void WriteAppliedShapeFields()
+    private void WriteMetadataInitializer()
     {
-        _writer.WriteLine(
-            "private static string s_akburaAppliedDescriptorShape =");
+        _writer.WriteHiddenApiAttributes();
+        _writer.WriteLine("private static global::System.Collections.Immutable.ImmutableArray<");
         _writer.CurrentIndent += _writer.TabSize;
-        _writer.WriteLine("__AkburaCurrentDescriptorShape();");
+        _writer.WriteLine("global::Akbura.ComponentTree.InjectService>");
+        _writer.Write(MetadataInitializerMethodName);
+        _writer.WriteLine("(");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine("global::System.Collections.Immutable.ImmutableArray<");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine("global::Akbura.ComponentTree.InjectService> __services)");
+        _writer.CurrentIndent -= _writer.TabSize * 3;
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine("global::Akbura.HotReload.AkburaHotReloadRuntime.RegisterComponentMetadata(");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.Write("typeof(");
+        _writer.Write(_ownerTypeName);
+        _writer.WriteLine("),");
+        _writer.WriteLine("__AkburaCurrentDescriptorShape(),");
+        _writer.WriteLine("__AkburaCurrentStateShape(),");
+        _writer.WriteLine("__AkburaCreateHotReloadProperties());");
         _writer.CurrentIndent -= _writer.TabSize;
-        _writer.WriteLine();
-        _writer.WriteLine(
-            "private static string s_akburaAppliedStateShape =");
-        _writer.CurrentIndent += _writer.TabSize;
-        _writer.WriteLine("__AkburaCurrentStateShape();");
+        _writer.WriteLine("return __services;");
         _writer.CurrentIndent -= _writer.TabSize;
-    }
-
-    private void WriteManifestField()
-    {
-        _writer.WriteLine(
-            "private static global::System.Collections.Immutable.ImmutableArray<");
-        _writer.CurrentIndent += _writer.TabSize;
-        _writer.WriteLine(
-            "global::Akbura.HotReload.AkburaHotReloadPropertyRegistration>");
-        _writer.Write(ManifestFieldName);
-        _writer.WriteLine(" =");
-        _writer.CurrentIndent += _writer.TabSize;
-        _writer.WriteLine("__AkburaCreateHotReloadProperties();");
-        _writer.CurrentIndent -= _writer.TabSize * 2;
+        _writer.WriteLine("}");
     }
 
     private void WriteShapeMethod(
@@ -191,14 +186,16 @@ internal readonly ref struct ComponentHotReloadWriter
     {
         _writer.WriteHiddenApiAttributes();
         _writer.WriteLine(
-            "private static void __AkburaHotReloadRebuildDescriptors()");
+            "private static void __AkburaHotReloadRebuildDescriptors(");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine("global::Akbura.HotReload.AkburaHotReloadMetadata __metadata,");
+        _writer.WriteLine("string __currentDescriptorShape)");
+        _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
         _writer.Write("var ");
         _writer.Write(PreviousManifestName);
-        _writer.Write(" = ");
-        _writer.Write(ManifestFieldName);
-        _writer.WriteLine(";");
+        _writer.WriteLine(" = __metadata.Properties;");
         _writer.WriteLine("var __currentKeys = new global::System.String[]");
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
@@ -229,10 +226,10 @@ internal readonly ref struct ComponentHotReloadWriter
         var arrayWriter = new DescriptorArrayWriter(_writer);
         arrayWriter.WriteHotReloadAssignments(plan);
         _writer.WriteLine();
-        _writer.Write(ManifestFieldName);
-        _writer.WriteLine(" =");
+        _writer.WriteLine("__metadata.UpdateDescriptors(");
         _writer.CurrentIndent += _writer.TabSize;
-        _writer.WriteLine("__AkburaCreateHotReloadProperties();");
+        _writer.WriteLine("__currentDescriptorShape,");
+        _writer.WriteLine("__AkburaCreateHotReloadProperties());");
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");
@@ -328,28 +325,6 @@ internal readonly ref struct ComponentHotReloadWriter
         }
     }
 
-    private void WriteStateInfoRebuilder(in ComponentMemberPlan plan)
-    {
-        _writer.WriteHiddenApiAttributes();
-        _writer.WriteLine(
-            "private static void __AkburaHotReloadRebuildStateInfos()");
-        _writer.WriteLine("{");
-        _writer.CurrentIndent += _writer.TabSize;
-
-        var stateWriter = new StateWriter(
-            _writer,
-            _sourceMap,
-            _ownerTypeName);
-
-        for (var i = 0; i < plan.States.Length; i++)
-        {
-            stateWriter.WriteHotReloadAssignment(plan.States.ItemRef(i));
-        }
-
-        _writer.CurrentIndent -= _writer.TabSize;
-        _writer.WriteLine("}");
-    }
-
     private void WriteStateReset()
     {
         _writer.WriteHiddenApiAttributes();
@@ -358,12 +333,8 @@ internal readonly ref struct ComponentHotReloadWriter
         _writer.WriteLine(" __component)");
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
-        _writer.WriteLine("var __previousStates = __component.__states;");
-        _writer.WriteLine("__component.__states = default;");
+        _writer.WriteLine("__component.RuntimeStates.InvalidateSnapshotForHotReload();");
         WritePrepareInvocation();
-        _writer.WriteLine(
-            "__component.ReconcileStateResourcesForHotReload(" +
-            "__previousStates, __component.__GetStates());");
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");
     }
@@ -406,12 +377,18 @@ internal readonly ref struct ComponentHotReloadWriter
         _writer.WriteLine("internal static void __AkburaHotReloadApply()");
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine("var __metadata = global::Akbura.HotReload.AkburaHotReloadRuntime.GetComponentMetadata(");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.Write("typeof(");
+        _writer.Write(_ownerTypeName);
+        _writer.WriteLine("));");
+        _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine(
             "var __currentDescriptorShape = __AkburaCurrentDescriptorShape();");
         _writer.WriteLine(
             "var __descriptorShapeChanged = !global::System.String.Equals(");
         _writer.CurrentIndent += _writer.TabSize;
-        _writer.WriteLine("s_akburaAppliedDescriptorShape,");
+        _writer.WriteLine("__metadata.DescriptorShape,");
         _writer.WriteLine("__currentDescriptorShape,");
         _writer.WriteLine("global::System.StringComparison.Ordinal);");
         _writer.CurrentIndent -= _writer.TabSize;
@@ -419,9 +396,7 @@ internal readonly ref struct ComponentHotReloadWriter
         _writer.WriteLine("if (__descriptorShapeChanged)");
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
-        _writer.WriteLine("__AkburaHotReloadRebuildDescriptors();");
-        _writer.WriteLine(
-            "s_akburaAppliedDescriptorShape = __currentDescriptorShape;");
+        _writer.WriteLine("__AkburaHotReloadRebuildDescriptors(__metadata, __currentDescriptorShape);");
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");
         _writer.WriteLine();
@@ -430,7 +405,7 @@ internal readonly ref struct ComponentHotReloadWriter
         _writer.WriteLine(
             "var __stateShapeChanged = !global::System.String.Equals(");
         _writer.CurrentIndent += _writer.TabSize;
-        _writer.WriteLine("s_akburaAppliedStateShape,");
+        _writer.WriteLine("__metadata.StateShape,");
         _writer.WriteLine("__currentStateShape,");
         _writer.WriteLine("global::System.StringComparison.Ordinal);");
         _writer.CurrentIndent -= _writer.TabSize;
@@ -438,9 +413,7 @@ internal readonly ref struct ComponentHotReloadWriter
         _writer.WriteLine("if (__stateShapeChanged)");
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
-        _writer.WriteLine("__AkburaHotReloadRebuildStateInfos();");
-        _writer.WriteLine(
-            "s_akburaAppliedStateShape = __currentStateShape;");
+        _writer.WriteLine("__metadata.UpdateStateShape(__currentStateShape);");
         _writer.Write(
             "global::Akbura.HotReload.AkburaHotReloadRuntime.Refresh<");
         _writer.Write(_ownerTypeName);

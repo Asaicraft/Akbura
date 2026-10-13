@@ -51,8 +51,12 @@ internal readonly partial struct ChildSyntaxList : IEquatable<ChildSyntaxList>, 
         return n;
     }
 
-    /// <summary>Gets the child at the specified index.</summary>
-    /// <param name="index">The zero-based index of the child to get.</param>
+    /// <summary>
+    /// Gets the child at the specified index.
+    /// </summary>
+    /// <param name="index">
+    /// The zero-based index of the child to get.
+    /// </param>
     /// <exception cref="System.ArgumentOutOfRangeException">
     ///   <paramref name="index"/> is less than 0.-or-<paramref name="index" /> is equal to or greater than <see cref="ChildSyntaxList.Count"/>. </exception>
     public SyntaxNodeOrToken this[int index]
@@ -204,9 +208,15 @@ internal readonly partial struct ChildSyntaxList : IEquatable<ChildSyntaxList>, 
     /// <summary>
     /// Locate the node or token that is a child of the given <see cref="SyntaxNode"/> and contains the given position.
     /// </summary>
-    /// <param name="node">The <see cref="SyntaxNode"/> to search.</param>
-    /// <param name="targetPosition">The position.</param>
-    /// <returns>The node or token that spans the given position.</returns>
+    /// <param name="node">
+    /// The <see cref="SyntaxNode"/> to search.
+    /// </param>
+    /// <param name="targetPosition">
+    /// The position.
+    /// </param>
+    /// <returns>
+    /// The node or token that spans the given position.
+    /// </returns>
     /// <remarks>
     /// Assumes that <paramref name="targetPosition"/> is within the span of <paramref name="node"/>.
     /// </remarks>
@@ -358,8 +368,12 @@ internal readonly partial struct ChildSyntaxList : IEquatable<ChildSyntaxList>, 
     /// <summary>
     /// Returns the first child in the list.
     /// </summary>
-    /// <returns>The first child in the list.</returns>
-    /// <exception cref="System.InvalidOperationException">The list is empty.</exception>    
+    /// <returns>
+    /// The first child in the list.
+    /// </returns>
+    /// <exception cref="System.InvalidOperationException">
+    /// The list is empty.
+    /// </exception>
     public SyntaxNodeOrToken First()
     {
         if (Any())
@@ -373,8 +387,12 @@ internal readonly partial struct ChildSyntaxList : IEquatable<ChildSyntaxList>, 
     /// <summary>
     /// Returns the last child in the list.
     /// </summary>
-    /// <returns>The last child in the list.</returns>
-    /// <exception cref="System.InvalidOperationException">The list is empty.</exception>    
+    /// <returns>
+    /// The last child in the list.
+    /// </returns>
+    /// <exception cref="System.InvalidOperationException">
+    /// The list is empty.
+    /// </exception>
     public SyntaxNodeOrToken Last()
     {
         if (Any())
@@ -388,15 +406,21 @@ internal readonly partial struct ChildSyntaxList : IEquatable<ChildSyntaxList>, 
     /// <summary>
     /// Returns a list which contains all children of <see cref="ChildSyntaxList"/> in reversed order.
     /// </summary>
-    /// <returns><see cref="Reversed"/> which contains all children of <see cref="ChildSyntaxList"/> in reversed order</returns>
+    /// <returns>
+    /// <see cref="Reversed"/> which contains all children of <see cref="ChildSyntaxList"/> in reversed order
+    /// </returns>
     public Reversed Reverse()
     {
         AkburaDebug.Assert(_node is not null);
         return new Reversed(_node, _count);
     }
 
-    /// <summary>Returns an enumerator that iterates through the <see cref="ChildSyntaxList"/>.</summary>
-    /// <returns>A <see cref="Enumerator"/> for the <see cref="ChildSyntaxList"/>.</returns>
+    /// <summary>
+    /// Returns an enumerator that iterates through the <see cref="ChildSyntaxList"/>.
+    /// </summary>
+    /// <returns>
+    /// A <see cref="Enumerator"/> for the <see cref="ChildSyntaxList"/>.
+    /// </returns>
     public Enumerator GetEnumerator()
     {
         if (_node == null)
@@ -427,42 +451,74 @@ internal readonly partial struct ChildSyntaxList : IEquatable<ChildSyntaxList>, 
         return new EnumeratorImpl(_node, _count);
     }
 
-    /// <summary>Determines whether the specified object is equal to the current instance.</summary>
-    /// <returns>true if the specified object is a <see cref="ChildSyntaxList" /> structure and is equal to the current instance; otherwise, false.</returns>
-    /// <param name="obj">The object to be compared with the current instance.</param>
+    /// <summary>
+    /// Determines whether the specified object is equal to the current instance.
+    /// </summary>
+    /// <returns>
+    /// true if the specified object is a <see cref="ChildSyntaxList" /> structure and is equal to the current instance; otherwise, false.
+    /// </returns>
+    /// <param name="obj">
+    /// The object to be compared with the current instance.
+    /// </param>
     public override bool Equals(object? obj)
     {
         return obj is ChildSyntaxList list && Equals(list);
     }
 
-    /// <summary>Determines whether the specified <see cref="ChildSyntaxList" /> structure is equal to the current instance.</summary>
-    /// <returns>true if the specified <see cref="ChildSyntaxList" /> structure is equal to the current instance; otherwise, false.</returns>
-    /// <param name="other">The <see cref="ChildSyntaxList" /> structure to be compared with the current instance.</param>
+    /// <summary>
+    /// Determines whether the specified <see cref="ChildSyntaxList" /> structure is equal to the current instance.
+    /// </summary>
+    /// <returns>
+    /// true if the specified <see cref="ChildSyntaxList" /> structure is equal to the current instance; otherwise, false.
+    /// </returns>
+    /// <param name="other">
+    /// The <see cref="ChildSyntaxList" /> structure to be compared with the current instance.
+    /// </param>
     public bool Equals(ChildSyntaxList other)
     {
         return _node == other._node;
     }
 
-    /// <summary>Returns the hash code for the current instance.</summary>
-    /// <returns>A 32-bit signed integer hash code.</returns>
+    /// <summary>
+    /// Returns the hash code for the current instance.
+    /// </summary>
+    /// <returns>
+    /// A 32-bit signed integer hash code.
+    /// </returns>
     public override int GetHashCode()
     {
         return _node?.GetHashCode() ?? 0;
     }
 
-    /// <summary>Indicates whether two <see cref="ChildSyntaxList" /> structures are equal.</summary>
-    /// <returns>true if <paramref name="list1" /> is equal to <paramref name="list2" />; otherwise, false.</returns>
-    /// <param name="list1">The <see cref="ChildSyntaxList" /> structure on the left side of the equality operator.</param>
-    /// <param name="list2">The <see cref="ChildSyntaxList" /> structure on the right side of the equality operator.</param>
+    /// <summary>
+    /// Indicates whether two <see cref="ChildSyntaxList" /> structures are equal.
+    /// </summary>
+    /// <returns>
+    /// true if <paramref name="list1" /> is equal to <paramref name="list2" />; otherwise, false.
+    /// </returns>
+    /// <param name="list1">
+    /// The <see cref="ChildSyntaxList" /> structure on the left side of the equality operator.
+    /// </param>
+    /// <param name="list2">
+    /// The <see cref="ChildSyntaxList" /> structure on the right side of the equality operator.
+    /// </param>
     public static bool operator ==(ChildSyntaxList list1, ChildSyntaxList list2)
     {
         return list1.Equals(list2);
     }
 
-    /// <summary>Indicates whether two <see cref="ChildSyntaxList" /> structures are unequal.</summary>
-    /// <returns>true if <paramref name="list1" /> is equal to <paramref name="list2" />; otherwise, false.</returns>
-    /// <param name="list1">The <see cref="ChildSyntaxList" /> structure on the left side of the inequality operator.</param>
-    /// <param name="list2">The <see cref="ChildSyntaxList" /> structure on the right side of the inequality operator.</param>
+    /// <summary>
+    /// Indicates whether two <see cref="ChildSyntaxList" /> structures are unequal.
+    /// </summary>
+    /// <returns>
+    /// true if <paramref name="list1" /> is equal to <paramref name="list2" />; otherwise, false.
+    /// </returns>
+    /// <param name="list1">
+    /// The <see cref="ChildSyntaxList" /> structure on the left side of the inequality operator.
+    /// </param>
+    /// <param name="list2">
+    /// The <see cref="ChildSyntaxList" /> structure on the right side of the inequality operator.
+    /// </param>
     public static bool operator !=(ChildSyntaxList list1, ChildSyntaxList list2)
     {
         return !list1.Equals(list2);

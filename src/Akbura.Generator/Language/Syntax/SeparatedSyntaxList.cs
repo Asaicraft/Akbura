@@ -118,8 +118,11 @@ internal readonly partial struct SeparatedSyntaxList<TNode> : IEquatable<Separat
     /// <summary>
     /// Gets the separator at the given index in this list.
     /// </summary>
-    /// <param name="index">The index.</param>
-    /// <returns></returns>
+    /// <param name="index">
+    /// The index.
+    /// </param>
+    /// <returns>
+    /// </returns>
     public SyntaxToken GetSeparator(int index)
     {
         var node = _list.Node;
@@ -333,7 +336,9 @@ internal readonly partial struct SeparatedSyntaxList<TNode> : IEquatable<Separat
     /// <summary>
     /// Creates a new list with the specified node added to the end.
     /// </summary>
-    /// <param name="node">The node to add.</param>
+    /// <param name="node">
+    /// The node to add.
+    /// </param>
     public SeparatedSyntaxList<TNode> Add(TNode node)
     {
         return Insert(Count, node);
@@ -342,7 +347,9 @@ internal readonly partial struct SeparatedSyntaxList<TNode> : IEquatable<Separat
     /// <summary>
     /// Creates a new list with the specified nodes added to the end.
     /// </summary>
-    /// <param name="nodes">The nodes to add.</param>
+    /// <param name="nodes">
+    /// The nodes to add.
+    /// </param>
     public SeparatedSyntaxList<TNode> AddRange(IEnumerable<TNode> nodes)
     {
         return InsertRange(Count, nodes);
@@ -351,8 +358,12 @@ internal readonly partial struct SeparatedSyntaxList<TNode> : IEquatable<Separat
     /// <summary>
     /// Creates a new list with the specified node inserted at the index.
     /// </summary>
-    /// <param name="index">The index to insert at.</param>
-    /// <param name="node">The node to insert.</param>
+    /// <param name="index">
+    /// The index to insert at.
+    /// </param>
+    /// <param name="node">
+    /// The node to insert.
+    /// </param>
     public SeparatedSyntaxList<TNode> Insert(int index, TNode node)
     {
         if(node == null)
@@ -366,8 +377,12 @@ internal readonly partial struct SeparatedSyntaxList<TNode> : IEquatable<Separat
     /// <summary>
     /// Creates a new list with the specified nodes inserted at the index.
     /// </summary>
-    /// <param name="index">The index to insert at.</param>
-    /// <param name="nodes">The nodes to insert.</param>
+    /// <param name="index">
+    /// The index to insert at.
+    /// </param>
+    /// <param name="nodes">
+    /// The nodes to insert.
+    /// </param>
     public SeparatedSyntaxList<TNode> InsertRange(int index, IEnumerable<TNode> nodes)
     {
         if(nodes == null)
@@ -441,7 +456,9 @@ internal readonly partial struct SeparatedSyntaxList<TNode> : IEquatable<Separat
     /// <summary>
     /// Creates a new list with the element at the specified index removed.
     /// </summary>
-    /// <param name="index">The index of the element to remove.</param>
+    /// <param name="index">
+    /// The index of the element to remove.
+    /// </param>
     public SeparatedSyntaxList<TNode> RemoveAt(int index)
     {
         if (index < 0 || index > Count)
@@ -455,7 +472,9 @@ internal readonly partial struct SeparatedSyntaxList<TNode> : IEquatable<Separat
     /// <summary>
     /// Creates a new list with specified element removed.
     /// </summary>
-    /// <param name="node">The element to remove.</param>
+    /// <param name="node">
+    /// The element to remove.
+    /// </param>
     public SeparatedSyntaxList<TNode> Remove(TNode node)
     {
         var nodesWithSeps = GetWithSeparators();
@@ -484,8 +503,12 @@ internal readonly partial struct SeparatedSyntaxList<TNode> : IEquatable<Separat
     /// <summary>
     /// Creates a new list with the specified element replaced by the new node.
     /// </summary>
-    /// <param name="nodeInList">The element to replace.</param>
-    /// <param name="newNode">The new node.</param>
+    /// <param name="nodeInList">
+    /// The element to replace.
+    /// </param>
+    /// <param name="newNode">
+    /// The new node.
+    /// </param>
     public SeparatedSyntaxList<TNode> Replace(TNode nodeInList, TNode newNode)
     {
         if(newNode == null)
@@ -505,8 +528,12 @@ internal readonly partial struct SeparatedSyntaxList<TNode> : IEquatable<Separat
     /// <summary>
     /// Creates a new list with the specified element replaced by the new nodes.
     /// </summary>
-    /// <param name="nodeInList">The element to replace.</param>
-    /// <param name="newNodes">The new nodes.</param>
+    /// <param name="nodeInList">
+    /// The element to replace.
+    /// </param>
+    /// <param name="newNodes">
+    /// The new nodes.
+    /// </param>
     public SeparatedSyntaxList<TNode> ReplaceRange(TNode nodeInList, IEnumerable<TNode> newNodes)
     {
         if (newNodes == null)
@@ -540,8 +567,12 @@ internal readonly partial struct SeparatedSyntaxList<TNode> : IEquatable<Separat
     /// <summary>
     /// Creates a new list with the specified separator token replaced with the new separator.
     /// </summary>
-    /// <param name="separatorToken">The separator token to be replaced.</param>
-    /// <param name="newSeparator">The new separator token.</param>
+    /// <param name="separatorToken">
+    /// The separator token to be replaced.
+    /// </param>
+    /// <param name="newSeparator">
+    /// The new separator token.
+    /// </param>
     public SeparatedSyntaxList<TNode> ReplaceSeparator(SyntaxToken separatorToken, SyntaxToken newSeparator)
     {
         var nodesWithSeps = GetWithSeparators();

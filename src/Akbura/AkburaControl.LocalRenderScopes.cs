@@ -12,7 +12,9 @@ public abstract partial class AkburaControl
     private List<WeakReference<LocalRenderScope>>? _localRenderScopes;
     private long _localRenderScopeFrame;
 
-    /// <summary>Owns one generated template or deferred-content render instance.</summary>
+    /// <summary>
+    /// Owns one generated template or deferred-content render instance.
+    /// </summary>
     [EditorBrowsable(EditorBrowsableState.Never)]
     [Browsable(false)]
     protected IDisposable __AkburaRegisterLocalRenderScope(Control root, Action render, Action cleanup,

@@ -19,28 +19,42 @@ internal partial class GreenSyntaxToken : GreenNode
     }
 
 
-    /// <summary>Indicates whether this is a token.</summary>
+    /// <summary>
+    /// Indicates whether this is a token.
+    /// </summary>
     internal override bool IsToken => true;
 
-    /// <summary>Gets the text representation of the token.</summary>
+    /// <summary>
+    /// Gets the text representation of the token.
+    /// </summary>
     public virtual string Text => SyntaxFacts.GetText(Kind);
 
-    /// <summary>Gets the width of the token.</summary>
+    /// <summary>
+    /// Gets the width of the token.
+    /// </summary>
     public override int Width => Text.Length;
 
-    /// <summary>Gets the value text of the token.</summary>
+    /// <summary>
+    /// Gets the value text of the token.
+    /// </summary>
     public virtual string? ValueText => Text;
 
-    /// <summary>Gets the value associated with the token based on its kind.</summary>
+    /// <summary>
+    /// Gets the value associated with the token based on its kind.
+    /// </summary>
     public virtual object? Value => SyntaxFacts.GetValue(Kind, Text);
 
-    /// <summary>Retrieves a specific slot of this syntax token.</summary>
+    /// <summary>
+    /// Retrieves a specific slot of this syntax token.
+    /// </summary>
     public override GreenNode? GetSlot(int index)
     {
         throw new UnreachableException();
     }
 
-    /// <summary>Creates a red node representation.</summary>
+    /// <summary>
+    /// Creates a red node representation.
+    /// </summary>
     public override AkburaSyntax CreateRed(AkburaSyntax? parent, int position)
     {
         throw new UnreachableException();
@@ -56,7 +70,9 @@ internal partial class GreenSyntaxToken : GreenNode
         return new GreenSyntaxToken(Kind, diagnostics, GetAnnotations());
     }
 
-    /// <summary>Creates a syntax token.</summary>
+    /// <summary>
+    /// Creates a syntax token.
+    /// </summary>
     public static GreenSyntaxToken Create(SyntaxKind kind)
     {
         if (kind > LastTokenWithWellKnownText)
@@ -72,7 +88,9 @@ internal partial class GreenSyntaxToken : GreenNode
         return s_tokensWithNoTrivia[(int)kind].Value;
     }
 
-    /// <summary>Creates a syntax token with trivia.</summary>
+    /// <summary>
+    /// Creates a syntax token with trivia.
+    /// </summary>
     public static GreenSyntaxToken Create(SyntaxKind kind, GreenNode? leading, GreenNode? trailing)
     {
         if (kind > LastTokenWithWellKnownText)
@@ -124,7 +142,9 @@ internal partial class GreenSyntaxToken : GreenNode
         return s_tokensWithSingleTrailingSpace[(ushort)kind];
     }
 
-    /// <summary>Creates a missing token.</summary>
+    /// <summary>
+    /// Creates a missing token.
+    /// </summary>
     public static GreenSyntaxToken CreateMissing(SyntaxKind kind)
     {
         if (kind <= LastTokenWithWellKnownText)
@@ -139,71 +159,97 @@ internal partial class GreenSyntaxToken : GreenNode
         return new MissingTokenWithTrivia(kind, leading: null, trailing: null);
     }
 
-    /// <summary>Creates a missing token with trivia.</summary>
+    /// <summary>
+    /// Creates a missing token with trivia.
+    /// </summary>
     public static GreenSyntaxToken CreateMissing(SyntaxKind kind, GreenNode? leading, GreenNode? trailing)
     {
         return new MissingTokenWithTrivia(kind, leading, trailing);
     }
 
-    /// <summary>Creates a token with a value.</summary>
+    /// <summary>
+    /// Creates a token with a value.
+    /// </summary>
     public static GreenSyntaxToken WithValue<T>(SyntaxKind kind, string text, T value)
     {
         return new SyntaxTokenWithValue<T>(kind, text, value);
     }
 
-    /// <summary>Creates a token with a value and trivia.</summary>
+    /// <summary>
+    /// Creates a token with a value and trivia.
+    /// </summary>
     public static GreenSyntaxToken WithValue<T>(SyntaxKind kind, GreenNode? leading, string text, T value, GreenNode? trailing)
     {
         return new SyntaxTokenWithValueAndTrivia<T>(kind, text, value, leading, trailing);
     }
 
-    /// <summary>Creates a string literal token.</summary>
+    /// <summary>
+    /// Creates a string literal token.
+    /// </summary>
     public static GreenSyntaxToken StringLiteral(string text)
     {
         return new SyntaxTokenWithValue<string>(SyntaxKind.StringLiteralToken, text, text);
     }
 
-    /// <summary>Creates a string literal token with trivia.</summary>
+    /// <summary>
+    /// Creates a string literal token with trivia.
+    /// </summary>
     public static GreenSyntaxToken StringLiteral(GreenNode leading, string text, GreenNode trailing)
     {
         return new SyntaxTokenWithValueAndTrivia<string>(SyntaxKind.StringLiteralToken, text, text, leading, trailing);
     }
 
-    /// <summary>Gets the leading trivia.</summary>
+    /// <summary>
+    /// Gets the leading trivia.
+    /// </summary>
     public GreenSyntaxList<GreenNode> LeadingTrivia => new(GetLeadingTrivia());
 
-    /// <summary>Gets the trailing trivia.</summary>
+    /// <summary>
+    /// Gets the trailing trivia.
+    /// </summary>
     public GreenSyntaxList<GreenNode> TrailingTrivia => new(GetTrailingTrivia());
 
-    /// <summary>Creates a new token with leading trivia.</summary>
+    /// <summary>
+    /// Creates a new token with leading trivia.
+    /// </summary>
     public sealed override GreenNode WithLeadingTrivia(GreenNode? trivia)
     {
         return trivia is not GreenNode green ? this : (GreenNode)TokenWithLeadingTrivia(green);
     }
 
-    /// <summary>Creates a new token with leading trivia.</summary>
+    /// <summary>
+    /// Creates a new token with leading trivia.
+    /// </summary>
     public virtual GreenSyntaxToken TokenWithLeadingTrivia(GreenNode? trivia)
     {
         return new SyntaxTokenWithTrivia(Kind, trivia, null, GetDiagnostics(), GetAnnotations());
     }
 
-    /// <summary>Creates a new token with trailing trivia.</summary>
+    /// <summary>
+    /// Creates a new token with trailing trivia.
+    /// </summary>
     public sealed override GreenNode WithTrailingTrivia(GreenNode? trivia)
     {
         return trivia is not GreenNode green ? this : (GreenNode)TokenWithTrailingTrivia(green);
     }
 
-    /// <summary>Creates a new token with trailing trivia.</summary>
+    /// <summary>
+    /// Creates a new token with trailing trivia.
+    /// </summary>
     public virtual GreenSyntaxToken TokenWithTrailingTrivia(GreenNode? trivia)
     {
         return new SyntaxTokenWithTrivia(Kind, null, trivia, GetDiagnostics(), GetAnnotations());
     }
 
-    /// <summary>Defines the range of well-known tokens.</summary>
+    /// <summary>
+    /// Defines the range of well-known tokens.
+    /// </summary>
     public const SyntaxKind FirstTokenWithWellKnownText = SyntaxKind.FirstTokenWithWellKnownText;
     public const SyntaxKind LastTokenWithWellKnownText = SyntaxKind.LastTokenWithWellKnownText;
 
-    /// <summary>Predefined token arrays.</summary>
+    /// <summary>
+    /// Predefined token arrays.
+    /// </summary>
     private static readonly ArrayElement<GreenSyntaxToken>[] s_tokensWithNoTrivia = new ArrayElement<GreenSyntaxToken>[(int)LastTokenWithWellKnownText + 1];
     private static readonly ArrayElement<GreenSyntaxToken>[] s_tokensWithSingleTrailingSpace = new ArrayElement<GreenSyntaxToken>[(int)LastTokenWithWellKnownText + 1];
     private static readonly ArrayElement<GreenSyntaxToken>[] s_tokensWithElasticTrivia = new ArrayElement<GreenSyntaxToken>[(int)LastTokenWithWellKnownText + 1];
@@ -211,7 +257,9 @@ internal partial class GreenSyntaxToken : GreenNode
     private static readonly ArrayElement<GreenSyntaxToken>[] s_missingTokensWithNoTrivia = new ArrayElement<GreenSyntaxToken>[(int)LastTokenWithWellKnownText + 1];
     private static readonly GreenSyntaxToken s_missingIdentifierTokenWithNoTrivia = new MissingTokenWithTrivia(SyntaxKind.IdentifierToken, leading: null, trailing: null);
 
-    /// <summary>Static constructor initializing predefined tokens.</summary>
+    /// <summary>
+    /// Static constructor initializing predefined tokens.
+    /// </summary>
     static GreenSyntaxToken()
     {
         for (var kind = FirstTokenWithWellKnownText; kind <= LastTokenWithWellKnownText; kind++)
@@ -224,7 +272,9 @@ internal partial class GreenSyntaxToken : GreenNode
         }
     }
 
-    /// <summary>Returns all well-known tokens.</summary>
+    /// <summary>
+    /// Returns all well-known tokens.
+    /// </summary>
     public static IEnumerable<GreenSyntaxToken> GetWellKnownTokens()
     {
         foreach (var element in s_tokensWithNoTrivia)

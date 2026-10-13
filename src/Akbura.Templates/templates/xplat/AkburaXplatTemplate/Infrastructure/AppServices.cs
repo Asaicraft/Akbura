@@ -11,7 +11,9 @@ using Splat;
 
 namespace AkburaTemplateNamespace.Infrastructure;
 
-/// <summary>One composition root shared by all platform hosts and Activity recreations.</summary>
+/// <summary>
+/// One composition root shared by all platform hosts and Activity recreations.
+/// </summary>
 internal sealed class AppServices
 {
     private static readonly Lazy<AppServices> s_current = new(() => new AppServices());

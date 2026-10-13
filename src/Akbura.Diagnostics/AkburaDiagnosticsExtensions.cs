@@ -22,7 +22,9 @@ public static class AkburaDiagnosticsExtensions
     /// Attaches Akbura developer tools and configures them before the window is
     /// created.
     /// </summary>
-    /// <param name="application">The Avalonia application.</param>
+    /// <param name="application">
+    /// The Avalonia application.
+    /// </param>
     /// <param name="options">
     /// A callback that configures the toggle gesture, value editors, and
     /// optional services available to editors.

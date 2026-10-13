@@ -4,7 +4,9 @@ using System.Windows.Input;
 
 namespace Akbura.Commands;
 
-/// <summary>Creates and refreshes compiler-owned adapters for ordinary <see cref="ICommand"/> properties.</summary>
+/// <summary>
+/// Creates and refreshes compiler-owned adapters for ordinary <see cref="ICommand"/> properties.
+/// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
 [Browsable(false)]
 public static class AkburaICommandAdapterFactory

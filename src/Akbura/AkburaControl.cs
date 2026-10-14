@@ -167,6 +167,17 @@ public abstract partial class AkburaControl : Control, IComponentTree
         AkcssRuntime.Refresh(target);
     }
 
+    /// <summary>
+    /// Refreshes Debug utility inputs without resetting unchanged class styles
+    /// or recreating subscriptions whose value source remains stable.
+    /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    public static void RefreshAkcssStylesForHotReload(object target)
+    {
+        AkcssRuntime.RefreshForHotReload(target);
+    }
+
     private static ImmutableArray<AkcssStyleActivator> CoerceAkcssStyles(
         AvaloniaObject sender,
         ImmutableArray<AkcssStyleActivator> styles)

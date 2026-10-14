@@ -40,6 +40,13 @@ internal static class AkcssRuntime
             .Refresh();
     }
 
+    public static void RefreshForHotReload(object target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        s_targets.GetValue(target, static value => new TargetRuntime(value))
+            .RefreshForHotReload();
+    }
+
     private sealed class TargetRuntime : IObserver<object?>
     {
         private readonly object _target;
@@ -139,6 +146,36 @@ internal static class AkcssRuntime
             }
 
             RequestApply();
+        }
+
+        public void RefreshForHotReload()
+        {
+            if (_isDetached)
+            {
+                return;
+            }
+
+            _isChanging = true;
+            try
+            {
+                foreach (var style in _styles)
+                {
+                    if (style is AkcssUtilityCandidateActivator candidate)
+                    {
+                        candidate.Refresh(_target);
+                        if (candidate.HasFrameCondition)
+                        {
+                            RequestApplyCandidate(candidate);
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                _isChanging = false;
+            }
+
+            ApplyPendingCandidates();
         }
 
         public void OnNext(object? value)
@@ -246,6 +283,16 @@ internal static class AkcssRuntime
                 _pendingConflictKeys.Add(conflictKey);
             }
 
+            if (_isApplying || _isChanging || _isDetached)
+            {
+                return;
+            }
+
+            ApplyPendingCandidates();
+        }
+
+        private void ApplyPendingCandidates()
+        {
             if (_isApplying || _isChanging || _isDetached)
             {
                 return;

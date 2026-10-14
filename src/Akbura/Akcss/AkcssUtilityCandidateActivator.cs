@@ -93,6 +93,7 @@ public sealed class AkcssUtilityCandidateActivator
     public UnprefixedUtilityPrecedence UnprefixedPrecedence { get; }
 
     public override bool IsConditional => IsPrefixed;
+    internal bool HasFrameCondition => _condition != null;
 
     public override bool Condition => IsReady && IsActive;
 

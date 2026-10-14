@@ -92,6 +92,77 @@ public sealed class AkcssRuntimeTests
     }
 
     [Fact]
+    public void DebugRefresh_DoesNotResetOrExecuteAnUnchangedStaticCascade()
+    {
+        var control = new Border();
+        var style = new WidthObservingClass();
+        AkburaControl.SetAkcssStyles(control, [new AkcssClassActivator(style)]);
+        AkburaControl.RefreshAkcssStylesForHotReload(control);
+        Assert.Equal(1, style.ResetCount);
+        Assert.Equal(1, style.UpdateCount);
+        control.Width = 25;
+        Assert.Equal(2, style.UpdateCount);
+        AkburaControl.ExecuteAkcssStyles(control);
+        Assert.Equal(3, style.UpdateCount);
+    }
+
+    [Fact]
+    public void DebugRefresh_ReevaluatesFrameConditionsAndDynamicArguments()
+    {
+        var control = new Border();
+        var active = true;
+        var value = 12;
+        var events = new List<string>();
+        var utility = new LoggingUtility(events);
+        var candidate = new AkcssUtilityCandidateActivator("width", 0,
+            [new AkcssUtilityApplication(utility, (target, arguments) => utility.Update(target, (int)arguments[0]!))],
+            [AkcssUtilityValueSource.Create<int>(_ => value, recreateOnRefresh: true)],
+            condition: () => active);
+        AkburaControl.SetAkcssStyles(control, [candidate]);
+        events.Clear();
+        value = 25;
+        AkburaControl.RefreshAkcssStylesForHotReload(control);
+        Assert.Equal(["utility:reset", "utility:update:25"], events);
+        events.Clear();
+        active = false;
+        AkburaControl.RefreshAkcssStylesForHotReload(control);
+        Assert.Equal(["utility:reset"], events);
+    }
+
+    [Fact]
+    public void ObservableSource_IgnoresRetiredObserversEvenAfterSameCascadeReattaches()
+    {
+        var control = new Border();
+        var signal = new TestSignal<int>();
+        var conversions = 0;
+        var events = new List<string>();
+        var utility = new LoggingUtility(events);
+        var argument = AkcssUtilityValueSource.CreateObservable<int, int>(_ => signal, value =>
+        {
+            conversions++;
+            return value;
+        });
+        var candidate = new AkcssUtilityCandidateActivator("width", 0,
+            [new AkcssUtilityApplication(utility, (target, arguments) => utility.Update(target, (int)arguments[0]!))],
+            [argument]);
+        AkburaControl.SetAkcssStyles(control, [candidate]);
+        signal.Emit(10);
+        Assert.Equal(1, conversions);
+        control.ClearValue(AkburaControl.AkcssStylesProperty);
+        signal.EmitRetired(20);
+        Assert.Equal(1, conversions);
+
+        AkburaControl.ReplaceAkcssStylesForHotReload(control, [candidate]);
+        signal.Emit(30);
+        Assert.Equal(2, conversions);
+        events.Clear();
+        signal.EmitRetired(40);
+        Assert.Equal(2, conversions);
+        Assert.Empty(events);
+        control.ClearValue(AkburaControl.AkcssStylesProperty);
+    }
+
+    [Fact]
     public void UtilityActivator_ValidatesArgumentCountAndTypes()
     {
         var utility = new ArgumentUtility();
@@ -1193,17 +1264,26 @@ public sealed class AkcssRuntimeTests
     private sealed class TestSignal<T> : IObservable<T>
     {
         private readonly List<IObserver<T>> _observers = [];
+        private readonly List<IObserver<T>> _retired = [];
 
         public IDisposable Subscribe(IObserver<T> observer)
         {
             ArgumentNullException.ThrowIfNull(observer);
             _observers.Add(observer);
-            return new Subscription(_observers, observer);
+            return new Subscription(_observers, _retired, observer);
         }
 
         public void Emit(T value)
         {
             foreach (var observer in _observers.ToArray())
+            {
+                observer.OnNext(value);
+            }
+        }
+
+        public void EmitRetired(T value)
+        {
+            foreach (var observer in _retired.ToArray())
             {
                 observer.OnNext(value);
             }
@@ -1229,12 +1309,15 @@ public sealed class AkcssRuntimeTests
         {
             private List<IObserver<T>>? _observers;
             private IObserver<T>? _observer;
+            private readonly List<IObserver<T>> _retired;
 
             public Subscription(
                 List<IObserver<T>> observers,
+                List<IObserver<T>> retired,
                 IObserver<T> observer)
             {
                 _observers = observers;
+                _retired = retired;
                 _observer = observer;
             }
 
@@ -1245,6 +1328,7 @@ public sealed class AkcssRuntimeTests
                 if (observers != null && observer != null)
                 {
                     observers.Remove(observer);
+                    _retired.Add(observer);
                 }
             }
         }

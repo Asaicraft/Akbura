@@ -79,6 +79,9 @@ internal static class HotReloadServiceWriter
         writer.WriteLine(
             "internal static void ClearCache(global::System.Type[]? updatedTypes)");
         writer.WriteLine("{");
+        writer.CurrentIndent += writer.TabSize;
+        writer.WriteLine("global::Akbura.HotReload.AkburaHotReloadRuntime.ClearAkcssMetadataCache(updatedTypes);");
+        writer.CurrentIndent -= writer.TabSize;
         writer.WriteLine("}");
     }
 

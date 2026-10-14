@@ -288,9 +288,9 @@ public sealed partial class AkburaRenderState : IDisposable
     /// Replaces the generated AKCSS cascade owned by one live render node.
     /// </summary>
     /// <remarks>
-    /// The cascade is deliberately replaced for every structural revision so
-    /// edits to referenced AKCSS definitions are observed even when the node's
-    /// own syntax identity is unchanged.
+    /// Current Debug generators first compare and register the cascade's semantic
+    /// revision with ShouldApplyOwnedOperation and pass operationRegistered.
+    /// Older callers and uncertain definitions keep unconditional replacement.
     /// </remarks>
     [EditorBrowsable(EditorBrowsableState.Never)]
     [Browsable(false)]
@@ -298,6 +298,21 @@ public sealed partial class AkburaRenderState : IDisposable
         int localId,
         object target,
         ImmutableArray<AkcssStyleActivator> styles)
+    {
+        ApplyAkcssStylesOperation(localId, target, styles, operationRegistered: false);
+    }
+
+    /// <summary>
+    /// Applies an AKCSS cascade whose owned operation may already be registered
+    /// by the generated semantic revision check.
+    /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    public void ApplyAkcssStylesOperation(
+        int localId,
+        object target,
+        ImmutableArray<AkcssStyleActivator> styles,
+        bool operationRegistered)
     {
         ArgumentNullException.ThrowIfNull(target);
 
@@ -310,9 +325,12 @@ public sealed partial class AkburaRenderState : IDisposable
                 target);
 
             var node = pendingRevision.Nodes[localId];
-            node.RegisterOwnedOperationForReplacement(
-                AkcssOperationSlot,
-                AkcssOperationIdentity);
+            if (!operationRegistered)
+            {
+                node.RegisterOwnedOperationForReplacement(
+                    AkcssOperationSlot,
+                    AkcssOperationIdentity);
+            }
             var key = CreateSlotKey(
                 pendingRevision,
                 localId,

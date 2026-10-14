@@ -381,13 +381,13 @@ public abstract class AkcssUtilityValueSource
     }
 
     private sealed class ObservableValueSource<TSource, TValue>
-        : AkcssUtilityValueSource,
-          IObserver<TSource>
+        : AkcssUtilityValueSource
     {
         private readonly Func<Control, IObservable<TSource>?> _factory;
         private readonly Func<Control, AkcssUtilityPrefixInvocation<IObservable<TSource>?>>? _priorityFactory;
         private readonly Func<TSource, TValue> _converter;
         private IDisposable? _subscription;
+        private SourceObserver? _observer;
 
         public ObservableValueSource(
             Func<Control, IObservable<TSource>?> factory,
@@ -429,27 +429,57 @@ public abstract class AkcssUtilityValueSource
                 observable = invocation.Value;
             }
 
-            _subscription = observable?.Subscribe(this);
+            if (observable == null)
+            {
+                return;
+            }
+
+            var observer = new SourceObserver(this);
+            _observer = observer;
+            try
+            {
+                _subscription = observable.Subscribe(observer);
+            }
+            catch
+            {
+                observer.Detach();
+                _observer = null;
+                throw;
+            }
         }
 
         private protected override void DetachCore(object target)
         {
-            _subscription?.Dispose();
-            _subscription = null;
+            Interlocked.Exchange(ref _observer, null)?.Detach();
+            Interlocked.Exchange(ref _subscription, null)?.Dispose();
         }
 
-        void IObserver<TSource>.OnNext(TSource value)
+        private sealed class SourceObserver(ObservableValueSource<TSource, TValue> owner) : IObserver<TSource>
         {
-            SetValue(_converter(value));
-        }
+            private ObservableValueSource<TSource, TValue>? _owner = owner;
 
-        void IObserver<TSource>.OnError(Exception error)
-        {
-            Fail(error);
-        }
+            public void Detach()
+            {
+                Interlocked.Exchange(ref _owner, null);
+            }
 
-        void IObserver<TSource>.OnCompleted()
-        {
+            public void OnNext(TSource value)
+            {
+                var source = Volatile.Read(ref _owner);
+                if (source != null)
+                {
+                    source.SetValue(source._converter(value));
+                }
+            }
+
+            public void OnError(Exception error)
+            {
+                Volatile.Read(ref _owner)?.Fail(error);
+            }
+
+            public void OnCompleted()
+            {
+            }
         }
     }
 

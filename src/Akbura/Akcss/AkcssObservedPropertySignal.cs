@@ -8,13 +8,70 @@ namespace Akbura.Akcss;
 internal static class AkcssObservedPropertySignal
 {
     private static readonly ConcurrentDictionary<Type, string[]> s_propertyNames = new();
+    private static readonly object s_cacheLock = new();
+
+    internal static void Invalidate(Type[]? updatedTypes)
+    {
+        lock (s_cacheLock)
+        {
+            if (updatedTypes == null)
+            {
+                s_propertyNames.Clear();
+                return;
+            }
+
+            foreach (var cachedType in s_propertyNames.Keys)
+            {
+                foreach (var updatedType in updatedTypes)
+                {
+                    if (IsAffected(cachedType, updatedType))
+                    {
+                        s_propertyNames.TryRemove(cachedType, out _);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    private static bool IsAffected(Type cachedType, Type updatedType)
+    {
+        // Attributes are inherited. A module update also invalidates derived
+        // styles declared outside that module whose base style is nested in it.
+        for (var current = cachedType; current != null; current = current.BaseType)
+        {
+            if (IsWithin(current, updatedType))
+            {
+                return true;
+            }
+        }
+        return IsWithin(updatedType, cachedType);
+    }
+
+    private static bool IsWithin(Type type, Type scope)
+    {
+        for (var current = type; current != null; current = current.DeclaringType)
+        {
+            if (current == scope)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 
     public static IObservable<object?> Create(Type styleType, object target)
     {
         ArgumentNullException.ThrowIfNull(styleType);
         ArgumentNullException.ThrowIfNull(target);
 
-        var propertyNames = s_propertyNames.GetOrAdd(styleType, GetPropertyNames);
+        string[] propertyNames;
+        lock (s_cacheLock)
+        {
+            // Do not let an in-flight reflection lookup repopulate stale names
+            // after ClearCache has invalidated this type.
+            propertyNames = s_propertyNames.GetOrAdd(styleType, GetPropertyNames);
+        }
         if (propertyNames.Length == 0)
         {
             return EmptySignal.Instance;

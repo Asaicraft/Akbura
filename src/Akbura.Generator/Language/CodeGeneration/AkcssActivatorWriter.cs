@@ -3,6 +3,7 @@ using Akbura.Language.Operations;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace Akbura.Language.CodeGeneration;
@@ -148,7 +149,8 @@ internal readonly ref struct AkcssActivatorWriter
         in AkcssPlanRange activators,
         int localId,
         string targetExpression,
-        in MarkupExtensionWriteContext context)
+        in MarkupExtensionWriteContext context,
+        bool canRetainCascade = true)
     {
         if (activators.IsEmpty)
         {
@@ -159,16 +161,129 @@ internal readonly ref struct AkcssActivatorWriter
         EnsureExpression(targetExpression, nameof(targetExpression));
 
         var indent = _writer.CurrentIndent;
+        var knownRevision = _generationMode == ComponentGenerationMode.DebugStructural && canRetainCascade
+            ? WriteRevisionGuard(plan, activators, localId, context)
+            : null;
+        var registered = knownRevision != null;
+        if (registered)
+        {
+            _writer.WriteLine("{");
+            _writer.CurrentIndent += _writer.TabSize;
+        }
 
         _writer
             .Write(ComponentStructuralHotReloadWriter.RenderStateFieldName)
             .WriteLine(".ApplyAkcssStylesOperation(");
-        _writer.CurrentIndent = indent + 4;
+        _writer.CurrentIndent += _writer.TabSize;
         _writer.WriteIntegerLiteral(localId).WriteLine(",");
         _writer.Write(targetExpression).WriteLine(",");
         WriteActivatorArray(plan, activators, context);
+        if (registered)
+        {
+            _writer.WriteLine(",");
+            _writer.Write("operationRegistered: ");
+            _writer.Write(knownRevision!);
+        }
         _writer.WriteLine(");");
+        if (registered)
+        {
+            _writer.CurrentIndent = indent;
+            _writer.WriteLine("}");
+        }
         _writer.CurrentIndent = indent;
+    }
+
+    private string? WriteRevisionGuard(
+        in AkcssComponentActivatorPlan plan,
+        in AkcssPlanRange activators,
+        int localId,
+        in MarkupExtensionWriteContext context)
+    {
+        var references = new List<AkcssStyleReferencePlan>();
+        for (var index = activators.Start; index < activators.Start + activators.Length; index++)
+        {
+            var activator = plan.Activators[index];
+            if (activator.Kind == AkcssActivatorKind.Class)
+            {
+                references.Add(plan.ClassCaches[activator.Index].Style);
+            }
+            else
+            {
+                var candidate = plan.Candidates[activator.Index];
+                var applications = GetApplicationCache(plan, candidate.ApplicationCacheId).Applications;
+                for (var applicationIndex = applications.Start; applicationIndex < applications.Start + applications.Length; applicationIndex++)
+                {
+                    references.Add(plan.Applications[applicationIndex].Reference);
+                }
+            }
+        }
+
+        var revisionName = "__akcssRevision" + localId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var reliable = references.Count != 0 &&
+            references.TrueForAll(static reference => reference.Kind == AkcssStyleReferenceKind.GeneratedModule);
+        if (!reliable)
+        {
+            return null;
+        }
+        using var code = new CodeWriter("\n");
+        new AkcssActivatorWriter(code, _bindingEnvironment, _ownerTypeName,
+            generationMode: _generationMode).WriteActivatorArray(plan, activators, context);
+        _writer.Write("var ");
+        _writer.Write(revisionName);
+        _writer.Write(" = ");
+        _writer.WriteStringLiteral(AkcssHotReloadIdentity.Create(code.GetText().ToString()));
+        _writer.WriteLine(";");
+        for (var index = 0; index < references.Count; index++)
+        {
+            _writer.Write("var ");
+            WriteReferenceRevisionName(revisionName, index);
+            _writer.Write(" = ");
+            _writer.Write(references[index].GeneratedModuleTypeName!);
+            _writer.Write(".");
+            _writer.Write(AkcssModuleWriter.DebugStyleRevisionName);
+            _writer.Write("(");
+            _writer.WriteIntegerLiteral(references[index].StyleIndex);
+            _writer.WriteLine(");");
+        }
+        _writer.Write("var ");
+        _writer.Write(revisionName + "Known = ");
+        for (var index = 0; index < references.Count; index++)
+        {
+            if (index != 0)
+            {
+                _writer.Write(" && ");
+            }
+            WriteReferenceRevisionName(revisionName, index);
+            _writer.Write(" != null");
+        }
+        _writer.WriteLine(";");
+        _writer.Write(revisionName);
+        _writer.Write(" += ");
+        for (var index = 0; index < references.Count; index++)
+        {
+            if (index != 0)
+            {
+                _writer.Write(" + ");
+            }
+            WriteReferenceRevisionName(revisionName, index);
+        }
+        _writer.WriteLine(";");
+
+        _writer.Write("if (!");
+        _writer.Write(revisionName + "Known || ");
+        _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName);
+        _writer.Write(".ShouldApplyOwnedOperation(");
+        _writer.WriteIntegerLiteral(localId);
+        _writer.Write(", \"$akcss\", ");
+        _writer.Write(revisionName);
+        _writer.WriteLine("))");
+        return revisionName + "Known";
+    }
+
+    private void WriteReferenceRevisionName(string revisionName, int index)
+    {
+        _writer.Write(revisionName + "_");
+        _writer.WriteIntegerLiteral(index);
     }
 
     private void WriteActivatorArray(
@@ -205,7 +320,9 @@ internal readonly ref struct AkcssActivatorWriter
         EnsureExpression(targetExpression, nameof(targetExpression));
 
         _writer
-            .Write("global::Akbura.AkburaControl.ExecuteAkcssStyles(")
+            .Write(_generationMode == ComponentGenerationMode.DebugStructural
+                ? "global::Akbura.AkburaControl.RefreshAkcssStylesForHotReload("
+                : "global::Akbura.AkburaControl.ExecuteAkcssStyles(")
             .Write(targetExpression)
             .WriteLine(");");
     }

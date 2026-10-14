@@ -15,8 +15,12 @@ internal sealed class AkburaCompilationSession
     private readonly CSharpCompilation _baseCompilation;
     private GeneratorDriver _driver;
     private AdditionalText _source;
+    private readonly Dictionary<string, AdditionalText> _stylesheetSources = new(StringComparer.OrdinalIgnoreCase);
 
-    public AkburaCompilationSession(string componentSource, string ownerSource)
+    public AkburaCompilationSession(
+        string componentSource,
+        string ownerSource,
+        IReadOnlyDictionary<string, string>? stylesheetSources = null)
     {
         var projectDirectory = Path.Combine(Path.GetTempPath(), "AkburaClrHotReload", Guid.NewGuid().ToString("N"));
         var options = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview)
@@ -27,8 +31,18 @@ internal sealed class AkburaCompilationSession
             CreateReferences(), new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Debug, nullableContextOptions: NullableContextOptions.Enable));
         _source = new ComponentSource(Path.Combine(projectDirectory, "Counter.akbura"), componentSource);
+        var additionalFiles = new List<AdditionalText> { _source };
+        if (stylesheetSources != null)
+        {
+            foreach (var (path, text) in stylesheetSources)
+            {
+                var file = new ComponentSource(Path.Combine(projectDirectory, path), text);
+                _stylesheetSources.Add(path, file);
+                additionalFiles.Add(file);
+            }
+        }
         _driver = CSharpGeneratorDriver.Create(
-            [new AkburaBlackSilenceGenerator().AsSourceGenerator()], [_source], options,
+            [new AkburaBlackSilenceGenerator().AsSourceGenerator()], additionalFiles, options,
             new ProjectOptionsProvider(projectDirectory));
         Compilation = Generate();
     }
@@ -40,6 +54,16 @@ internal sealed class AkburaCompilationSession
         var updated = new ComponentSource(_source.Path, componentSource);
         _driver = _driver.ReplaceAdditionalText(_source, updated);
         _source = updated;
+        Compilation = Generate();
+        return Compilation;
+    }
+
+    public Compilation UpdateAkcss(string path, string source)
+    {
+        var previous = _stylesheetSources[path];
+        var updated = new ComponentSource(previous.Path, source);
+        _driver = _driver.ReplaceAdditionalText(previous, updated);
+        _stylesheetSources[path] = updated;
         Compilation = Generate();
         return Compilation;
     }

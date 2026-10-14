@@ -130,7 +130,7 @@ internal static void ClearCache(Type[]? updatedTypes)
 internal static void UpdateApplication(Type[]? updatedTypes)
 ```
 
-At the inspected revision, Akbura's generated `ClearCache` is empty. The actual refresh work begins in `UpdateApplication`. The .NET contract calls cache-clearing callbacks before application-update callbacks; Akbura performs its generated descriptor reconciliation in the application-update path.
+Akbura's generated `ClearCache` clears affected AKCSS observed-property metadata before refresh. The actual component refresh work begins in `UpdateApplication`. The .NET contract calls cache-clearing callbacks before application-update callbacks; Akbura performs its generated descriptor reconciliation in the application-update path.
 
 ### UI-thread handoff
 
@@ -568,11 +568,19 @@ An unchanged operation can retain its resource. A replacement releases the previ
 
 A property value and an owned operation cannot both claim the same node slot in one pending revision. Transitions such as “literal value becomes a binding” must explicitly release the previous kind of ownership.
 
-### Why AKCSS is refreshed even when markup is unchanged
+### AKCSS revisions and module-only updates
 
-AKCSS is intentionally different: the generated cascade is replaced for **every structural revision**. A referenced style module can change while an element's own markup and syntax identity remain identical.
+In Debug, the generated cascade has a semantic revision independent of the element's overall markup identity. Its identity combines normalized generated activator code with the current revisions of the referenced styles and utilities. Style revision methods include expanded transitive `@apply` operations and return their current literals after CLR Hot Reload; they do not rely on rerunning static field initializers.
 
-Two mechanisms work together: the generated handler knows which AKCSS module types affect a component, and instance preparation invalidates its render state. The next structural revision then replaces the cascade instead of incorrectly deciding that unchanged local markup means unchanged styling.
+`ShouldApplyOwnedOperation` registers an unchanged cascade as retained in the pending revision. The activator array is created only when replacement is required. This preserves activator instances and subscriptions across unrelated markup edits. A changed definition, a new target node, or uncertain ownership still requires full-cascade replacement. Metadata-only references, intercepted styles, and scoped/template ownership conservatively retain the previous replacement behavior. ReleaseDirect and ReleaseConditional generation are unchanged.
+
+The existing handler's AKCSS dependency filtering still schedules affected live components when only a referenced module changes. Debug style creation continues through `__AkburaGetStyle(index)`, so changed utility operation arrays and changed style indexes use current constructors rather than the old static `Styles` collection.
+
+The generated `ClearCache` phase invalidates observed-property name caches for reported styles, containing modules, and affected derived styles. Unknown update scope (`null`) clears this metadata cache; unrelated type entries remain cached for a concrete update list. `UpdateApplication` continues to dispatch refreshes on the Avalonia UI thread.
+
+Debug frame refresh reevaluates dynamic arguments and frame conditions through existing utility conflict-key queues, without resetting/executing an unchanged static cascade. Disposed observable argument subscriptions ignore late callbacks before invoking their converter and drop their reference to the old source, including after the same activator reattaches.
+
+For the real CLR scenarios, validation commands, and limitations, see [AKCSS Phase 1 verification](akcss-hot-reload-phase-1.md).
 
 The implicit root DataContext binding is also tracked as an owned operation. Infrastructure-generated bindings need the same lifecycle discipline as bindings written explicitly in markup.
 

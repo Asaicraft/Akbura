@@ -179,6 +179,12 @@ internal static class AkcssDocumentWriter
             moduleWriter.WriteDebugStyleAccessor(plan);
         }
 
+        if (generationMode == ComponentGenerationMode.DebugStructural)
+        {
+            writer.WriteLine();
+            moduleWriter.WriteDebugStyleRevisions(plan);
+        }
+
         if (!plan.Symbols.IsEmpty)
         {
             writer.WriteLine();

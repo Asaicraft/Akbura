@@ -6,8 +6,11 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Threading;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
@@ -20,6 +23,9 @@ namespace Akbura.Language.Binder;
 
 internal sealed partial class CSharpProbeBinder
 {
+    private HookProbeCache? _hookProbeCache;
+    private HookProbeCache HookProbes => LazyInitializer.EnsureInitialized(ref _hookProbeCache, static () => new HookProbeCache())!;
+
     internal UseHookProbeResult BindUseHookInvocation(
         AkburaSyntax syntax,
         CSharp.InvocationExpressionSyntax invocation,
@@ -29,19 +35,19 @@ internal sealed partial class CSharpProbeBinder
         bool rewriteStateArguments = false)
     {
 #if STATS
+        using var probeMeasurement = MeasureProbe(ProbeCategory.Hook, syntax);
         using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeBinding);
 #endif
         var effectiveInvocation = injectSelf
-            ? AddSyntheticSelf(invocation)
+            ? HookProbes.SelfInvocations.GetValue(invocation, static source => AddSyntheticSelf(source))
             : invocation;
         var probe = CreateUseHookProbe(syntax, effectiveInvocation, hookTypes);
 
         var hasPropertyArgumentSubstitution = false;
         if (rewritePropertyArguments)
         {
-            var rewritten = RewritePropertyArguments(
-                probe.SemanticModel,
-                probe.Invocation);
+            var rewritten = HookProbes.PropertyInvocations.GetValue(probe.Invocation,
+                source => RewritePropertyArguments(probe.SemanticModel, source));
             if (!rewritten.IsEquivalentTo(probe.Invocation))
             {
                 hasPropertyArgumentSubstitution = true;
@@ -84,6 +90,23 @@ internal sealed partial class CSharpProbeBinder
         CSharp.InvocationExpressionSyntax invocation,
         ImmutableArray<INamedTypeSymbol> hookTypes,
         ImmutableArray<UseHookStateArgument> stateArguments = default)
+    {
+        var key = new HookProbeKey(syntax, invocation,
+            hookTypes.IsDefault ? ImmutableArray<INamedTypeSymbol>.Empty : hookTypes, stateArguments);
+        if (HookProbes.Probes.TryGetValue(key, out var probe))
+        {
+#if STATS
+            GenerationStatistics.Increment(GenerationStatisticCounter.ProbeContextReused);
+#endif
+            return probe;
+        }
+
+        probe = CreateUseHookProbeCore(syntax, invocation, hookTypes, stateArguments);
+        return HookProbes.Probes.GetOrAdd(key, probe);
+    }
+
+    private UseHookProbe CreateUseHookProbeCore(AkburaSyntax syntax, CSharp.InvocationExpressionSyntax invocation,
+        ImmutableArray<INamedTypeSymbol> hookTypes, ImmutableArray<UseHookStateArgument> stateArguments)
     {
         var sourceInvocation = invocation;
         var precedingLocals = syntax is CSharpStatementSyntax
@@ -269,6 +292,9 @@ internal sealed partial class CSharpProbeBinder
         ref CSharpBindingResult bindingResult,
         out ImmutableArray<UseHookStateArgument> stateArguments)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.ProbeStateRewriting);
+#endif
         stateArguments = ImmutableArray<UseHookStateArgument>.Empty;
         var originalProbe = probe;
         var hasValidCandidate = false;
@@ -593,6 +619,56 @@ internal sealed partial class CSharpProbeBinder
         }
 
         return false;
+    }
+
+    private sealed class HookProbeCache
+    {
+        internal readonly ConcurrentDictionary<HookProbeKey, UseHookProbe> Probes = new();
+        internal readonly ConditionalWeakTable<CSharp.InvocationExpressionSyntax, CSharp.InvocationExpressionSyntax> SelfInvocations = new();
+        internal readonly ConditionalWeakTable<CSharp.InvocationExpressionSyntax, CSharp.InvocationExpressionSyntax> PropertyInvocations = new();
+    }
+
+    private readonly record struct HookProbeKey(AkburaSyntax Syntax, CSharp.InvocationExpressionSyntax Invocation,
+        ImmutableArray<INamedTypeSymbol> HookTypes, ImmutableArray<UseHookStateArgument> StateArguments)
+    {
+        public bool Equals(HookProbeKey other)
+        {
+            if (!ReferenceEquals(Syntax, other.Syntax) || !ReferenceEquals(Invocation, other.Invocation) ||
+                HookTypes.Length != other.HookTypes.Length ||
+                StateArguments.IsDefaultOrEmpty != other.StateArguments.IsDefaultOrEmpty)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < HookTypes.Length; index++)
+            {
+                if (!ReferenceEquals(HookTypes[index], other.HookTypes[index]))
+                {
+                    return false;
+                }
+            }
+
+            if (!StateArguments.IsDefaultOrEmpty)
+            {
+                if (StateArguments.Length != other.StateArguments.Length)
+                {
+                    return false;
+                }
+
+                for (var index = 0; index < StateArguments.Length; index++)
+                {
+                    if (StateArguments[index].ArgumentIndex != other.StateArguments[index].ArgumentIndex ||
+                        !ReferenceEquals(StateArguments[index].State, other.StateArguments[index].State))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        public override int GetHashCode() => RuntimeHelpers.GetHashCode(Syntax) ^ RuntimeHelpers.GetHashCode(Invocation);
     }
 
     private readonly struct UseHookProbe

@@ -5618,6 +5618,12 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         CSharp.TypeSyntax typeSyntax,
         ImmutableArray<CSharp.UsingDirectiveSyntax> usingDirectives = default)
     {
+        return BindingSession.ProbeContext.BindType(typeSyntax, usingDirectives,
+            () => BindCSharpTypeCore(typeSyntax, usingDirectives));
+    }
+
+    private CSharpBindingResult BindCSharpTypeCore(CSharp.TypeSyntax typeSyntax, ImmutableArray<CSharp.UsingDirectiveSyntax> usingDirectives)
+    {
         var field = CSharpSyntaxFactory.FieldDeclaration(
             CSharpSyntaxFactory.VariableDeclaration(typeSyntax)
                 .WithVariables(CSharpSyntaxFactory.SingletonSeparatedList(
@@ -6297,6 +6303,11 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     }
 
     internal ImmutableArray<CSharp.UsingDirectiveSyntax> GetCSharpUsingDirectives()
+    {
+        return BindingSession.ProbeContext.DefaultUsings;
+    }
+
+    internal ImmutableArray<CSharp.UsingDirectiveSyntax> GetCSharpUsingDirectivesCore()
     {
         if (SyntaxTree.Kind == SyntaxTreeKind.Akcss)
         {

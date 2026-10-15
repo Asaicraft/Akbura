@@ -16,7 +16,7 @@ using System.Threading.Tasks;
 
 namespace Akbura.UnitTests;
 
-public sealed class BlackSilenceIncrementalGenerationTests
+public sealed partial class BlackSilenceIncrementalGenerationTests
 {
     private const string RequestsTrackingName = "BlackSilence.GenerationRequests";
 
@@ -749,7 +749,7 @@ public sealed class BlackSilenceIncrementalGenerationTests
         return CSharpGeneratorDriver.Create(
             generators: [new AkburaBlackSilenceGenerator().AsSourceGenerator()],
             additionalTexts: files,
-            parseOptions: CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview),
+            parseOptions: options.ParseOptions,
             optionsProvider: options,
             driverOptions: new GeneratorDriverOptions(IncrementalGeneratorOutputKind.None, trackIncrementalGeneratorSteps: true));
     }
@@ -768,13 +768,13 @@ public sealed class BlackSilenceIncrementalGenerationTests
 
     private sealed class TestProject
     {
-        public TestProject(bool publishDiagnostics = false)
+        public TestProject(bool publishDiagnostics = false, bool debugStructural = false)
         {
             Directory = Path.Combine(Path.GetTempPath(), "BlackSilenceIncrementalTests", Guid.NewGuid().ToString("N"));
-            Options = new TestOptions("Demo", Directory, publishDiagnostics);
+            Options = new TestOptions("Demo", Directory, publishDiagnostics, debugStructural);
             Compilation = CSharpCompilation.Create(
                 "BlackSilenceIncrementalTests",
-                syntaxTrees: [CSharpSyntaxTree.ParseText(string.Empty, CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview))],
+                syntaxTrees: [CSharpSyntaxTree.ParseText(string.Empty, Options.ParseOptions)],
                 references: SymbolTests.CreateAvaloniaReferences(),
                 options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
         }
@@ -814,9 +814,12 @@ public sealed class BlackSilenceIncrementalGenerationTests
         }
     }
 
-    private sealed class TestOptions(string rootNamespace, string projectDirectory, bool publishDiagnostics = false) : AnalyzerConfigOptionsProvider
+    private sealed class TestOptions(string rootNamespace, string projectDirectory, bool publishDiagnostics = false, bool debugStructural = false) : AnalyzerConfigOptionsProvider
     {
         private static readonly AnalyzerConfigOptions s_empty = new Values(new Dictionary<string, string>());
+
+        public CSharpParseOptions ParseOptions { get; } = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview)
+            .WithPreprocessorSymbols(debugStructural ? new[] { "DEBUG" } : Array.Empty<string>());
 
         public override AnalyzerConfigOptions GlobalOptions { get; } = new Values(new Dictionary<string, string>
         {

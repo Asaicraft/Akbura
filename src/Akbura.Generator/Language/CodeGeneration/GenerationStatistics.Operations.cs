@@ -12,6 +12,7 @@ internal enum GenerationStatisticOperation : byte
 {
     AkcssLookupSymbols,
     UtilityParameterBinding,
+    CSharpProbe,
 }
 
 internal readonly record struct GenerationOperationStatistics(

@@ -552,15 +552,13 @@ internal sealed partial class CSharpProbeBuilder
             symbolOrigins.ToImmutable());
     }
 
-    private static CSharp.MethodDeclarationSyntax? GetContainingComponentMethodProbe(AkburaSyntax scope)
+    private CSharp.MethodDeclarationSyntax? GetContainingComponentMethodProbe(AkburaSyntax scope)
     {
         for (var current = scope.Parent; current != null; current = current.Parent)
         {
             if (current is CSharpStatementSyntax statement &&
                 statement.Parent is AkburaDocumentSyntax &&
-                CSharpProbeBinder.TryCreateComponentMethodProbe(
-                    statement,
-                    out var method))
+                _binder.SemanticModel.BindingSession.ProbeContext.GetMethodSignature(statement) is { } method)
             {
                 return method;
             }

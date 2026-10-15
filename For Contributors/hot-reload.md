@@ -35,6 +35,7 @@ Diagrams use Mermaid and are embedded directly in this Markdown file. GitHub can
 - [16. Debugging a failed refresh](#16-debugging-a-failed-refresh)
 - [17. Tests contributors should add](#17-tests-contributors-should-add)
 - [18. Source map and contributor checklist](#18-source-map-and-contributor-checklist)
+- [19. C# semantic probes and compilation latency](#19-c-semantic-probes-and-compilation-latency)
 
 ## 1. The two layers of Hot Reload
 
@@ -881,6 +882,185 @@ Before submitting a Hot Reload change, verify these invariants:
 - [ ] Representative edits preserve the intended emitted metadata contract, and Release generation still works.
 
 The design is easiest to maintain when its guarantees remain explicit: **identity is not position, ownership is not the entire control, preparation is not completion, and completion of one layer is not completion of every layer.**
+
+## 19. C# semantic probes and compilation latency
+
+Before a CLR delta can be prepared, BlackSilence binds embedded C# through synthetic Roslyn trees. Avoiding an unnecessary component generation and avoiding redundant probes *inside* a changed component are independent optimizations. A reduced probe count does not establish an equivalent reduction in Edit-and-Continue or live-control latency.
+
+### Ownership and reuse
+
+`BindingSession.ProbeContext` belongs to one document semantic model in one immutable `AkburaCompilation`. It is not copied into `SemanticModelState`, BlackSilence's reusable project entries, or a process-wide cache. A new document or C# compilation gets a new context. Executable member models in that same document share the owning binding session.
+
+The context reuses only preparation whose identity is established:
+
+- Component templates: imports, extern aliases, namespace, partial type and base declaration. Each request supplies its own members and optional import override; completion projections retain their own annotations and active target.
+- Projected declarations: keyed by the exact Akbura symbol object, after the existing lexical lookup has resolved it. Lookup, preceding statements, foreach and conditional wrappers, containing-method context, and target conversions are not replaced by a component-name cache.
+- Component method syntax: header projections, full method bodies and captured local-function syntax are parsed once per exact source statement. Target statement annotations and their semantic models remain request-specific; parameters, constraints, local functions, captures, async and unsafe modifiers follow the existing paths.
+- Type bindings: keyed by the exact type text **and syntax structure**, plus the exact ordered import text and structure. The owning context supplies compilation identity, document identity, namespace, extern aliases, references and options. Trivia is not normalized away. An identifier token spelling `int` is not interchangeable with a predefined-type node spelling `int`.
+
+Only type probes reuse a completed `CSharpBindingResult` across requests. Their synthetic field context is invariant for the owning document and imports. Expression binding results, target-type conversions and general statement operations are not memoized by source text. A type-probe exception, including `OperationCanceledException`, is propagated without inserting a result.
+
+Hook probe reuse is narrower still: a lazy cache belongs to one `CSharpProbeBinder`. Its identity includes the exact source syntax, effective invocation node, hook-type symbol identities, and state-argument indices and symbol identities. Synthetic-self and property rewrite nodes can be reused for the same source invocation. Ordinary arguments, property substitution, synthetic self, imported extension-hook resolution and reactive-state substitution still run through the existing ordered overload attempts. A changed invocation or state substitution gets its own tree/model. All operations stay attached to the semantic model that produced them.
+
+Factories compute complete immutable values before concurrent publication. A race may duplicate a computation; it cannot expose a placeholder or half-built result. The existing document-batch cancellation and version checks remain responsible for project snapshot publication. Completed request-local preparation is safe to retry, but a canceled batch cannot publish sources, diagnostics or reusable project state.
+
+### Diagnostic retrieval
+
+`CSharpProbeDiagnostics` belongs to one exact Roslyn `SemanticModel`, through a context-owned `ConditionalWeakTable`. Covering-span results can serve later contained-span queries against that same model. Other spans still call Roslyn; unrelated models and revisions never share diagnostics. The weak table does not retain obsolete probe models merely because the document remains alive.
+
+The cache stores raw diagnostics. A contained query filters by source-tree identity and intersecting primary **or additional** locations, including zero-width boundaries. Each target then independently applies the original error-only selection, top-level `CS0029`/`CS0266` conversion suppression and deduplication. Thus a suppression for a parent expression cannot suppress a child's error, and a sibling diagnostic cannot leak into another expression. IDs, severity, messages, raw spans and mapped locations are preserved. Empty results avoid a deduplication allocation; nonempty error results use a tuple key instead of concatenating diagnostic spans into strings.
+
+This matters because Roslyn's [semantic diagnostic API](https://learn.microsoft.com/en-us/dotnet/api/microsoft.codeanalysis.semanticmodel.getdiagnostics) can repeat method-body analysis. Reuse is deliberately restricted to an already-computed covering span, not a speculative full-tree diagnostic pass.
+
+### Opt-in profiling
+
+`DebugStats` and `ReleaseStats` enable the additional instrumentation. Ordinary Debug/Release builds contain no per-probe statistics calls or logging. Counters distinguish requests, synthetic trees, derived compilations, acquired semantic models, requested diagnostics, actual Roslyn diagnostic queries, reused contexts and reused type-binding results. A type-cache hit remains a request; a hook attempt can perform several passes, so requests and tree counts need not match.
+
+Fine-grained stages separate scope construction, component-template syntax construction, tree creation, compilation derivation, semantic-model acquisition, expression symbol/type queries, expression operation queries and state rewriting. Existing `CSharpProbeBinding`, `CSharpProbeSemanticModel` and `CSharpProbeDiagnostics` measurements remain available. Statement/type work is also included in the enclosing probe/category measurements, not mislabeled as expression-query time.
+
+With `GenerationStatistics.BeginMeasurement(trackOperations: true)`, `CSharpProbe` operation rows report document path, source span, category, completed invocations, inclusive elapsed time and optional allocations. Categories cover type probes, binding paths, markup expressions, statements, component methods, lambdas and hooks. State rewriting has its own stage. Instrumented public entry requests do not count internal foreach-header/condition helpers as additional requests; tree/model counters include every pass through `CreateSyntaxTree`/`CreateSemanticModel`.
+
+All stage/category times are **inclusive accumulated worker durations**, not additive wall-clock costs. Scope construction may cause nested type binding; binding includes its own diagnostics. Current-thread allocation samples are reliable only across synchronous same-thread scopes; the existing invalid-sample checks are retained. For a complete GeneratorDriver call, use wall-clock elapsed time and process-wide total allocated-byte deltas separately. Detached statistics rows retain labels/totals, not semantic models, after measurement disposal.
+
+### Batching experiment and boundary
+
+A controlled Roslyn experiment used 64 independent methods, ten iterations with the first two excluded, the same reference set, and type/operation/diagnostic verification. On the investigation machine, separate parsed probes measured 84.811 ms / 3,640,672 bytes at the median; shared immutable scaffolding with separate trees measured 75.175 ms / 3,551,432 bytes. A single tree queried per span measured 36.391 ms / 807,372 bytes, and a single diagnostic pass measured 18.513 ms / 509,392 bytes.
+
+This establishes a batching opportunity for an already-independent homogeneous workload, **not** a Purity or Hot Reload result. The production binder resolves state types, preceding statements, conditional/loop locals, target types and hook rewrites on demand; those contexts are not known as one equivalent batch in advance. General eager batching would require a new scheduling/prebinding layer and a much wider binder change. It was not introduced here. The implemented optimization shares proven-equivalent preparation and exact owned hook models while preserving the existing request order.
+
+### Reproducible investigation baseline
+
+The requested branch was `feature/improve-hot-reload`, based on `7d36b62cee088c9df8b42ea42a8812fc3cb0c408`. The initial checkout was clean on a different branch at `33e4074`; that work was preserved, and neither master nor the dependency-graph change was merged/rebased into the requested branch. Consequently, **both probe measurements regenerate seven components**, not one. The results below must not be credited with the separate graph optimization.
+
+The machine was Windows 11, Intel Core i5-11400H / 12 logical processors, .NET SDK 10.0.401, CLR 10.0.12, Avalonia 12.0.4. GeneratorDriver measurements loaded SDK Roslyn 5.9.0.0 and DebugStats analyzers; repository unit/editor tests use the pinned Roslyn 4.11.0 packages. The workload is the ignored copy of `D:/Repos/ForVidos/PurityUIDashborad`, with 18 markup/style inputs, 16 components and 17 generated sources. The original project was not modified.
+
+Ten successive `NeedHelp.akbura` / `Ellipse.StrokeThickness` edits were measured, extending the one-digit values through 11. The first two edits were warm-up; the table contains the remaining **eight medians**. The same reference set, diagnostic mode, allocation provider and operation tracking were used before and after, without concurrent test/build workloads. Full source text, hint names and diagnostic keys were compared against saved baseline output for the initial generation and every edit: **11/11 snapshots matched without normalization**.
+
+| Metric | Base `7d36b62` | With probe optimization |
+| --- | ---: | ---: |
+| GeneratorDriver wall time | 2,478.837 ms | 1,955.140 ms |
+| SemanticBinding, accumulated | 2,337.911 ms | 1,822.393 ms |
+| CSharpProbeBinding, inclusive accumulated | 2,400.796 ms | 1,868.067 ms |
+| CSharpProbeSemanticModel, accumulated | 17.435 ms | 15.353 ms |
+| CSharpProbeDiagnostics, accumulated | 683.144 ms | 601.554 ms |
+| Scope construction, inclusive accumulated | 906.775 ms | 701.790 ms |
+| Component-template syntax construction | 195.141 ms / 782 calls | 2.736 ms / 32 calls |
+| Syntax-tree creation, accumulated | 17.419 ms | 24.637 ms |
+| Compilation derivation, accumulated | 13.283 ms | 13.680 ms |
+| Semantic-model acquisition, accumulated | 1.727 ms | 1.363 ms |
+| Expression symbol/type queries, accumulated | 291.749 ms | 299.144 ms |
+| Expression operation queries, accumulated | 10.325 ms | 13.288 ms |
+| ComponentPlanning, accumulated | 185.064 ms | 168.812 ms |
+| CSharpEmission, accumulated | 65.682 ms | 63.398 ms |
+| Instrumented requests, including type-cache hits | 1,164 | 1,164 |
+| Synthetic trees / derived compilations / acquired models | 1,168 each | 840 each |
+| Diagnostic requests / actual Roslyn diagnostic queries | 1,287 / 1,287 | 984 / 843 |
+| Type-binding results reused | 0 | 303 |
+| Covering-span diagnostic results reused | 0 | 141 |
+| Context reuse events | 0 | 1,900 |
+| Components generated / reused | 7 / 9 | 7 / 9 |
+| GeneratorDriver total allocated bytes, all workers | 514,659,372 | 336,207,744 |
+
+The measured wall-time reduction is about 21%; total allocations fall about 35%. This is not a claim that every small stage improves: tree-creation, symbol-query and operation-query timings increased in this sample. Scope/template reuse, avoiding repeated type bindings and avoiding repeated diagnostics account for the useful reduction; compilation derivation itself was not the dominant cost. These inclusive timings must not be summed.
+
+Category medians, likewise inclusive, were: binding paths 1,817.714 → 1,582.211 ms; types 375.489 → 147.062 ms; hooks 148.486 → 86.367 ms; statements 51.561 → 44.624 ms; component methods 22.781 → 21.209 ms; markup expressions 4.182 → 4.891 ms; lambdas 3.068 → 3.166 ms. Per-document operation rows put NeedHelp's executed public probes at 110 → 82, plus 28 reused type requests after optimization, and 118.283 → 98.781 ms median inclusive probe time. Internal loop/header helpers are excluded from those public-entry rows, not from the global tree/model counters.
+
+For context only, earlier measurements at `c3b954f` reported 2.413 s with seven regenerated components; `33e4074` reported 0.648 s with one regenerated component. They used the earlier profiling setup and are **not** the before/after comparison above. The combined graph-plus-probe optimization was not measured on this branch.
+
+The standalone driver intentionally runs BlackSilence, not every SDK generator: it retains 539 compiler diagnostic keys from that input setup. Exact equality of those keys is an equivalence check, not a claim that the standalone input compiles cleanly. The real project build/watch path supplies the SDK generators separately.
+
+Evidence and the temporary executable harness are under ignored `bin/ProbeBindingOptimization` and `bin/HotReloadTimingProbe`: `baseline-final.log`, `after-final.log`, `ReferenceOutputs/sources-*.json`, and `batching-experiment.log`. Generator binary SHA-256 was `B6A87674455BEECEC70844D9932DDE97B9981DF651A9A6E7841ADA67DA787F30` before and `4187C5071D46B094351A6FA08A49BCD20519870F09B385FDD36C5AE4417F1B48` after. The latter is the uncommitted implementation on the stated base, not a new Git commit.
+
+### Real dotnet watch latency
+
+The separate headless TimingHost copy built and ran the actual Purity project with `dotnet watch --verbose --non-interactive --no-restore run`. Six file writes changed `Ellipse.StrokeThickness` from 1 through 7. A 10 ms UI-thread timer observed the actual Avalonia property and checked `ReferenceEquals` against the original Ellipse. Every update retained the same process and control: baseline PID 20804, optimized PID 15784; there was no application restart. Headless observation measures property visibility, not screen-presentation latency.
+
+| Observation | Before | After |
+| --- | ---: | ---: |
+| First file write → live value, reported separately | 15,659.281 ms | 12,888.005 ms |
+| Five subsequent writes → live value, median | 3,962.988 ms | 3,450.840 ms |
+| Warm range | 3,507.405–5,496.997 ms | 2,796.783–4,849.473 ms |
+| File write → first watcher event, median | 1.248 ms | 1.040 ms |
+| File write → updated workspace document, median | 47.522 ms | 32.746 ms |
+| Updated document → CLR batch submission, median | 3,928.350 ms | 3,424.283 ms |
+| Submission → start of applying the module, median | 3.647 ms | 3.510 ms |
+| Start of applying → updates/handlers completed, median | 1.286 ms | 1.533 ms |
+| Updates completed → observed live property, median | 6.058 ms | 5.023 ms |
+
+The observed warmed end-to-end reduction is about 13%, smaller than the GeneratorDriver reduction. The first update remains a separate multi-second cost; neither a one-minute worst case nor Visual Studio was reproduced here. Five subsequent updates still show tiering/warm-up variation, so these are sample medians, not a universal latency guarantee. Phase medians describe different intervals and must not be added to reconstruct a median total.
+
+Before each retained run, the fixture was rebuilt with `--no-incremental` and the selected frozen analyzer directory. Its runtime, diagnostics and build-task dependencies were consistent, with no Hot Reload handler exceptions. Earlier discarded logs (`watch-before.log`, `watch-after.log`) exposed an old `Akbura.Diagnostics.dll` from another branch calling the absent `ClearAkcssMetadataCache` API; rebuilding the existing project, without source changes, removed the mismatch. Only `watch-before-clean.log` and `watch-after-clean.log` support the table above. The manifest implementation was unchanged and held constant between these runs.
+
+```powershell
+dotnet build src/Akbura.Diagnostics/Akbura.Diagnostics.csproj -c Debug --no-restore --no-incremental --nologo -v:q
+$env:TimingAnalyzerDirectory = Join-Path (Get-Location) 'bin/ProbeBindingOptimization/Baseline'
+dotnet build bin/HotReloadTimingProbe/Purity/TimingHost/TimingHost.csproj --no-restore --no-incremental --nologo -v:q
+dotnet bin/ProbeBindingOptimization/Baseline/HotReloadTimingProbe.dll watch bin/HotReloadTimingProbe/Purity/TimingHost/TimingHost.csproj bin/HotReloadTimingProbe/Purity/PurityUIDashborad/Components/NeedHelp.akbura
+$env:TimingAnalyzerDirectory = Join-Path (Get-Location) 'bin/ProbeBindingOptimization/After'
+dotnet build bin/HotReloadTimingProbe/Purity/TimingHost/TimingHost.csproj --no-restore --no-incremental --nologo -v:q
+dotnet bin/ProbeBindingOptimization/After/HotReloadTimingProbe.dll watch bin/HotReloadTimingProbe/Purity/TimingHost/TimingHost.csproj bin/HotReloadTimingProbe/Purity/PurityUIDashborad/Components/NeedHelp.akbura
+```
+
+### Verification and source map
+
+The two new test files add 51 cases including parameterized rows (47 available in normal configurations, plus four statistics-only cases). They cover repeated type requests, exact type/import structure and trivia, same expression with different target types, nested foreach and conditional scopes, generic methods/local functions/captured render locals/lambdas, hook-model reuse, property and state-hook resolution through the existing hook suite, malformed expressions and repairs, exact raw diagnostic filtering for every nested/zero-width span, reference/assembly/options/language/nullable changes, unresolved-symbol repair, command/service/parameter/state/local/method changes, cancellation, concurrent branches and weak-reference lifetimes. No timing threshold is asserted: deterministic type/model/diagnostic reuse counts protect the optimization.
+
+Five workloads each perform **20 edits/reversions in both DebugStructural and ReleaseDirect**, comparing complete generated text, source identities and compiler/generator diagnostic keys with fresh generation after every edit. The two normal test configurations each exercise both emitted representations, not just their own configuration's name. A separate real-Purity driver run also compared all 17 generated sources and complete diagnostic keys against fresh generation after each of six edits: 6/6 matched (`purity-fresh-parity.log`). Together with the 11 preserved-baseline snapshots, this checks both before/after compatibility and incremental/fresh parity.
+
+| Executed selection | Result |
+| --- | --- |
+| Broad DebugStats binding/semantic/BlackSilence selection, before the final import fast path | 1,204 / 1,204 |
+| Core Debug selection, including both emitted modes | 317 / 317 |
+| Core Release selection, including both emitted modes | 317 / 317 |
+| Additional final DebugStats safety/counter/lifetime/invalidation selection on the measured binary | 58 / 58 |
+| Workspace unit suite, repeated after shared-import preparation | 1,294 / 1,294 |
+| Language-server completion/hover/signature/definition/rename/diagnostic selection | 22 / 22 |
+| Three deterministic reuse tests against preserved pre-optimization binaries | 3 expected failures: 31 type models instead of 1, 5 diagnostics queries instead of 1, distinct hook models |
+
+One intermediate 73-case statistics selection had 72 passes and an existing parse-counter assertion failure: `WhitespaceEdit_ParsesOneFileWithoutCreatingSemanticModelsOrSources(false)` observed one full parse rather than zero. Its isolated two-case rerun passed. Repeated invocation against the preserved baseline reproduced the same failure and proved a self-collision between `StatisticsView.akbura` and `Styles.akcss` in slot 19 of the existing direct-mapped 32-entry parse cache. This is not lost semantic/probe-cache state: the parser correctly falls back to a full parse, and the fixture's exact counter assumption is unstable. Parser/cache production code and that test were not changed. Evidence: `Before/probe-before.trx`, `StatsFinal/probe-stats-final.trx`, `StatisticsRecheck/probe-whitespace-recheck.trx`, `baseline-statistics-collision.log`. No claim is made that the entire repository test suite was run or that the intermediate selection had no failure.
+
+Actual core test filters and commands (dependencies were built first; the flag prevents rebuilding unrelated projects for each repeat):
+
+```powershell
+$probeCoreFilter = 'FullyQualifiedName~CSharpProbeOptimizationTests|FullyQualifiedName~BlackSilenceIncrementalGenerationTests|FullyQualifiedName~CSharpEnvironmentSnapshotTests|FullyQualifiedName~UseHookSemanticTests|FullyQualifiedName~UseHookInvocationWriterTests|FullyQualifiedName~MarkupForeachBindingTests|FullyQualifiedName~MarkupConditionalBindingTests|FullyQualifiedName~BinderArchitectureTests|FullyQualifiedName~ComposableHookSemanticTests'
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c Debug --no-restore -p:BuildProjectReferences=false --filter $probeCoreFilter --logger 'trx;LogFileName=probe-debug-final.trx' --results-directory bin/ProbeBindingOptimization/DebugFinal --nologo -v:q
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c Release --no-restore -p:BuildProjectReferences=false --filter $probeCoreFilter --logger 'trx;LogFileName=probe-release-final.trx' --results-directory bin/ProbeBindingOptimization/ReleaseFinal --nologo -v:q
+
+$probeSafetyFilter = 'FullyQualifiedName~CSharpProbeOptimizationTests|FullyQualifiedName~ProbeDeclarationChanges|FullyQualifiedName~ProbeCompilationChanges|FullyQualifiedName~ProbeErrorsAndRepairs|FullyQualifiedName~ConcurrentProbeBranches|FullyQualifiedName~CancellationDuringProbeBinding|FullyQualifiedName~GenerationStatisticsAllocationTests|FullyQualifiedName~GenerationStatisticsOperationTests'
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c DebugStats --no-restore -p:BuildProjectReferences=false --filter $probeSafetyFilter --logger 'trx;LogFileName=probe-final-safety.trx' --results-directory bin/ProbeBindingOptimization/FinalSafety --nologo -v:q
+
+dotnet test src/Workspaces/Akbura.Workspaces.UnitTests/Akbura.Workspaces.UnitTests.csproj -c Debug --no-restore -p:BuildProjectReferences=false --logger 'trx;LogFileName=probe-workspaces-final.trx' --results-directory bin/ProbeBindingOptimization/WorkspacesFinal --nologo -v:q
+dotnet test src/Workspaces/Akbura.LanguageServer.UnitTests/Akbura.LanguageServer.UnitTests.csproj -c Debug --no-restore -p:BuildProjectReferences=false --filter 'FullyQualifiedName~Completion|FullyQualifiedName~Hover|FullyQualifiedName~Signature|FullyQualifiedName~Definition|FullyQualifiedName~Rename|FullyQualifiedName~Diagnostic' --logger 'trx;LogFileName=probe-editor-final.trx' --results-directory bin/ProbeBindingOptimization/EditorFinal --nologo -v:q
+```
+
+Performance reproduction uses the existing ignored harness, with independently preserved baseline/current analyzer directories; verify their hashes rather than assuming a transitive build copied the intended generator:
+
+```powershell
+$env:AKBURA_TIMING_PARITY_DIRECTORY = Join-Path (Get-Location) 'bin/ProbeBindingOptimization/ReferenceOutputs'
+dotnet bin/ProbeBindingOptimization/Baseline/HotReloadTimingProbe.dll gallery bin/HotReloadTimingProbe/purity-inputs.json NeedHelp.akbura Publish
+dotnet bin/ProbeBindingOptimization/After/HotReloadTimingProbe.dll gallery bin/HotReloadTimingProbe/purity-inputs.json NeedHelp.akbura Publish
+dotnet bin/ProbeBindingOptimization/Harness/HotReloadTimingProbe.dll probe-experiment
+```
+
+The implementation changes only these files:
+
+| Files | Responsibility |
+| --- | --- |
+| `src/Akbura.Generator/Language/Binder/CSharpProbeContext.cs` | Document-owned imports, templates, projections, type results and parsed method syntax. |
+| `src/Akbura.Generator/Language/Binder/CSharpProbeDiagnostics.cs` | Exact-model covering-span diagnostic reuse. |
+| `src/Akbura.Generator/Language/Binder/CSharpProbeBinder.Statistics.cs` | Optional category/document operation measurements. |
+| `src/Akbura.Generator/Language/Binder/BindingSession.cs` | Context ownership. |
+| `src/Akbura.Generator/Language/Binder/CSharpProbeBinder.cs` | Shared template/method paths, diagnostic retrieval and fine-grained counters/timing. |
+| `src/Akbura.Generator/Language/Binder/CSharpProbeBinder.Scope.cs` | Exact-symbol declaration projection reuse. |
+| `src/Akbura.Generator/Language/Binder/CSharpProbeBinder.UseHooks.cs` | Lazy binder-local hook models and rewrite-node reuse. |
+| `src/Akbura.Generator/Language/Binder/CSharpProbeBuilder.cs` | Reused containing-method syntax. |
+| `src/Akbura.Generator/Language/Compilation/AkburaSemanticModel.cs` | Type cache entry point and snapshot-owned full imports; prefix imports stay separate. |
+| `src/Akbura.Generator/Language/CodeGeneration/GenerationStatistics.cs`, `GenerationStatistics.Operations.cs` | Instrumentation ABI and counters/stages. |
+| `src/Akbura.UnitTests/CSharpProbeOptimizationTests.cs` | Focused correctness, counters, concurrency, cancellation and lifetime tests. |
+| `src/Akbura.UnitTests/BlackSilenceIncrementalGenerationTests.Probes.cs`, `BlackSilenceIncrementalGenerationTests.cs` | Fresh/incremental scenarios and emitted-mode fixture options. |
+| `For Contributors/hot-reload.md` | This design, validation and measurement record. |
+
+The dependency graph, manifest builder/task, Avalonia runtime reconciliation, language syntax and unrelated `StyledElement.Name` behavior are unchanged. All added/modified source files use CRLF and multiline XML summaries; changed C# files were syntax-scanned with both `STATS` and `DEBUG` enabled to verify braces for every `if`, `for` and `foreach` body.
 
 <!-- Source references: implementation snapshot inspected for this guide. -->
 [baseline]: https://github.com/Asaicraft/Akbura/commit/959ae1590cce507bab17893da8284df69887120b

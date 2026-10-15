@@ -30,9 +30,12 @@ internal sealed class BindingSession
 
         _binderFactory = new BinderFactory(semanticModel, this);
         _blockBinderCache = new ConcurrentCache<BinderCacheKey, Binder>(32);
+        ProbeContext = new CSharpProbeContext(semanticModel);
     }
 
     public CompilationBinder RootBinder { get; }
+
+    internal CSharpProbeContext ProbeContext { get; }
 
     public MarkupDataTypeResolver MarkupDataTypes { get; }
 

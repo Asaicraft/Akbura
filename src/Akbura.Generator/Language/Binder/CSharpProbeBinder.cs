@@ -48,6 +48,7 @@ internal sealed partial class CSharpProbeBinder : Binder
     public CSharpBindingResult BindFieldType(CSharp.CompilationUnitSyntax compilationUnit)
     {
 #if STATS
+        using var probeMeasurement = MeasureProbe(ProbeCategory.Type);
         using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeBinding);
 #endif
         var syntaxTree = CreateSyntaxTree(compilationUnit);
@@ -87,6 +88,7 @@ internal sealed partial class CSharpProbeBinder : Binder
         ITypeSymbol? targetType = null)
     {
 #if STATS
+        using var probeMeasurement = MeasureProbe(isBindingPath ? ProbeCategory.BindingPath : ProbeCategory.MarkupExpression);
         using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeBinding);
 #endif
         var syntaxTree = CreateSyntaxTree(compilationUnit);
@@ -115,6 +117,8 @@ internal sealed partial class CSharpProbeBinder : Binder
         bool isBindingPath = true)
     {
 #if STATS
+        using var probeMeasurement = MeasureProbe(expression is CSharp.LambdaExpressionSyntax
+            ? ProbeCategory.Lambda : isBindingPath ? ProbeCategory.BindingPath : ProbeCategory.MarkupExpression, syntax);
         using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeBinding);
 #endif
         if (syntax == null)
@@ -166,6 +170,7 @@ internal sealed partial class CSharpProbeBinder : Binder
         bool isBindingPath)
     {
 #if STATS
+        using var probeMeasurement = MeasureProbe(ProbeCategory.Statement);
         using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeBinding);
 #endif
         var syntaxTree = CreateSyntaxTree(compilationUnit);
@@ -186,6 +191,7 @@ internal sealed partial class CSharpProbeBinder : Binder
         bool isBindingPath = false)
     {
 #if STATS
+        using var probeMeasurement = MeasureProbe(ProbeCategory.Statement, syntax);
         using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeBinding);
 #endif
         if (syntax == null)
@@ -235,6 +241,10 @@ internal sealed partial class CSharpProbeBinder : Binder
         {
             return false;
         }
+
+#if STATS
+        using var probeMeasurement = MeasureProbe(ProbeCategory.ComponentMethod, syntax);
+#endif
 
         if (methodSyntax.Parent is AkburaDocumentSyntax document &&
             ComponentRenderLocalFunctionFacts.GetCapturedFunctions(document).Contains(methodSyntax))
@@ -296,8 +306,7 @@ internal sealed partial class CSharpProbeBinder : Binder
         out BoundStatement boundStatement)
     {
         boundStatement = null!;
-        if (CSharpSyntaxFactory.ParseStatement(methodSyntax.ToFullString()) is not
-            CSharp.LocalFunctionStatementSyntax function)
+        if (SemanticModel.BindingSession.ProbeContext.GetCapturedFunction(methodSyntax) is not { } function)
         {
             return false;
         }
@@ -344,7 +353,7 @@ internal sealed partial class CSharpProbeBinder : Binder
         return true;
     }
 
-    private static bool TryGetContainingComponentMethod(
+    private bool TryGetContainingComponentMethod(
         AkburaSyntax syntax,
         out CSharpStatementSyntax methodSyntax,
         out CSharp.MethodDeclarationSyntax method)
@@ -359,19 +368,12 @@ internal sealed partial class CSharpProbeBinder : Binder
                 continue;
             }
 
-            try
+            var parsedMethod = SemanticModel.BindingSession.ProbeContext.GetMethodBody(statement);
+            if (parsedMethod != null)
             {
-                var parsedMethod = CSharpSyntaxFactory.ParseMemberDeclaration(
-                    statement.ToFullString()) as CSharp.MethodDeclarationSyntax;
-                if (parsedMethod != null)
-                {
-                    methodSyntax = statement;
-                    method = parsedMethod;
-                    return true;
-                }
-            }
-            catch (ArgumentException)
-            {
+                methodSyntax = statement;
+                method = parsedMethod;
+                return true;
             }
         }
 
@@ -385,6 +387,7 @@ internal sealed partial class CSharpProbeBinder : Binder
         string methodName)
     {
 #if STATS
+        using var probeMeasurement = MeasureProbe(ProbeCategory.ComponentMethod);
         using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeBinding);
 #endif
         if (string.IsNullOrWhiteSpace(methodName))
@@ -421,6 +424,10 @@ internal sealed partial class CSharpProbeBinder : Binder
 
     private SyntaxTree CreateSyntaxTree(CSharp.CompilationUnitSyntax compilationUnit)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.ProbeSyntaxTreeCreation);
+        GenerationStatistics.Increment(GenerationStatisticCounter.ProbeSyntaxTreeCreated);
+#endif
         var parseOptions = CSharpCompilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions ??
             CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
 
@@ -438,7 +445,21 @@ internal sealed partial class CSharpProbeBinder : Binder
 #if STATS
         using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeSemanticModel);
 #endif
-        var probeCompilation = CSharpCompilation.AddSyntaxTrees(syntaxTree);
+        CSharpCompilation probeCompilation;
+#if STATS
+        using (GenerationStatistics.Measure(GenerationStatisticStage.ProbeCompilationDerivation))
+#endif
+        {
+            probeCompilation = CSharpCompilation.AddSyntaxTrees(syntaxTree);
+#if STATS
+            GenerationStatistics.Increment(GenerationStatisticCounter.ProbeCompilationCreated);
+#endif
+        }
+
+#if STATS
+        using var acquisition = GenerationStatistics.Measure(GenerationStatisticStage.ProbeSemanticModelAcquisition);
+        GenerationStatistics.Increment(GenerationStatisticCounter.ProbeSemanticModelAcquired);
+#endif
         return probeCompilation.GetSemanticModel(syntaxTree);
     }
 
@@ -447,6 +468,17 @@ internal sealed partial class CSharpProbeBinder : Binder
         string fallbackTypeName,
         ImmutableArray<CSharp.UsingDirectiveSyntax> usingDirectives = default)
     {
+        return SemanticModel.BindingSession.ProbeContext.CreateComponentCompilationUnit(
+            this, members, fallbackTypeName, usingDirectives);
+    }
+
+    internal CSharp.CompilationUnitSyntax CreateComponentProbeCompilationUnitCore(
+        ImmutableArray<CSharp.MemberDeclarationSyntax> members, string fallbackTypeName,
+        ImmutableArray<CSharp.UsingDirectiveSyntax> usingDirectives)
+    {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.ProbeSyntaxConstruction);
+#endif
         var componentName = SemanticModel.SyntaxTree.ComponentName;
         var componentTypeInfo = AkburaComponentTypeResolver.Resolve(
             CSharpCompilation,
@@ -678,16 +710,30 @@ internal sealed partial class CSharpProbeBinder : Binder
             : expression.Token.Value;
     }
 
-    private static CSharpBindingResult BindExpression(
+    private CSharpBindingResult BindExpression(
         RoslynSemanticModel semanticModel,
         CSharp.ExpressionSyntax expression,
         bool isBindingPath,
         bool suppressTopLevelConversionDiagnostic = false)
     {
-        var typeInfo = semanticModel.GetTypeInfo(expression);
-        var symbolInfo = semanticModel.GetSymbolInfo(expression);
-        var operation = semanticModel.GetOperation(expression);
-        var receiverType = GetExpressionReceiverType(semanticModel, expression);
+        TypeInfo typeInfo;
+        SymbolInfo symbolInfo;
+        ITypeSymbol? receiverType;
+#if STATS
+        using (GenerationStatistics.Measure(GenerationStatisticStage.ProbeSymbolBinding))
+#endif
+        {
+            typeInfo = semanticModel.GetTypeInfo(expression);
+            symbolInfo = semanticModel.GetSymbolInfo(expression);
+            receiverType = GetExpressionReceiverType(semanticModel, expression);
+        }
+        IOperation? operation;
+#if STATS
+        using (GenerationStatistics.Measure(GenerationStatisticStage.ProbeOperationBinding))
+#endif
+        {
+            operation = semanticModel.GetOperation(expression);
+        }
         var diagnostics = GetProbeDiagnostics(
             semanticModel,
             expression,
@@ -709,7 +755,7 @@ internal sealed partial class CSharpProbeBinder : Binder
             diagnostics);
     }
 
-    private static CSharpBindingResult BindStatement(
+    private CSharpBindingResult BindStatement(
         RoslynSemanticModel semanticModel,
         CSharp.StatementSyntax statement,
         Microsoft.CodeAnalysis.ISymbol? symbol)
@@ -728,17 +774,24 @@ internal sealed partial class CSharpProbeBinder : Binder
             diagnostics);
     }
 
-    private static ImmutableArray<Diagnostic> GetProbeDiagnostics(
+    private ImmutableArray<Diagnostic> GetProbeDiagnostics(
         RoslynSemanticModel semanticModel,
         SyntaxNode syntax,
         bool suppressTopLevelConversionDiagnostic = false)
     {
 #if STATS
+        GenerationStatistics.Increment(GenerationStatisticCounter.ProbeDiagnosticsRequested);
         using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeDiagnostics);
 #endif
+        var diagnostics = SemanticModel.BindingSession.ProbeContext.GetDiagnostics(semanticModel, syntax.Span);
+        if (diagnostics.IsEmpty)
+        {
+            return ImmutableArray<Diagnostic>.Empty;
+        }
+
         using var builder = ImmutableArrayBuilder<Diagnostic>.Rent();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var diagnostic in semanticModel.GetDiagnostics(syntax.Span))
+        HashSet<(string Id, string Message, TextSpan Span)>? seen = null;
+        foreach (var diagnostic in diagnostics)
         {
             if (diagnostic.Severity != DiagnosticSeverity.Error)
             {
@@ -752,8 +805,8 @@ internal sealed partial class CSharpProbeBinder : Binder
                 continue;
             }
 
-            var key = diagnostic.Id + "|" + diagnostic.GetMessage() + "|" +
-                diagnostic.Location.SourceSpan.ToString();
+            var key = (diagnostic.Id, diagnostic.GetMessage(), diagnostic.Location.SourceSpan);
+            seen ??= new HashSet<(string Id, string Message, TextSpan Span)>();
             if (seen.Add(key))
             {
                 builder.Add(diagnostic);

@@ -5,20 +5,29 @@ namespace Akbura.Akcss;
 
 internal static partial class AkcssRuntime
 {
+    internal static bool QueueContributionUpdate(object target, AkcssPropertyContribution contribution)
+    {
+        return s_targets.TryGetValue(target, out var runtime) && runtime.QueueContribution(contribution);
+    }
+
     internal abstract class Reconciliation
     {
         public abstract ImmutableArray<AkcssStyleActivator> Styles { get; }
         public abstract ImmutableArray<AkcssActivatorDescriptor> Descriptors { get; }
         public abstract void Commit();
+        public virtual void PrepareCommit() => Commit();
         public abstract void Rollback();
+        public virtual void Complete()
+        {
+        }
     }
 
     internal static Reconciliation Reconcile(object target,
-        ImmutableArray<AkcssActivatorDescriptor> descriptors, Func<int, AkcssStyleActivator> factory)
+        ImmutableArray<AkcssActivatorDescriptor> descriptors, Func<int, AkcssStyleActivator> factory, bool propertySet = true)
     {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(factory);
-        return s_targets.GetValue(target, static value => new TargetRuntime(value)).Reconcile(descriptors, factory);
+        return s_targets.GetValue(target, static value => new TargetRuntime(value)).Reconcile(descriptors, factory, propertySet);
     }
 
     internal static void SetStylesFromProperty(object target, ImmutableArray<AkcssStyleActivator> styles)
@@ -56,9 +65,47 @@ internal static partial class AkcssRuntime
         private ImmutableArray<AkcssActivatorDescriptor> _descriptors;
         private bool _isPublishing;
         private bool _isReconciling;
+        private CascadeTransition? _activeTransition;
+        private HashSet<AkcssPropertyContribution>? _pendingContributions;
+
+        public bool QueueContribution(AkcssPropertyContribution contribution)
+        {
+            if (_activeTransition == null)
+            {
+                return false;
+            }
+            (_pendingContributions ??= []).Add(contribution);
+            return true;
+        }
+
+        private void FlushContributions()
+        {
+            if (_pendingContributions == null)
+            {
+                return;
+            }
+            var pending = _pendingContributions;
+            _pendingContributions = null;
+            List<Exception>? failures = null;
+            foreach (var contribution in pending)
+            {
+                try
+                {
+                    contribution.PublishLatest();
+                }
+                catch (Exception failure)
+                {
+                    (failures ??= []).Add(failure);
+                }
+            }
+            if (failures != null)
+            {
+                throw new AggregateException("AKCSS queued resource updates failed.", failures);
+            }
+        }
 
         public bool IsPublishingStyles => _isPublishing;
-        public bool IsReconcilingStyles => _isReconciling;
+        public bool IsReconcilingStyles => _isReconciling || _activeTransition != null;
 
         private readonly struct ReconciliationScope : IDisposable
         {
@@ -78,13 +125,15 @@ internal static partial class AkcssRuntime
             _descriptors = descriptors;
         }
 
-        public Reconciliation Reconcile(ImmutableArray<AkcssActivatorDescriptor> descriptors, Func<int, AkcssStyleActivator> factory)
+        public Reconciliation Reconcile(ImmutableArray<AkcssActivatorDescriptor> descriptors, Func<int, AkcssStyleActivator> factory, bool propertySet)
         {
-            if (_isApplying || _isChanging || _isReconciling || descriptors.IsDefault)
+            if (_isApplying || _isChanging || IsReconcilingStyles || descriptors.IsDefault)
             {
                 throw new InvalidOperationException("An AKCSS reconciliation cannot start during a cascade update.");
             }
-            var transition = new CascadeTransition(this, descriptors, factory);
+            using var scope = new ReconciliationScope(this);
+            var transition = new CascadeTransition(this, descriptors, factory, propertySet);
+            _activeTransition = transition;
             try
             {
                 transition.Apply();
@@ -143,17 +192,21 @@ internal static partial class AkcssRuntime
             private readonly List<AkcssUtilityCandidateActivator> _added = [];
             private readonly List<AkcssUtilityCandidateActivator> _removed = [];
             private readonly List<AkcssUtilityCandidateActivator> _retired = [];
+            private readonly List<AkcssUtilityCandidateActivator.ContributionUpdate> _contributions = [];
             private readonly HashSet<string> _affected = new(StringComparer.Ordinal);
             private readonly bool _partial;
             private readonly bool _oldPropertySet;
+            private readonly bool _propertySet;
             private bool _started;
             private bool _committed;
+            private bool _completed;
             private bool _rolledBack;
 
             public CascadeTransition(TargetRuntime runtime, ImmutableArray<AkcssActivatorDescriptor> desired,
-                Func<int, AkcssStyleActivator> factory)
+                Func<int, AkcssStyleActivator> factory, bool propertySet)
             {
                 _runtime = runtime;
+                _propertySet = propertySet;
                 _oldStyles = runtime._styles;
                 _oldDescriptors = runtime._descriptors;
                 _oldPropertySet = runtime._target is not Control control ||
@@ -169,6 +222,7 @@ internal static partial class AkcssRuntime
                 var canRetain = (_oldStyles.IsEmpty || !_oldDescriptors.IsDefault) &&
                     _oldStyles.All(IsSupported) && desired.All(static value => value.Revision != null);
                 var styles = new AkcssStyleActivator[desired.Length];
+                var instances = new HashSet<AkcssStyleActivator>(ReferenceEqualityComparer.Instance);
                 var metadata = desired.ToArray();
                 var retained = new HashSet<AkcssStyleActivator>();
                 for (var index = 0; index < styles.Length; index++)
@@ -224,6 +278,13 @@ internal static partial class AkcssRuntime
                     metadata[index] = metadata[index] with { Identity = identity };
                 }
                 _newStyles = ImmutableArray.Create(styles);
+                foreach (var style in styles)
+                {
+                    if (style == null || !instances.Add(style))
+                    {
+                        throw new InvalidOperationException("An AKCSS declaration must own a distinct activator instance.");
+                    }
+                }
                 _newDescriptors = ImmutableArray.Create(metadata);
                 if (!_partial)
                 {
@@ -272,14 +333,33 @@ internal static partial class AkcssRuntime
                 _started = true;
                 if (!_partial)
                 {
-                    _runtime.SetStyles(_newStyles);
+                    _runtime._activeTransition = null;
+                    try
+                    {
+                        _runtime.SetStyles(_newStyles);
+                    }
+                    finally
+                    {
+                        _runtime._activeTransition = this;
+                    }
                     _runtime._descriptors = _newDescriptors;
-                    _runtime.PublishStyles();
+                    _runtime.PublishStyles(_propertySet);
                     return;
                 }
                 _runtime._isChanging = true;
                 try
                 {
+                    foreach (var candidate in _oldStyles.Cast<AkcssUtilityCandidateActivator>())
+                    {
+                        if (candidate.BeginContributionUpdate(_affected) is { } update)
+                        {
+                            _contributions.Add(update);
+                        }
+                    }
+                    foreach (var update in _contributions)
+                    {
+                        update.Suspend();
+                    }
                     if (!_runtime._isDetached)
                     {
                         foreach (var candidate in _added)
@@ -297,28 +377,58 @@ internal static partial class AkcssRuntime
                             _runtime.ExecuteConflictKey(key);
                         }
                     }
-                    _runtime.PublishStyles();
+                    _runtime.PublishStyles(_propertySet);
                 }
                 finally
                 {
                     _runtime._isChanging = false;
                 }
-                _runtime.ApplyPendingCandidates();
             }
 
             public override void Commit()
+            {
+                PrepareCommit();
+                Complete();
+            }
+
+            public override void PrepareCommit()
             {
                 if (_rolledBack || _committed)
                 {
                     return;
                 }
                 using var scope = new ReconciliationScope(_runtime);
-                _committed = true;
                 foreach (var candidate in _removed)
                 {
+                    if (_retired.Contains(candidate))
+                    {
+                        continue;
+                    }
                     _retired.Add(candidate);
                     candidate.Detach(_runtime._target);
                 }
+                _committed = true;
+            }
+
+            public override void Complete()
+            {
+                if (!_committed || _rolledBack || _completed)
+                {
+                    return;
+                }
+                using var scope = new ReconciliationScope(_runtime);
+                _completed = true;
+                // All enclosing render mutations have committed. Only now retire
+                // rollback contributions and allow queued reactive invalidations.
+                List<Exception>? failures = null;
+                foreach (var update in _contributions)
+                {
+                    Attempt(update.Complete, ref failures);
+                }
+                _runtime._activeTransition = null;
+                Attempt(_runtime.FlushContributions, ref failures);
+                ThrowFailures(failures);
+                _runtime.ApplyPendingCandidates();
             }
 
             public override void Rollback()
@@ -331,46 +441,113 @@ internal static partial class AkcssRuntime
                 _rolledBack = true;
                 if (!_partial)
                 {
+                    _runtime._activeTransition = null;
+                    _runtime._pendingContributions = null;
                     _runtime.SetStyles(_oldStyles);
                     _runtime._descriptors = _oldDescriptors;
                     _runtime.PublishStyles(_oldPropertySet);
                     return;
                 }
                 _runtime._isChanging = true;
+                List<Exception>? failures = null;
                 try
                 {
                     foreach (var candidate in _added)
                     {
-                        candidate.Detach(_runtime._target);
+                        Attempt(() => candidate.Detach(_runtime._target), ref failures);
                     }
-                    Reset(_newStyles);
+                    Attempt(() => Reset(_newStyles), ref failures);
                     _runtime._styles = _oldStyles;
                     _runtime._descriptors = _oldDescriptors;
                     if (!_runtime._isDetached)
                     {
-                        if (_committed)
+                        foreach (var candidate in _retired)
                         {
-                            foreach (var candidate in _retired)
+                            _runtime._isRestoringSources = true;
+                            try
                             {
-                                candidate.Attach(_runtime._target, _runtime.RequestApplyCandidate);
+                                Attempt(() => candidate.Attach(_runtime._target, _runtime.RequestApplyCandidate), ref failures);
+                            }
+                            finally
+                            {
+                                _runtime._isRestoringSources = false;
+                            }
+                            if (candidate.HaveArgumentValuesChanged())
+                            {
+                                _runtime.RequestApplyCandidate(candidate);
                             }
                         }
+                    }
+                    foreach (var update in _contributions)
+                    {
+                        Attempt(() => update.Rollback(!_runtime._isDetached), ref failures);
+                    }
+                    if (!_runtime._isDetached)
+                    {
                         foreach (var key in _affected)
                         {
-                            _runtime.ExecuteConflictKey(key);
+                            Attempt(() => _runtime.ExecuteConflictKey(key, preserveContribution: true), ref failures);
                         }
                     }
-                    _runtime.PublishStyles(_oldPropertySet);
+                    Attempt(() => _runtime.PublishStyles(_oldPropertySet), ref failures);
                 }
                 finally
                 {
                     _runtime._isChanging = false;
+                    _runtime._activeTransition = null;
                 }
-                _runtime.ApplyPendingCandidates();
+                Attempt(_runtime.ApplyPendingCandidates, ref failures);
+                Attempt(_runtime.FlushContributions, ref failures);
+                ThrowFailures(failures);
+            }
+
+            public bool ContainsPrevious(AkcssUtilityCandidateActivator candidate) => _oldStyles.Contains(candidate);
+
+            public void DetachPrevious()
+            {
+                List<Exception>? failures = null;
+                foreach (var candidate in _removed)
+                {
+                    if (!_retired.Contains(candidate))
+                    {
+                        _retired.Add(candidate);
+                        Attempt(() => candidate.Detach(_runtime._target), ref failures);
+                    }
+                }
+                foreach (var update in _contributions)
+                {
+                    Attempt(update.Detach, ref failures);
+                }
+                ThrowFailures(failures);
+            }
+
+            private static void Attempt(Action action, ref List<Exception>? failures)
+            {
+                try
+                {
+                    action();
+                }
+                catch (Exception failure)
+                {
+                    (failures ??= []).Add(failure);
+                }
+            }
+
+            private static void ThrowFailures(List<Exception>? failures)
+            {
+                if (failures?.Count == 1)
+                {
+                    System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+                }
+                if (failures != null)
+                {
+                    throw new AggregateException("AKCSS transition recovery or cleanup failed.", failures);
+                }
             }
 
             private void Reset(ImmutableArray<AkcssStyleActivator> styles)
             {
+                List<Exception>? failures = null;
                 for (var index = styles.Length - 1; index >= 0; index--)
                 {
                     var candidate = (AkcssUtilityCandidateActivator)styles[index];
@@ -378,10 +555,12 @@ internal static partial class AkcssRuntime
                     {
                         if (_affected.Contains(candidate.GetOperationConflictKey(operation)))
                         {
-                            candidate.ResetOperation(operation, _runtime._target);
+                            var current = operation;
+                            Attempt(() => candidate.ResetOperation(current, _runtime._target), ref failures);
                         }
                     }
                 }
+                ThrowFailures(failures);
             }
 
             private static int[] Match(ImmutableArray<AkcssActivatorDescriptor> old, ImmutableArray<AkcssActivatorDescriptor> desired)

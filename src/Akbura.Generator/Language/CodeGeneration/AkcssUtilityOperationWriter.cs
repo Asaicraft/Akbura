@@ -116,6 +116,7 @@ internal ref struct AkcssUtilityOperationWriter
         {
             _writer.WriteLine();
             _writer.WriteLine("public override bool SupportsHotReloadReconciliation => true;");
+            _writer.WriteLine("public override bool SupportsOwnedContributions => !HotReloadProperty!.IsDirect;");
             _writer.Write("public override global::Avalonia.AvaloniaProperty HotReloadProperty => ");
             _targetPropertyWriter.Write(targetProperty);
             _writer.WriteLine(";");
@@ -324,7 +325,16 @@ internal ref struct AkcssUtilityOperationWriter
     {
         var indent = _writer.CurrentIndent;
 
-        _writer.WriteLine("return ((global::Avalonia.AvaloniaObject)__target).SetValue(");
+        if (_hotReload)
+        {
+            _writer.WriteLine("return global::Akbura.Akcss.AkcssPropertyContribution.SetValue(");
+            _writer.CurrentIndent = indent + _writer.TabSize;
+            _writer.WriteLine("(global::Avalonia.AvaloniaObject)__target,");
+        }
+        else
+        {
+            _writer.WriteLine("return ((global::Avalonia.AvaloniaObject)__target).SetValue(");
+        }
         _writer.CurrentIndent = indent + _writer.TabSize;
 
         _targetPropertyWriter.Write(targetProperty);
@@ -343,6 +353,12 @@ internal ref struct AkcssUtilityOperationWriter
         }
 
         _writer.CurrentIndent = indent + _writer.TabSize;
+        if (_hotReload)
+        {
+            _writer.WriteLine("__bindingPriority);");
+            _writer.CurrentIndent = indent;
+            return;
+        }
         _writer.WriteLine("__bindingPriority) ??");
 
         _writer.CurrentIndent = indent + _writer.TabSize;
@@ -361,7 +377,16 @@ internal ref struct AkcssUtilityOperationWriter
     {
         var indent = _writer.CurrentIndent;
 
-        _writer.WriteLine("return ((global::Avalonia.AvaloniaObject)__target).Bind(");
+        if (_hotReload)
+        {
+            _writer.WriteLine("return global::Akbura.Akcss.AkcssPropertyContribution.Bind(");
+            _writer.CurrentIndent = indent + _writer.TabSize;
+            _writer.WriteLine("(global::Avalonia.AvaloniaObject)__target,");
+        }
+        else
+        {
+            _writer.WriteLine("return ((global::Avalonia.AvaloniaObject)__target).Bind(");
+        }
         _writer.CurrentIndent = indent + _writer.TabSize;
 
         _targetPropertyWriter.Write(targetProperty);

@@ -370,6 +370,104 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
             GetBindingPriority());
     }
 
+    internal ContributionUpdate? BeginContributionUpdate(HashSet<string> affected)
+    {
+        ContributionUpdate? update = null;
+        for (var index = 0; index < _operations.Length; index++)
+        {
+            if (affected.Contains(_operations[index].ConflictKey) &&
+                _operationContributions[index] is AkcssPropertyContribution contribution)
+            {
+                (update ??= new ContributionUpdate(this)).Capture(index, contribution);
+                _operationContributions[index] = null;
+            }
+        }
+        return update;
+    }
+
+    internal sealed class ContributionUpdate(AkcssUtilityCandidateActivator owner)
+    {
+        private readonly List<(int Index, AkcssPropertyContribution Resource)> _previous = [];
+        private bool _completed;
+        private bool _rolledBack;
+        public void Capture(int index, AkcssPropertyContribution contribution) => _previous.Add((index, contribution));
+        public void Suspend()
+        {
+            foreach (var (_, resource) in _previous)
+            {
+                resource.Suspend();
+            }
+        }
+        public void Complete()
+        {
+            Finish(rollback: false);
+        }
+        public void Rollback(bool activate = true)
+        {
+            Finish(rollback: true, activate);
+        }
+        public void Detach()
+        {
+            List<Exception>? failures = null;
+            foreach (var (_, resource) in _previous)
+            {
+                try
+                {
+                    resource.Dispose();
+                }
+                catch (Exception failure)
+                {
+                    (failures ??= []).Add(failure);
+                }
+            }
+            if (failures != null)
+            {
+                throw new AggregateException("AKCSS detached contribution cleanup failed.", failures);
+            }
+        }
+        private void Finish(bool rollback, bool activate = true)
+        {
+            if (_rolledBack || (!rollback && _completed))
+            {
+                return;
+            }
+            _rolledBack = rollback;
+            _completed = !rollback;
+            List<Exception>? failures = null;
+            foreach (var (index, resource) in _previous)
+            {
+                try
+                {
+                    if (rollback)
+                    {
+                        owner.DisposeContribution(index);
+                        owner._operationContributions[index] = resource;
+                        if (activate)
+                        {
+                            resource.Resume();
+                        }
+                        else
+                        {
+                            resource.Dispose();
+                        }
+                    }
+                    else
+                    {
+                        resource.Dispose();
+                    }
+                }
+                catch (Exception failure)
+                {
+                    (failures ??= []).Add(failure);
+                }
+            }
+            if (failures != null)
+            {
+                throw new AggregateException("AKCSS contribution transition cleanup failed.", failures);
+            }
+        }
+    }
+
     private void ResetOperationCore(int index, object target)
     {
         if (UsesBindingPriority)
@@ -379,6 +477,20 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
         }
 
         _operations[index].Reset(target);
+    }
+
+    internal bool HasOwnedContribution(int index) => _operationContributions[index] is AkcssPropertyContribution;
+
+    internal bool HaveArgumentValuesChanged()
+    {
+        for (var index = 0; index < _arguments.Length; index++)
+        {
+            if (_arguments[index].HasValue && !Equals(_arguments[index].Value, _values[index]))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private BindingPriority GetBindingPriority()

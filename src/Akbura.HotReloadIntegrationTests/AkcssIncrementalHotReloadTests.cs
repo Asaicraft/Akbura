@@ -358,6 +358,140 @@ public sealed class AkcssIncrementalHotReloadTests
         reload.DispatchMetadataUpdateHandlers();
     }
 
+    [Fact]
+    [Trait("Category", "ClrHotReload")]
+    public Task OwnedPropertyMigration_PreservesExternalBindingAndReleasesOriginalProperty() =>
+        Scenario(nameof(OwnedPropertyMigration_PreservesExternalBindingAndReleasesOriginalProperty), "${Owned}:w-12 h-${Stream}", (source, reload, owner, target, window) =>
+        {
+            using var external = target.Bind(Control.WidthProperty, new Avalonia.Data.Binding(nameof(Border.Height)) { Source = target });
+            Publish(reload, "Publish", 73d);
+            Assert.Equal(12, target.Width);
+            var old = AkburaControl.GetAkcssStyles(target);
+            var updated = Styles.Replace("Width: value;", "MinWidth: value;", StringComparison.Ordinal);
+            reload.ApplyUpdate(source.UpdateAkcss("Styles.akcss", updated));
+            reload.DispatchMetadataUpdateHandlers();
+            Assert.Same(target, owner.Child);
+            Assert.Same(old[1], AkburaControl.GetAkcssStyles(target)[1]);
+            Assert.Equal(73, target.Width);
+            Assert.Equal(12, target.MinWidth);
+            Publish(reload, "Publish", 81d);
+            Assert.Equal(81, target.Width);
+            Update(source, reload, "h-${Stream}");
+            Assert.False(target.IsSet(Control.MinWidthProperty));
+            Publish(reload, "Publish", 92d);
+            Assert.Equal(92, target.Width);
+        });
+
+    [Fact]
+    [Trait("Category", "ClrHotReload")]
+    public Task OwnedMultiPropertyFailure_RestoresCapturedContributionsAndAllowsRetry() =>
+        Scenario(nameof(OwnedMultiPropertyFailure_RestoresCapturedContributionsAndAllowsRetry), "${Owned}:pair-12 pad-4", (source, reload, owner, target, window) =>
+        {
+            var old = AkburaControl.GetAkcssStyles(target);
+            var failing = Styles.Replace("Width: value; Height: value * 2;", "Width: value + 1; Height: Demo.Probe.FailValue();", StringComparison.Ordinal);
+            reload.ApplyUpdate(source.UpdateAkcss("Styles.akcss", failing));
+            Assert.ThrowsAny<Exception>(() => reload.DispatchMetadataUpdateHandlers());
+            Assert.Same(target, owner.Child);
+            Assert.True(old == AkburaControl.GetAkcssStyles(target));
+            Assert.Equal(12, target.Width);
+            Assert.Equal(24, target.Height);
+            Assert.Equal(new Thickness(4), target.Padding);
+            reload.ApplyUpdate(source.UpdateAkcss("Styles.akcss", Styles));
+            reload.DispatchMetadataUpdateHandlers();
+            Assert.Equal(12, target.Width);
+            Assert.Equal(24, target.Height);
+        });
+
+    [Fact]
+    [Trait("Category", "ClrHotReload")]
+    public Task OwnedTwentyDeltas_RetainOtherContributionsAndRestoreExternalValueOnRemoval() =>
+        Scenario(nameof(OwnedTwentyDeltas_RetainOtherContributionsAndRestoreExternalValueOnRemoval), "${Owned}:w-12 ${Owned}:round-7 h-${Stream}", (source, reload, owner, target, window) =>
+        {
+            target.Width = 73;
+            var old = AkburaControl.GetAkcssStyles(target);
+            var subscriptions = Count(reload, "Subscriptions");
+            for (var index = 0; index < 20; index++)
+            {
+                Update(source, reload, "${Owned}:w-" + (index + 20) + " ${Owned}:round-7 h-${Stream}");
+                Assert.Equal(index + 20, target.Width);
+                Assert.Same(old[1], AkburaControl.GetAkcssStyles(target)[1]);
+                Assert.Same(old[2], AkburaControl.GetAkcssStyles(target)[2]);
+                Assert.Equal(subscriptions, Count(reload, "Subscriptions"));
+            }
+            Update(source, reload, "h-${Stream}");
+            Assert.Equal(73, target.Width);
+            Assert.False(target.IsSet(Border.CornerRadiusProperty));
+            Publish(reload, "PublishStale", 999d);
+            Assert.Equal(73, target.Width);
+        });
+
+    [Fact]
+    [Trait("Category", "ClrHotReload")]
+    public Task OwnedDetachedUpdate_ActivatesOnlyTheLatestCascadeOnReattachment() =>
+        Scenario(nameof(OwnedDetachedUpdate_ActivatesOnlyTheLatestCascadeOnReattachment), "${Owned}:w-12 h-${Stream}", (source, reload, owner, target, window) =>
+        {
+            target.Width = 73;
+            window.Content = null;
+            Assert.Equal(73, target.Width);
+            Update(source, reload, "${Owned}:w-25 h-${Stream}");
+            Update(source, reload, "${Owned}:w-31 h-${Stream}");
+            Assert.Equal(0, Count(reload, "Subscribers"));
+            Assert.Equal(73, target.Width);
+            window.Content = owner;
+            Assert.Equal(31, target.Width);
+            Assert.Equal(1, Count(reload, "Subscribers"));
+            Update(source, reload, "h-${Stream}");
+            Assert.Equal(73, target.Width);
+        });
+
+    [Fact]
+    [Trait("Category", "ClrHotReload")]
+    public Task OwnedDynamicResource_ReplacementRollbackAndRemovalPreserveLiveSources() =>
+        Scenario(nameof(OwnedDynamicResource_ReplacementRollbackAndRemovalPreserveLiveSources), "${Owned}:resource-3 pad-4", (source, reload, owner, target, window) =>
+        {
+            target.Resources["size"] = 4d;
+            Assert.Equal(12, target.Width);
+            Update(source, reload, "${Owned}:resource-4 pad-4");
+            Assert.Equal(16, target.Width);
+            var old = AkburaControl.GetAkcssStyles(target);
+            var failed = Styles.Replace("Width: Amx.DynamicResource<double>(\"size\") * value;",
+                "Width: Amx.DynamicResource<double>(\"size\") * value; Height: Demo.Probe.FailValue();", StringComparison.Ordinal);
+            reload.ApplyUpdate(source.UpdateAkcss("Styles.akcss", failed));
+            Assert.ThrowsAny<Exception>(() => reload.DispatchMetadataUpdateHandlers());
+            Assert.True(old == AkburaControl.GetAkcssStyles(target));
+            Assert.Equal(16, target.Width);
+            target.Resources["size"] = 5d;
+            Assert.Equal(20, target.Width);
+            reload.ApplyUpdate(source.UpdateAkcss("Styles.akcss", Styles));
+            reload.DispatchMetadataUpdateHandlers();
+            Update(source, reload, "pad-4");
+            Assert.False(target.IsSet(Control.WidthProperty));
+            target.Resources["size"] = 9d;
+            Assert.False(target.IsSet(Control.WidthProperty));
+        });
+
+    [Fact]
+    [Trait("Category", "ClrHotReload")]
+    public Task OwnedPaddingEdit_RetainsUnrelatedBackgroundAndCornerRadiusContributions() =>
+        Scenario(nameof(OwnedPaddingEdit_RetainsUnrelatedBackgroundAndCornerRadiusContributions), "${Owned}:bg-1 ${Owned}:round-7 ${Owned}:pad-4 h-${Stream}", (source, reload, owner, target, window) =>
+        {
+            var old = AkburaControl.GetAkcssStyles(target);
+            var background = target.Background;
+            var subscriptions = Count(reload, "Subscriptions");
+            Reset(reload);
+            Update(source, reload, "${Owned}:bg-1 ${Owned}:round-7 ${Owned}:pad-6 h-${Stream}");
+            var current = AkburaControl.GetAkcssStyles(target);
+            Assert.Same(old[0], current[0]);
+            Assert.Same(old[1], current[1]);
+            Assert.Same(old[3], current[3]);
+            Assert.Same(background, target.Background);
+            Assert.Equal(new CornerRadius(7), target.CornerRadius);
+            Assert.Equal(new Thickness(6), target.Padding);
+            Assert.Equal(subscriptions, Count(reload, "Subscriptions"));
+            Assert.Equal(1, Count(reload, "Constructions"));
+            AssertKeys(reload, "property:Padding");
+        });
+
     private static int Count(ClrHotReloadSession reload, string name) =>
         Assert.IsType<int>(reload.Assembly.GetType("Demo.Probe")!.GetProperty(name)!.GetValue(null));
 
@@ -410,10 +544,12 @@ public sealed class AkcssIncrementalHotReloadTests
     }
 
     private const string Styles =
-        "@using Avalonia; @using Avalonia.Controls; Border.card { CornerRadius: new CornerRadius(7); } @utilities { " +
+        "@using Akbura; @using Avalonia; @using Avalonia.Controls; Border.card { CornerRadius: new CornerRadius(7); } @utilities { " +
         "Border.w-(double value) { Width: value; } Border.h-(double value) { Height: value; } " +
         "Border.pad-(double value) { Padding: new Thickness(value); } Border.round-(double value) { CornerRadius: new CornerRadius(value); } " +
-        "Border.pair-(double value) { Width: value; Height: value * 2; } }";
+        "Border.pair-(double value) { Width: value; Height: value * 2; } " +
+        "Border.resource-(double value) { Width: Amx.DynamicResource<double>(\"size\") * value; } " +
+        "Border.bg-(double value) { Background: Avalonia.Media.Brushes.Red; } }";
 
     private const string OwnerSource =
         """
@@ -438,6 +574,11 @@ public sealed class AkcssIncrementalHotReloadTests
         public sealed class ThrowingStreamExtension
         {
             public IObservable<double> ProvideValue(IServiceProvider services) => throw new InvalidOperationException("incremental failure");
+        }
+        [Akbura.Markup.UtilityBindingPriority(Priority = Avalonia.Data.BindingPriority.Animation)]
+        public sealed class OwnedExtension
+        {
+            public bool ProvideValue(IServiceProvider services) => true;
         }
         public static class Probe
         {
@@ -473,6 +614,7 @@ public sealed class AkcssIncrementalHotReloadTests
             public static void PublishStale(double value) => Source.PublishStale(value);
             public static void Hover(bool value) => HoverSource.Publish(value);
             public static void HoverStale(bool value) => HoverSource.PublishStale(value);
+            public static double FailValue() => throw new InvalidOperationException("property application failed");
         }
         public sealed class Signal<T>(T initial) : IObservable<T>
         {

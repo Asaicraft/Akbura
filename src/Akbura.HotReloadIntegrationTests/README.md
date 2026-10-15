@@ -121,6 +121,13 @@ split-delta workaround as complete-cascade tests, with one handler dispatch per 
 See [AKCSS incremental reconciliation](../../For%20Contributors/hot-reload.md#20-akcss-incremental-reconciliation)
 for eligibility, ownership boundaries, measurements and exact validation results.
 
+Owned-contribution cases additionally cover CLR property migration with a live
+external binding, multi-property failure/retry, twenty updates, dynamic-resource
+rollback/removal, detached catch-up, and isolated padding changes. They use an
+explicit Animation priority, not a global change to ordinary LocalValue semantics.
+See [property ownership and transactions](../../For%20Contributors/hot-reload.md#21-akcss-property-ownership-and-transactions)
+for reversible priorities and compatibility fallback limitations.
+
 ## Harness and boundaries
 
 `AkburaCompilationSession` keeps the same incremental driver and replaces the

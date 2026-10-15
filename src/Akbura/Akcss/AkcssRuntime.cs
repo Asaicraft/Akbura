@@ -62,6 +62,7 @@ internal static partial class AkcssRuntime
         private bool _isChanging;
         private bool _isDetached;
         private bool _applyPending;
+        private bool _isRestoringSources;
 
         public TargetRuntime(object target)
         {
@@ -91,9 +92,16 @@ internal static partial class AkcssRuntime
                     Subscribe();
                 }
             }
-            catch
+            catch (Exception failure)
             {
-                DisposeSubscriptions();
+                try
+                {
+                    DisposeSubscriptions();
+                }
+                catch (Exception cleanup)
+                {
+                    throw new AggregateException("AKCSS application and cleanup failed.", failure, cleanup);
+                }
                 throw;
             }
             finally
@@ -110,7 +118,7 @@ internal static partial class AkcssRuntime
         public void RequestApply()
         {
             _applyPending = true;
-            if (_isApplying || _isChanging || _isDetached)
+            if (_isApplying || _isChanging || _isDetached || _activeTransition != null)
             {
                 return;
             }
@@ -259,26 +267,53 @@ internal static partial class AkcssRuntime
 
         private void DisposeSubscriptions()
         {
+            List<Exception>? failures = null;
             foreach (var style in _styles)
             {
                 if (style is AkcssUtilityCandidateActivator candidate)
                 {
-                    candidate.Detach(_target);
+                    try
+                    {
+                        candidate.Detach(_target);
+                    }
+                    catch (Exception failure)
+                    {
+                        (failures ??= []).Add(failure);
+                    }
                 }
             }
 
             foreach (var subscription in _subscriptions)
             {
-                subscription.Dispose();
+                try
+                {
+                    subscription.Dispose();
+                }
+                catch (Exception failure)
+                {
+                    (failures ??= []).Add(failure);
+                }
             }
 
             _subscriptions.Clear();
+            if (failures?.Count == 1)
+            {
+                ExceptionDispatchInfo.Capture(failures[0]).Throw();
+            }
+            if (failures != null)
+            {
+                throw new AggregateException("AKCSS subscription cleanup failed.", failures);
+            }
         }
 
         private void RequestApplyCandidate(
             AkcssUtilityCandidateActivator candidate)
         {
-            if (!_styles.Contains(candidate))
+            if (_isRestoringSources)
+            {
+                return;
+            }
+            if (!_styles.Contains(candidate) && _activeTransition?.ContainsPrevious(candidate) != true)
             {
                 return;
             }
@@ -292,7 +327,7 @@ internal static partial class AkcssRuntime
                 _pendingConflictKeys.Add(conflictKey);
             }
 
-            if (_isApplying || _isChanging || _isDetached)
+            if (_isApplying || _isChanging || _isDetached || _activeTransition != null)
             {
                 return;
             }
@@ -302,7 +337,7 @@ internal static partial class AkcssRuntime
 
         private void ApplyPendingCandidates()
         {
-            if (_isApplying || _isChanging || _isDetached)
+            if (_isApplying || _isChanging || _isDetached || _activeTransition != null)
             {
                 return;
             }
@@ -361,11 +396,15 @@ internal static partial class AkcssRuntime
             }
         }
 
-        private void ExecuteConflictKey(string conflictKey)
+        private void ExecuteConflictKey(string conflictKey, bool preserveContribution = false)
         {
             var winner = ResolveUtilityWinner(conflictKey);
             if (winner.HasValue)
             {
+                if (preserveContribution && winner.Value.Candidate.HasOwnedContribution(winner.Value.OperationIndex))
+                {
+                    return;
+                }
                 winner.Value.Candidate.ExecuteOperation(
                     winner.Value.OperationIndex,
                     _target);
@@ -601,7 +640,27 @@ internal static partial class AkcssRuntime
             _isDetached = true;
             _applyPending = false;
             _pendingConflictKeys.Clear();
-            DisposeSubscriptions();
+            List<Exception>? failures = null;
+            try
+            {
+                DisposeSubscriptions();
+            }
+            catch (Exception failure)
+            {
+                (failures ??= []).Add(failure);
+            }
+            try
+            {
+                _activeTransition?.DetachPrevious();
+            }
+            catch (Exception failure)
+            {
+                (failures ??= []).Add(failure);
+            }
+            if (failures != null)
+            {
+                throw new AggregateException("AKCSS detach cleanup failed.", failures);
+            }
         }
 
         private readonly struct UtilityOperationWinner

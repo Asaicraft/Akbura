@@ -50,6 +50,12 @@ public abstract class AkcssUtilityOperation : AkcssStyle
     public virtual bool SupportsHotReloadReconciliation => false;
 
     /// <summary>
+    /// Gets whether Apply returns an independently suspendable property contribution.
+    /// Ordinary LocalValue assignments and direct properties remain compatibility paths.
+    /// </summary>
+    public virtual bool SupportsOwnedContributions => false;
+
+    /// <summary>
     /// Gets the Avalonia property captured when a Debug candidate is constructed.
     /// </summary>
     public virtual AvaloniaProperty? HotReloadProperty => null;

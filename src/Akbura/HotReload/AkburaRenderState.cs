@@ -2277,7 +2277,7 @@ public sealed partial class AkburaRenderState : IDisposable
                     new RenderOperationMutation(
                         resource,
                         replacement: null));
-                resource.Release();
+                resource.StageRelease();
             }
         }
     }
@@ -2413,6 +2413,10 @@ public sealed partial class AkburaRenderState : IDisposable
             foreach (var mutation in Mutations)
             {
                 mutation.Commit();
+            }
+            foreach (var mutation in Mutations)
+            {
+                mutation.CompleteCommit();
             }
         }
 
@@ -3344,6 +3348,13 @@ public sealed partial class AkburaRenderState : IDisposable
 
     private abstract class RenderOperationResource
     {
+        public virtual void StageRelease() => Release();
+        public virtual void CommitRelease()
+        {
+        }
+        public virtual void CompleteRelease()
+        {
+        }
         public bool IsApplied { get; private set; }
 
         public void SetAppliedState(bool applied)
@@ -3545,8 +3556,8 @@ public sealed partial class AkburaRenderState : IDisposable
     {
         protected readonly object _target;
         protected ImmutableArray<AkcssStyleActivator> _styles;
-        private readonly bool _baselineWasSet;
-        private readonly ImmutableArray<AkcssStyleActivator> _baselineStyles;
+        protected readonly bool _baselineWasSet;
+        protected readonly ImmutableArray<AkcssStyleActivator> _baselineStyles;
 
         public AkcssStylesOperation(
             object target,
@@ -3603,6 +3614,9 @@ public sealed partial class AkburaRenderState : IDisposable
 
     private abstract class RenderRevisionMutation
     {
+        public virtual void CompleteCommit()
+        {
+        }
         public abstract void Rollback();
 
         public virtual void Commit()
@@ -3622,6 +3636,9 @@ public sealed partial class AkburaRenderState : IDisposable
             _previous = previous;
             _replacement = replacement;
         }
+
+        public override void Commit() => _previous?.CommitRelease();
+        public override void CompleteCommit() => _previous?.CompleteRelease();
 
         public override void Rollback()
         {

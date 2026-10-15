@@ -10,8 +10,11 @@ using Xunit.Abstractions;
 
 namespace Akbura.UnitTests;
 
+[Collection(AvaloniaHeadlessCollection.Name)]
 public sealed class AkcssReconciliationPerformanceTests(ITestOutputHelper output)
 {
+    private static Task OnDispatcher(Action action) => AvaloniaHeadlessTestSession.GetSession().Dispatch(action, CancellationToken.None);
+
     private static readonly AvaloniaProperty[] s_properties =
     [
         Control.WidthProperty, Control.HeightProperty, Control.MinWidthProperty, Control.MinHeightProperty,
@@ -20,7 +23,7 @@ public sealed class AkcssReconciliationPerformanceTests(ITestOutputHelper output
     ];
 
     [Fact]
-    public void OneOfTenUtilities_ComparesFullReplacementWithIncrementalReconciliation()
+    public Task OneOfTenUtilities_ComparesFullReplacementWithIncrementalReconciliation() => OnDispatcher(() =>
     {
         const int iterations = 1000;
         var full = Measure(incremental: false, iterations);
@@ -34,16 +37,33 @@ public sealed class AkcssReconciliationPerformanceTests(ITestOutputHelper output
         Assert.Equal(iterations, incremental.Resets);
         Assert.True(full.Resets >= iterations * 10);
         output.WriteLine("Runtime/ownership microbenchmark; 10 independent Avalonia properties, 9 unchanged observable arguments.");
-        Write("Phase 1 full replacement", full, iterations);
-        Write("Phase 2 incremental", incremental, iterations);
-    }
+        Write("Full replacement", full, iterations);
+        Write("Incremental compatibility path", incremental, iterations);
+    });
+
+    [Fact]
+    public Task OneOfTenOwnedUtilities_ComparesDisposableHandlesWithSuspendableContributions() => OnDispatcher(() =>
+    {
+        const int iterations = 1000;
+        var handles = Measure(true, iterations, priority: true);
+        var owned = Measure(true, iterations, priority: true, owned: true);
+        Assert.Equal(iterations, handles.Constructions);
+        Assert.Equal(iterations, owned.Constructions);
+        Assert.Equal(0, owned.Subscriptions);
+        Assert.Equal(iterations, owned.Executions);
+        Assert.Equal(iterations, owned.Installations);
+        Assert.Equal(iterations, owned.Releases);
+        Write("Disposable priority handles", handles, iterations);
+        Write("Suspendable owned contributions", owned, iterations);
+    });
 
     private void Write(string label, Measurement result, int iterations) =>
         output.WriteLine($"{label}: {result.Bytes / iterations} B/update; {result.Elapsed.TotalMicroseconds / iterations:F2} us/update; " +
             $"constructed={result.Constructions / iterations}, subscriptions={result.Subscriptions / iterations}, " +
-            $"reset={result.Resets / iterations}, execute={result.Executions / iterations}");
+            $"reset={result.Resets / iterations}, execute={result.Executions / iterations}, " +
+            $"installed={result.Installations / iterations}, released={result.Releases / iterations}");
 
-    private static Measurement Measure(bool incremental, int iterations)
+    private static Measurement Measure(bool incremental, int iterations, bool priority = false, bool owned = false)
     {
         using var state = new AkburaRenderState();
         var counters = new Counters();
@@ -65,7 +85,7 @@ public sealed class AkcssReconciliationPerformanceTests(ITestOutputHelper output
         var bytes = GC.GetAllocatedBytesForCurrentThread() - allocated;
         Assert.Equal(9, signal.Subscribers);
         return new Measurement(bytes, timer.Elapsed, counters.Constructions, counters.Subscriptions,
-            counters.Resets, counters.Executions);
+            counters.Resets, counters.Executions, counters.Installations, counters.Releases);
 
         void Apply(int revision)
         {
@@ -92,18 +112,19 @@ public sealed class AkcssReconciliationPerformanceTests(ITestOutputHelper output
             AkcssStyleActivator Factory(int index)
             {
                 counters.Constructions++;
-                var utility = new Utility(s_properties[index], counters);
+                var utility = new Utility(s_properties[index], counters, owned);
                 var argument = index == 0
                     ? AkcssUtilityValueSource.Create<double>(_ => revision + 12)
                     : AkcssUtilityValueSource.CreateObservable<double, double>(_ => signal, AkcssUtilityValueSource.Identity);
                 return new AkcssUtilityCandidateActivator(s_properties[index].Name, index,
-                    [new AkcssUtilityApplication(utility, static (_, _) => { })], [argument]);
+                    [new AkcssUtilityApplication(utility, static (_, _) => { })], [argument],
+                    bindingPriority: priority ? Avalonia.Data.BindingPriority.Style : null);
             }
         }
     }
 
     private readonly record struct Measurement(long Bytes, TimeSpan Elapsed, int Constructions,
-        int Subscriptions, int Resets, int Executions);
+        int Subscriptions, int Resets, int Executions, int Installations, int Releases);
 
     private sealed class Counters
     {
@@ -111,7 +132,9 @@ public sealed class AkcssReconciliationPerformanceTests(ITestOutputHelper output
         public int Subscriptions;
         public int Resets;
         public int Executions;
-        public void Clear() => Constructions = Subscriptions = Resets = Executions = 0;
+        public int Installations;
+        public int Releases;
+        public void Clear() => Constructions = Subscriptions = Resets = Executions = Installations = Releases = 0;
     }
 
     private sealed class Signal(Counters counters) : IObservable<double>
@@ -134,25 +157,41 @@ public sealed class AkcssReconciliationPerformanceTests(ITestOutputHelper output
 
     private sealed class Utility : AkcssUtility<double>
     {
-        public Utility(AvaloniaProperty property, Counters counters) => Operations = [new Operation(this, property, counters)];
+        public Utility(AvaloniaProperty property, Counters counters, bool owned) => Operations = [new Operation(this, property, counters, owned)];
         public override ImmutableArray<AkcssUtilityOperation> Operations { get; }
         public override void Update(object target, double value) => Operations[0].Update(target, [value]);
     }
 
-    private sealed class Operation(AkcssUtility utility, AvaloniaProperty property, Counters counters)
+    private sealed class Operation(AkcssUtility utility, AvaloniaProperty property, Counters counters, bool owned)
         : AkcssUtilityOperation(utility, property.Name, AkcssOperationPriority.Style, 0)
     {
         public override bool SupportsHotReloadReconciliation => true;
+        public override bool SupportsOwnedContributions => owned;
         public override AvaloniaProperty HotReloadProperty => property;
         public override bool IsActive(object target, IReadOnlyList<object?> arguments) => true;
         public override void Update(object target, IReadOnlyList<object?> arguments)
         {
             counters.Executions++;
-            var value = (double)arguments[0]!;
-            object converted = property.PropertyType == typeof(Thickness) ? new Thickness(value)
+            ((AvaloniaObject)target).SetValue(property, Convert((double)arguments[0]!));
+        }
+        private object Convert(double value) => property.PropertyType == typeof(Thickness) ? new Thickness(value)
                 : property.PropertyType == typeof(CornerRadius) ? new CornerRadius(value)
                 : property == Visual.OpacityProperty ? 0.5 : value;
-            ((AvaloniaObject)target).SetValue(property, converted);
+        public override IDisposable Apply(object target, IReadOnlyList<object?> arguments, Avalonia.Data.BindingPriority priority)
+        {
+            counters.Executions++;
+            counters.Installations++;
+            var value = Convert((double)arguments[0]!);
+            if (owned)
+            {
+                return AkcssPropertyContribution.Bind((AvaloniaObject)target, property, new ValueSource(value, counters), priority);
+            }
+            var handle = ((AvaloniaObject)target).SetValue(property, value, priority)!;
+            return new Subscription(() =>
+            {
+                counters.Releases++;
+                handle.Dispose();
+            });
         }
         public override void Reset(object target)
         {
@@ -163,6 +202,15 @@ public sealed class AkcssReconciliationPerformanceTests(ITestOutputHelper output
         {
             counters.Resets++;
             base.Reset(target, capturedProperty);
+        }
+    }
+
+    private sealed class ValueSource(object value, Counters counters) : IObservable<object?>
+    {
+        public IDisposable Subscribe(IObserver<object?> observer)
+        {
+            observer.OnNext(value);
+            return new Subscription(() => counters.Releases++);
         }
     }
 }

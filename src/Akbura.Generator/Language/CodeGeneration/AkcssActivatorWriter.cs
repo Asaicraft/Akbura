@@ -3,6 +3,7 @@ using Akbura.Language.Operations;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace Akbura.Language.CodeGeneration;
@@ -16,6 +17,7 @@ internal readonly ref struct AkcssActivatorWriter
     private readonly bool _hasSourceMap;
     private readonly string _ownerTypeName;
     private readonly ComponentGenerationMode _generationMode;
+    private readonly bool _forIdentity;
 
     public AkcssActivatorWriter(
         CodeWriter writer,
@@ -23,7 +25,8 @@ internal readonly ref struct AkcssActivatorWriter
         string ownerTypeName,
         ComponentGenerationSourceMap? sourceMap = null,
         ComponentGenerationMode generationMode =
-            ComponentGenerationMode.ReleaseDirect)
+            ComponentGenerationMode.ReleaseDirect,
+        bool forIdentity = false)
     {
         Debug.Assert(writer != null);
         Debug.Assert(!string.IsNullOrEmpty(ownerTypeName));
@@ -39,6 +42,7 @@ internal readonly ref struct AkcssActivatorWriter
 
         _ownerTypeName = ownerTypeName;
         _generationMode = generationMode;
+        _forIdentity = forIdentity;
         _hasSourceMap = sourceMap != null;
         _sourceMappingWriter = sourceMap != null
             ? new SourceMappingWriter(_writer, sourceMap)
@@ -148,7 +152,8 @@ internal readonly ref struct AkcssActivatorWriter
         in AkcssPlanRange activators,
         int localId,
         string targetExpression,
-        in MarkupExtensionWriteContext context)
+        in MarkupExtensionWriteContext context,
+        bool canRetainCascade = true)
     {
         if (activators.IsEmpty)
         {
@@ -159,16 +164,244 @@ internal readonly ref struct AkcssActivatorWriter
         EnsureExpression(targetExpression, nameof(targetExpression));
 
         var indent = _writer.CurrentIndent;
+        var knownRevision = _generationMode == ComponentGenerationMode.DebugStructural && canRetainCascade
+            ? WriteRevisionGuard(plan, activators, localId, context)
+            : null;
+        var registered = knownRevision != null;
+        if (registered)
+        {
+            _writer.WriteLine("{");
+            _writer.CurrentIndent += _writer.TabSize;
+        }
+
+        if (registered && CanWriteDescriptors(plan, activators))
+        {
+            WriteReconciliation(plan, activators, localId, targetExpression, context, knownRevision!);
+            _writer.CurrentIndent = indent;
+            _writer.WriteLine("}");
+            return;
+        }
 
         _writer
             .Write(ComponentStructuralHotReloadWriter.RenderStateFieldName)
             .WriteLine(".ApplyAkcssStylesOperation(");
-        _writer.CurrentIndent = indent + 4;
+        _writer.CurrentIndent += _writer.TabSize;
         _writer.WriteIntegerLiteral(localId).WriteLine(",");
         _writer.Write(targetExpression).WriteLine(",");
         WriteActivatorArray(plan, activators, context);
+        if (registered)
+        {
+            _writer.WriteLine(",");
+            _writer.Write("operationRegistered: ");
+            _writer.Write(knownRevision!);
+        }
         _writer.WriteLine(");");
+        if (registered)
+        {
+            _writer.CurrentIndent = indent;
+            _writer.WriteLine("}");
+        }
         _writer.CurrentIndent = indent;
+    }
+
+    private string? WriteRevisionGuard(
+        in AkcssComponentActivatorPlan plan,
+        in AkcssPlanRange activators,
+        int localId,
+        in MarkupExtensionWriteContext context)
+    {
+        var references = new List<AkcssStyleReferencePlan>();
+        for (var index = activators.Start; index < activators.Start + activators.Length; index++)
+        {
+            var activator = plan.Activators[index];
+            if (activator.Kind == AkcssActivatorKind.Class)
+            {
+                references.Add(plan.ClassCaches[activator.Index].Style);
+            }
+            else
+            {
+                var candidate = plan.Candidates[activator.Index];
+                var applications = GetApplicationCache(plan, candidate.ApplicationCacheId).Applications;
+                for (var applicationIndex = applications.Start; applicationIndex < applications.Start + applications.Length; applicationIndex++)
+                {
+                    references.Add(plan.Applications[applicationIndex].Reference);
+                }
+            }
+        }
+
+        var revisionName = "__akcssRevision" + localId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var reliable = references.Count != 0 &&
+            references.TrueForAll(static reference => reference.Kind == AkcssStyleReferenceKind.GeneratedModule);
+        if (!reliable)
+        {
+            return null;
+        }
+        using var code = new CodeWriter("\n");
+        new AkcssActivatorWriter(code, _bindingEnvironment, _ownerTypeName,
+            generationMode: _generationMode).WriteActivatorArray(plan, activators, context);
+        _writer.Write("var ");
+        _writer.Write(revisionName);
+        _writer.Write(" = ");
+        _writer.WriteStringLiteral(AkcssHotReloadIdentity.Create(code.GetText().ToString()));
+        _writer.WriteLine(";");
+        for (var index = 0; index < references.Count; index++)
+        {
+            _writer.Write("var ");
+            WriteReferenceRevisionName(revisionName, index);
+            _writer.Write(" = ");
+            _writer.Write(references[index].GeneratedModuleTypeName!);
+            _writer.Write(".");
+            _writer.Write(AkcssModuleWriter.DebugStyleRevisionName);
+            _writer.Write("(");
+            _writer.WriteIntegerLiteral(references[index].StyleIndex);
+            _writer.WriteLine(");");
+        }
+        _writer.Write("var ");
+        _writer.Write(revisionName + "Known = ");
+        for (var index = 0; index < references.Count; index++)
+        {
+            if (index != 0)
+            {
+                _writer.Write(" && ");
+            }
+            WriteReferenceRevisionName(revisionName, index);
+            _writer.Write(" != null");
+        }
+        _writer.WriteLine(";");
+        _writer.Write(revisionName);
+        _writer.Write(" += ");
+        for (var index = 0; index < references.Count; index++)
+        {
+            if (index != 0)
+            {
+                _writer.Write(" + ");
+            }
+            WriteReferenceRevisionName(revisionName, index);
+        }
+        _writer.WriteLine(";");
+
+        _writer.Write("if (!");
+        _writer.Write(revisionName + "Known || ");
+        _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName);
+        _writer.Write(".ShouldApplyOwnedOperation(");
+        _writer.WriteIntegerLiteral(localId);
+        _writer.Write(", \"$akcss\", ");
+        _writer.Write(revisionName);
+        _writer.WriteLine("))");
+        return revisionName + "Known";
+    }
+
+    private void WriteReferenceRevisionName(string revisionName, int index)
+    {
+        _writer.Write(revisionName + "_");
+        _writer.WriteIntegerLiteral(index);
+    }
+
+    private static bool CanWriteDescriptors(in AkcssComponentActivatorPlan plan, in AkcssPlanRange range)
+    {
+        for (var index = range.Start; index < range.Start + range.Length; index++)
+        {
+            var activator = plan.Activators[index];
+            if (activator.Kind != AkcssActivatorKind.UtilityCandidate)
+            {
+                return false;
+            }
+            var candidate = plan.Candidates[activator.Index];
+            if (candidate.VariantValueSourceIndex >= 0)
+            {
+                var variant = plan.ValueSources[candidate.VariantValueSourceIndex];
+                if (variant.Kind == AkcssUtilityValueSourceKind.Observable &&
+                    !SymbolEqualityComparer.Default.Equals(variant.ExpectedType, variant.ObservableElementType))
+                {
+                    return false;
+                }
+            }
+            for (var valueIndex = candidate.ValueSources.Start;
+                 valueIndex < candidate.ValueSources.Start + candidate.ValueSources.Length; valueIndex++)
+            {
+                var value = plan.ValueSources[valueIndex];
+                if (value.Kind == AkcssUtilityValueSourceKind.Observable &&
+                    !SymbolEqualityComparer.Default.Equals(value.ExpectedType, value.ObservableElementType))
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private void WriteReconciliation(in AkcssComponentActivatorPlan plan, in AkcssPlanRange range,
+        int localId, string target, in MarkupExtensionWriteContext context, string knownRevision)
+    {
+        var names = new string[range.Length];
+        var identities = new string[range.Length];
+        var revisions = new string[range.Length];
+        var familyOccurrences = new Dictionary<string, int>(StringComparer.Ordinal);
+        var anchorOccurrences = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var index = 0; index < range.Length; index++)
+        {
+            var candidate = plan.Candidates[plan.Activators[range.Start + index].Index];
+            familyOccurrences.TryGetValue(candidate.ConflictKey, out var occurrence);
+            familyOccurrences[candidate.ConflictKey] = occurrence + 1;
+            identities[index] = candidate.ConflictKey + "/" + occurrence.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            anchorOccurrences.TryGetValue(candidate.SyntaxIdentity, out var anchorOccurrence);
+            anchorOccurrences[candidate.SyntaxIdentity] = anchorOccurrence + 1;
+            names[index] = "CreateAkcss_" + candidate.SyntaxIdentity + "_" +
+                anchorOccurrence.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            using var definition = new CodeWriter("\n");
+            new AkcssActivatorWriter(definition, _bindingEnvironment, _ownerTypeName,
+                generationMode: _generationMode, forIdentity: true).WriteCandidate(plan, candidate, context);
+            revisions[index] = AkcssHotReloadIdentity.Create(definition.GetText().ToString());
+            _writer.Write("global::Akbura.Akcss.AkcssStyleActivator ");
+            _writer.Write(names[index]);
+            _writer.WriteLine("()");
+            _writer.WriteLine("{");
+            _writer.CurrentIndent += _writer.TabSize;
+            _writer.Write("return ");
+            WriteCandidate(plan, candidate, context);
+            _writer.WriteLine(";");
+            _writer.CurrentIndent -= _writer.TabSize;
+            _writer.WriteLine("}");
+        }
+        _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName);
+        _writer.WriteLine(".ReconcileAkcssStylesOperation(");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteIntegerLiteral(localId).WriteLine(",");
+        _writer.Write(target).WriteLine(",");
+        _writer.WriteLine("global::System.Collections.Immutable.ImmutableArray.Create<global::Akbura.Akcss.AkcssActivatorDescriptor>(");
+        _writer.CurrentIndent += _writer.TabSize;
+        var referenceIndex = 0;
+        var revisionName = "__akcssRevision" + localId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        for (var index = 0; index < range.Length; index++)
+        {
+            var candidate = plan.Candidates[plan.Activators[range.Start + index].Index];
+            _writer.Write("new global::Akbura.Akcss.AkcssActivatorDescriptor(");
+            _writer.WriteStringLiteral(identities[index]).Write(", ");
+            _writer.WriteStringLiteral(candidate.ConflictKey).Write(", ");
+            _writer.WriteStringLiteral(candidate.SyntaxIdentity).Write(", ");
+            _writer.Write(knownRevision).Write(" ? ");
+            _writer.WriteStringLiteral(revisions[index]);
+            var applications = GetApplicationCache(plan, candidate.ApplicationCacheId).Applications;
+            for (var application = 0; application < applications.Length; application++)
+            {
+                _writer.Write(" + ");
+                WriteReferenceRevisionName(revisionName, referenceIndex++);
+            }
+            _writer.Write(" : null)");
+            _writer.WriteLine(index + 1 == range.Length ? ")," : ",");
+        }
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("__index => __index switch");
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        for (var index = 0; index < names.Length; index++)
+        {
+            _writer.WriteIntegerLiteral(index).Write(" => ").Write(names[index]).WriteLine("(),");
+        }
+        _writer.WriteLine("_ => throw new global::System.ArgumentOutOfRangeException(nameof(__index)),");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("},");
+        _writer.Write("operationRegistered: ").Write(knownRevision).WriteLine(");");
     }
 
     private void WriteActivatorArray(
@@ -205,7 +438,9 @@ internal readonly ref struct AkcssActivatorWriter
         EnsureExpression(targetExpression, nameof(targetExpression));
 
         _writer
-            .Write("global::Akbura.AkburaControl.ExecuteAkcssStyles(")
+            .Write(_generationMode == ComponentGenerationMode.DebugStructural
+                ? "global::Akbura.AkburaControl.RefreshAkcssStylesForHotReload("
+                : "global::Akbura.AkburaControl.ExecuteAkcssStyles(")
             .Write(targetExpression)
             .WriteLine(");");
     }
@@ -528,7 +763,7 @@ internal readonly ref struct AkcssActivatorWriter
         _writer.CurrentIndent = indent + 4;
         _writer.Write("conflictKey: ");
         _writer.WriteStringLiteral(candidate.ConflictKey).WriteLine(",");
-        _writer.Write("sourceOrder: ").WriteIntegerLiteral(candidate.SourceOrder).WriteLine(",");
+        _writer.Write("sourceOrder: ").WriteIntegerLiteral(_forIdentity ? 0 : candidate.SourceOrder).WriteLine(",");
         _writer.Write("applications: ");
 
         if (_generationMode.UsesStructuralRuntime())
@@ -731,7 +966,7 @@ internal readonly ref struct AkcssActivatorWriter
         _valueWriter.WriteTypeName(plan.ExpectedType);
         _writer.Write(">(");
         WriteMarkupExtensionFactory(componentPlan, plan, context);
-        WriteObjectConverter(plan.ExpectedType, useNullForgivingOperator: false);
+        WriteObjectConverter(plan.ExpectedType, useNullForgivingOperator: false, plan.ObservableElementType);
         WriteRecreateOnRefresh(plan.RecreateOnRefresh);
     }
 
@@ -774,8 +1009,18 @@ internal readonly ref struct AkcssActivatorWriter
 
     private void WriteObjectConverter(
         ITypeSymbol expectedType,
-        bool useNullForgivingOperator)
+        bool useNullForgivingOperator,
+        ITypeSymbol? sourceType = null)
     {
+        if (_generationMode == ComponentGenerationMode.DebugStructural &&
+            (sourceType == null || SymbolEqualityComparer.Default.Equals(sourceType, expectedType)))
+        {
+            _writer.Write(", global::Akbura.Akcss.AkcssUtilityValueSource.");
+            _writer.Write(sourceType == null ? "CastObject<" : "Identity<");
+            _valueWriter.WriteTypeName(expectedType);
+            _writer.Write(">");
+            return;
+        }
         _writer.Write(", static __value => (");
         _valueWriter.WriteTypeName(expectedType);
         _writer.Write(")__value");
@@ -956,7 +1201,7 @@ internal readonly ref struct AkcssActivatorWriter
                 .Write(".")
                 .Write(AkcssModuleWriter.DebugStyleAccessorName)
                 .Write("(")
-                .WriteIntegerLiteral(reference.StyleIndex)
+                .WriteIntegerLiteral(_forIdentity ? 0 : reference.StyleIndex)
                 .Write(")");
             return;
         }
@@ -977,9 +1222,7 @@ internal readonly ref struct AkcssActivatorWriter
         _writer.Write("s_akcssApplications").WriteIntegerLiteral(id);
     }
 
-    private static AkcssMarkupExtensionSlotPlan GetSlot(
-        in AkcssComponentActivatorPlan plan,
-        int slotId)
+    private static AkcssMarkupExtensionSlotPlan GetSlot(in AkcssComponentActivatorPlan plan, int slotId)
     {
         var slots = plan.MarkupExtensionSlots;
 

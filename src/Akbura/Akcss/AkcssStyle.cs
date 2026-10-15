@@ -114,12 +114,28 @@ public abstract class AkcssStyle
 
         public void Dispose()
         {
-            for (var index = _subscriptions.Count - 1; index >= 0; index--)
-            {
-                _subscriptions[index].Dispose();
-            }
-
+            var subscriptions = _subscriptions.ToArray();
             _subscriptions.Clear();
+            List<Exception>? failures = null;
+            for (var index = subscriptions.Length - 1; index >= 0; index--)
+            {
+                try
+                {
+                    subscriptions[index].Dispose();
+                }
+                catch (Exception failure)
+                {
+                    (failures ??= []).Add(failure);
+                }
+            }
+            if (failures?.Count == 1)
+            {
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+            }
+            if (failures != null)
+            {
+                throw new AggregateException("AKCSS style subscription cleanup failed.", failures);
+            }
         }
     }
 }

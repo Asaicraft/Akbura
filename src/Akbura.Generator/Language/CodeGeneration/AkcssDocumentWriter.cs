@@ -66,7 +66,8 @@ internal static class AkcssDocumentWriter
 #endif
             using var writer = new CodeWriter();
 
-            var moduleWriter = new AkcssModuleWriter(writer, sourceMap);
+            var moduleWriter = new AkcssModuleWriter(writer, sourceMap,
+                hotReload: generationMode == ComponentGenerationMode.DebugStructural);
 
             WriteHeader(writer, input);
 
@@ -177,6 +178,12 @@ internal static class AkcssDocumentWriter
         {
             writer.WriteLine();
             moduleWriter.WriteDebugStyleAccessor(plan);
+        }
+
+        if (generationMode == ComponentGenerationMode.DebugStructural)
+        {
+            writer.WriteLine();
+            moduleWriter.WriteDebugStyleRevisions(plan);
         }
 
         if (!plan.Symbols.IsEmpty)

@@ -1,4 +1,5 @@
 using Akbura.CompilerAnotations;
+using Avalonia;
 using Avalonia.Data;
 using System.ComponentModel;
 
@@ -41,6 +42,51 @@ public abstract class AkcssUtilityOperation : AkcssStyle
     public AkcssOperationPriority Priority { get; }
 
     public int Order { get; }
+
+    /// <summary>
+    /// Gets whether this generated operation can reset one known Avalonia property.
+    /// Custom and legacy operations conservatively opt out of incremental updates.
+    /// </summary>
+    public virtual bool SupportsHotReloadReconciliation => false;
+
+    /// <summary>
+    /// Gets whether Apply returns an independently suspendable property contribution.
+    /// Ordinary LocalValue assignments and direct properties remain compatibility paths.
+    /// </summary>
+    public virtual bool SupportsOwnedContributions => false;
+
+    /// <summary>
+    /// Opts into scalar publication without resetting the owned binding first.
+    /// Operations with target-dependent eligibility or arbitrary effects must opt out.
+    /// </summary>
+    public virtual bool SupportsContributionUpdates => false;
+
+    /// <summary>
+    /// Updates an existing owned scalar source, or returns false without effects.
+    /// </summary>
+    public virtual bool TryUpdateContribution(object target, IReadOnlyList<object?> arguments,
+        BindingPriority priority, IDisposable contribution) => false;
+
+    /// <summary>
+    /// Gets the Avalonia property captured when a Debug candidate is constructed.
+    /// </summary>
+    public virtual AvaloniaProperty? HotReloadProperty => null;
+
+    /// <summary>
+    /// Gets the receiver guard captured alongside the original reset property.
+    /// </summary>
+    public virtual Type HotReloadResetTargetType => typeof(AvaloniaObject);
+
+    /// <summary>
+    /// Clears a captured property without relying on a replaced generated Reset body.
+    /// </summary>
+    public virtual void Reset(object target, AvaloniaProperty property)
+    {
+        if (target is AvaloniaObject avaloniaObject)
+        {
+            avaloniaObject.ClearValue(property);
+        }
+    }
 
     public abstract bool IsActive(
         object target,

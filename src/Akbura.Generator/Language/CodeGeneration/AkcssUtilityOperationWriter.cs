@@ -27,6 +27,7 @@ internal ref struct AkcssUtilityOperationWriter
     private readonly PooledImmutableList<AkcssOperationMetadataPlan> _metadata;
     private readonly PooledImmutableList<AkcssUtilityOperationPlan> _operations;
     private readonly ArrayBuilder<int> _conditionOrders;
+    private readonly bool _hotReload;
 
     private AkcssRuntimeOperationWriter _runtimeWriter;
 
@@ -36,7 +37,8 @@ internal ref struct AkcssUtilityOperationWriter
         in AkcssUtilityPlan plan,
         ArrayBuilder<AkcssIdentifierValue> identifierValues,
         PooledHashSet<IAkcssSymbol> expansionPath,
-        ArrayBuilder<int> conditionOrders)
+        ArrayBuilder<int> conditionOrders,
+        bool hotReload = false)
     {
         Debug.Assert(writer != null);
         AkburaDebug.Assert(sourceMap != null);
@@ -52,6 +54,7 @@ internal ref struct AkcssUtilityOperationWriter
         _metadata = plan.Metadata;
         _operations = plan.Operations;
         _conditionOrders = conditionOrders;
+        _hotReload = hotReload;
         _runtimeWriter = new AkcssRuntimeOperationWriter(
             _writer,
             sourceMap,
@@ -109,16 +112,63 @@ internal ref struct AkcssUtilityOperationWriter
 
         WriteConstructor(styleIndex, operationIndex, operation);
 
+        if (_hotReload && hasAvaloniaTarget)
+        {
+            _writer.WriteLine();
+            _writer.WriteLine("public override bool SupportsHotReloadReconciliation => true;");
+            _writer.WriteLine("public override bool SupportsOwnedContributions => !HotReloadProperty!.IsDirect;");
+            _writer.Write("public override global::Avalonia.AvaloniaProperty HotReloadProperty => ");
+            _targetPropertyWriter.Write(targetProperty);
+            _writer.WriteLine(";");
+            _writer.Write("public override global::System.Type HotReloadResetTargetType => typeof(");
+            if (AkcssExpressionGenerator.GetPropertyReceiverType(property) is { } receiverType)
+            {
+                _valueWriter.WriteTypeName(receiverType);
+            }
+            else
+            {
+                _writer.Write("global::Avalonia.AvaloniaObject");
+            }
+            _writer.WriteLine(");");
+        }
+        if (_hotReload)
+        {
+            // Keep this overload even when a new revision writes an ordinary CLR
+            // property: retired operations must still reset their captured property.
+            _writer.WriteLine("public override void Reset(object __target, global::Avalonia.AvaloniaProperty __property)");
+            _writer.WriteLine("{");
+            _writer.CurrentIndent += _writer.TabSize;
+            _writer.WriteLine("base.Reset(__target, __property);");
+            _writer.CurrentIndent -= _writer.TabSize;
+            _writer.WriteLine("}");
+        }
+
         _writer.WriteLine();
         WriteIsActive(metadata, property, value);
 
         _writer.WriteLine();
         WriteUpdate(setter, value);
 
+        if (_hotReload && (!hasAvaloniaTarget || value.DynamicResource != null || _conditionOrders.Count != 0))
+        {
+            _writer.WriteLine("public override bool SupportsContributionUpdates => false;");
+            _writer.WriteLine("public override bool TryUpdateContribution(object __target,");
+            _writer.CurrentIndent += _writer.TabSize;
+            _writer.WriteLine("global::System.Collections.Generic.IReadOnlyList<object?> __arguments,");
+            _writer.WriteLine("global::Avalonia.Data.BindingPriority __bindingPriority, global::System.IDisposable __contribution) => false;");
+            _writer.CurrentIndent -= _writer.TabSize;
+        }
+
         if (hasAvaloniaTarget)
         {
             _writer.WriteLine();
             WriteApply(setter, property, targetProperty, value);
+
+            if (_hotReload && value.DynamicResource == null && _conditionOrders.Count == 0)
+            {
+                _writer.WriteLine();
+                WriteContributionUpdate(setter, targetProperty, value.Expression);
+            }
 
             _writer.WriteLine();
 
@@ -291,7 +341,16 @@ internal ref struct AkcssUtilityOperationWriter
     {
         var indent = _writer.CurrentIndent;
 
-        _writer.WriteLine("return ((global::Avalonia.AvaloniaObject)__target).SetValue(");
+        if (_hotReload)
+        {
+            _writer.WriteLine("return global::Akbura.Akcss.AkcssPropertyContribution.SetValue(");
+            _writer.CurrentIndent = indent + _writer.TabSize;
+            _writer.WriteLine("(global::Avalonia.AvaloniaObject)__target,");
+        }
+        else
+        {
+            _writer.WriteLine("return ((global::Avalonia.AvaloniaObject)__target).SetValue(");
+        }
         _writer.CurrentIndent = indent + _writer.TabSize;
 
         _targetPropertyWriter.Write(targetProperty);
@@ -310,6 +369,12 @@ internal ref struct AkcssUtilityOperationWriter
         }
 
         _writer.CurrentIndent = indent + _writer.TabSize;
+        if (_hotReload)
+        {
+            _writer.WriteLine("__bindingPriority);");
+            _writer.CurrentIndent = indent;
+            return;
+        }
         _writer.WriteLine("__bindingPriority) ??");
 
         _writer.CurrentIndent = indent + _writer.TabSize;
@@ -320,6 +385,36 @@ internal ref struct AkcssUtilityOperationWriter
         _writer.CurrentIndent = indent;
     }
 
+    private void WriteContributionUpdate(IAkcssPropertySetterOperation setter,
+        in MarkupTargetPropertyPlan targetProperty, string expression)
+    {
+        _writer.WriteLine("public override bool SupportsContributionUpdates => true;");
+        _writer.WriteLine("public override bool TryUpdateContribution(object __target,");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine("global::System.Collections.Generic.IReadOnlyList<object?> __arguments,");
+        _writer.WriteLine("global::Avalonia.Data.BindingPriority __bindingPriority, global::System.IDisposable __contribution)");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.Write("if (!global::Akbura.Akcss.AkcssPropertyContribution.CanUpdate(__contribution, (global::Avalonia.AvaloniaObject)__target, ");
+        _targetPropertyWriter.Write(targetProperty);
+        _writer.WriteLine(", __bindingPriority))");
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine("return false;");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
+        _writer.Write("global::Akbura.Akcss.AkcssPropertyContribution.Update(__contribution, ");
+        using (_sourceMappingWriter.WriteStart(setter.Syntax?.Expression))
+        {
+            _writer.Write(expression);
+        }
+        _writer.WriteLine(");");
+        _writer.WriteLine("return true;");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
+    }
+
     private void WriteDynamicResourceContribution(
         IAkcssPropertySetterOperation setter,
         in MarkupTargetPropertyPlan targetProperty,
@@ -328,7 +423,16 @@ internal ref struct AkcssUtilityOperationWriter
     {
         var indent = _writer.CurrentIndent;
 
-        _writer.WriteLine("return ((global::Avalonia.AvaloniaObject)__target).Bind(");
+        if (_hotReload)
+        {
+            _writer.WriteLine("return global::Akbura.Akcss.AkcssPropertyContribution.Bind(");
+            _writer.CurrentIndent = indent + _writer.TabSize;
+            _writer.WriteLine("(global::Avalonia.AvaloniaObject)__target,");
+        }
+        else
+        {
+            _writer.WriteLine("return ((global::Avalonia.AvaloniaObject)__target).Bind(");
+        }
         _writer.CurrentIndent = indent + _writer.TabSize;
 
         _targetPropertyWriter.Write(targetProperty);

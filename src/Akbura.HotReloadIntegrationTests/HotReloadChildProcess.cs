@@ -8,7 +8,7 @@ internal static class HotReloadChildProcess
 
     public static bool IsChild(string testName) => Environment.GetEnvironmentVariable(Marker) == testName;
 
-    public static async Task RunAsync(string testName)
+    public static async Task<string> RunAsync(string testName, bool detailedOutput = false)
     {
         var assemblyPath = typeof(HotReloadChildProcess).Assembly.Location;
         var start = new ProcessStartInfo("dotnet")
@@ -22,7 +22,7 @@ internal static class HotReloadChildProcess
         start.ArgumentList.Add("vstest");
         start.ArgumentList.Add(assemblyPath);
         start.ArgumentList.Add("/TestCaseFilter:FullyQualifiedName=" + testName);
-        start.ArgumentList.Add("/logger:console;verbosity=normal");
+        start.ArgumentList.Add(detailedOutput ? "/logger:console;verbosity=detailed" : "/logger:console;verbosity=normal");
         start.Environment[Marker] = testName;
         start.Environment["DOTNET_MODIFIABLE_ASSEMBLIES"] = "debug";
         start.Environment["DOTNET_CLI_UI_LANGUAGE"] = "en-US";
@@ -44,5 +44,6 @@ internal static class HotReloadChildProcess
         var output = await stdout + "\n" + await stderr;
         Assert.True(process.ExitCode == 0, "CLR Hot Reload child failed.\n" + output);
         Assert.Contains("Passed " + testName, output, StringComparison.Ordinal);
+        return output;
     }
 }

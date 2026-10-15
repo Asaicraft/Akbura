@@ -11,6 +11,96 @@ namespace Akbura.UnitTests;
 public sealed class DocumentSyntaxVersionTests
 {
     [Theory]
+    [InlineData("<StackPanel>$foreach (var item in new[] { 1, 2 }) { <Border Width=\"10\" /> }</StackPanel>")]
+    [InlineData("<StackPanel>$if (true) { <Border Width=\"10\" /> } $else if (false) { <Border /> } $else { <Border /> }</StackPanel>")]
+    [InlineData("<StackPanel>$foreach (var item in new[] { 1 }) { var size = 10d; <Border Width={size} /> }</StackPanel>")]
+    [InlineData("<StackPanel>$foreach (var item in new[] { 1 }) { if (item > 0) { <Border Width=\"10\" /> } else { <Border /> } }</StackPanel>")]
+    [InlineData("<Border><Border.Background><SolidColorBrush Color=\"Red\" /></Border.Background><TextBlock Text=\"10\" /></Border>")]
+    [InlineData("<Grid><Grid.RowDefinitions><RowDefinition Height=\"10\" /></Grid.RowDefinitions><Border /></Grid>")]
+    [InlineData("<DataTemplate><Border x.Name=\"nested\" Width=\"10\" /></DataTemplate>")]
+    [InlineData("<ControlTemplate><Border Width=\"10\" /></ControlTemplate>")]
+    [InlineData("using Avalonia.Controls.Presenters; param Control? Content = null; <Border Width=\"10\"><ContentPresenter Content={Content} /></Border>")]
+    [InlineData("<StackPanel><TextBlock Text={10.ToString()} /> plain text </StackPanel>")]
+    public void SupportedContent_TracksBodyWithoutMakingTheDeclarationSurfaceConservative(string source)
+    {
+        var original = DocumentSyntaxVersion.Create(Parse(false, source));
+        var updated = DocumentSyntaxVersion.Create(Parse(false, source.Replace("10", "20", StringComparison.Ordinal)));
+
+        Assert.True(original.CanReuse);
+        Assert.True(updated.CanReuse);
+        Assert.False(original.RequiresConservativeDependencies);
+        Assert.False(updated.RequiresConservativeDependencies);
+        Assert.True(original.HasSameSurface(updated));
+        Assert.False(original.HasSameGenerationShape(updated));
+    }
+
+    [Fact]
+    public void SupportedControlFlow_RetainsExpressionTypeAliasAndUnresolvedDependencies()
+    {
+        const string source = "using Alias = Demo.Models; param bool Visible; <StackPanel>" +
+            "$foreach (var item in Alias.Items.Values) { $if (Visible && Demo.Flags.Enabled) { <Future Value={item} /> } }" +
+            "</StackPanel>";
+        var version = DocumentSyntaxVersion.Create(Parse(false, source));
+
+        Assert.True(version.CanReuse);
+        Assert.False(version.RequiresConservativeDependencies);
+        foreach (var name in new[] { "Items", "Flags", "Visible", "item", "Future" })
+        {
+            Assert.Contains(new DocumentDependencyName(DocumentDependencyKind.Identifier, name), version.DependencyNames);
+        }
+        Assert.Contains(new DocumentDependencyName(DocumentDependencyKind.Component, "Future"), version.DependencyNames);
+        Assert.Contains(new DocumentDependencyName(DocumentDependencyKind.Alias, "Demo.Models", "Alias"), version.DependencyNames);
+    }
+
+    [Theory]
+    [InlineData("<StackPanel>$foreach (var item in new[] { 1 }) { var width = 1 + ; <Border /> }</StackPanel>")]
+    [InlineData("<StackPanel>$if (1 + ) { <Border /> }</StackPanel>")]
+    [InlineData("<StackPanel><Border x. /></StackPanel>")]
+    public void MalformedSupportedContent_StillRequiresConservativeDependencies(string source)
+    {
+        var version = DocumentSyntaxVersion.Create(Parse(false, source));
+
+        Assert.False(version.CanReuse);
+        Assert.True(version.RequiresConservativeDependencies);
+    }
+
+    [Fact]
+    public void ConservativeReasons_AreOptionalStatisticsWithSyntaxKindsAndSourceSpans()
+    {
+        const string source = "param double Value = 1 + ; <Border {true}: />";
+        using var measurement = GenerationStatistics.BeginMeasurement();
+        var tree = Parse(false, source);
+        Assert.Single(tree.GetRootSyntax().DescendantNodes().OfType<IncompletePrefixedAttributeSyntax>());
+        var version = DocumentSyntaxVersion.Create(tree);
+        var reasons = measurement.GetSnapshot().ConservativeDependencies;
+
+        Assert.True(version.RequiresConservativeDependencies);
+#if STATS
+        Assert.Contains(reasons, reason => reason.Cause == ConservativeDependencyCause.MalformedCSharp && reason.SyntaxKind == SyntaxKind.CSharpRawToken);
+        Assert.Contains(reasons, reason => reason.Cause == ConservativeDependencyCause.UnsupportedSyntax && reason.SyntaxKind == SyntaxKind.IncompletePrefixedAttributeSyntax);
+        Assert.All(reasons, reason =>
+        {
+            Assert.Equal(version.FilePath, reason.SourcePath);
+            Assert.InRange(reason.Span.Start, 0, source.Length);
+            Assert.InRange(reason.Span.End, reason.Span.Start, source.Length);
+        });
+#else
+        Assert.Empty(reasons);
+#endif
+    }
+
+    [Fact]
+    public void SupportedControlFlow_DoesNotProduceConservativeReasonRows()
+    {
+        using var measurement = GenerationStatistics.BeginMeasurement();
+        var version = DocumentSyntaxVersion.Create(Parse(false,
+            "<StackPanel>$foreach (var item in new[] { 1 }) { $if (item > 0) { <Border /> } }</StackPanel>"));
+
+        Assert.False(version.RequiresConservativeDependencies);
+        Assert.Empty(measurement.GetSnapshot().ConservativeDependencies);
+    }
+
+    [Theory]
     [InlineData(false, "using Avalonia.Controls;\r\n<Border />")]
     [InlineData(true, "@using Avalonia.Controls;\r\nBorder.shared { Width: 10; }")]
     public void TrailingTrivia_PreservesGenerationShapeAfterIncrementalAndFreshParse(bool akcss, string source)

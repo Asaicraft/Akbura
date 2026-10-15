@@ -20,8 +20,9 @@ internal readonly ref struct AkcssUtilityWriter
     private readonly AkcssGenerationSourceMap _sourceMap;
     private readonly AkcssOperationMetadataWriter _operationMetadataWriter;
     private readonly AkcssResetWriter _resetWriter;
+    private readonly bool _hotReload;
 
-    public AkcssUtilityWriter(CodeWriter writer, AkcssGenerationSourceMap sourceMap)
+    public AkcssUtilityWriter(CodeWriter writer, AkcssGenerationSourceMap sourceMap, bool hotReload = false)
     {
         Debug.Assert(writer != null);
         AkburaDebug.Assert(sourceMap != null);
@@ -31,6 +32,7 @@ internal readonly ref struct AkcssUtilityWriter
         _sourceMap = sourceMap!;
         _operationMetadataWriter = new AkcssOperationMetadataWriter(_writer, sourceMap);
         _resetWriter = new AkcssResetWriter(_writer);
+        _hotReload = hotReload;
     }
 
     public bool Write(in AkcssModulePlan module, in AkcssSymbolGenerationPlan symbolPlan)
@@ -109,7 +111,8 @@ internal readonly ref struct AkcssUtilityWriter
                     plan,
                     identifierValues,
                     expansionPath,
-                    conditionOrders);
+                    conditionOrders,
+                    _hotReload);
 
                 operationWriter.Write(symbolPlan.SymbolIndex);
             }

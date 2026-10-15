@@ -129,10 +129,12 @@ public sealed class AkcssActivatorWriterTests
         var output = codeWriter.GetText().ToString();
         Assert.Contains(
             "__akburaRenderState.ApplyAkcssStylesOperation(\n" +
-            "    7,\n" +
-            "    __target,\n",
+            "        7,\n" +
+            "        __target,\n",
             output,
             StringComparison.Ordinal);
+        Assert.Contains(".ShouldApplyOwnedOperation(7, \"$akcss\", __akcssRevision7)", output, StringComparison.Ordinal);
+        Assert.Contains("operationRegistered: __akcssRevision7Known", output, StringComparison.Ordinal);
         Assert.DoesNotContain(
             "ReplaceAkcssStylesForHotReload",
             output,
@@ -142,6 +144,42 @@ public sealed class AkcssActivatorWriterTests
             output,
             StringComparison.Ordinal);
         Assert.Equal(0, codeWriter.CurrentIndent);
+    }
+
+    [Theory]
+    [InlineData("DebugStructural", true)]
+    [InlineData("ReleaseDirect", false)]
+    [InlineData("ReleaseConditional", false)]
+    public void CascadeRevisionAndNarrowRefresh_AreDebugOnly(string mode, bool usesRevision)
+    {
+        var fixture = CreateBasicFixture();
+        using var code = new CodeWriter("\n");
+        var environment = fixture.Environment;
+        var writer = new AkcssActivatorWriter(code, environment, OwnerTypeName,
+            generationMode: Enum.Parse<ComponentGenerationMode>(mode));
+        writer.WriteApplyHotReloadStyles(fixture.Plan, fixture.Plan.Elements[0].Activators, 0, "__target", CreateWriteContext());
+        writer.WriteRefresh(fixture.Plan.Elements[0].Activators, "__target");
+        var output = code.GetText().ToString();
+        Assert.Equal(usesRevision, output.Contains(".ShouldApplyOwnedOperation(", StringComparison.Ordinal));
+        Assert.Equal(usesRevision, output.Contains("RefreshAkcssStylesForHotReload(", StringComparison.Ordinal));
+        Assert.Equal(!usesRevision, output.Contains("ExecuteAkcssStyles(", StringComparison.Ordinal));
+        Assert.Equal(usesRevision, output.Contains(AkcssModuleWriter.DebugStyleRevisionName, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void UncertainScopedOwnership_UsesLegacyReplacement()
+    {
+        var fixture = CreateBasicFixture();
+        using var code = new CodeWriter("\n");
+        var environment = fixture.Environment;
+        var writer = new AkcssActivatorWriter(code, environment, OwnerTypeName,
+            generationMode: ComponentGenerationMode.DebugStructural);
+        writer.WriteApplyHotReloadStyles(fixture.Plan, fixture.Plan.Elements[0].Activators, 0, "__target",
+            CreateWriteContext(), canRetainCascade: false);
+        var output = code.GetText().ToString();
+        Assert.Contains(".ApplyAkcssStylesOperation(", output, StringComparison.Ordinal);
+        Assert.DoesNotContain(".ShouldApplyOwnedOperation(", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("operationRegistered:", output, StringComparison.Ordinal);
     }
 
     [Fact]

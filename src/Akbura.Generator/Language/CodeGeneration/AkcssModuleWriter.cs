@@ -1,4 +1,8 @@
+using Akbura.Language.Operations;
+using Akbura.Language.Symbols;
 using Microsoft.CodeAnalysis;
+using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 
 namespace Akbura.Language.CodeGeneration;
@@ -8,14 +12,12 @@ namespace Akbura.Language.CodeGeneration;
 /// </summary>
 internal readonly ref struct AkcssModuleWriter
 {
-    internal const string DebugStyleAccessorName =
-        "__AkburaGetStyle";
+    internal const string DebugStyleAccessorName = "__AkburaGetStyle";
+    internal const string DebugStyleRevisionName = "__AkburaStyleRevision";
 
-    private const string RuntimeStyleType =
-        "global::Akbura.Akcss.AkcssStyle";
+    private const string RuntimeStyleType = "global::Akbura.Akcss.AkcssStyle";
 
-    private const string AkcssModuleReferenceAttribute =
-        "global::Akbura.CompilerAnotations.AkcssModuleReferenceAttribute";
+    private const string AkcssModuleReferenceAttribute = "global::Akbura.CompilerAnotations.AkcssModuleReferenceAttribute";
 
     private readonly CodeWriter _writer;
     private readonly CSharpValueWriter _valueWriter;
@@ -23,8 +25,9 @@ internal readonly ref struct AkcssModuleWriter
     private readonly AkcssOperationMetadataWriter _operationMetadataWriter;
     private readonly AkcssStyleWriter _styleWriter;
     private readonly AkcssUtilityWriter _utilityWriter;
+    private readonly AkcssGenerationSourceMap _sourceMap;
 
-    public AkcssModuleWriter(CodeWriter writer, AkcssGenerationSourceMap sourceMap)
+    public AkcssModuleWriter(CodeWriter writer, AkcssGenerationSourceMap sourceMap, bool hotReload = false)
     {
         AkburaDebug.Assert(writer != null);
         AkburaDebug.Assert(sourceMap != null);
@@ -34,7 +37,8 @@ internal readonly ref struct AkcssModuleWriter
         _metadataWriter = new AkcssDeclarationMetadataWriter(_writer);
         _operationMetadataWriter = new AkcssOperationMetadataWriter(_writer, sourceMap);
         _styleWriter = new AkcssStyleWriter(_writer, sourceMap);
-        _utilityWriter = new AkcssUtilityWriter(_writer, sourceMap);
+        _utilityWriter = new AkcssUtilityWriter(_writer, sourceMap, hotReload);
+        _sourceMap = sourceMap;
     }
 
     public void WriteAssemblyReference(in AkcssModulePlan plan)
@@ -155,6 +159,95 @@ internal readonly ref struct AkcssModuleWriter
         _writer.WriteLine("};");
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");
+    }
+
+    public void WriteDebugStyleRevisions(in AkcssModulePlan plan)
+    {
+        _writer.WriteHiddenApiAttributes();
+        _writer.Write("internal static string? ");
+        _writer.Write(DebugStyleRevisionName);
+        _writer.WriteLine("(int index) => index switch");
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        foreach (var runtimeStyle in plan.RuntimeStyles)
+        {
+            _writer.WriteIntegerLiteral(runtimeStyle.RuntimeStyleIndex);
+            _writer.Write(" => ");
+            ref readonly var symbol = ref plan.Symbols.ItemRef(runtimeStyle.SymbolIndex);
+            if (runtimeStyle.Kind == AkcssRuntimeStyleKind.Interceptor || !HasReliableOperations(symbol.Symbol))
+            {
+                _writer.Write("null");
+            }
+            else
+            {
+                using var code = new CodeWriter("\n");
+                if (symbol.Kind == AkcssSymbolGenerationKind.Style)
+                {
+                    new AkcssStyleWriter(code, _sourceMap).Write(plan, symbol);
+                }
+                else
+                {
+                    new AkcssUtilityWriter(code, _sourceMap).Write(plan, symbol);
+                }
+                _writer.WriteStringLiteral(AkcssHotReloadIdentity.Create(code.GetText().ToString()));
+            }
+            _writer.WriteLine(",");
+        }
+        _writer.WriteLine("_ => throw new global::System.ArgumentOutOfRangeException(nameof(index)),");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("};");
+    }
+
+    private bool HasReliableOperations(IAkcssSymbol symbol)
+    {
+        var sourceMap = _sourceMap;
+        var seen = new HashSet<IAkcssSymbol>();
+        return Visit(sourceMap.GetGenerationSymbol(symbol));
+
+        bool Visit(IAkcssSymbol current)
+        {
+            if (!seen.Add(current))
+            {
+                return true;
+            }
+            if (current.IsIntercepted)
+            {
+                return false;
+            }
+            return VisitOperations(current.Operations);
+        }
+
+        bool VisitOperations(ImmutableArray<IAkcssOperation> operations)
+        {
+            foreach (var operation in operations)
+            {
+                if (operation.HasErrors)
+                {
+                    return false;
+                }
+                if (operation is IAkcssIfOperation conditional &&
+                    !VisitOperations(conditional.Operations))
+                {
+                    return false;
+                }
+                if (operation is IMetadataAkcssApplyOperation metadataApply &&
+                    !VisitOperations(metadataApply.ExpandedOperations))
+                {
+                    return false;
+                }
+                if (operation is IAkcssApplyOperation apply)
+                {
+                    foreach (var dependency in apply.AppliedSymbols)
+                    {
+                        if (!Visit(sourceMap.GetGenerationSymbol(dependency)))
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
     }
 
     public void WriteMetadataCarriers(in AkcssModulePlan plan)

@@ -1819,6 +1819,48 @@ public sealed class AkburaRenderStateTests
     }
 
     [Fact]
+    public void OwnedAkcss_RevisionGuardRetainsOwnershipAndReplacesChangedDefinitions()
+    {
+        var state = new AkburaRenderState();
+        var plan = new[] { Spec<Border>(-1, RootSlot, "Border") };
+        var original = new TrackingAkcssActivator("original");
+        var changed = new TrackingAkcssActivator("changed");
+
+        Begin(state, "render-1", plan);
+        var node = state.GetRequired<Border>(0);
+        Assert.True(state.ShouldApplyOwnedOperation(0, "$akcss", "cascade-1"));
+        state.ApplyAkcssStylesOperation(0, node, [original], operationRegistered: true);
+        state.CompleteRevision();
+
+        Begin(state, "render-2", plan);
+        Assert.False(state.ShouldApplyOwnedOperation(0, "$akcss", "cascade-1"));
+        state.CompleteRevision();
+        Assert.Same(original, Assert.Single(AkburaControl.GetAkcssStyles(node)));
+        Assert.Equal(1, original.SubscriptionCount);
+
+        Begin(state, "render-3", plan);
+        Assert.True(state.ShouldApplyOwnedOperation(0, "$akcss", "cascade-2"));
+        state.ApplyAkcssStylesOperation(0, node, [changed], operationRegistered: true);
+        state.AbortRevision();
+        Assert.Same(original, Assert.Single(AkburaControl.GetAkcssStyles(node)));
+        Assert.Equal(1, original.SubscriptionCount);
+        Assert.Equal(0, changed.SubscriptionCount);
+
+        Begin(state, "render-4", plan);
+        Assert.True(state.ShouldApplyOwnedOperation(0, "$akcss", "cascade-2"));
+        state.ApplyAkcssStylesOperation(0, node, [changed], operationRegistered: true);
+        state.CompleteRevision();
+        Assert.Same(changed, Assert.Single(AkburaControl.GetAkcssStyles(node)));
+        Assert.Equal(0, original.SubscriptionCount);
+        Assert.Equal(1, changed.SubscriptionCount);
+
+        Begin(state, "render-5", plan);
+        state.CompleteRevision();
+        Assert.Empty(AkburaControl.GetAkcssStyles(node));
+        Assert.Equal(0, changed.SubscriptionCount);
+    }
+
+    [Fact]
     public void OwnedAkcss_RemovingNodeDetachesItsCascade()
     {
         var state = new AkburaRenderState();
@@ -1848,6 +1890,29 @@ public sealed class AkburaRenderStateTests
             removedNode.GetBaseValue(
                 AkburaControl.AkcssStylesProperty).HasValue);
         Assert.Equal(0, activator.SubscriptionCount);
+    }
+
+    [Fact]
+    public void OwnedAkcss_SameDefinitionOnNewTargetMustBeApplied()
+    {
+        var state = new AkburaRenderState();
+        var original = new TrackingAkcssActivator("original");
+        Begin(state, "render-1", [Spec<Border>(-1, RootSlot, "Border")]);
+        var oldTarget = state.GetRequired<Border>(0);
+        Assert.True(state.ShouldApplyOwnedOperation(0, "$akcss", "same-definition"));
+        state.ApplyAkcssStylesOperation(0, oldTarget, [original], operationRegistered: true);
+        state.CompleteRevision();
+
+        Begin(state, "render-2", [Spec<StackPanel>(-1, RootSlot, "StackPanel")]);
+        var newTarget = state.GetRequired<StackPanel>(0);
+        Assert.True(state.ShouldApplyOwnedOperation(0, "$akcss", "same-definition"));
+        var replacement = new TrackingAkcssActivator("replacement");
+        state.ApplyAkcssStylesOperation(0, newTarget, [replacement], operationRegistered: true);
+        state.CompleteRevision();
+        Assert.Empty(AkburaControl.GetAkcssStyles(oldTarget));
+        Assert.Same(replacement, Assert.Single(AkburaControl.GetAkcssStyles(newTarget)));
+        Assert.Equal(0, original.SubscriptionCount);
+        Assert.Equal(1, replacement.SubscriptionCount);
     }
 
     [Fact]

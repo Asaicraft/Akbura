@@ -271,7 +271,8 @@ internal static class AkcssActivatorPlanner
                 operation.ConditionText,
                 operation.ConditionOperation,
                 operation.Variant,
-                operation.BindingPriority));
+                operation.BindingPriority,
+                ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(operation.Syntax)));
             _activators.Add(AkcssActivatorPlan.CreateCandidate(candidateIndex));
         }
 

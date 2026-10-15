@@ -1885,12 +1885,8 @@ public sealed class AkburaBlackSilenceGeneratorTests
     {
         var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(
             LanguageVersion.Preview);
-        var references = SymbolTests.CreateAvaloniaReferences()
-            .Where(static reference =>
-                reference.Display is not { } path ||
-                !Path.GetFileName(path).StartsWith(
-                    "Akbura",
-                    StringComparison.OrdinalIgnoreCase));
+        // Generated ClearCache forwards to the runtime's AKCSS metadata cache.
+        var references = SymbolTests.CreateAvaloniaReferences();
 
         return CSharpCompilation.Create(
             "AkburaHotReloadServiceTests",

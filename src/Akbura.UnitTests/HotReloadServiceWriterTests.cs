@@ -44,6 +44,7 @@ public sealed class HotReloadServiceWriterTests
         Assert.Contains(
             "internal static void ClearCache(global::System.Type[]? updatedTypes)\r\n" +
             "        {\r\n" +
+            "            global::Akbura.HotReload.AkburaHotReloadRuntime.ClearAkcssMetadataCache(updatedTypes);\r\n" +
             "        }",
             output,
             StringComparison.Ordinal);
@@ -420,13 +421,7 @@ public sealed class HotReloadServiceWriterTests
 
     private static MetadataReference[] CreateHotReloadReferences()
     {
-        return SymbolTests.CreateAvaloniaReferences()
-            .Where(static reference =>
-                reference.Display is not { } path ||
-                !Path.GetFileName(path).StartsWith(
-                    "Akbura",
-                    StringComparison.OrdinalIgnoreCase))
-            .ToArray();
+        return SymbolTests.CreateAvaloniaReferences().ToArray();
     }
 
     private static Assembly CompileAndLoad(

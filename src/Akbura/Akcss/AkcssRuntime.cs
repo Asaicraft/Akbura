@@ -1,4 +1,3 @@
-using Akbura.CompilerAnotations;
 using Akbura.Markup;
 using Avalonia;
 using Avalonia.Controls;
@@ -9,7 +8,7 @@ using System.Runtime.ExceptionServices;
 
 namespace Akbura.Akcss;
 
-internal static class AkcssRuntime
+internal static partial class AkcssRuntime
 {
     private static readonly ConditionalWeakTable<object, TargetRuntime> s_targets = new();
 
@@ -19,8 +18,12 @@ internal static class AkcssRuntime
     {
         ArgumentNullException.ThrowIfNull(target);
 
-        s_targets.GetValue(target, static value => new TargetRuntime(value))
-            .SetStyles(styles.IsDefault ? [] : styles);
+        var runtime = s_targets.GetValue(target, static value => new TargetRuntime(value));
+        if (runtime.IsReconcilingStyles)
+        {
+            throw new InvalidOperationException("An AKCSS cascade cannot be replaced during reconciliation.");
+        }
+        runtime.SetStyles(styles.IsDefault ? [] : styles);
     }
 
     public static ImmutableArray<AkcssStyleActivator> GetStyles(object target)
@@ -40,7 +43,14 @@ internal static class AkcssRuntime
             .Refresh();
     }
 
-    private sealed class TargetRuntime : IObserver<object?>
+    public static void RefreshForHotReload(object target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        s_targets.GetValue(target, static value => new TargetRuntime(value))
+            .RefreshForHotReload();
+    }
+
+    private sealed partial class TargetRuntime : IObserver<object?>
     {
         private readonly object _target;
         private readonly List<IDisposable> _subscriptions = [];
@@ -51,6 +61,7 @@ internal static class AkcssRuntime
         private bool _isChanging;
         private bool _isDetached;
         private bool _applyPending;
+        private bool _isRestoringSources;
 
         public TargetRuntime(object target)
         {
@@ -66,6 +77,7 @@ internal static class AkcssRuntime
 
         public void SetStyles(ImmutableArray<AkcssStyleActivator> styles)
         {
+            _descriptors = default;
             _isChanging = true;
             _applyPending = false;
             try
@@ -73,15 +85,23 @@ internal static class AkcssRuntime
                 DisposeSubscriptions();
                 ResetStyles();
                 _styles = styles;
+                _conflictIndex = new(StringComparer.Ordinal);
 
                 if (!_isDetached)
                 {
                     Subscribe();
                 }
             }
-            catch
+            catch (Exception failure)
             {
-                DisposeSubscriptions();
+                try
+                {
+                    DisposeSubscriptions();
+                }
+                catch (Exception cleanup)
+                {
+                    throw new AggregateException("AKCSS application and cleanup failed.", failure, cleanup);
+                }
                 throw;
             }
             finally
@@ -98,26 +118,7 @@ internal static class AkcssRuntime
         public void RequestApply()
         {
             _applyPending = true;
-            if (_isApplying || _isChanging || _isDetached)
-            {
-                return;
-            }
-
-            while (_applyPending && !_isDetached)
-            {
-                _applyPending = false;
-                _pendingConflictKeys.Clear();
-                _isApplying = true;
-                try
-                {
-                    ResetStyles();
-                    ExecuteStyles();
-                }
-                finally
-                {
-                    _isApplying = false;
-                }
-            }
+            ApplyPendingCandidates();
         }
 
         public void Refresh()
@@ -139,6 +140,36 @@ internal static class AkcssRuntime
             }
 
             RequestApply();
+        }
+
+        public void RefreshForHotReload()
+        {
+            if (_isDetached)
+            {
+                return;
+            }
+
+            _isChanging = true;
+            try
+            {
+                foreach (var style in _styles)
+                {
+                    if (style is AkcssUtilityCandidateActivator candidate)
+                    {
+                        candidate.Refresh(_target);
+                        if (candidate.RefreshFrameCondition())
+                        {
+                            RequestApplyCandidate(candidate);
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                _isChanging = false;
+            }
+
+            ApplyPendingCandidates();
         }
 
         public void OnNext(object? value)
@@ -217,25 +248,56 @@ internal static class AkcssRuntime
 
         private void DisposeSubscriptions()
         {
+            List<Exception>? failures = null;
             foreach (var style in _styles)
             {
                 if (style is AkcssUtilityCandidateActivator candidate)
                 {
-                    candidate.Detach(_target);
+                    try
+                    {
+                        candidate.Detach(_target);
+                    }
+                    catch (Exception failure)
+                    {
+                        (failures ??= []).Add(failure);
+                    }
                 }
             }
 
             foreach (var subscription in _subscriptions)
             {
-                subscription.Dispose();
+                try
+                {
+                    subscription.Dispose();
+                }
+                catch (Exception failure)
+                {
+                    (failures ??= []).Add(failure);
+                }
             }
 
             _subscriptions.Clear();
+            if (failures?.Count == 1)
+            {
+                ExceptionDispatchInfo.Capture(failures[0]).Throw();
+            }
+            if (failures != null)
+            {
+                throw new AggregateException("AKCSS subscription cleanup failed.", failures);
+            }
         }
 
         private void RequestApplyCandidate(
             AkcssUtilityCandidateActivator candidate)
         {
+            if (_isRestoringSources)
+            {
+                return;
+            }
+            if (!_styles.Contains(candidate) && _activeTransition?.ContainsPrevious(candidate) != true)
+            {
+                return;
+            }
             if (_applyPending)
             {
                 return;
@@ -246,70 +308,85 @@ internal static class AkcssRuntime
                 _pendingConflictKeys.Add(conflictKey);
             }
 
-            if (_isApplying || _isChanging || _isDetached)
+            if (CannotFlush)
             {
                 return;
             }
 
-            while (_pendingConflictKeys.Count > 0 &&
-                   !_applyPending &&
-                   !_isDetached)
-            {
-                var key = _pendingConflictKeys.First();
-                _pendingConflictKeys.Remove(key);
-                _isApplying = true;
-                try
-                {
-                    ResetConflictKey(key);
-                    ExecuteConflictKey(key);
-                }
-                finally
-                {
-                    _isApplying = false;
-                }
-            }
-
-            if (_applyPending)
-            {
-                RequestApply();
-            }
+            ApplyPendingCandidates();
         }
 
-        private void ResetConflictKey(string conflictKey)
+        private void ApplyPendingCandidates()
         {
-            for (var styleIndex = _styles.Length - 1;
-                 styleIndex >= 0;
-                 styleIndex--)
+            if (CannotFlush)
             {
-                if (_styles[styleIndex] is not
-                    AkcssUtilityCandidateActivator candidate)
+                return;
+            }
+            _isApplying = true;
+            try
+            {
+                while (!_isDetached && _activeTransition == null && _updateDepth == 0)
                 {
-                    continue;
-                }
-
-                for (var operationIndex = candidate.OperationCount - 1;
-                     operationIndex >= 0;
-                     operationIndex--)
-                {
-                    if (string.Equals(
-                            candidate.GetOperationConflictKey(
-                                operationIndex),
-                            conflictKey,
-                            StringComparison.Ordinal))
+                    if (_applyPending)
                     {
-                        candidate.ResetOperation(
-                            operationIndex,
-                            _target);
+                        _applyPending = false;
+                        _pendingConflictKeys.Clear();
+                        ResetStyles();
+                        ExecuteStyles();
+                    }
+                    else if (_pendingConflictKeys.Count > 0)
+                    {
+                        var enumerator = _pendingConflictKeys.GetEnumerator();
+                        enumerator.MoveNext();
+                        var key = enumerator.Current;
+                        enumerator.Dispose();
+                        _pendingConflictKeys.Remove(key);
+                        var index = GetConflictIndex(key);
+                        if (!index.SupportsPublication)
+                        {
+                            index.Reset(_target);
+                            ExecuteConflictKey(key);
+                            continue;
+                        }
+                        var winner = index.Resolve(_target);
+                        if (winner.HasValue && winner.Value.Candidate.TryUpdateOperation(winner.Value.OperationIndex, _target))
+                        {
+                            index.Reset(_target, winner);
+                        }
+                        else
+                        {
+                            index.Reset(_target);
+                            if (winner.HasValue)
+                            {
+                                winner.Value.Candidate.ExecuteOperation(winner.Value.OperationIndex, _target);
+                            }
+                        }
+                    }
+                    else if (_pendingContributions?.Count > 0)
+                    {
+                        FlushContributions();
+                    }
+                    else
+                    {
+                        break;
                     }
                 }
             }
+            finally
+            {
+                _isApplying = false;
+            }
         }
 
-        private void ExecuteConflictKey(string conflictKey)
+        private void ExecuteConflictKey(string conflictKey, bool preserveContribution = false)
         {
             var winner = ResolveUtilityWinner(conflictKey);
             if (winner.HasValue)
             {
+                if (preserveContribution && winner.Value.Candidate.HasOwnedContribution(winner.Value.OperationIndex))
+                {
+                    return;
+                }
                 winner.Value.Candidate.ExecuteOperation(
                     winner.Value.OperationIndex,
                     _target);
@@ -343,160 +420,18 @@ internal static class AkcssRuntime
             return result;
         }
 
-        private UtilityOperationWinner? ResolveUtilityWinner(
-            string conflictKey)
+        private UtilityOperationWinner? ResolveUtilityWinner(string conflictKey)
         {
-            var contenders = new List<UtilityOperationWinner>();
-            AkcssOperationPriority? highestPriority = null;
-
-            foreach (var style in _styles)
-            {
-                if (style is not
-                    AkcssUtilityCandidateActivator candidate)
-                {
-                    continue;
-                }
-
-                for (var operationIndex = 0;
-                     operationIndex < candidate.OperationCount;
-                     operationIndex++)
-                {
-                    if (!string.Equals(
-                            candidate.GetOperationConflictKey(
-                                operationIndex),
-                            conflictKey,
-                            StringComparison.Ordinal) ||
-                        !candidate.IsOperationActive(
-                            operationIndex,
-                            _target))
-                    {
-                        continue;
-                    }
-
-                    var priority = candidate.GetOperationPriority(
-                        operationIndex);
-                    if (!highestPriority.HasValue ||
-                        priority > highestPriority.Value)
-                    {
-                        contenders.Clear();
-                        highestPriority = priority;
-                    }
-
-                    if (priority == highestPriority.Value)
-                    {
-                        contenders.Add(
-                            new UtilityOperationWinner(
-                                candidate,
-                                operationIndex));
-                    }
-                }
-            }
-
-            if (contenders.Count == 0)
-            {
-                return null;
-            }
-
-            UtilityOperationWinner? unprefixedWinner = null;
-            var groupedWinners =
-                new Dictionary<string, UtilityOperationWinner>(
-                    StringComparer.Ordinal);
-            var ungroupedPrefixed =
-                new List<UtilityOperationWinner>();
-
-            foreach (var contender in contenders)
-            {
-                var candidate = contender.Candidate;
-                if (!candidate.IsPrefixed)
-                {
-                    if (!unprefixedWinner.HasValue ||
-                        IsLater(
-                            contender,
-                            unprefixedWinner.Value))
-                    {
-                        unprefixedWinner = contender;
-                    }
-
-                    continue;
-                }
-
-                if (candidate.ConflictGroup == null)
-                {
-                    ungroupedPrefixed.Add(contender);
-                    continue;
-                }
-
-                if (!groupedWinners.TryGetValue(
-                        candidate.ConflictGroup,
-                        out var groupWinner) ||
-                    candidate.Order >
-                        groupWinner.Candidate.Order ||
-                    candidate.Order ==
-                        groupWinner.Candidate.Order &&
-                    IsLater(contender, groupWinner))
-                {
-                    groupedWinners[candidate.ConflictGroup] =
-                        contender;
-                }
-            }
-
-            UtilityOperationWinner? prefixedWinner = null;
-            foreach (var contender in groupedWinners.Values)
-            {
-                if (!prefixedWinner.HasValue ||
-                    IsLater(
-                        contender,
-                        prefixedWinner.Value))
-                {
-                    prefixedWinner = contender;
-                }
-            }
-
-            foreach (var contender in ungroupedPrefixed)
-            {
-                if (!prefixedWinner.HasValue ||
-                    IsLater(
-                        contender,
-                        prefixedWinner.Value))
-                {
-                    prefixedWinner = contender;
-                }
-            }
-
-            if (!prefixedWinner.HasValue)
-            {
-                return unprefixedWinner;
-            }
-
-            if (!unprefixedWinner.HasValue)
-            {
-                return prefixedWinner;
-            }
-
-            return prefixedWinner.Value.Candidate
-                .UnprefixedPrecedence switch
-            {
-                UnprefixedUtilityPrecedence.Below =>
-                    unprefixedWinner,
-                UnprefixedUtilityPrecedence.Above =>
-                    prefixedWinner,
-                _ => IsLater(
-                        prefixedWinner.Value,
-                        unprefixedWinner.Value)
-                    ? prefixedWinner
-                    : unprefixedWinner,
-            };
+            return GetConflictIndex(conflictKey).Resolve(_target);
         }
 
         private static bool IsLater(
             UtilityOperationWinner left,
             UtilityOperationWinner right)
         {
-            if (left.Candidate.SourceOrder !=
-                right.Candidate.SourceOrder)
+            if (left.SourceOrder != right.SourceOrder)
             {
-                return left.Candidate.SourceOrder >
-                    right.Candidate.SourceOrder;
+                return left.SourceOrder > right.SourceOrder;
             }
 
             var leftApplication =
@@ -547,26 +482,48 @@ internal static class AkcssRuntime
             _isDetached = true;
             _applyPending = false;
             _pendingConflictKeys.Clear();
-            DisposeSubscriptions();
+            List<Exception>? failures = null;
+            try
+            {
+                DisposeSubscriptions();
+            }
+            catch (Exception failure)
+            {
+                (failures ??= []).Add(failure);
+            }
+            try
+            {
+                _activeTransition?.DetachPrevious();
+            }
+            catch (Exception failure)
+            {
+                (failures ??= []).Add(failure);
+            }
+            if (failures != null)
+            {
+                throw new AggregateException("AKCSS detach cleanup failed.", failures);
+            }
         }
 
         private readonly struct UtilityOperationWinner
         {
             public UtilityOperationWinner(
                 AkcssUtilityCandidateActivator candidate,
-                int operationIndex)
+                int operationIndex,
+                int sourceOrder = 0)
             {
                 Candidate = candidate;
                 OperationIndex = operationIndex;
+                SourceOrder = sourceOrder;
             }
 
             public AkcssUtilityCandidateActivator Candidate { get; }
 
             public int OperationIndex { get; }
 
-            public bool Is(
-                AkcssUtilityCandidateActivator candidate,
-                int operationIndex)
+            public int SourceOrder { get; }
+
+            public bool Is(AkcssUtilityCandidateActivator candidate, int operationIndex)
             {
                 return ReferenceEquals(Candidate, candidate) &&
                     OperationIndex == operationIndex;

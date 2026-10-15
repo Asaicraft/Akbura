@@ -35,7 +35,12 @@ Diagrams use Mermaid and are embedded directly in this Markdown file. GitHub can
 - [16. Debugging a failed refresh](#16-debugging-a-failed-refresh)
 - [17. Tests contributors should add](#17-tests-contributors-should-add)
 - [18. Source map and contributor checklist](#18-source-map-and-contributor-checklist)
-- [19. C# semantic probes and compilation latency](#19-c-semantic-probes-and-compilation-latency)
+- [19. AKCSS baseline implementation and verification](#19-akcss-baseline-implementation-and-verification)
+- [20. AKCSS incremental reconciliation](#20-akcss-incremental-reconciliation)
+- [21. AKCSS property ownership and transactions](#21-akcss-property-ownership-and-transactions)
+- [22. AKCSS update batching and indexed conflict resolution](#22-akcss-update-batching-and-indexed-conflict-resolution)
+- [23. BlackSilence document dependencies and reload latency](#23-blacksilence-document-dependencies-and-reload-latency)
+- [24. C# semantic probes and compilation latency](#24-c-semantic-probes-and-compilation-latency)
 
 ## 1. The two layers of Hot Reload
 
@@ -131,7 +136,7 @@ internal static void ClearCache(Type[]? updatedTypes)
 internal static void UpdateApplication(Type[]? updatedTypes)
 ```
 
-At the inspected revision, Akbura's generated `ClearCache` is empty. The actual refresh work begins in `UpdateApplication`. The .NET contract calls cache-clearing callbacks before application-update callbacks; Akbura performs its generated descriptor reconciliation in the application-update path.
+Akbura's generated `ClearCache` clears affected AKCSS observed-property metadata before refresh. The actual component refresh work begins in `UpdateApplication`. The .NET contract calls cache-clearing callbacks before application-update callbacks; Akbura performs its generated descriptor reconciliation in the application-update path.
 
 ### UI-thread handoff
 
@@ -569,11 +574,19 @@ An unchanged operation can retain its resource. A replacement releases the previ
 
 A property value and an owned operation cannot both claim the same node slot in one pending revision. Transitions such as “literal value becomes a binding” must explicitly release the previous kind of ownership.
 
-### Why AKCSS is refreshed even when markup is unchanged
+### AKCSS revisions and module-only updates
 
-AKCSS is intentionally different: the generated cascade is replaced for **every structural revision**. A referenced style module can change while an element's own markup and syntax identity remain identical.
+In Debug, the generated cascade has a semantic revision independent of the element's overall markup identity. Its identity combines normalized generated activator code with the current revisions of the referenced styles and utilities. Style revision methods include expanded transitive `@apply` operations and return their current literals after CLR Hot Reload; they do not rely on rerunning static field initializers.
 
-Two mechanisms work together: the generated handler knows which AKCSS module types affect a component, and instance preparation invalidates its render state. The next structural revision then replaces the cascade instead of incorrectly deciding that unchanged local markup means unchanged styling.
+`ShouldApplyOwnedOperation` registers an unchanged cascade as retained in the pending revision. Descriptors, factories, and activators are created only when the cascade changes. For supported generated utility-only cascades, `ReconcileAkcssStylesOperation` retains compatible activators and subscriptions, constructs only added or changed candidates, and updates affected conflict keys. A new target has no previous candidates to retain. Classes, mixed cascades, unknown revisions, intercepted styles, and uncertain scoped/template ownership conservatively use full replacement on change. ReleaseDirect and ReleaseConditional generation are unchanged.
+
+The existing handler's AKCSS dependency filtering still schedules affected live components when only a referenced module changes. Debug style creation continues through `__AkburaGetStyle(index)`, so changed utility operation arrays and changed style indexes use current constructors rather than the old static `Styles` collection.
+
+The generated `ClearCache` phase invalidates observed-property name caches for reported styles, containing modules, and affected derived styles. Unknown update scope (`null`) clears this metadata cache; unrelated type entries remain cached for a concrete update list. `UpdateApplication` continues to dispatch refreshes on the Avalonia UI thread.
+
+Debug frame refresh reevaluates dynamic arguments and frame conditions through existing utility conflict-key queues, without resetting/executing an unchanged static cascade. Disposed observable argument subscriptions ignore late callbacks before invoking their converter and drop their reference to the old source, including after the same activator reattaches.
+
+For the real CLR scenarios, validation commands, and limitations, see [baseline verification](#19-akcss-baseline-implementation-and-verification) and [incremental reconciliation](#20-akcss-incremental-reconciliation) below.
 
 The implicit root DataContext binding is also tracked as an owned operation. Infrastructure-generated bindings need the same lifecycle discipline as bindings written explicitly in markup.
 
@@ -883,7 +896,1263 @@ Before submitting a Hot Reload change, verify these invariants:
 
 The design is easiest to maintain when its guarantees remain explicit: **identity is not position, ownership is not the entire control, preparation is not completion, and completion of one layer is not completion of every layer.**
 
-## 19. C# semantic probes and compilation latency
+## 19. AKCSS baseline implementation and verification
+
+This section describes complete-cascade replacement and its validation results.
+Selective updates extend this mechanism as documented in section 20.
+
+### Implementation
+
+The complete-cascade implementation was validated against baseline `559208b`.
+
+Debug structural generation compares a cascade revision through the existing
+`AkburaRenderState.ShouldApplyOwnedOperation` contract. An unchanged operation is
+registered as retained, not omitted. Its activator array is constructed only when
+the guard requires replacement. Changed definitions and changed target nodes
+still replace the complete cascade. The original three-argument
+`ApplyAkcssStylesOperation` API remains available with unconditional replacement.
+
+`AkcssHotReloadIdentity` hashes emitted C# tokens with SHA-256. The input encodes
+token kind and length-prefixed token value, excluding whitespace, comments, and
+source-mapping trivia. It includes ordered activator definitions, references,
+arguments, variants, conflict metadata, and binding priorities, but not live
+reactive values. Each referenced source-module style/utility contributes a
+separate revision returned by `__AkburaStyleRevision(index)`. That method hashes
+the emitted style/utility implementation, including metadata attributes and
+expanded transitive `@apply` operations. These are method literals, not mutable
+values hidden behind static readonly initializers.
+
+The existing module dependency graph and generated handler select affected
+components for module-only changes. Current style instances still come from
+`__AkburaGetStyle(index)`, including current utility operation arrays. The CLR
+tests cover both transitive imports and insertion/removal that changes indexes.
+Unreferenced style changes and formatting-only edits retain installed cascades.
+
+Debug frame refresh reuses the runtime's conflict-key queues to refresh dynamic
+arguments, variants, and frame conditions. It does not unconditionally reset and
+execute static cascades. Normal refresh and ReleaseDirect/ReleaseConditional
+generation retain their previous paths.
+Detached targets are not refreshed or resubscribed; visual reattachment installs
+their sources through the existing attachment lifecycle.
+
+`ClearCache` forwards the CLR's updated types to targeted observed-property name
+invalidation. Nested styles, updated module scopes, and inherited attributes on
+derived styles are covered; unrelated cache entries survive. A null update list
+clears the metadata cache. Reflection lookup and invalidation are synchronized
+so a concurrent lookup cannot reinsert stale metadata after invalidation.
+Application refresh remains dispatched through Avalonia's UI thread.
+
+Each observable argument attachment now has an observer that is deactivated
+before subscription disposal. A retired observer ignores late values/errors
+without calling an old converter and releases its reference to the value source.
+This also protects detach/reattach of the same activator. Unchanged cascades do
+not allocate new observers because they do not attach again.
+
+### Important files
+
+- Generator: `AkcssHotReloadIdentity.cs`, `AkcssModuleWriter.cs`,
+  `AkcssDocumentWriter.cs`, `AkcssActivatorWriter.cs`, `ComponentScopeWriter.cs`.
+- Runtime: `AkburaRenderState.cs`, `AkburaControl.cs`, `AkcssRuntime.cs`,
+  `AkcssUtilityCandidateActivator.cs`, `AkcssUtilityValueSource.cs`.
+- Cache lifecycle: `AkcssObservedPropertySignal.cs`,
+  `AkburaHotReloadRuntime.cs`, `HotReloadServiceWriter.cs`.
+- Tests: `AkcssHotReloadTests.cs`, `AkburaCompilationSession.cs`,
+  `ClrHotReloadSession.cs`, revision/cache/ownership/runtime/writer unit tests.
+
+### Real CLR scenarios
+
+All integration cases use the production incremental generator, real
+`EmitDifference` and `MetadataUpdater.ApplyUpdate`, the original assembly,
+existing live controls, and generated handlers on Avalonia's UI thread.
+Unavailable CLR Hot Reload fails the isolated child process; it is not skipped.
+
+| Scenario | Verified behavior |
+| --- | --- |
+| A: unrelated component markup | Same controls and activators, same subscriptions, no extra reset/execute marker writes; reactive values still update. |
+| B: utility definition | Same control reflects changed utility code and subsequent observable values. |
+| C: module-only delta | Component is absent from the actual changed-type list; updated module/nested types refresh the existing component. |
+| D: declaration removal | Removed utility releases its subscription and Width; unrelated class styling remains; removing the remaining class clears Height and the owned cascade. Late callbacks are inert. |
+| E: 20 consecutive module deltas | Stable controls, one active subscription, one replacement/disposal per delta, no stale callback effects or growth of the installed activator array. |
+| F: observed-property metadata | Real attribute delta changes Width to Height; reflection reports Height, Width stops causing updates, Height remains active. |
+| G: failed refresh and retry | One-shot source attachment failure restores the previous owned activator array and active subscription; a later valid delta updates successfully. |
+| Unreferenced style and reattachment | Unchanged cascade survives module edits and detach/reattach; a changed module while detached is applied on reattachment, and retired subscriptions stay inert. |
+| Transitive import | Changing a base `@apply` declaration refreshes the dependent cascade. |
+| Style indexes | Insert/remove declarations before the used style; current factories select the right definition. |
+| Formatting only | Real source-mapping delta retains the cascade and its subscriptions. |
+
+The harness updates source types and nested types and supplies types resolved
+from `EmitDifferenceResult.ChangedTypes`, including compiler-generated types,
+rather than assuming every delta updates the component.
+
+### Validation
+
+Environment: Windows, .NET SDK 10.0.401, CLR 10.0.12, repository Roslyn 4.11.0.
+
+```powershell
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj --no-restore --filter "FullyQualifiedName~Akcss|FullyQualifiedName~AkburaRenderState|FullyQualifiedName~AkburaHotReload|FullyQualifiedName~ComponentDocumentWriter|FullyQualifiedName~HotReloadServiceWriter" --logger "console;verbosity=minimal" -m:1 /nodeReuse:false
+dotnet test src/Akbura.HotReloadIntegrationTests/Akbura.HotReloadIntegrationTests.csproj --no-restore --logger "console;verbosity=minimal" -m:1 /nodeReuse:false
+dotnet test src/Akbura.HotReloadIntegrationTests/Akbura.HotReloadIntegrationTests.csproj -c Release --no-restore --logger "console;verbosity=minimal" -m:1 /nodeReuse:false
+```
+
+The integration assembly's configuration selects the runtime build. Its dynamic
+owner compilation deliberately remains Debug so CLR deltas are supported.
+Separate generation tests exercise DebugStructural, ReleaseDirect, and
+ReleaseConditional; this is not a claim that Release-optimized owners support
+structural CLR edits.
+
+Final results (all passed, none skipped):
+
+| Run | Passed | Duration |
+| --- | --- | --- |
+| Selected Debug unit tests | 332 / 332 | 2 m 43 s |
+| Complete CLR suite, Debug runtime | 24 / 24 | 1 m 55 s |
+| Complete CLR suite, Release runtime | 24 / 24 | 2 m 31 s |
+
+The CLR suite includes 11 new AKCSS scenarios and 13 existing scenarios. There
+are 19 new unit-test cases covering hashing, cache scope, operation ownership,
+generation modes, refresh behavior, and detached subscription lifetime. All 25
+modified/new files passed CRLF and final-newline checks; modified/new C# files
+passed Roslyn AST checks for braced if/for/foreach bodies and multiline XML
+summaries. Embedded C# fixtures were checked as well. `git diff --check` passed.
+
+Development runs additionally filtered on `AkcssHotReloadTests`,
+`DeclarationRemoval`, and `AkcssDetachedRefreshTests`. The detached refresh test
+was run before the runtime guard and failed with Expected 0 / Actual 1 active
+subscriptions; it passed in the final selected suite after the fix. Intermediate
+failed runs are described below rather than represented as successful checks.
+
+During development, the tests exposed and resolved:
+
+- Duplicate method-token emission when repeated generated lambdas were not
+  matched. The harness now matches repeated occurrences, not only unique names.
+- Duplicate `DeletedPEMethodDefinition` rows when removing the same cascade
+  factories from multiple methods in one delta. This reproduced with Roslyn
+  4.11.0, 5.0.0, and 5.9.0. The test harness emits those destructive method edits
+  as separate real CLR deltas, unions their actual changed types, and invokes
+  handlers only after the complete logical source update. No edits are omitted,
+  and the repository's package versions were not changed.
+- A late callback invoking a deleted converter after utility removal. Fixed by
+  deactivating per-attachment observers before disposal.
+- A dynamic source resubscribing while its target was detached. A new headless
+  test first reproduced one subscription instead of zero, then verified the
+  Debug-only refresh guard and normal reattachment.
+- Standalone handler fixtures missing their newly required runtime reference.
+- Incorrect fixture assumptions about initial attachment counts, reusing the
+  once-only Set API, and resetting arbitrary CLR setter effects.
+- One development build hit an MSBuild DLL lock. Shutting down build servers and
+  using single-node, non-reused builds resolved the infrastructure failure.
+
+Existing nullable/analyzer warnings in `Akbura.Furioso` and
+`QuotedResourceRegressionTests` are outside these changes.
+
+### Complete-replacement boundaries
+
+- Metadata-only style references, intercepted declarations, and scoped/template
+  ownership use conservative full replacement rather than an uncertain identity.
+- The dependency graph is for AKCSS declarations, not arbitrary external C#
+  helper/service implementation changes. Such changes are not promised to
+  automatically invalidate dependent components.
+- CLR-supported edits vary by host. The tested observed-property attribute edit
+  works on this runtime; arbitrary base-type/layout/attribute edits are not
+  promised. The harness explicitly rejects changed base types and CLR retains
+  metadata for deleted types/fields.
+- An IDE's one-delta deletion behavior remains dependent on its compiler/host;
+  the harness's split-delta workaround is not installed into the production host.
+- Rollback restores the existing owned-resource contract, not old method IL or
+  arbitrary user-defined style effects. For example, an unregistered CLR setter
+  such as the test's Marker has no reversible Avalonia property contribution;
+  deletion assertions cover actual Avalonia Width/Height reset instead.
+- Subscription callbacks already executing on another thread are not an added
+  thread-quiescence guarantee. The live UI scenarios run on Avalonia's UI thread.
+- No per-activator diff, reversible contribution infrastructure, transactional
+  cascade engine, or new global module registry was introduced.
+
+Per-activator reconciliation extends this mechanism as described in section 20.
+Independent property contributions, compiler/IDE deletion interoperability, and
+broader scoped ownership retention are not guarantees of complete replacement.
+
+## 20. AKCSS incremental reconciliation
+
+This section documents the incremental implementation, its compatibility boundaries,
+and the validation results recorded after the baseline in section 19.
+
+### 1. Architecture and baseline
+
+Incremental reconciliation extends the complete-cascade implementation at
+`18e3be27e5b46bb822f4f305a1deed0e8120f9a2`. The complete-cascade semantic
+guard remains the first gate: an unchanged cascade registers the existing owned
+resource and does not create descriptors, factories, activators or subscriptions.
+
+For changed Debug utility-only cascades, the generator now supplies descriptors
+and a lazy indexed factory to `AkburaRenderState.ReconcileAkcssStylesOperation`.
+The existing target runtime stages a new ordered snapshot containing retained
+instances and newly constructed replacements. It uses the existing utility
+conflict resolver, operation reset/execute methods and reactive queues; this is
+not another cascade engine or an independent property-contribution system.
+
+ReleaseDirect and ReleaseConditional retain their existing generated paths.
+Generated Debug components also work against a Release-built runtime.
+
+### 2. Important files
+
+- `src/Akbura/Akcss/AkcssActivatorDescriptor.cs`: hidden generated-code descriptor contract.
+- `src/Akbura/Akcss/AkcssRuntime.Reconciliation.cs`: matching, staged transitions,
+  affected-key invalidation, publication, commit and rollback.
+- `src/Akbura/Akcss/AkcssRuntime.cs`: existing resolver with snapshot-local
+  precedence, candidate membership checks and selective Debug condition refresh.
+- `src/Akbura/HotReload/AkburaRenderState.AkcssReconciliation.cs` and
+  `AkburaRenderState.cs`: owned resource integration and revision commit hook.
+- `src/Akbura/AkburaControl.cs`: reconciliation-aware property-changed forwarding.
+- `src/Akbura/Akcss/AkcssUtilityCandidateActivator.cs`, `AkcssUtilityOperation.cs`
+  and `AkcssUtilityValueSource.cs`: eligibility, stable converters and lifecycle guards.
+- Generator `AkcssActivatorPlan.cs`, `AkcssActivatorPlanner.cs` and
+  `AkcssActivatorWriter.cs`: declaration anchors, individual revisions and lazy factories.
+- Generator `AkcssDocumentWriter.cs`, `AkcssModuleWriter.cs`,
+  `AkcssUtilityWriter.cs` and `AkcssUtilityOperationWriter.cs`: Debug safety metadata.
+- `AkcssReconciliationTests.cs`, `AkcssReconciliationPerformanceTests.cs` and
+  `AkcssIncrementalHotReloadTests.cs`: algorithm, ownership, measurements and real CLR tests.
+- `AkburaBlackSilenceGeneratorTests.cs`: align the empty-project fixture's references
+  with the generated runtime cache dependency.
+- CLR harness `AkburaCompilationSession.cs` and `ClrHotReloadSession.cs`: optional
+  generated-code counters and syntax maps for named local factories.
+
+These generated-code entry points and the descriptor are public only because
+generated components live in consumers' assemblies; the runtime reconciliation
+engine is internal. They are not intended as user-facing styling APIs.
+
+### 3. Declaration identity versus semantic revision
+
+The descriptor contains `Identity`, `Family`, `SyntaxIdentity` and `Revision`.
+Family is the existing utility-name key. The syntax anchor uses
+`ComponentHotReloadIdentity.CreateOperationSyntaxIdentity`, not a positional
+index or `GetHashCode()`. It ignores trivia and source mappings.
+
+Within each family, uniquely matching old/new syntax anchors are paired first.
+If exactly one declaration remains unmatched on each side, that pair represents
+a modified declaration. The runtime carries the previous installed identity
+forward for either retained or modified pairs. A value edit such as `w-12` to
+`w-13` can therefore keep the declaration slot while changing its revision.
+New slots use deterministic family/occurrence identities; collision suffixes
+are deterministic and never steal a matched installed identity.
+
+Repeated identical anchors are ambiguous. Their affected subset is replaced,
+not guessed by position. Unique neighbors are still eligible for retention.
+Multiple simultaneous unanchored edits in one family are also replaced.
+
+The semantic revision hashes normalized emitted candidate tokens with SHA-256,
+using zero in place of source order and module accessor indexes. It includes
+arguments, activation, priorities, conflict metadata and value-source context,
+plus the current `__AkburaStyleRevision(index)` of every referenced definition.
+Live observable values are not revision inputs. A null referenced revision
+preserves the unknown-definition full-replacement fallback.
+
+Module implementation hashes currently include generated style names/indexes.
+Inserting earlier definitions can therefore conservatively replace additional
+utilities even if their behavior is unchanged. Correct current factories and
+values are verified; maximal retention across module index shifts is not promised.
+
+### 4. Reconciliation algorithm
+
+Matching groups declarations by family and syntax anchor in O(n) expected time
+and O(n) storage. A matched, supported candidate with an equal semantic revision
+is retained by exact reference. Factories run for added, modified and ambiguous
+declarations only. If any installed or desired operation is incompatible, the
+whole transition uses complete replacement; already created replacements are
+not constructed a second time.
+
+Retained instances keep immutable `SourceOrder`. Effective precedence is the
+desired snapshot's array index, stored in the runtime's snapshot sidecar rather
+than mutating candidates. Old indexes are restored by rollback. The existing
+resolver still handles operation priority/order, application order, prefixed
+variants, conflict groups and unprefixed precedence.
+
+### 5. Lazy generated factories and CLR shape
+
+Named local factories are generated per declaration, with names based on the
+existing syntax anchor and duplicate occurrence, not the structural local ID.
+Each cascade's lexical block supplies the element-level namespace. A neighboring
+element insertion must not rename and retire a retained factory's lambdas; a real
+CLR regression shifts the styled element's local ID and then detaches/reattaches
+the same controls. Value-source context changes may still replace affected
+candidates conservatively, while compatible candidates retain callable factories.
+An indexed switch dispatches
+only requested declarations. No new component instance fields or mutable static
+factory arrays are emitted. Fresh utilities use `__AkburaGetStyle(index)` and
+their current operation arrays; static initializers are not replayed.
+
+Debug object and same-type observable converters use runtime method groups,
+so retiring an unrelated generated factory cannot retire a retained converter.
+Observable conversions between different element/value types retain the older
+complete-replacement generation path. This avoids promising compatibility for
+converter lambdas whose identities could be changed by CLR edits.
+
+The test harness maps named local functions and their scoped lambdas. With the
+repository's Roslyn 4.11, removal of generated lambdas/local functions from
+multiple methods can emit duplicate deleted-method rows. Such destructive
+method edits are emitted as separate actual CLR deltas; handlers run only after
+the complete logical source update. This extends the existing harness workaround,
+not a production runtime workaround or simulated assembly replacement.
+
+### 6. Subscriptions and activation state
+
+Retained candidates are not attached or detached during supported reconciliation.
+Their current arguments, observable variants, watchers and reversible binding
+contributions remain installed. Changed candidates attach before publication;
+obsolete subscriptions are retired only when the enclosing revision commits.
+An in-flight callback from a staged/obsolete candidate cannot enqueue work unless
+that candidate belongs to the currently installed snapshot.
+
+Each utility Watch attachment has a deactivatable observer, as observable
+arguments do. Deactivation precedes disposal and drops the
+owner reference. Retired values/errors are ignored even after the same candidate
+reattaches. Cleanup attempts all owned sources if one disposal throws, and clears
+internal references before retry. User code that fails to actually unsubscribe
+cannot be made transactional by reconciliation, but its retired observer is inert.
+
+Detached targets do not attach added sources or execute the new cascade.
+Reattachment uses the existing lifecycle and activates the latest snapshot.
+`RefreshForHotReload` remains selective: inputs follow their existing refresh
+contracts, and frame conditions invalidate keys only when their evaluated
+activation changes. Sources explicitly requiring recreation on each frame still
+follow that existing contract; retention does not override it.
+
+### 7. Affected conflict groups
+
+Changed, added and removed candidates contribute the union of their old/new
+operation conflict keys. This includes every operation of multi-property
+utilities. A relative-order inversion among retained candidates sharing a key
+also marks that key. For each affected key, old operations are reset and the
+existing resolver executes the current winner. A removed winner therefore exposes
+the original retained shadowed candidate.
+
+Unrelated keys are neither reset nor executed, and their contributions are not
+disposed. Dependency-driven reactive notifications can legitimately invalidate
+additional keys through the existing queue. Eligibility requires generated,
+granular Avalonia-property operations with known revisions and reversible reset
+metadata. Each candidate operation captures the original AvaloniaProperty and
+receiver Type at construction. Its reset passes that captured property to a
+stable runtime-backed overload instead of using the current generated Reset body.
+The Debug overload remains emitted even if a later revision uses a CLR setter,
+so a retired generated override is not deleted while it is still needed.
+This matters because a CLR delta also replaces methods on retired instances:
+changing Width to MinWidth must still clear the original Width. The captured
+receiver guard preserves the original reset's target compatibility. A real CLR
+regression additionally changes both keys of a multi-property utility and verifies
+the old/new union without resubscribing its unaffected neighbor.
+
+Arbitrary CLR setters do not opt in. Non-priority `ClearValue()` still
+has its existing ownership limitations within an affected property; this work
+does not introduce independent ownership of arbitrary external local values.
+
+### 8. Avalonia property synchronization
+
+The target runtime publishes the exact reconciled ordered array to
+`AkburaControl.AkcssStylesProperty`. A flag scoped to that single target and
+publication suppresses only the matching self-notification. There is no global
+notification suppression. A different reentrant property replacement during
+publication or reset/execute/retirement is rejected and causes rollback; both runtime and property snapshots
+are checked against the expected array.
+
+Normal `SetAkcssStyles`, its already-set validation, normal replacement and
+`GetAkcssStyles` keep their existing behavior. Non-Control targets bypass the
+Avalonia property and use the same runtime transition directly.
+
+### 9. Ownership, staging, rollback and fallback
+
+The reconciled resource occupies the existing `$akcss` owned-operation slot and
+uses `ShouldApplyOwnedOperation` registration. Its baseline is inherited from the
+previous resource, not from a chain of previous resources. Omission releases the
+current cascade and restores the original public/runtime baseline. Aborting
+omission reapplies the owned snapshot and restores its descriptor metadata.
+
+Partial transitions retain the old ordered array, descriptors and working sources
+until revision completion. Abort detaches staged replacements, resets affected
+new operations, restores old snapshots/order, reapplies old affected winners and
+restores the previous property-set state. Commit detaches only obsolete sources.
+If cleanup fails during commit, rollback reattaches only candidates whose
+retirement was attempted; unaffected sources are not attached twice.
+
+The installed operation drops the transition snapshot and factory after success.
+Pending mutations own rollback data only until completion, avoiding unbounded
+previous-resource chains across repeated updates. Constructor/attachment failures,
+explicit abort, omission abort, commit disposal failure and reentrant publication
+are covered separately.
+
+Fallback uses the established full `SetStyles` reset/replacement and previous
+render-revision recovery path. It does not promise rollback of old IL after a CLR
+delta or transactional compensation for arbitrary user style effects.
+
+### 10. Support matrix
+
+| Scenario | Behavior |
+| --- | --- |
+| Unchanged complete cascade, including classes | The semantic revision guard retains the complete resource. |
+| Changed generated utility-only cascade with known revisions and Avalonia operations | Incremental matching, construction and affected-key update. |
+| Observable arguments/variants with compatible contexts | Retained instances and subscriptions; existing refresh contracts remain in force. |
+| Binding priorities and reversible contributions | Retained unrelated contributions remain installed. |
+| Multi-operation utility or conflicting/reordered candidates | Old/new key union and snapshot-local precedence. |
+| One external utility definition changes | Selective replacement of its applications on existing controls. |
+| Earlier module definitions inserted/removed | Current indexes/factories; conservative extra replacements may occur. |
+| Repeated identical declarations | Ambiguous subset replaced, unique neighbors retained. |
+| Classes, mixed cascades, interceptors, legacy/custom operations, unknown revisions | Complete replacement on change. |
+| Source-dependent local scope rejected by the existing retention guard | Existing forced/full replacement path. |
+| Typed observable conversion requiring a generated converter lambda | Existing full-replacement generation path. |
+| Arbitrary setters/effects or external-value contribution ownership | No new transactional/property-ownership guarantees. |
+
+### 11. Tests and execution
+
+Algorithm/ownership tests cover selective change, insertion, removal, reorder,
+ambiguous duplicates, attachment failure, explicit abort, priority contributions,
+omission/baseline restoration, unchanged frame conditions, retired Watch callbacks,
+non-Control targets, commit cleanup failure, reentrant property publication/reset and
+preservation/collision handling of installed declaration identities.
+
+`AkcssIncrementalHotReloadTests` implements all requested A-M cases plus
+module-only multi-property conflict-key migration and structural local-ID movement
+regressions using the
+production generator, the original loaded assembly, real `EmitDifference` and
+`MetadataUpdater.ApplyUpdate`, live retained controls and generated handlers.
+The fixtures optionally insert counters directly into generated utility
+constructors and operation methods; counters measure actual construction,
+Reset/Update/Apply calls and conflict keys. No production instrumentation is added.
+Tests also assert reference identities, actual Avalonia values, active/cumulative
+subscriptions and delayed retired callbacks. Supported cases fail if the runtime
+unnecessarily uses full replacement. The isolated child fails, rather than skips,
+if CLR updates are unavailable. J applies 20 successive logical CLR updates.
+
+Validation commands (from the repository root):
+
+```powershell
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj --no-restore --filter "FullyQualifiedName~Akcss|FullyQualifiedName~AkburaRenderState|FullyQualifiedName~AkburaHotReload|FullyQualifiedName~ComponentDocumentWriter|FullyQualifiedName~HotReloadServiceWriter|FullyQualifiedName~ComponentStructuralHotReload|FullyQualifiedName~GenerateSources_DebugCompilationRegistersHotReloadService" --logger "console;verbosity=minimal" -m:1 /nodeReuse:false
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c Release --no-restore --filter "FullyQualifiedName~Akcss|FullyQualifiedName~AkburaRenderState|FullyQualifiedName~AkburaHotReload|FullyQualifiedName~ComponentDocumentWriter|FullyQualifiedName~HotReloadServiceWriter|FullyQualifiedName~ComponentStructuralHotReload|FullyQualifiedName~GenerateSources_DebugCompilationRegistersHotReloadService" --logger "console;verbosity=minimal" -m:1 /nodeReuse:false
+dotnet test src/Akbura.HotReloadIntegrationTests/Akbura.HotReloadIntegrationTests.csproj --no-restore --logger "console;verbosity=minimal" -m:1 /nodeReuse:false
+dotnet test src/Akbura.HotReloadIntegrationTests/Akbura.HotReloadIntegrationTests.csproj -c Release --no-restore --logger "console;verbosity=minimal" -m:1 /nodeReuse:false
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj --no-restore --filter "FullyQualifiedName~OneOfTenUtilities" --logger "console;verbosity=detailed" -m:1 /nodeReuse:false
+```
+
+On Windows, .NET SDK 10.0.401, CLR 10.0.12 and repository Roslyn 4.11.0:
+
+- The regression unit filter includes 17 new unit/measurement cases and the
+  corrected empty-project fixture: 381 tests in both Debug and Release, zero skips.
+- The complete real CLR project contains 15 new cases (A-M, conflict-key migration
+  and structural local-ID movement) and 24 existing cases: all 39 passed in both
+  Debug and Release, zero skips.
+
+Final reruns on 2026-10-15 also saved machine-readable TRX results under the ignored
+unit-test and integration-project `TestResults` (Debug) and `bin` (Release)
+directories. All four result summaries report zero failures,
+errors, timeouts, aborted cases and unexecuted cases. The latest complete unit
+reruns include the stable-factory-name fix.
+
+An optional unfiltered Debug run was stopped after 21 minutes because it had
+started before the final reset-metadata fix: 2,570 cases had passed and the
+empty-project fixture below had failed. This interrupted run is not reported as
+a successful whole-repository suite. Validation uses the current focused unit
+filter and the complete real CLR project in both runtime configurations.
+
+The full Debug run exposed an existing fixture that deliberately removed all
+Akbura references. Its generated ClearCache has called
+`AkburaHotReloadRuntime.ClearAkcssMetadataCache` since the complete-cascade
+implementation; incremental reconciliation does not change that writer.
+Keeping the normal runtime reference fixes that test;
+its assertions were not weakened. Existing unrelated analyzer warnings
+(Furioso CS8602 and QuotedResourceRegressionTests xUnit2031/xUnit2013) remain.
+
+### 12. Performance methodology
+
+`AkcssReconciliationPerformanceTests` compares the old owned-operation
+full-replacement API against the incremental API on the same current runtime.
+Each path retains one Border across updates of ten independent real Avalonia
+properties, including Padding and CornerRadius. Nine unchanged arguments are
+observable; one scalar Width changes. Both paths include render ownership,
+matching, arrays, reactive sources, property synchronization and conflict execution.
+After 100 warm-up updates, 1,000 updates are measured with Stopwatch and
+`GC.GetAllocatedBytesForCurrentThread`. Counters verify 10 versus 1 constructions,
+9 versus 0 replacement subscriptions, 20 versus 1 resets and 10 versus 1 executions
+per update. The old ownership path resets during release and again during install.
+
+This is a runtime microbenchmark, not an end-to-end compiler/debugger latency
+benchmark or BenchmarkDotNet statistical result. Tests do not assert timings;
+results depend on JIT, machine load and cascade size. Descriptor matching has
+nontrivial allocation overhead; small cascades may not benefit in elapsed time.
+
+Recorded Debug sample after lifecycle/rollback hardening:
+
+| Per update | Full-replacement path | Incremental path |
+| --- | ---: | ---: |
+| Constructed activators | 10 | 1 |
+| Replaced observable subscriptions | 9 | 0 |
+| Reset operations | 20 | 1 |
+| Executed operations | 10 | 1 |
+| Allocated bytes | 40,013 | 27,740 |
+| Elapsed microseconds | 241.41 | 99.30 |
+
+That sample uses about 30% fewer allocated bytes. A preceding sample measured
+133.00/53.62 microseconds, illustrating timing variability; no universal latency
+or allocation ratio is asserted. The exact operation/subscription counts are
+test assertions. The benchmark excludes compiler generation and CLR delta
+emission/application costs.
+
+### 13. Remaining limitations
+
+Remaining work includes independent property-contribution ownership for all
+non-priority setters, better compensation for arbitrary custom/intercepted style
+effects, granular metadata for class activators, stronger failure isolation for
+misbehaving disposal code, and reducing conservative replacements across module
+index changes. Pooling/matching allocation optimization needs further measurement.
+Incremental reconciliation does not implement those mechanisms or change AKCSS syntax.
+
+
+## 21. AKCSS property ownership and transactions
+
+### Property API audit and compatibility contract
+
+The runtime targets Avalonia 12.0.4. Generated utility operations have two
+application paths: ordinary `Update` assignments and explicit-priority `Apply`
+contributions. Generated class styles and interceptors have their own effect
+and subscription lifecycle. Property ownership does not replace the existing
+per-operation conflict resolver.
+
+| Operation | Existing write/reset | Ownership contract |
+| --- | --- | --- |
+| Styled or attached property, ordinary utility | LocalValue assignment or local resource binding; ClearValue reset | Compatibility fallback; no independent local-source ownership or transactional guarantee. |
+| Styled or attached property, explicit Animation/StyleTrigger/Template/Style | Reversible SetValue or Bind handle | Eligible for owned contributions and captured-resource rollback. |
+| Direct property | Direct setter/local binding | Compatibility fallback; no reversible value stack. |
+| Arbitrary CLR setter, class, interceptor, legacy/custom operation | User/generated effect and custom reset | Compatibility fallback; arbitrary side effects cannot be reversed. |
+| ReleaseDirect/ReleaseConditional generation | Existing direct/conditional application | Unchanged generation; no Debug transaction metadata. |
+
+Avalonia's LocalValue `SetValue` does not return a reversible handle; local
+`Bind` replaces the previous binding. The compatibility path deliberately keeps
+its existing priority and behavior. It does not restore external bindings using
+an effective-value snapshot and does not use private value-store APIs. Preserving
+an external local binding while temporarily overriding it at LocalValue is not
+a supported transactional scenario. Explicit non-local layers preserve external
+local values and bindings according to their original Avalonia precedence.
+LocalValue utilities still retain semantic revision guards and incremental
+activator matching; the compatibility boundary concerns property cleanup and
+rollback, not an unconditional loss of incremental reconciliation.
+
+API audit sources: [AvaloniaObject](https://github.com/AvaloniaUI/Avalonia/blob/12.0.4/src/Avalonia.Base/AvaloniaObject.cs)
+and [ValueStore](https://github.com/AvaloniaUI/Avalonia/blob/12.0.4/src/Avalonia.Base/PropertyStore/ValueStore.cs).
+
+### Owned sources and generated code
+
+Debug generated `AkcssUtilityOperation.Apply` returns an
+`AkcssPropertyContribution` for styled/attached properties at the four supported
+non-local priorities. `SupportsOwnedContributions` distinguishes this capability
+from incremental matching alone. The runtime checks the actual returned resource;
+custom disposable handles retain the older compensation contract. Ordinary
+generated `Update` and `Reset` remain the LocalValue compatibility path.
+
+Each contribution captures the exact target, property, priority, current value,
+and its own Avalonia binding handle. Its observable initially supplies UnsetValue,
+so the handle is owned before a real value can invoke a throwing notification.
+The public property API validates values before publication. Suspending sends
+UnsetValue through this binding, never ClearValue on the target. Resuming
+republishes the captured value without invoking generated Apply/Update/Reset.
+Resource contributions retain their subscription and latest value while suspended.
+Disposal deactivates the observer, attempts both source and binding cleanup, and
+is idempotent. Retired values/errors cannot mutate the property.
+A suspended UnsetValue binding still exists until commit; IsSet alone is not a
+test that its effective contribution is active. After committed removal, the
+binding itself is gone and an originally unset ordinary property is unset again.
+
+The existing ConflictKey resolver remains authoritative. Only a winning operation
+owns an active property contribution; shadowed candidates retain argument/variant
+state. External local values still outrank Style/Template/StyleTrigger and remain
+below Animation. Removal reveals the underlying live binding/value naturally.
+Originally unset properties receive no fabricated local value.
+
+### Transaction and structural ownership protocol
+
+1. Preparation validates descriptors, distinct activator instances and matches,
+   and constructs only necessary replacements. It does not attach subscriptions
+   or execute operations for validation.
+2. Application transfers affected owned handles from candidate slots to the
+   transition snapshot, suspends them, attaches replacements, resolves affected
+   keys, and publishes the staged ordered array. Unaffected handles and sources
+   are neither transferred nor recreated.
+3. `PrepareCommit` retires obsolete candidate watchers and argument subscriptions.
+   Attempted retirements are recorded before invoking user disposal code. A failure
+   reattaches only those candidates, without duplicating unaffected subscriptions.
+4. Every render mutation commits before `CompleteCommit` releases old suspended
+   contributions. A standalone runtime `Commit` combines these two steps.
+5. Rollback releases provisional resources, restores arrays/descriptors and the
+   original handles, then resumes owned winners without rerunning generated
+   application code. Compatibility operations use the older reset/reapply path.
+
+A handle belongs to one candidate slot or one transition snapshot, never both.
+The render operation owns the cascade, not individual property handles. Rollback
+is idempotent; installed operations retain no previous-resource chains. Cascade
+baseline restoration distinguishes unset and explicitly installed arrays.
+Omission to an empty cascade baseline is staged through the same transition:
+abort resumes the old contributions, while structural commit releases them.
+Restoring a non-empty preexisting public cascade retains the established
+full-replacement compatibility path and its compensation limitations.
+
+Candidate invalidations and resource publications are queued per target until
+structural completion. Commit drains them against the new cascade; rollback
+drains them against the restored cascade. No global scheduler or background
+property mutation is introduced. Detachment releases current and suspended
+snapshot sources; rollback while detached does not reactivate them. Reattachment
+activates the latest applicable cascade.
+
+### Failure boundaries
+
+Independent cleanup continues after a failure. Application and rollback failures
+are preserved in AggregateException; a second rollback does not repeat a failed
+release. A subsequent valid revision can retry. If finalization released an old
+source before a later mutation failed, compensation reinstalls its captured
+property source. Re-subscribing a custom source may itself fail and is reported.
+
+Transactions cannot undo CLR IL changes, arbitrary constructor/class/interceptor
+effects, or direct/CLR setters. A source that throws before returning a handle
+or fails to unsubscribe cannot be made transactional. Re-subscribing retired user
+observables can execute updated/deleted code: that recovery remains best-effort.
+LocalValue assignments and ClearValue resets explicitly have no independent
+ownership guarantee. External bindings are never recreated using effective-value
+snapshots, and private Avalonia APIs are not used.
+
+### Verification and measurements
+
+`AkcssOwnedContributionTests` covers external values and a real live binding,
+all reversible priorities, unset restoration, competing/reordered entries,
+variant/priority changes, preparation/application/commit/rollback failures,
+structural aborts, queued notifications, resources, pending detachment, retry,
+and LocalValue/direct-property boundaries. Generator tests cover owned Debug
+scalar/attached/resource operations and unchanged non-Debug generation.
+
+Real CLR cases retain original controls while testing property migration with an
+external binding, multi-property failure/retry, twenty updates, resource
+rollback/removal, detached updates, and isolated padding changes with retained
+background/corner-radius sources. The ordinary compatibility cases remain covered.
+
+The microbenchmark compares disposable priority handles with suspendable sources
+on the same current runtime, not an old runtime binary. One of ten independent
+properties changes while nine argument subscriptions remain retained. Allocations
+and timing are measured after warm-up, without timing assertions. The existing
+compatibility full-replacement/incremental measurement is retained separately.
+Additional paired workloads measure conflicts, multi-property utilities, reactive
+updates, and failed application with rollback. Extra observable entries and relay
+objects are the cost of owning the handle before publishing a value and keeping
+old resource sources suspended. Retained subscriptions and unrelated contributions
+are not replaced. Timing samples under concurrent compiler/test load are not
+treated as statistical performance results.
+
+Important implementation files are `AkcssPropertyContribution.cs`,
+`AkcssRuntime.Reconciliation.cs`, `AkcssUtilityCandidateActivator.cs`,
+`AkcssUtilityOperationWriter.cs`, `AkburaRenderState.AkcssReconciliation.cs`, and
+the render-state commit/release hooks. `AkcssStyle.cs` and `AkcssRuntime.cs` also
+attempt remaining independent cleanup after disposal failures. Tests live in
+`AkcssOwnedContributionTests.cs`, `AkcssReconciliationPerformanceTests.cs`,
+`AkcssUtilityWriterTests.cs`, and `AkcssIncrementalHotReloadTests.cs`.
+
+Validation uses the regression unit filter and CLR commands from section 20 in
+both Debug and Release. Debug generated owners are deliberately tested against
+both runtime configurations; ReleaseDirect/ReleaseConditional generation retains
+the original paths and does not emit the new Debug ownership metadata.
+The three initial regression tests failed before implementation. Intermediate
+runs exposed an incorrect IsSet expectation for the coerced cascade property and
+an accidental single-exception wrapper; both were corrected. Superseded runs
+compiled before subsequent fixes were stopped/replaced, not counted as successful
+validation. No claim is made about an unfiltered whole-repository test run.
+An isolated Debug run also exposed fixture dependence on Avalonia dispatcher
+initialization order. Owned-property and measurement tests now dispatch every
+property mutation through the headless UI session, matching production and CLR
+integration threading requirements.
+
+### Recorded validation results
+
+Final validation on 2026-10-15, Windows, SDK 10.0.401 / CLR 10.0.12,
+Avalonia 12.0.4 and repository Roslyn 4.11:
+
+| Run | Passed | Failed / skipped |
+| --- | ---: | ---: |
+| Regression unit filter, Debug | 411 | 0 / 0 |
+| Regression unit filter, Release | 411 | 0 / 0 |
+| Complete real CLR project, Debug runtime | 45 | 0 / 0 |
+| Complete real CLR project, Release runtime | 45 | 0 / 0 |
+| Isolated owned/generator/measurement filter, Debug and Release | 36 each | 0 / 0 |
+
+The unit filter adds 25 functional cases and five measurement cases to the
+previous 381 cases. The CLR project adds six cases to the previous 39. All four
+final TRX summaries also report zero errors, timeouts, aborted and unexecuted
+cases. Unit and CLR projects were checked to use byte-identical runtime binaries
+for each configuration. Existing unrelated Furioso/QuotedResourceRegressionTests
+warnings remain; no package or target-framework changes were required.
+
+Machine-readable results are under ignored `bin/OwnedAkcss/FinalDebugUnit`,
+`FinalReleaseUnit`, `VerifiedDebugClr`, and `VerifiedReleaseClr` directories.
+Three separate, sequential Debug measurement runs were then executed without
+the parallel validation runs, six cases per run, all passing. Their TRX files
+are under `bin/OwnedAkcss/Measurements`. Medians of these three samples follow;
+times are descriptive microbenchmarks, not statistically established speedups.
+
+| Workload | Handle path B/update | Owned path B/update | Handle path us/update | Owned path us/update |
+| --- | ---: | ---: | ---: | ---: |
+| One changed utility of ten | 29,307 | 29,892 | 110.52 | 94.42 |
+| Competing candidates | 11,122 | 11,512 | 58.89 | 63.43 |
+| Multi-property utility | 9,040 | 9,544 | 38.63 | 47.60 |
+| Reactive update | 848 | 1,128 | 3.90 | 5.25 |
+| Failed update and rollback | 11,216 | 11,376 | 61.25 | 70.10 |
+
+The one-of-ten instrumented source benchmark still constructs one candidate,
+replaces zero argument subscriptions, and installs/releases one contribution per
+update on either path. Its approximately 2% allocation overhead buys suspendable
+rollback resources. Reactive scalar updates add 280 bytes (about 33%) and extra
+binding relay work: this is a real cost, not an allocation improvement. The
+multi-property samples also show extra publication work. Smaller/fewer relay
+allocations and affected-key bookkeeping are candidates for future profiling;
+no new pooling or scheduler was added. The instrumented source benchmark is not
+an end-to-end generated-code/compiler/CLR latency measurement.
+
+The unchanged compatibility workload measures full replacement at 40,093
+B/update versus incremental matching at 29,140 B/update; their median times are
+172.17 and 89.96 microseconds. The earlier recorded incremental sample in section
+20 was 27,740 B/update: the additional validation and rollback bookkeeping cost
+about 5% in this fixture, while preserving the exact one-versus-ten construction,
+zero-versus-nine replacement subscription, and one-versus-ten execution counts.
+All 15 changed/new files passed CRLF/final-newline checks; C# files passed braced
+if/for/foreach and multiline XML-summary checks. `git diff --check` passed.
+
+## 22. AKCSS update batching and indexed conflict resolution
+
+The implementation baseline for these optimizations is commit
+`6d905239d41feb5471c17fbb6ee989899019281e`. The checkout HEAD was verified before
+changes; the historical ownership measurements above are not universal targets.
+
+### Synchronous update boundaries
+
+`AkburaControl.BeginAkcssUpdate(target)` opens a target-local, nestable synchronous
+scope. Dispose the outermost scope to resolve pending conflict keys using their
+latest inputs. A key occurs only once in the pending set; background and padding
+still represent independent work. Disposing a scope twice is harmless. An ordinary
+unbatched notification continues to take effect before its publisher returns.
+Scopes must be used on the target's Avalonia thread and must not span asynchronous
+work. There is no Dispatcher-posted flush and no global reactive scheduler.
+
+```csharp
+using (AkburaControl.BeginAkcssUpdate(target))
+{
+    backgroundSource.Publish(first);
+    backgroundSource.Publish(latest);
+    paddingSource.Publish(padding);
+}
+```
+
+Structural render revisions hold existing styled targets from `BeginRevision`
+through commit or abort, including retained targets whose styling operation does
+not change. New reconciled targets join that boundary when styling is installed.
+Candidate refresh already provides an internal boundary. Pending reconciliation
+continues to isolate both candidate invalidations and resource publications.
+Commit drains against the new snapshot; rollback restores the old snapshot first.
+Removed source observers are deactivated before disposal and cannot enqueue work
+after retirement. Detached targets remain inactive until attachment.
+
+One iterative drain now handles full-cascade requests, individual keys and queued
+resource publications. A key is removed immediately before execution, so a real
+reentrant invalidation can enqueue it again without recursion or lost work.
+Invalidations for another still-pending key are naturally coalesced. There is no
+silent iteration cap: genuinely non-converging user feedback remains an application
+error, not work the scheduler discards. Explicit full refresh still resets/reapplies
+the cascade and preserves arbitrary class/interceptor execution semantics.
+
+### Snapshot-local candidate indexes
+
+Each target lazily indexes a conflict key to its candidate operation references,
+captured effective source order and static conflict-group slots. After the first
+lookup, reset and resolution visit only that key's operations, not unrelated
+background, typography or layout operations. Scratch group winners and insertion
+order arrays are reused and cleared after resolution, including exceptional exits.
+There is no cached dynamic winner: readiness, variants, operation eligibility and
+priority are evaluated on every invalidation.
+
+Resolution preserves operation priority, effective source order, application order,
+operation order, conflict-group order, prefix precedence and binding-layer behavior.
+In particular, group insertion order and the final ungrouped-prefixed tie break are
+preserved even when public callers supply equal source-order values.
+
+An incremental snapshot shallow-copies the key map and invalidates affected keys
+for additions, removals, revised metadata and conflicting declaration reorders.
+Unaffected indexes are shared only while their membership and relative order remain
+valid. A rebuilt key performs one snapshot scan; subsequent notifications do not.
+Rollback restores the original map with the original styles/descriptors. Full
+replacement or descriptor restoration invalidates the entire map. Runtime value,
+variant, frame-condition and binding-priority changes do not require rebuilding
+static membership: their dynamic eligibility is never assumed cached. Empty keys
+are not retained, preventing removed declaration names from accumulating.
+
+### Matching and allocation ownership
+
+Declaration matching now counts unique `(Family, SyntaxIdentity)` anchors directly,
+then matches only a single remaining old/new declaration per family. Ambiguous
+duplicates remain unmatched. This preserves the previous matching rules without
+per-family LINQ lookups, group arrays, filtered iterators and temporary integer
+hash sets. Known-size validation sets are pre-sized, and affected-operation cleanup
+uses direct exception handling instead of allocating closures for retained styles.
+
+Fresh private style/descriptor arrays transfer to immutable snapshots without a
+second copy. They are not subsequently mutated or shared with factory callers.
+The empty style array remains canonical for Avalonia's coerced attached property.
+Rollback storage remains owned by its transition until completion; no subscription,
+contribution, array or target is pooled. Map copying, initial key construction,
+factories, subscriptions and rollback snapshots still allocate. The optimization
+does not promise constant-memory reconciliation independent of cascade size.
+
+### Scalar contributions and equality contracts
+
+Generated Debug operations expose stable virtual publication hooks, including a
+false-returning hook for resource-backed/conditional/unsupported operations. This
+avoids deleting a virtual override when a real CLR edit changes operation shape.
+An eligible scalar operation can update an existing `AkcssPropertyContribution`
+only when the target, property and priority match exactly and the scalar handle is
+active, not suspended or disposed. Validation precedes publication. A changed
+winner, priority, missing handle or unsupported operation takes the existing
+replacement path. Target-dependent frame/operation eligibility and mixed conflict
+groups conservatively retain reset-before-resolution behavior.
+
+The optimization retains the independently owned Avalonia binding and publishes
+through its relay; it does not substitute direct SetValue/ClearValue calls.
+Transactions still suspend/capture old handles rather than updating rollback state
+in place. Dynamic resources retain live subscriptions and publish their latest
+queued values; they are not converted into scalar caches. Stale resource observers
+are deactivated. Ordinary LocalValue compatibility limitations are unchanged.
+
+`AkcssUtilityValueSource.WithEqualityPolicy(...)` is opt-in, before attachment:
+
+- `AlwaysNotify` is the existing default, including generated sources.
+- `ImmutableScalar` suppresses equal primitive, enum, string, decimal, date/time,
+  duration and Guid values, including boxed nullable scalars. It never invokes a
+  user-defined Equals implementation; unrecognized structs, brushes, collections
+  and other mutable/custom values continue notifying.
+- `ReferenceEquality` is an explicit caller-owned reference-identity contract. Do
+  not select it when in-place mutation must be observed.
+
+Converters still execute for every emission before the source compares its output.
+`RecreateOnRefresh` clears readiness before reattachment, so an equal refreshed
+value still notifies. Priority/activation changes and explicit full refresh are
+not bypassed. Automatically selecting equality from an argument's scalar type
+alone was rejected: arbitrary utility code can rely on each emission. Existing
+callers do not silently acquire value-suppression semantics.
+
+ReleaseDirect/ReleaseConditional output is unchanged; only Debug-generated scalar
+operations opt into relay reuse. Runtime indexing and explicit batches also work
+with compatible hand-written operations. Debug-generated components are validated
+against both Debug and Release runtime assemblies, without generated instance
+fields or mutable module caches that require rerunning a type initializer.
+
+### Measurement and lifetime methodology
+
+`AkcssOptimizationPerformanceTests` uses identical warmed inputs for unchanged
+refresh, one-of-ten/one-of-fifty reconciliation, observable emissions, same/different
+key bursts, fifty competing candidates, multi-property writes and failed updates.
+There are 100 warm-up iterations, 1000 allocation iterations and a separate 1000
+timing iterations. GC generation counts and deterministic construction, installation,
+release, source subscription/disposal, eligibility and effective property-change
+counts (including attached cascade publication) are reported outside timed loops. These single-key fixtures have one resolver
+call per eligible group pass; the fifty-contender fixture evaluates fifty operations
+per resolution. No elapsed-time assertions are used.
+
+A separate GCAllocationTick sampler profiles allocation types, not exact allocation
+stacks or retained memory. Before optimization, large samples came from integer
+arrays, LINQ Grouping/Lookup/GroupBy/Where structures and matching dictionaries.
+Afterward, remaining samples are principally snapshot/validation dictionaries and
+arrays. Sampling includes instrumentation overhead and is not part of timing runs.
+Pooling and persistent winner caching were not introduced: the measured reductions
+did not require either lifecycle complexity. Source observer epochs and binding
+ownership handles remain separate because stale callbacks and rollback can outlive
+an individual attachment.
+
+Runtime benchmarks exclude Roslyn compilation and CLR delta emission. A separate
+real-CLR fixture applies fifty consecutive deltas to the original owner/control,
+reorders conflicts, retains its reactive neighbor and checks retired activator
+lifetime. It measures handler allocation/time after five warm-up deltas. Its GC
+counts explicitly include compilation and must not be interpreted as handler-only
+GC cost. Additional CLR cases exercise synchronous scalar reuse/batching and real
+scalar/resource/conditional shape edits without replacing the loaded assembly.
+
+Lifetime tests use no-inline creation helpers, repeated collections and a later
+dispatcher turn. They cover removed controls/activators, committed/aborted
+transitions, discarded detached controls, disposed contributions and retired
+observable sources. Another test keeps the current target alive while collecting
+100 old activators and completed transitions, detecting snapshot chains rather
+than merely confirming the whole target cycle can be collected. Stress coverage
+uses 200 controls, 2000 utility applications and 20 reactive/structural cycles;
+failure stress checks 100 failed transactions, retry, stale observers and bounded
+index/queue storage. These tests check reachability and deterministic live-resource
+counts, not a fixed process working-set or a single GC result.
+
+### Recorded comparison
+
+Measurements were collected on 2026-10-15, Windows 11 build 26200, Intel i5-11400H
+(6 cores / 12 logical processors), win-x64, SDK 10.0.401, CLR 10.0.12, Avalonia
+12.0.4 and Roslyn 4.11. Defaults for GC/tiered compilation were retained. After
+validation and builds finished, baseline/final samples were alternated sequentially,
+three per configuration. Values below are medians of those three runs, not a claim
+of statistically established latency improvements. No compiler/test suites ran
+concurrently with these samples.
+
+The baseline was also extracted from Git into ignored
+`bin/AkcssOptimization/BaselineSource`. Runtime/generator source hashes, normalized
+with the repository's CRLF attributes, matched the baseline Git objects. Only
+measurement fixtures and output capture were added there. The common workloads
+use the same fixture inputs and instrumentation on both actual implementation
+versions; batching and publication-reuse cases require the new APIs and are
+reported separately. Initial pre-change measurements/profile were captured before
+runtime implementation began.
+
+| Runtime workload | Baseline B/update | Final B/update | Debug us/update, baseline -> final | Release us/update, baseline -> final |
+| --- | ---: | ---: | ---: | ---: |
+| Unchanged refresh, ten candidates | 0 | 0 | 0.30 -> 0.30 | 0.44 -> 0.45 |
+| One changed utility of ten | 26,420 | 9,202 | 58.26 -> 44.36 | 60.87 -> 47.48 |
+| One changed utility of fifty | 106,411 | 21,867 | 123.55 -> 84.33 | 167.96 -> 93.15 |
+| Reactive source notification | 952 | 656 | 5.09 -> 4.88 | 4.88 -> 4.28 |
+| Three unbatched notifications, same key | 2,856 | 1,968 | 14.87 -> 10.94 | 17.57 -> 13.14 |
+| Three unbatched notifications, distinct keys | 2,856 | 1,968 | 15.56 -> 9.95 | 16.18 -> 19.49 |
+| Fifty competing candidates | 108,724 | 20,315 | 135.58 -> 85.50 | 141.17 -> 93.09 |
+| Multi-property utility, ten candidates | 27,988 | 10,514 | 61.11 -> 44.64 | 65.29 -> 51.22 |
+| Failed reconciliation and rollback | 28,107 | 10,282 | 64.21 -> 48.58 | 67.86 -> 52.69 |
+
+The existing render-owned one-of-ten source benchmark changes from 29,892 to
+12,826 B/update (Debug 68.62 -> 53.27 us; Release 68.26 -> 54.69 us). It still
+constructs one candidate, replaces zero retained argument subscriptions and
+installs/releases one source contribution per update. Existing owned-reactive
+measurements change from 1,128 to 832 B/update (Debug 4.15 -> 3.27 us; Release
+4.55 -> 4.39 us). The source-based ownership gap remains 280 B relative to the
+disposable path; preserving independently suspendable source ownership still has
+a cost. Scalar reuse addresses repeated creation instead of deleting that handle.
+
+| Final-runtime comparison | B/update | Debug us/update | Release us/update | Deterministic work |
+| --- | ---: | ---: | ---: | --- |
+| Three same-key notifications without a batch | 1,968 | 10.94 | 13.14 | Three resolutions/installations |
+| Same burst in an explicit batch | 728 | 3.90 | 5.05 | One resolution/installation |
+| Three distinct keys in an explicit batch | 1,992 | 10.27 | 12.73 | Three resolutions/installations |
+| Scalar handle replacement | 512 | 3.29 | 4.12 | One installation, two effective changes |
+| Scalar publication through the retained handle | 104 | 1.88 | 1.69 | Zero installations, one effective change |
+
+These publication rows use the same final runtime and scalar fixture with opt-in
+reuse enabled/disabled, not different historical binaries or the older 1,128-byte
+fixture. Source-disposal counters instrument observable contributions; they are
+not an independent scalar-binding release counter. Scalar ownership is additionally
+checked through unchanged Apply/subscription counts, external-value restoration,
+explicit disposal and lifetime tests.
+
+In a representative 1000-update Debug allocation pass, one-of-fifty reconciliation
+went from 17 to 3 Gen0 collections, one-of-ten from 4 to 1, and the multi-property
+case from 5 to 2. Short reactive passes typically collected zero times. Detailed
+per-run GC and operation counters remain in TRX, not just elapsed-time summaries.
+The competing case performs fifty fresh eligibility checks per resolution;
+one-of-fifty invalidation evaluates only its one affected operation. The rollback
+fixture performs two group resolutions (provisional and restored) per failure.
+
+The first index implementation increased full-replacement allocations by about
+6%; it was refined rather than retained with that cost. The single-operation fast
+path avoids temporary lists/group dictionaries and empty scratch arrays. The
+final full-replacement compatibility benchmark measures 39,653 versus 40,093
+B/update (Debug 108.95 versus 115.09 us; Release 109.93 versus 119.28 us).
+
+Not every timing sample improved. In particular, Release distinct-key notifications
+were slower in the recorded medians, and older owned multi-property/rollback
+fixtures changed from 38.57 to 40.87 us and 53.44 to 55.86 us. Debug owned-conflict
+timing also changed from 40.95 to 41.53 us. These short samples are sensitive to
+JIT/GC/load and do not establish a universal speedup. The index is retained for
+its measured allocation/scanning reductions and unchanged semantics, not on a
+claim that every workload became faster. ReleaseDirect generation itself is
+unchanged; normal compatibility full replacement did not regress in these samples.
+
+Real CLR handler measurements are separate single 50-delta runs, averaged over
+the last 45 deltas after warm-up:
+
+| Runtime | Baseline handler B/update | Final handler B/update | Baseline handler us/update | Final handler us/update |
+| --- | ---: | ---: | ---: | ---: |
+| Debug | 29,140 | 26,087 | 2,614.37 | 2,680.47 |
+| Release | 29,152 | 26,091 | 2,734.10 | 2,744.29 |
+
+Handler allocation is lower, but handler latency did not improve in these samples.
+Reflection/metadata dispatch dominates this small component; no end-to-end edit
+latency gain is claimed. Whole-loop Gen0 counts were 258 -> 266 (Debug) and
+259 -> 265 (Release), including Roslyn compilation/delta creation; those figures
+must not be attributed to runtime reconciliation alone. All four isolated cases
+passed their 50-delta, original-control and retired-activator checks.
+
+### Validation commands and results
+
+The expanded regression filter passed 449 cases in both Debug and Release, zero
+failed/skipped. Two further index edge cases were then added and the complete
+25-case scheduling/lifetime/stress class passed in each configuration (23 overlap
+the broad run, two are additional). This validates 451 distinct unit cases, not
+474. Relative to the baseline filter, there are 25 scheduling/lifetime/stress,
+14 measurement/profile and one generator cases. The entire real CLR project
+passed all 48 cases against each runtime configuration (45 existing, three new).
+The repeated CLR and scalar/resource/conditional shape cases use actual
+EmitDifference/MetadataUpdater updates, not assembly replacement.
+
+All final TRX summaries report zero errors, timeouts, aborted and unexecuted cases.
+Unit/CLR runtime binaries were byte-identical within each configuration. The
+25-case targeted run includes 200 controls / 2000 utility applications over 20
+cycles, 100 repeated failures/retry, stale callbacks, and weak-reference lifetime
+checks, including 100 retired activators/transitions with a still-live target.
+No fixed working-set bound, whole-process object census or whole-repository
+passing claim is made.
+CLR and the test harness retain edit metadata while their assemblies are loaded;
+these lifetime checks bound AKCSS runtime snapshots, not CLR metadata storage.
+All 18 changed/new files passed CRLF/final-newline checks; C# files passed braced
+if/for/foreach and multiline XML-summary checks. `git diff --check` passed.
+
+Exact validation commands (run from repository root):
+
+```powershell
+$regression = 'FullyQualifiedName~Akcss|FullyQualifiedName~AkburaRenderState|FullyQualifiedName~AkburaHotReload|FullyQualifiedName~ComponentDocumentWriter|FullyQualifiedName~HotReloadServiceWriter|FullyQualifiedName~ComponentStructuralHotReload|FullyQualifiedName~GenerateSources_DebugCompilationRegistersHotReloadService'
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c Debug --no-restore --filter $regression --logger 'trx;LogFileName=regression-debug.trx' --results-directory bin/AkcssOptimization/VerifiedDebug -m:1 /nodeReuse:false
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c Release --no-restore --filter $regression --logger 'trx;LogFileName=regression-release.trx' --results-directory bin/AkcssOptimization/VerifiedRelease -m:1 /nodeReuse:false
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c Debug --no-restore --filter 'FullyQualifiedName~AkcssReactiveSchedulingTests' --logger 'trx;LogFileName=scheduling-final-debug.trx' --results-directory bin/AkcssOptimization/VerifiedSchedulingDebug -m:1 /nodeReuse:false -p:BuildProjectReferences=false
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c Release --no-restore --filter 'FullyQualifiedName~AkcssReactiveSchedulingTests' --logger 'trx;LogFileName=scheduling-final-release.trx' --results-directory bin/AkcssOptimization/VerifiedSchedulingRelease -m:1 /nodeReuse:false -p:BuildProjectReferences=false
+dotnet test src/Akbura.HotReloadIntegrationTests/Akbura.HotReloadIntegrationTests.csproj -c Debug --no-restore --logger 'trx;LogFileName=clr-debug.trx' --results-directory bin/AkcssOptimization/VerifiedClrDebug -m:1 /nodeReuse:false -p:BuildProjectReferences=false
+dotnet test src/Akbura.HotReloadIntegrationTests/Akbura.HotReloadIntegrationTests.csproj -c Release --no-restore --logger 'trx;LogFileName=clr-release.trx' --results-directory bin/AkcssOptimization/VerifiedClrRelease -m:1 /nodeReuse:false -p:BuildProjectReferences=false
+```
+
+`BuildProjectReferences=false` was used only after both configurations' dependencies
+had been rebuilt. Running the broad filter now also includes the two added edge
+cases. The initial baseline AKCSS filter passed 293 cases before implementation.
+Intermediate red tests included an empty-array coercion issue introduced by copy
+elision and test-registration mistakes; they were corrected before the verified
+runs. The first 50-delta fixture counted duplicate references to a retained
+candidate; its corrected version tracks each replaced slot and passes on both
+baseline and final versions. Existing unrelated Furioso/QuotedResourceRegressionTests
+warnings remain. No package/target-framework changes were made.
+
+For each Debug/Release configuration and samples 1..3, measurement runs used:
+
+```powershell
+$measurementFilter = 'FullyQualifiedName~AkcssOptimizationPerformanceTests.Workloads|FullyQualifiedName~AkcssReconciliationPerformanceTests|FullyQualifiedName~OwnedWorkloads'
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c $configuration --no-build --no-restore --filter $measurementFilter --logger "trx;LogFileName=final-$configuration-$sample.trx" --results-directory "bin/AkcssOptimization/Measurements/Final$configuration"
+dotnet test bin/AkcssOptimization/BaselineSource/src/Akbura.UnitTests/Akbura.UnitTests.csproj -c $configuration --no-build --no-restore --filter $measurementFilter --logger "trx;LogFileName=baseline-$configuration-$sample.trx" --results-directory "bin/AkcssOptimization/Measurements/Baseline$configuration"
+```
+
+Each final sample passed 19 cases and each baseline sample 15. The baseline-only
+fixture omits the four cases requiring batching/publication APIs; runtime and
+generator sources remain unchanged. CLR measurement commands replace the project
+path with each version's CLR project, select `FullyQualifiedName~FiftyDeltas`, and
+write `baseline-clr-$configuration.trx` / `final-clr-$configuration.trx` under
+`bin/AkcssOptimization/Measurements/Clr`. Detailed child output is captured for
+this measurement instead of being lost after a successful subprocess.
+
+Changed implementation files are `AkcssRuntime.cs`, its new `ConflictIndex` and
+`Updates` partials, `AkcssRuntime.Reconciliation.cs`, `AkcssPropertyContribution.cs`,
+`AkcssUtilityCandidateActivator.cs`, `AkcssUtilityOperation.cs`,
+`AkcssUtilityValueSource.cs`, `AkcssValueEqualityPolicy.cs`, `AkburaControl.cs`,
+`AkburaRenderState.cs` and `AkcssUtilityOperationWriter.cs`. Tests are in the new
+`AkcssReactiveSchedulingTests.cs` / `AkcssOptimizationPerformanceTests.cs`, plus
+`AkcssUtilityWriterTests.cs`, `AkcssIncrementalHotReloadTests.cs` and the child-output
+harness. This guide remains the canonical mechanism/measurement document.
+
+## 23. BlackSilence document dependencies and reload latency
+
+The generator's dependency graph determines which documents need semantic binding
+and generation **before** Roslyn constructs a CLR update. This is separate from
+the runtime reconciliation and scheduling described above.
+
+### Supported syntax versus conservative fallback
+
+The implementation baseline for this change is
+`c3b954fd4c72473c8afc16119a8fda9824d76e2d`. The syntax hierarchy was inspected rather
+than treating every `MarkupContentSyntax` as safe. Its concrete content leaves are
+`MarkupElementContentSyntax`, `MarkupInlineExpressionSyntax`,
+`MarkupTextLiteralSyntax`, `IncompleteTagSyntax`, and the four concrete
+`MarkupStatementSyntax` subclasses below.
+
+| Syntax category | Classification |
+| --- | --- |
+| `MarkupForeachStatementSyntax` | Supported implementation body; header, key, nested tags and C# remain dependencies. |
+| `MarkupIfStatementSyntax` | Supported implementation body, including conditions, `$else if` and `$else`. |
+| `MarkupCodeStatementSyntax` | Supported local C# statements inside markup code blocks; raw C# validation and identifier scanning remain enabled. |
+| `MarkupCodeIfStatementSyntax` | Supported C# control flow in markup code blocks; nested expressions and content are still visited. |
+| Elements, inline expressions and text literals | Already supported before this change. |
+| Property-element and collection content, templates, deferred content, content parameters and name scopes | Represented by the existing element/attribute/content nodes, not separate unclassified template syntax types. Their existing handling is preserved. |
+| `IncompleteTagSyntax`, `IncompleteAttributeSyntax`, `IncompletePrefixedAttributeSyntax` | Recovery/unsupported syntax; still conservative. |
+| Future, unclassified content, attribute or declaration subclasses | Still conservative through the explicit leaf allowlists. |
+
+The other inspected families retain their existing classification. All nine
+current `AkTopLevelMemberSyntax` leaves are explicitly recognized: using,
+namespace, param, state, command, inject, top-level C#, markup root and inline
+AKCSS. Top-level C# remains part of the declaration surface because it can
+introduce class members and inferred contracts. The five `AkcssBodyMemberSyntax`
+leaves (assignment, apply, intercept, if and pseudo block), the three AKCSS
+top-level leaves, and the four complete markup-attribute leaves retain their
+existing behavior. The two incomplete attribute leaves are not made safe.
+
+Previously, the four supported markup statement types entered the unknown-content
+fallback, and their entire bodies were also added to `SurfaceShape`. In the Purity
+fixture the exact triggers were `MarkupForeachStatementSyntax` in `NeedHelp` and
+`CreditCard`, and `MarkupIfStatementSyntax` plus `MarkupForeachStatementSyntax` in
+`Invoices`. All three documents were syntactically reusable; parser recovery was
+not the cause.
+
+`DocumentSyntaxVersion` now recognizes these four concrete implementation-only
+types. It does not suppress traversal: nested component tags, raw C# identifiers
+(including escaped identifiers), aliases, binding paths and potential identifiers
+from the meaningful source text are still collected. Param/state/command/inject
+declarations, namespace/imports and top-level C# keep their existing surface
+versions. `GenerationShape`, `BodyShape`, `SourceMapShape`, meaningful whitespace
+and `#line` source positions are unchanged.
+
+### How the graph propagates changes
+
+No dependency traversal or candidate-selection algorithm needed changing.
+`AkburaDependencyGraph` already distinguishes component-surface edges from
+whole-body AKCSS/global/fallback edges; removing the incorrect fallback restores
+that distinction for supported control flow.
+
+- In `AppShell -> Sidebar -> NeedHelp`, an internal property or line-mapping edit
+  in `NeedHelp` changes its generation version, not its exported surface. Only
+  `NeedHelp` needs generation.
+- A parameter type or other exported-contract change still invalidates consumers
+  and conservatively relevant transitive consumers. Expression-only references
+  inside a foreach remain component dependencies even without a matching tag.
+- Imported AKCSS bodies, transitive `@apply`, inline module ownership and source
+  mappings remain whole-body inputs. These edges can still propagate through
+  component dependencies where the existing module contract requires them.
+- Global using documents still have broad body dependencies. Additions, removals,
+  namespace/metadata-name changes and reordered/ambiguous declarations keep the
+  existing declaration-environment invalidation and deterministic candidate set.
+- Genuinely unknown syntax, missing meaningful tokens, incomplete elements,
+  malformed embedded C# and parser recovery still use conservative fallback.
+
+In particular, the graph does not pick the first matching short name or forget
+unresolved names. Its existing cycle handling, ordering, cancellation checks and
+snapshot publication rules are unchanged.
+
+### Inspecting conservative reasons
+
+`DebugStats` / `ReleaseStats` extend the existing `GenerationStatistics` session.
+After a generator call, `measurement.GetSnapshot().ConservativeDependencies`
+contains immutable rows with `SourcePath`, the parser's actual `SyntaxKind`,
+`Span` and `Cause`. A document can contribute several rows, for example a malformed
+raw C# token and an incomplete prefixed attribute. Causes distinguish recovery,
+missing tokens, malformed C#, incomplete elements, unknown syntax and empty
+dependency names.
+
+No compiler warning or normal application log is emitted. Recording calls are
+conditional on `STATS`; ordinary Debug/Release builds do not collect rows or
+allocate a per-document reason list. The optional measurement owns its rows,
+copies them under a lock for snapshots, and retains no syntax nodes. Supported
+control flow produces no conservative-reason rows.
+
+### Measured Purity workload
+
+Measurements were repeated on 15 October 2026 using a separate copy of
+`D:/Repos/ForVidos/PurityUIDashborad`, never editing the original. The copy uses
+the current local Akbura binaries/analyzers rather than its published beta.4
+packages. Environment: Windows 11, Intel i5-11400H / 12 logical processors,
+.NET SDK 10.0.401, CLR 10.0.12, Avalonia 12.0.4 and SDK Roslyn 5.9.0.0.
+
+There are 18 markup/style documents and 16 components. Only the Ellipse
+`StrokeThickness` inside `NeedHelp`'s foreach changes. GeneratorDriver measurements
+use DebugStats, ten successive edits, two warm-up edits and eight measured edits.
+The before/after rows below are repeated measurements from this implementation
+session, not a subtraction from the earlier investigation's independent results.
+
+| Metric | Before | After |
+| --- | ---: | ---: |
+| Components generated / reused per edit | 7 / 9 | 1 / 15 |
+| Semantic models created per edit | 14 | 2 |
+| Generated source texts created per edit | 7 | 1 |
+| Diagnostic documents evaluated / reused | 7 / 11 | 1 / 17 |
+| Generated files whose text actually changed | 1 | 1 |
+| GeneratorDriver warmed median | 2.413 s | 0.648 s |
+| GeneratorDriver warmed range | 2.225–3.735 s | 0.595–0.744 s |
+| SemanticBinding median | 2.271 s | 0.558 s |
+| ComponentPlanning median | 183.94 ms | 68.84 ms |
+| CSharpEmission median | 63.84 ms | 10.31 ms |
+| Cold GeneratorDriver initialization, single sample | 7.867 s | 11.161 s |
+| Actual dotnet watch warmed median, five edits | 5.312 s | 1.918 s |
+| Actual dotnet watch warmed range | 4.902–6.640 s | 1.613–2.276 s |
+| First dotnet watch edit, separate from warm samples | 24.368 s | 24.561 s |
+
+The originally reported medians were 3.632 s for GeneratorDriver, 3.433 s for
+SemanticBinding, and 5.317 s for watch. They remain historical observations, not
+the control samples used to compute this session's improvement. Cold runs are
+single observations and do not demonstrate an improvement; this change reduces
+repeat work, not cold initialization.
+
+All ten profiled edits confirmed exactly one generated component (`NeedHelp`),
+15 reused components, and one changed C# source. Before the change the unnecessary
+work also included `CreditCard`, `Invoices`, `MainContent`, `Sidebar`, `AppShell`
+and `MainView`. The exported `NeedHelp` contract did not change.
+
+Both watch runs applied `1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7` to the actual live
+Ellipse in an Avalonia.Headless window. Every update retained the PID and control
+identity within its session. Timing starts before file writing and ends when the
+UI thread observes the new property, with a 10 ms observation timer. Screen
+presentation is not measured. There was no process restart or replacement of
+the target control. Visual Studio was not measured.
+
+Stage statistics are nested and may accumulate across workers. Do not sum them,
+or subtract independent GeneratorDriver timings from watch latency. Remaining
+cost includes binding the genuinely changed component and the host's cold
+compilation/EnC path. C# probe binding, MSBuild manifest generation, runtime
+reconciliation and the unrelated styled-element Name failure are intentionally
+unchanged.
+
+### Correctness and regression checks
+
+New tests first reproduced the over-invalidation: 12 of the initial 21 cases
+failed on the unchanged baseline. The first corrected primary run passed 105
+cases. Additional coverage checks exported type changes, expression-only
+references, templates/deferred content, nested property/collection content,
+content parameters, imported `@apply`, aliases, source mapping, malformed syntax
+and repair, and twenty successive edits/reverts. Every successful incremental
+generation in these scenarios is compared to a fresh driver, including source
+identities/content and mapped diagnostic locations. Existing concurrency and
+cancellation scenarios now also exercise supported control flow.
+
+The actual Purity fixture was additionally compared to a fresh generator after
+each of six successive edits: all 17 generated sources and diagnostics matched.
+The independent watch run compiled the real project and applied all six deltas
+to the retained live control. Unit tests validate complete generated C#
+compilations, including contracts and mapped diagnostics; the standalone Purity
+driver is not a replacement for the other generators participating in an SDK
+build.
+
+Final targeted results: **119/119 Debug**, **119/119 Release**, and **16/16
+DebugStats** checks. The change adds 35 regression cases; the existing concurrent
+branch and canceled-publication fixtures also now use supported control flow.
+The statistics checks verify both exact recovery kinds/spans and that ordinary
+Debug/Release collect no reason rows. No timing threshold was introduced.
+
+The wider filter ran 577 cases in each of Debug and Release. Its initial result
+was 574 passed / 3 failed: a new content-parameter fixture was missing the
+presenter namespace and supplied no default for its required parameter, and two
+existing `ConditionalNameScopeTests` failed with a null key in
+`AkcssRuntime.BeginExistingUpdate`. The fixture was corrected, without weakening
+assertions, and the complete 119-case targeted set was rerun successfully in both
+configurations. The two runtime failures were reproduced separately with the
+baseline analyzer/generator binaries and the unchanged runtime; both fail before
+any generator work. They are outside this dependency-graph change and remain
+unfixed. Thus this is not a claim that the complete repository or the broad
+577-case set is entirely green.
+
+Validation commands, after rebuilding the changed generator/analyzer libraries
+for each configuration (untouched dependencies were already built):
+
+```powershell
+$dependencyTests = 'FullyQualifiedName~DocumentSyntaxVersionTests|FullyQualifiedName~AkburaDependencyGraphTests|FullyQualifiedName~BlackSilenceIncrementalGenerationTests|FullyQualifiedName~BlackSilenceDiagnosticSnapshotTests'
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj --no-restore -c Debug -p:BuildProjectReferences=false --filter $dependencyTests
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj --no-restore -c Release -p:BuildProjectReferences=false --filter $dependencyTests
+
+$statisticsTests = 'FullyQualifiedName~DocumentSyntaxVersionTests.ConservativeReasons|FullyQualifiedName~DocumentSyntaxVersionTests.SupportedControlFlow_DoesNotProduceConservativeReasonRows|FullyQualifiedName~BlackSilenceGenerationStatisticsTests|FullyQualifiedName~GenerationStatisticsOperationTests'
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj --no-restore -c DebugStats -p:BuildProjectReferences=false --filter $statisticsTests
+```
+
+Local raw logs and TRX results are under ignored `bin/HotReloadTimingProbe` and
+`bin/DependencyGraphOptimization`: `dependency-baseline.log`,
+`dependency-after.log`, `dependency-watch-before.log`,
+`dependency-watch-after.log`, and `dependency-purity-parity.log` record the
+measurement and real-fixture comparisons. No elapsed-time threshold is asserted
+in a unit test. The original Purity project and the unrelated Name failure have
+not been modified.
+
+## 24. C# semantic probes and compilation latency
 
 Before a CLR delta can be prepared, BlackSilence binds embedded C# through synthetic Roslyn trees. Avoiding an unnecessary component generation and avoiding redundant probes *inside* a changed component are independent optimizations. A reduced probe count does not establish an equivalent reduction in Edit-and-Continue or live-control latency.
 

@@ -167,6 +167,23 @@ public abstract partial class AkburaControl : Control, IComponentTree
         AkcssRuntime.Refresh(target);
     }
 
+    /// <summary>
+    /// Coalesces synchronous AKCSS invalidations for one target until the outermost
+    /// scope is disposed. Updates outside a scope remain immediate.
+    /// </summary>
+    public static IDisposable BeginAkcssUpdate(object target) => AkcssRuntime.BeginUpdate(target);
+
+    /// <summary>
+    /// Refreshes Debug utility inputs without resetting unchanged class styles
+    /// or recreating subscriptions whose value source remains stable.
+    /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    public static void RefreshAkcssStylesForHotReload(object target)
+    {
+        AkcssRuntime.RefreshForHotReload(target);
+    }
+
     private static ImmutableArray<AkcssStyleActivator> CoerceAkcssStyles(
         AvaloniaObject sender,
         ImmutableArray<AkcssStyleActivator> styles)
@@ -193,14 +210,13 @@ public abstract partial class AkburaControl : Control, IComponentTree
         return styles;
     }
 
-    private static void OnAkcssStylesChanged(
-        Control control,
-        AvaloniaPropertyChangedEventArgs args)
+    private static void OnAkcssStylesChanged(Control control, AvaloniaPropertyChangedEventArgs args)
     {
         var styles = args.NewValue is ImmutableArray<AkcssStyleActivator> value
             ? value
             : ImmutableArray<AkcssStyleActivator>.Empty;
-        AkcssRuntime.SetStyles(control, styles);
+
+        AkcssRuntime.SetStylesFromProperty(control, styles);
     }
 
     private readonly AkburaEngine _engine;

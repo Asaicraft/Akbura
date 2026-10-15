@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.Emit;
 using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 
 namespace Akbura.HotReloadIntegrationTests;
@@ -17,14 +18,17 @@ internal sealed class ClrHotReloadSession : IDisposable
     private readonly PEReader _peReader;
     private readonly MetadataReaderProvider _pdbProvider;
     private readonly string _componentName;
+    private readonly bool _includeAkcssTypes;
+    private readonly HashSet<string> _updatedTypeNames = new(StringComparer.Ordinal);
     private Compilation _compilation;
     private EmitBaseline _baseline;
 
-    public ClrHotReloadSession(Compilation compilation, string componentName)
+    public ClrHotReloadSession(Compilation compilation, string componentName, bool includeAkcssTypes = false)
     {
         Assert.True(MetadataUpdater.IsSupported, "Real CLR Hot Reload must be enabled in the isolated child process.");
         _compilation = compilation;
         _componentName = componentName;
+        _includeAkcssTypes = includeAkcssTypes;
         using var pe = new MemoryStream();
         using var pdb = new MemoryStream();
         var result = compilation.Emit(pe, pdb, options: new EmitOptions(
@@ -45,15 +49,61 @@ internal sealed class ClrHotReloadSession : IDisposable
     public Assembly Assembly { get; }
     public Type ComponentType { get; }
     public int AppliedUpdates { get; private set; }
+    public IReadOnlyCollection<string> UpdatedTypeNames => _updatedTypeNames;
 
     public void ApplyUpdate(Compilation updated)
     {
         var edits = GetEdits(_compilation, updated);
         Assert.NotEmpty(edits);
+        _updatedTypeNames.Clear();
+        var removedLambdas = edits.Where(edit =>
+            edit.Kind == SemanticEditKind.Update && edit.OldSymbol is IMethodSymbol &&
+            edit.NewSymbol is IMethodSymbol &&
+            (Syntax(edit.OldSymbol).DescendantNodes().OfType<LambdaExpressionSyntax>().Count() >
+            Syntax(edit.NewSymbol).DescendantNodes().OfType<LambdaExpressionSyntax>().Count() ||
+            Syntax(edit.OldSymbol).DescendantNodes().OfType<LocalFunctionStatementSyntax>().Any(function =>
+                !Syntax(edit.NewSymbol).DescendantNodes().OfType<LocalFunctionStatementSyntax>()
+                    .Any(current => current.Identifier.ValueText == function.Identifier.ValueText)))).ToArray();
+        if (_includeAkcssTypes && removedLambdas.Length > 1)
+        {
+            // Roslyn emits duplicate deleted-lambda rows when the same generated
+            // cascade factory disappears from multiple methods in one delta.
+            // Emit those method edits separately; refresh the live UI only after
+            // the caller has applied the complete logical source update.
+            var remaining = edits.Except(removedLambdas).ToArray();
+            if (remaining.Length != 0)
+            {
+                ApplyDelta(updated, remaining);
+            }
+            foreach (var edit in removedLambdas)
+            {
+                ApplyDelta(updated, [edit]);
+            }
+        }
+        else
+        {
+            ApplyDelta(updated, edits);
+        }
+        _compilation = updated;
+        AppliedUpdates++;
+    }
+
+    private void ApplyDelta(Compilation updated, SemanticEdit[] edits)
+    {
         using var metadata = new MemoryStream();
         using var il = new MemoryStream();
         using var pdb = new MemoryStream();
-        var result = updated.EmitDifference(_baseline, edits, static _ => false, metadata, il, pdb);
+        EmitDifferenceResult result;
+        try
+        {
+            result = updated.EmitDifference(_baseline, edits, static _ => false, metadata, il, pdb);
+        }
+        catch (Exception exception)
+        {
+            throw new InvalidOperationException("CLR delta emission failed for edits:\n" +
+                string.Join("\n", edits.Select(edit => edit.Kind + ": " +
+                    (edit.NewSymbol ?? edit.OldSymbol)?.ToDisplayString())), exception);
+        }
         Assert.True(result.Success, string.Join(Environment.NewLine, result.Diagnostics));
         Assert.NotEqual(0, metadata.Length);
         Assert.NotEqual(0, il.Length);
@@ -64,9 +114,12 @@ internal sealed class ClrHotReloadSession : IDisposable
         Assert.True(deltaReader.GetMetadataReader().MethodDefinitions.Count > 0,
             "The delta must contain actual method definitions, not only metadata headers.");
         MetadataUpdater.ApplyUpdate(Assembly, metadata.ToArray(), il.ToArray(), pdb.ToArray());
+        foreach (var handle in result.ChangedTypes)
+        {
+            var type = Assembly.ManifestModule.ResolveType(MetadataTokens.GetToken(handle));
+            _updatedTypeNames.Add(type.FullName!);
+        }
         _baseline = Assert.IsAssignableFrom<EmitBaseline>(result.Baseline);
-        _compilation = updated;
-        AppliedUpdates++;
     }
 
     public void DispatchMetadataUpdateHandlers()
@@ -81,13 +134,17 @@ internal sealed class ClrHotReloadSession : IDisposable
             foreach (var handler in handlers)
             {
                 var method = Assert.IsAssignableFrom<MethodInfo>(handler.HandlerType.GetMethod(phase, flags));
-                method.Invoke(null, [new[] { ComponentType }]);
+                method.Invoke(null, [GetUpdatedTypes()]);
             }
         }
     }
 
     private SemanticEdit[] GetEdits(Compilation previous, Compilation updated)
     {
+        if (_includeAkcssTypes)
+        {
+            return GetAssemblyEdits(previous, updated);
+        }
         var oldType = Assert.IsAssignableFrom<INamedTypeSymbol>(previous.GetTypeByMetadataName(_componentName));
         var newType = Assert.IsAssignableFrom<INamedTypeSymbol>(updated.GetTypeByMetadataName(_componentName));
         var oldMembers = GetMembers(oldType);
@@ -139,6 +196,116 @@ internal sealed class ClrHotReloadSession : IDisposable
         }
     }
 
+    private Type[] GetUpdatedTypes() => _updatedTypeNames
+        .Select(name => Assert.IsAssignableFrom<Type>(Assembly.GetType(name)))
+        .ToArray();
+
+    private SemanticEdit[] GetAssemblyEdits(Compilation previous, Compilation updated)
+    {
+        var oldTypes = GetSourceTypes(previous.Assembly.GlobalNamespace)
+            .ToDictionary(MetadataName, StringComparer.Ordinal);
+        var newTypes = GetSourceTypes(updated.Assembly.GlobalNamespace)
+            .ToDictionary(MetadataName, StringComparer.Ordinal);
+        var edits = new List<SemanticEdit>();
+        foreach (var (name, newType) in newTypes)
+        {
+            if (!oldTypes.TryGetValue(name, out var oldType))
+            {
+                if (newType.ContainingType == null || oldTypes.ContainsKey(MetadataName(newType.ContainingType)))
+                {
+                    edits.Add(new SemanticEdit(SemanticEditKind.Insert, null, newType));
+                }
+                continue;
+            }
+
+            Assert.Equal(oldType.BaseType?.ToDisplayString(), newType.BaseType?.ToDisplayString());
+            var oldMembers = GetMembers(oldType);
+            var newMembers = GetMembers(newType);
+            var attributesChanged = AttributeShape(oldType) != AttributeShape(newType);
+            var membersChanged = oldMembers.Count != newMembers.Count || newMembers.Any(entry =>
+                !oldMembers.TryGetValue(entry.Key, out var old) || !Syntax(old).IsEquivalentTo(Syntax(entry.Value)));
+            if (!membersChanged && !attributesChanged)
+            {
+                continue;
+            }
+
+            if (attributesChanged)
+            {
+                edits.Add(new SemanticEdit(SemanticEditKind.Update, oldType, newType));
+            }
+            foreach (var (key, member) in newMembers)
+            {
+                if (!oldMembers.TryGetValue(key, out var old))
+                {
+                    edits.Add(new SemanticEdit(SemanticEditKind.Insert, null, member));
+                }
+                else if (member is IMethodSymbol method)
+                {
+                    if (!Syntax(old).IsEquivalentTo(Syntax(member)))
+                    {
+                        edits.Add(new SemanticEdit(SemanticEditKind.Update, old, method,
+                            syntaxMap: CreateSyntaxMap(Syntax(old), Syntax(member))));
+                    }
+                }
+                else if (member is IPropertySymbol property)
+                {
+                    var oldProperty = (IPropertySymbol)old;
+                    UpdateAccessor(oldProperty.GetMethod, property.GetMethod);
+                    UpdateAccessor(oldProperty.SetMethod, property.SetMethod);
+                }
+            }
+            foreach (var (key, member) in oldMembers)
+            {
+                if (!newMembers.ContainsKey(key) && member is IMethodSymbol or IPropertySymbol)
+                {
+                    edits.Add(new SemanticEdit(SemanticEditKind.Delete, member, newType));
+                }
+            }
+        }
+        return edits.ToArray();
+
+        void UpdateAccessor(IMethodSymbol? previousAccessor, IMethodSymbol? updatedAccessor)
+        {
+            if (previousAccessor != null && updatedAccessor != null)
+            {
+                if (!Syntax(previousAccessor).IsEquivalentTo(Syntax(updatedAccessor)))
+                {
+                    edits.Add(new SemanticEdit(SemanticEditKind.Update, previousAccessor, updatedAccessor,
+                    syntaxMap: CreateSyntaxMap(Syntax(previousAccessor), Syntax(updatedAccessor))));
+                }
+            }
+        }
+    }
+
+    private static string AttributeShape(INamedTypeSymbol type) =>
+        string.Join("|", type.GetAttributes().Select(attribute => attribute.ToString()));
+
+    private static string MetadataName(INamedTypeSymbol type) => type.ContainingType != null
+        ? MetadataName(type.ContainingType) + "+" + type.MetadataName
+        : (type.ContainingNamespace.IsGlobalNamespace ? "" : type.ContainingNamespace.ToDisplayString() + ".") + type.MetadataName;
+
+    private static IEnumerable<INamedTypeSymbol> GetSourceTypes(INamespaceOrTypeSymbol container)
+    {
+        foreach (var member in container.GetMembers())
+        {
+            if (member is INamespaceSymbol space)
+            {
+                foreach (var type in GetSourceTypes(space))
+                {
+                    yield return type;
+                }
+            }
+            else if (member is INamedTypeSymbol type && !type.IsImplicitlyDeclared)
+            {
+                yield return type;
+                foreach (var nested in GetSourceTypes(type))
+                {
+                    yield return nested;
+                }
+            }
+        }
+    }
+
     private static Dictionary<string, ISymbol> GetMembers(INamedTypeSymbol type) => type.GetMembers()
         .Where(member => !member.IsImplicitlyDeclared && !member.DeclaringSyntaxReferences.IsDefaultOrEmpty &&
             (member is IFieldSymbol or IPropertySymbol || member is IMethodSymbol { AssociatedSymbol: null }))
@@ -162,33 +329,48 @@ internal sealed class ClrHotReloadSession : IDisposable
     private static Func<SyntaxNode, SyntaxNode?> CreateSyntaxMap(SyntaxNode oldSyntax, SyntaxNode newSyntax)
     {
         var map = new Dictionary<SyntaxNode, SyntaxNode> { [newSyntax] = oldSyntax };
-        Map<VariableDeclaratorSyntax>(node => node.Identifier.ValueText);
-        Map<ParameterSyntax>(node => node.Identifier.ValueText);
-        Map<LambdaExpressionSyntax>(node => node switch
+        Map<LocalFunctionStatementSyntax>(node => node.Identifier.ValueText);
+        Map<VariableDeclaratorSyntax>(node => Scope(node) + node.Identifier.ValueText);
+        Map<ParameterSyntax>(node => Scope(node) + node.Identifier.ValueText);
+        Map<LambdaExpressionSyntax>(node => Scope(node) + (node switch
         {
             SimpleLambdaExpressionSyntax simple => simple.Parameter.Identifier.ValueText,
             ParenthesizedLambdaExpressionSyntax parenthesized => string.Join(",",
                 parenthesized.ParameterList.Parameters.Select(parameter => parameter.Identifier.ValueText)),
             _ => throw new InvalidOperationException(),
-        });
+        }));
         foreach (var (current, previous) in map.ToArray())
         {
             if (current is LambdaExpressionSyntax currentLambda && previous is LambdaExpressionSyntax previousLambda)
             {
                 map[currentLambda.Body] = previousLambda.Body;
             }
+            if (current is LocalFunctionStatementSyntax { Body: { } currentBody } &&
+                previous is LocalFunctionStatementSyntax { Body: { } previousBody })
+            {
+                map[currentBody] = previousBody;
+            }
         }
         return node => map.GetValueOrDefault(node);
+
+        static string Scope(SyntaxNode node) => string.Join("/", node.Ancestors().OfType<LocalFunctionStatementSyntax>()
+            .Select(function => function.Identifier.ValueText)) + ":";
 
         void Map<T>(Func<T, string> key) where T : SyntaxNode
         {
             var oldNodes = oldSyntax.DescendantNodes().OfType<T>().GroupBy(key, StringComparer.Ordinal)
-                .Where(group => group.Count() == 1).ToDictionary(group => group.Key, group => group.Single());
+                .ToDictionary(group => group.Key, group => group.ToArray());
             foreach (var group in newSyntax.DescendantNodes().OfType<T>().GroupBy(key, StringComparer.Ordinal))
             {
-                if (group.Count() == 1 && oldNodes.TryGetValue(group.Key, out var old))
+                var current = group.ToArray();
+                if (oldNodes.TryGetValue(group.Key, out var old) && current.Length == old.Length)
                 {
-                    map[group.Single()] = old;
+                    // Generated AKCSS factories repeat lambda parameter names.
+                    // Preserve each occurrence, not just globally unique names.
+                    for (var index = 0; index < current.Length; index++)
+                    {
+                        map[current[index]] = old[index];
+                    }
                 }
             }
         }

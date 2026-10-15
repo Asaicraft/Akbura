@@ -30,6 +30,15 @@ public static class AkburaHotReloadRuntime
     private static long s_publishedRefreshRevision;
 
     /// <summary>
+    /// Invalidates observed-property metadata for updated styles, module scopes
+    /// and affected derived styles before the application refresh phase.
+    /// </summary>
+    public static void ClearAkcssMetadataCache(Type[]? updatedTypes)
+    {
+        Akbura.Akcss.AkcssObservedPropertySignal.Invalidate(updatedTypes);
+    }
+
+    /// <summary>
     /// Captures initial generated metadata during component static initialization.
     /// Repeated registration retains the last applied snapshot.
     /// </summary>

@@ -17,6 +17,7 @@ namespace Akbura.Akcss;
 public abstract class AkcssUtilityValueSource
 {
     private Action? _changed;
+    private AkcssValueEqualityPolicy _equalityPolicy;
 
     private protected AkcssUtilityValueSource(
         bool recreateOnRefresh,
@@ -35,6 +36,34 @@ public abstract class AkcssUtilityValueSource
     internal bool HasBindingPriorityMetadata { get; }
 
     internal BindingPriority BindingPriority { get; private protected set; }
+
+    /// <summary>
+    /// Selects an equality contract before attachment. ImmutableScalar never invokes
+    /// equality on mutable or user-defined values; ReferenceEquality is explicitly caller-owned.
+    /// </summary>
+    public AkcssUtilityValueSource WithEqualityPolicy(AkcssValueEqualityPolicy policy)
+    {
+        if (_changed != null)
+        {
+            throw new InvalidOperationException("An attached AKCSS source cannot change its equality policy.");
+        }
+        if (!Enum.IsDefined(policy))
+        {
+            throw new ArgumentOutOfRangeException(nameof(policy));
+        }
+        _equalityPolicy = policy;
+        return this;
+    }
+
+    /// <summary>
+    /// Converts generated object values without a converter lambda that CLR edits can retire.
+    /// </summary>
+    public static TValue CastObject<TValue>(object? value) => (TValue)value!;
+
+    /// <summary>
+    /// Preserves generated typed observable values without a component-owned converter lambda.
+    /// </summary>
+    public static TValue Identity<TValue>(TValue value) => value;
 
     internal void Attach(object target, Action changed)
     {
@@ -55,14 +84,24 @@ public abstract class AkcssUtilityValueSource
 
     internal void Detach(object target)
     {
-        DetachCore(target);
-        HasValue = false;
-        Value = null;
-        _changed = null;
+        try
+        {
+            DetachCore(target);
+        }
+        finally
+        {
+            HasValue = false;
+            Value = null;
+            _changed = null;
+        }
     }
 
     private protected void SetValue(object? value)
     {
+        if (HasValue && AkcssValueEquality.IsEquivalent(Value, value, _equalityPolicy))
+        {
+            return;
+        }
         HasValue = true;
         Value = value;
         _changed?.Invoke();
@@ -381,13 +420,13 @@ public abstract class AkcssUtilityValueSource
     }
 
     private sealed class ObservableValueSource<TSource, TValue>
-        : AkcssUtilityValueSource,
-          IObserver<TSource>
+        : AkcssUtilityValueSource
     {
         private readonly Func<Control, IObservable<TSource>?> _factory;
         private readonly Func<Control, AkcssUtilityPrefixInvocation<IObservable<TSource>?>>? _priorityFactory;
         private readonly Func<TSource, TValue> _converter;
         private IDisposable? _subscription;
+        private SourceObserver? _observer;
 
         public ObservableValueSource(
             Func<Control, IObservable<TSource>?> factory,
@@ -429,27 +468,57 @@ public abstract class AkcssUtilityValueSource
                 observable = invocation.Value;
             }
 
-            _subscription = observable?.Subscribe(this);
+            if (observable == null)
+            {
+                return;
+            }
+
+            var observer = new SourceObserver(this);
+            _observer = observer;
+            try
+            {
+                _subscription = observable.Subscribe(observer);
+            }
+            catch
+            {
+                observer.Detach();
+                _observer = null;
+                throw;
+            }
         }
 
         private protected override void DetachCore(object target)
         {
-            _subscription?.Dispose();
-            _subscription = null;
+            Interlocked.Exchange(ref _observer, null)?.Detach();
+            Interlocked.Exchange(ref _subscription, null)?.Dispose();
         }
 
-        void IObserver<TSource>.OnNext(TSource value)
+        private sealed class SourceObserver(ObservableValueSource<TSource, TValue> owner) : IObserver<TSource>
         {
-            SetValue(_converter(value));
-        }
+            private ObservableValueSource<TSource, TValue>? _owner = owner;
 
-        void IObserver<TSource>.OnError(Exception error)
-        {
-            Fail(error);
-        }
+            public void Detach()
+            {
+                Interlocked.Exchange(ref _owner, null);
+            }
 
-        void IObserver<TSource>.OnCompleted()
-        {
+            public void OnNext(TSource value)
+            {
+                var source = Volatile.Read(ref _owner);
+                if (source != null)
+                {
+                    source.SetValue(source._converter(value));
+                }
+            }
+
+            public void OnError(Exception error)
+            {
+                Volatile.Read(ref _owner)?.Fail(error);
+            }
+
+            public void OnCompleted()
+            {
+            }
         }
     }
 

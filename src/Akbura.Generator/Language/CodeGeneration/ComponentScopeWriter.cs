@@ -640,7 +640,8 @@ internal readonly ref partial struct ComponentScopeWriter
                 element.Akcss.Activators,
                 element.RuntimeStorageId,
                 targetExpression,
-                context);
+                context,
+                canRetainCascade: element.RuntimeStorageRootScopeId == 0 && element.ScopeId == 0);
         }
         else
         {

@@ -188,7 +188,8 @@ internal readonly struct AkcssUtilityCandidatePlan
         string? conditionText,
         CSharpOperationDefinition conditionOperation,
         TailwindUtilityVariant variant,
-        TailwindUtilityBindingPriority bindingPriority)
+        TailwindUtilityBindingPriority bindingPriority,
+        string? syntaxIdentity = null)
     {
         ConflictKey = conflictKey ?? throw new ArgumentNullException(nameof(conflictKey));
         SourceOrder = sourceOrder;
@@ -200,11 +201,14 @@ internal readonly struct AkcssUtilityCandidatePlan
         ConditionOperation = conditionOperation;
         Variant = variant;
         BindingPriority = bindingPriority;
+        SyntaxIdentity = syntaxIdentity ?? conflictKey;
     }
 
     public string ConflictKey { get; }
 
     public int SourceOrder { get; }
+
+    public string SyntaxIdentity { get; }
 
     public int ApplicationCacheId { get; }
 

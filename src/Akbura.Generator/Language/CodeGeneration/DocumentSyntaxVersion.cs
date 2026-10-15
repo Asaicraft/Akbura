@@ -8,6 +8,22 @@ using CSharp = Microsoft.CodeAnalysis.CSharp;
 
 namespace Akbura.Language.CodeGeneration;
 
+internal enum ConservativeDependencyCause : byte
+{
+    ParserRecovery,
+    MissingToken,
+    MalformedCSharp,
+    IncompleteElement,
+    UnsupportedSyntax,
+    EmptyDependency,
+}
+
+internal readonly record struct ConservativeDependencyReason(
+    string SourcePath,
+    SyntaxKind SyntaxKind,
+    TextSpan Span,
+    ConservativeDependencyCause Cause);
+
 /// <summary>
 /// Exact, compilation-independent inputs to document generation. This deliberately
 /// over-invalidates: source positions and embedded C# trivia are part of the shape.
@@ -69,10 +85,15 @@ internal sealed class DocumentSyntaxVersion
         cancellationToken.ThrowIfCancellationRequested();
 
         var root = syntaxTree.GetRootSyntax();
-        var builder = new ShapeBuilder(cancellationToken);
+        var builder = new ShapeBuilder(syntaxTree, cancellationToken);
         var canReuse = root.FullWidth == syntaxTree.Text.Length &&
             !root.ContainsDiagnostics && !root.ContainsSkippedText && !root.ContainsAnnotations;
         var meaningfulLength = 0;
+
+        if (!canReuse)
+        {
+            builder.MarkConservative(root.Kind, root.Span, ConservativeDependencyCause.ParserRecovery);
+        }
 
         ScanTokens(root, ref meaningfulLength, ref canReuse, builder);
         builder.Collect(root);
@@ -163,6 +184,7 @@ internal sealed class DocumentSyntaxVersion
             if (token.IsMissing && token.Kind != SyntaxKind.EndOfFileToken)
             {
                 canReuse = false;
+                builder.MarkConservative(token.Kind, token.Span, ConservativeDependencyCause.MissingToken);
             }
 
             if (token.Kind != SyntaxKind.EndOfFileToken)
@@ -181,6 +203,7 @@ internal sealed class DocumentSyntaxVersion
             if (HasBlockingRawDiagnostics(token.GetRawCSharpSyntax(), allowVoidReturnType))
             {
                 canReuse = false;
+                builder.MarkConservative(token.Kind, token.Span, ConservativeDependencyCause.MalformedCSharp);
             }
 
             builder.AddCSharpIdentifiers(token.Text);
@@ -214,7 +237,7 @@ internal sealed class DocumentSyntaxVersion
         return false;
     }
 
-    private sealed class ShapeBuilder(CancellationToken cancellationToken)
+    private sealed class ShapeBuilder(AkburaSyntaxTree syntaxTree, CancellationToken cancellationToken)
     {
         private readonly HashSet<DocumentDependencyName> _dependencySet = [];
 
@@ -237,7 +260,7 @@ internal sealed class DocumentSyntaxVersion
                     case MarkupElementSyntax element when element.StartTag == null ||
                         element.StartTag.CloseToken.Kind != SyntaxKind.SlashGreaterToken && element.EndTag == null:
                         ContainsRecoverySyntax = true;
-                        RequiresConservativeDependencies = true;
+                        MarkConservative(syntax.Kind, syntax.Span, ConservativeDependencyCause.IncompleteElement);
                         break;
 
                     case UsingDirectiveSyntax directive:
@@ -292,30 +315,41 @@ internal sealed class DocumentSyntaxVersion
                         ParamDeclarationSyntax or StateDeclarationSyntax or CommandDeclarationSyntax or
                         InjectDeclarationSyntax or CSharpStatementSyntax or MarkupRootSyntax or InlineAkcssBlockSyntax))
                 {
-                    RequiresConservativeDependencies = true;
+                    MarkConservative(syntax.Kind, syntax.Span, ConservativeDependencyCause.UnsupportedSyntax);
                     AddSurface(syntax);
                 }
 
                 if (syntax is AkcssTopLevelMemberSyntax &&
                     syntax is not (AkcssUsingDirectiveSyntax or AkcssStyleRuleSyntax or AkcssUtilitiesSectionSyntax))
                 {
-                    RequiresConservativeDependencies = true;
+                    MarkConservative(syntax.Kind, syntax.Span, ConservativeDependencyCause.UnsupportedSyntax);
                     AddSurface(syntax);
                 }
 
+                // These control-flow nodes emit only implementation code. Their
+                // nested tags and raw C# tokens are still visited and scanned for
+                // dependencies; do not export their bodies as component surface.
+                // Keep an explicit leaf allowlist so future/unknown syntax falls back.
                 if (syntax is AkcssBodyMemberSyntax &&
                     syntax is not (AkcssAssignmentSyntax or AkcssApplyDirectiveSyntax or
                         AkcssInterceptDirectiveSyntax or AkcssIfDirectiveSyntax or AkcssPseudoBlockSyntax) ||
                     syntax is MarkupContentSyntax &&
-                    syntax is not (MarkupElementContentSyntax or MarkupInlineExpressionSyntax or MarkupTextLiteralSyntax) ||
+                    syntax is not (MarkupElementContentSyntax or MarkupInlineExpressionSyntax or MarkupTextLiteralSyntax or
+                        MarkupForeachStatementSyntax or MarkupIfStatementSyntax or MarkupCodeStatementSyntax or MarkupCodeIfStatementSyntax) ||
                     syntax is MarkupAttributeSyntax &&
                     syntax is not (MarkupPlainAttributeSyntax or MarkupAttachedPropertyAttributeSyntax or
                         MarkupPrefixedAttributeSyntax or TailwindAttributeSyntax))
                 {
-                    RequiresConservativeDependencies = true;
+                    MarkConservative(syntax.Kind, syntax.Span, ConservativeDependencyCause.UnsupportedSyntax);
                     AddSurface(syntax);
                 }
             }
+        }
+
+        public void MarkConservative(SyntaxKind kind, TextSpan span, ConservativeDependencyCause cause)
+        {
+            RequiresConservativeDependencies = true;
+            GenerationStatistics.RecordConservativeDependency(new ConservativeDependencyReason(syntaxTree.FilePath, kind, span, cause));
         }
 
         public void AddCSharpIdentifiers(string text)
@@ -389,7 +423,8 @@ internal sealed class DocumentSyntaxVersion
         {
             if (name.Length == 0)
             {
-                RequiresConservativeDependencies = true;
+                var root = syntaxTree.GetRootSyntax();
+                MarkConservative(root.Kind, root.Span, ConservativeDependencyCause.EmptyDependency);
                 return;
             }
 

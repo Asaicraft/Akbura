@@ -21,6 +21,178 @@ public sealed class BlackSilenceIncrementalGenerationTests
     private const string RequestsTrackingName = "BlackSilence.GenerationRequests";
 
     [Theory]
+    [InlineData("<StackPanel>$foreach (var item in new[] { 1, 2 }) { <Border Width=\"10\" /> }</StackPanel>")]
+    [InlineData("param bool Visible = true; <StackPanel>$if (Visible) { <Border Width=\"10\" /> } $else { <TextBlock Text=\"hidden\" /> }</StackPanel>")]
+    [InlineData("<StackPanel>$foreach (var item in new[] { 1 }) { var size = 10d; if (item > 0) { <Border Width={size} /> } else { <Border /> } }</StackPanel>")]
+    [InlineData("<Border><Border.Background><SolidColorBrush Color=\"Red\" /></Border.Background><TextBlock Text=\"10\" /></Border>")]
+    [InlineData("<Grid><Grid.RowDefinitions><RowDefinition Height=\"10\" /></Grid.RowDefinitions><Border /></Grid>")]
+    [InlineData("<DataTemplate><Border><Child Width=\"10\" /></Border></DataTemplate>")]
+    [InlineData("<ControlTemplate><Border Width=\"10\" /></ControlTemplate>")]
+    [InlineData("using Avalonia.Controls.Presenters; param Control? Content = null; <Border Width=\"10\"><ContentPresenter Content={Content} /></Border>")]
+    public void SupportedContent_BodyEditReusesConsumersAndMatchesFreshGeneration(string markup)
+    {
+        var project = new TestProject(publishDiagnostics: true);
+        var files = new[]
+        {
+            project.File("NeedHelp.akbura", Component("using Avalonia.Media; using Avalonia.Markup.Xaml.Templates; using Demo; " + markup)),
+            project.File("Sidebar.akbura", "using Demo; <NeedHelp />"),
+            project.File("AppShell.akbura", "using Demo; <Sidebar />"),
+            project.File("Unrelated.akbura", Component("<Border />")),
+            project.File("Child.akbura", Component("param double Width; <Border Width={Width} />")),
+        };
+        var initial = Run(project, CreateDriver(project.Options, files));
+        var original = files[0];
+        files[0] = original.Replace("10", "20");
+        var updated = Run(project, initial.Driver.ReplaceAdditionalText(original, files[0]));
+
+        AssertReusedExcept(initial, updated, "component:NeedHelp.akbura");
+        Assert.All(updated.Request.Components, request => Assert.False(request.Descriptor.DocumentVersion.RequiresConservativeDependencies));
+        AssertParityWithFresh(project, updated, project.Options, files);
+    }
+
+    [Fact]
+    public void SupportedControlFlow_TwentyEditsAndRevertsKeepOnlyTheOwnerDirtyAndMatchFreshGeneration()
+    {
+        var project = new TestProject(publishDiagnostics: true);
+        const string markup = "param bool Visible = true; <StackPanel>$foreach (var item in new[] { 1, 2 }) { " +
+            "$if (Visible) { <Border Width=\"10\" /> } $else { <TextBlock Text={item.ToString()} /> } }</StackPanel>";
+        var files = new[]
+        {
+            project.File("NeedHelp.akbura", Component(markup)),
+            project.File("Sidebar.akbura", "using Demo; <NeedHelp />"),
+            project.File("AppShell.akbura", "using Demo; <Sidebar />"),
+            project.File("Unrelated.akbura", Component("<Border />")),
+        };
+        var current = Run(project, CreateDriver(project.Options, files));
+        for (var index = 0; index < 20; index++)
+        {
+            var previous = files[0];
+            files[0] = project.File("NeedHelp.akbura", Component(markup.Replace("\"10\"", "\"" + (index % 2 == 0 ? 20 + index : 10) + "\"", StringComparison.Ordinal)));
+            var updated = Run(project, current.Driver.ReplaceAdditionalText(previous, files[0]));
+
+            AssertReusedExcept(current, updated, "component:NeedHelp.akbura");
+            AssertParityWithFresh(project, updated, project.Options, files);
+            current = updated;
+        }
+    }
+
+    [Fact]
+    public void SupportedControlFlow_ParameterTypeChangeStillInvalidatesTransitiveConsumers()
+    {
+        var project = new TestProject(publishDiagnostics: true);
+        var files = new[]
+        {
+            project.File("NeedHelp.akbura", Component("param double Value = 0d; <Border />")),
+            project.File("Sidebar.akbura", Component("using Demo; <StackPanel>$if (true) { <NeedHelp Value=\"10\" /> }</StackPanel>")),
+            project.File("AppShell.akbura", "using Demo; <Sidebar />"),
+            project.File("Other.akbura", Component("<StackPanel>$foreach (var item in new[] { 1 }) { <Border /> }</StackPanel>")),
+        };
+        var initial = Run(project, CreateDriver(project.Options, files));
+        var original = files[0];
+        files[0] = original.Replace("param double Value = 0d;", "param string Value = \"initial\";");
+        var updated = Run(project, initial.Driver.ReplaceAdditionalText(original, files[0]));
+
+        AssertReusedExcept(initial, updated, "component:NeedHelp.akbura", "component:Sidebar.akbura", "component:AppShell.akbura");
+        AssertParityWithFresh(project, updated, project.Options, files);
+    }
+
+    [Fact]
+    public void SupportedControlFlow_ExpressionOnlyComponentReferenceStillTracksItsContract()
+    {
+        var project = new TestProject(publishDiagnostics: true);
+        var files = new[]
+        {
+            project.File("NeedHelp.akbura", Component("param double Value = 0d; <Border />")),
+            project.File("Consumer.akbura", Component("using Demo; <StackPanel>$foreach (var item in new[] { new NeedHelp() }) { <TextBlock Text={item.Value.ToString()} /> }</StackPanel>")),
+            project.File("Other.akbura", Component("<Border />")),
+        };
+        var initial = Run(project, CreateDriver(project.Options, files));
+        var original = files[0];
+        files[0] = original.Replace("param double Value = 0d;", "param string Value = \"initial\";");
+        var updated = Run(project, initial.Driver.ReplaceAdditionalText(original, files[0]));
+
+        AssertReusedExcept(initial, updated, "component:NeedHelp.akbura", "component:Consumer.akbura");
+        AssertParityWithFresh(project, updated, project.Options, files);
+    }
+
+    [Fact]
+    public void SupportedTemplate_ImportedApplyBodyChangesStillInvalidateItsConsumer()
+    {
+        var project = new TestProject(publishDiagnostics: true);
+        var files = new[]
+        {
+            project.File("Page.akbura", Component("using Avalonia.Markup.Xaml.Templates; using Demo.Styles.Top.akcss; <DataTemplate><Border class=\"top\" /></DataTemplate>")),
+            project.File("Other.akbura", Component("<StackPanel>$foreach (var item in new[] { 1 }) { <Border /> }</StackPanel>")),
+            project.File("Styles/Top.akcss", "@using Demo.Styles.Base.akcss; .top { @apply basic; }"),
+            project.File("Styles/Base.akcss", "@using Avalonia.Controls; Border.basic { Width: 10; }"),
+        };
+        var initial = Run(project, CreateDriver(project.Options, files));
+        var original = files[3];
+        files[3] = original.Replace("10", "20");
+        var updated = Run(project, initial.Driver.ReplaceAdditionalText(original, files[3]));
+
+        AssertReusedExcept(initial, updated, "component:Page.akbura", "akcss:Styles/Top.akcss", "akcss:Styles/Base.akcss");
+        AssertParityWithFresh(project, updated, project.Options, files);
+    }
+
+    [Fact]
+    public void SupportedControlFlow_LineMappingEditReusesConsumersAndChangesOnlyOwnerMappings()
+    {
+        var project = new TestProject(publishDiagnostics: true);
+        var files = new[]
+        {
+            project.File("NeedHelp.akbura", Component("<StackPanel>$foreach (var item in new[] { 1 }) { <Border Width={item + 10d} /> }</StackPanel>")),
+            project.File("Sidebar.akbura", "using Demo; <NeedHelp />"),
+            project.File("Other.akbura", Component("<Border />")),
+        };
+        var initial = Run(project, CreateDriver(project.Options, files));
+        var original = files[0];
+        files[0] = original.WithText(original.Text.WithChanges(new TextChange(new TextSpan(0, 0), "\r\n")));
+        var updated = Run(project, initial.Driver.ReplaceAdditionalText(original, files[0]));
+
+        AssertReusedExcept(initial, updated, "component:NeedHelp.akbura");
+        Assert.Contains("#line", updated.Snapshot.Entries["component:NeedHelp.akbura"].Source.SourceText.ToString(), StringComparison.Ordinal);
+        Assert.NotEqual(initial.Snapshot.Entries["component:NeedHelp.akbura"].Source.SourceText.ToString(),
+            updated.Snapshot.Entries["component:NeedHelp.akbura"].Source.SourceText.ToString());
+        AssertParityWithFresh(project, updated, project.Options, files);
+    }
+
+    [Fact]
+    public void SupportedControlFlow_RecoveryAndRepairMatchFreshIncludingDiagnostics()
+    {
+        var project = new TestProject(publishDiagnostics: true);
+        var original = project.File("NeedHelp.akbura", Component("<StackPanel>$foreach (var item in new[] { 1 }) { <Border Width={item + 10d} /> }</StackPanel>"));
+        var consumer = project.File("Sidebar.akbura", "using Demo; <NeedHelp />");
+        var initial = Run(project, CreateDriver(project.Options, original, consumer));
+        var broken = original.Replace("item + 10d", "item +");
+        var driver = initial.Driver.ReplaceAdditionalText(original, broken)
+            .RunGeneratorsAndUpdateCompilation(project.Compilation, out var brokenOutput, out var diagnostics);
+        var result = Assert.Single(driver.GetRunResult().Results);
+        Assert.Null(result.Exception);
+        var request = Assert.IsType<BlackSilenceGenerationRequest>(Assert.Single(result.TrackedSteps[RequestsTrackingName].SelectMany(static step => step.Outputs)).Value);
+        Assert.True(Assert.Single(request.Documents, document => document.FilePath == broken.Path).RequiresConservativeDependencies);
+        Assert.Contains(diagnostics.Concat(brokenOutput.GetDiagnostics()), diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+
+        var fresh = CreateDriver(project.Options, broken, consumer)
+            .RunGeneratorsAndUpdateCompilation(project.Compilation, out var freshOutput, out var freshDiagnostics);
+        var freshResult = Assert.Single(fresh.GetRunResult().Results);
+        Assert.Null(freshResult.Exception);
+        Assert.Equal(freshResult.GeneratedSources.Select(static source => (source.HintName, source.SourceText.ToString())).OrderBy(static source => source.HintName),
+            result.GeneratedSources.Select(static source => (source.HintName, source.SourceText.ToString())).OrderBy(static source => source.HintName));
+        Assert.Equal(GetDiagnostics(freshDiagnostics), GetDiagnostics(diagnostics));
+        Assert.Equal(GetDiagnostics(freshOutput.GetDiagnostics()), GetDiagnostics(brokenOutput.GetDiagnostics()));
+
+        var repaired = original.Replace("10d", "20d");
+        var repairedRun = Run(project, driver.ReplaceAdditionalText(broken, repaired));
+        Assert.All(repairedRun.Request.Documents, document => Assert.False(document.RequiresConservativeDependencies));
+        AssertParityWithFresh(project, repairedRun, project.Options, repaired, consumer);
+        var next = repaired.Replace("20d", "30d");
+        var nextRun = Run(project, repairedRun.Driver.ReplaceAdditionalText(repaired, next));
+        AssertReusedExcept(repairedRun, nextRun, "component:NeedHelp.akbura");
+        AssertParityWithFresh(project, nextRun, project.Options, next, consumer);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void EofWhitespace_ReusesEveryCompletedEntryAndMatchesFreshGeneration(bool editAkcss)
@@ -550,8 +722,8 @@ public sealed class BlackSilenceIncrementalGenerationTests
     public async Task ConcurrentBranchesFromOneWarmDriver_KeepTheirOwnOutputsAndMatchFreshGeneration()
     {
         var project = new TestProject();
-        var first = project.File("First.akbura", Component("<Border Width=\"10\" />"));
-        var second = project.File("Second.akbura", Component("<Border Height=\"10\" />"));
+        var first = project.File("First.akbura", Component("<StackPanel>$foreach (var item in new[] { 1 }) { <Border Width=\"10\" /> }</StackPanel>"));
+        var second = project.File("Second.akbura", Component("<StackPanel>$if (true) { <Border Height=\"10\" /> }</StackPanel>"));
         var baseline = Run(project, CreateDriver(project.Options, first, second));
         var changedFirst = first.Replace("10", "20");
         var changedSecond = second.Replace("10", "30");
@@ -631,7 +803,7 @@ public sealed class BlackSilenceIncrementalGenerationTests
     public void CanceledPreparedBatch_LeavesPublishedSnapshotIntactAndCanBeRetried()
     {
         var project = new TestProject();
-        var original = project.File("Page.akbura", Component("<Border Width=\"10\" />"));
+        var original = project.File("Page.akbura", Component("<StackPanel>$foreach (var item in new[] { 1 }) { <Border Width=\"10\" /> }</StackPanel>"));
         var initial = Run(project, CreateDriver(project.Options, original));
         var changed = original.Replace("10", "20");
         var syntaxTree = Assert.IsType<ComponentSyntaxTree>(Assert.Single(initial.Request.Documents).SyntaxTree);

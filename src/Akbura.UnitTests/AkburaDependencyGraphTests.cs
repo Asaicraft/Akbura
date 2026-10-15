@@ -9,6 +9,57 @@ namespace Akbura.UnitTests;
 
 public sealed class AkburaDependencyGraphTests
 {
+    [Theory]
+    [InlineData("<StackPanel>$foreach (var item in new[] { 1 }) { <NeedHelp /> }</StackPanel>")]
+    [InlineData("<StackPanel>$if (true) { <NeedHelp /> } $else { <Border /> }</StackPanel>")]
+    [InlineData("<DataTemplate><Border><NeedHelp /></Border></DataTemplate>")]
+    public void SupportedContent_KeepsTransitiveComponentEdgesSurfaceOnly(string sidebar)
+    {
+        var index = CreateIndex(
+            ("AppShell.akbura", "<Sidebar />"),
+            ("Sidebar.akbura", sidebar),
+            ("NeedHelp.akbura", "<StackPanel>$foreach (var item in new[] { 1 }) { <Border Width=\"10\" /> }</StackPanel>"),
+            ("Unrelated.akbura", "<Border />"));
+        var graph = AkburaDependencyGraph.Create(index);
+        var dependencies = graph.GetDependencies(GetDocument(index, "AppShell.akbura"));
+
+        Assert.Equal(new[] { "NeedHelp.akbura", "Sidebar.akbura" }, dependencies.Select(static dependency => dependency.Document.FilePath));
+        Assert.All(dependencies, static dependency => Assert.False(dependency.IncludesBody));
+        Assert.Empty(graph.GetDependencies(GetDocument(index, "NeedHelp.akbura")));
+    }
+
+    [Fact]
+    public void SupportedControlFlow_AliasesKeepAllAmbiguousCandidatesAndExpressionReferences()
+    {
+        var index = CreateIndex(
+            ("Page.akbura", "using Alias = Demo.First; <StackPanel>$foreach (var item in Provider.Items) { <Alias::Widget /> }</StackPanel>"),
+            ("First/Widget.akbura", "<Border />"),
+            ("Second/Widget.akbura", "<Border />"),
+            ("Provider.akbura", "<Border />"),
+            ("Other.akbura", "<Border />"));
+        var dependencies = AkburaDependencyGraph.Create(index).GetDependencies(GetDocument(index, "Page.akbura"));
+
+        Assert.Equal(new[] { "First/Widget.akbura", "Provider.akbura", "Second/Widget.akbura" },
+            dependencies.Select(static dependency => dependency.Document.FilePath));
+        Assert.All(dependencies, static dependency => Assert.False(dependency.IncludesBody));
+    }
+
+    [Fact]
+    public void SupportedControlFlow_ChildImportsStillCarryTransitiveAkcssBodies()
+    {
+        var index = CreateIndex(
+            ("Page.akbura", "<StackPanel>$foreach (var item in new[] { 1 }) { <Child /> }</StackPanel>"),
+            ("Child.akbura", "using Demo.Styles.Top.akcss; <Border class=\"top\" />"),
+            ("Styles/Top.akcss", "@using Demo.Styles.Base.akcss; .top { @apply basic; }"),
+            ("Styles/Base.akcss", ".basic { Width: 10; }"));
+        var dependencies = AkburaDependencyGraph.Create(index).GetDependencies(GetDocument(index, "Page.akbura"));
+
+        Assert.Equal(3, dependencies.Length);
+        Assert.False(Assert.Single(dependencies, dependency => dependency.Document.FilePath == "Child.akbura").IncludesBody);
+        Assert.True(Assert.Single(dependencies, dependency => dependency.Document.FilePath == "Styles/Top.akcss").IncludesBody);
+        Assert.True(Assert.Single(dependencies, dependency => dependency.Document.FilePath == "Styles/Base.akcss").IncludesBody);
+    }
+
     [Fact]
     public void ComponentReference_DependsOnSurfaceButNotUnrelatedDocuments()
     {

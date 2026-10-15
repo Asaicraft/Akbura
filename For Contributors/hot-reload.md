@@ -38,6 +38,8 @@ Diagrams use Mermaid and are embedded directly in this Markdown file. GitHub can
 - [19. AKCSS baseline implementation and verification](#19-akcss-baseline-implementation-and-verification)
 - [20. AKCSS incremental reconciliation](#20-akcss-incremental-reconciliation)
 - [21. AKCSS property ownership and transactions](#21-akcss-property-ownership-and-transactions)
+- [22. AKCSS update batching and indexed conflict resolution](#22-akcss-update-batching-and-indexed-conflict-resolution)
+- [23. BlackSilence document dependencies and reload latency](#23-blacksilence-document-dependencies-and-reload-latency)
 
 ## 1. The two layers of Hot Reload
 
@@ -1942,6 +1944,212 @@ Changed implementation files are `AkcssRuntime.cs`, its new `ConflictIndex` and
 `AkcssReactiveSchedulingTests.cs` / `AkcssOptimizationPerformanceTests.cs`, plus
 `AkcssUtilityWriterTests.cs`, `AkcssIncrementalHotReloadTests.cs` and the child-output
 harness. This guide remains the canonical mechanism/measurement document.
+
+## 23. BlackSilence document dependencies and reload latency
+
+The generator's dependency graph determines which documents need semantic binding
+and generation **before** Roslyn constructs a CLR update. This is separate from
+the runtime reconciliation and scheduling described above.
+
+### Supported syntax versus conservative fallback
+
+The implementation baseline for this change is
+`c3b954fd4c72473c8afc16119a8fda9824d76e2d`. The syntax hierarchy was inspected rather
+than treating every `MarkupContentSyntax` as safe. Its concrete content leaves are
+`MarkupElementContentSyntax`, `MarkupInlineExpressionSyntax`,
+`MarkupTextLiteralSyntax`, `IncompleteTagSyntax`, and the four concrete
+`MarkupStatementSyntax` subclasses below.
+
+| Syntax category | Classification |
+| --- | --- |
+| `MarkupForeachStatementSyntax` | Supported implementation body; header, key, nested tags and C# remain dependencies. |
+| `MarkupIfStatementSyntax` | Supported implementation body, including conditions, `$else if` and `$else`. |
+| `MarkupCodeStatementSyntax` | Supported local C# statements inside markup code blocks; raw C# validation and identifier scanning remain enabled. |
+| `MarkupCodeIfStatementSyntax` | Supported C# control flow in markup code blocks; nested expressions and content are still visited. |
+| Elements, inline expressions and text literals | Already supported before this change. |
+| Property-element and collection content, templates, deferred content, content parameters and name scopes | Represented by the existing element/attribute/content nodes, not separate unclassified template syntax types. Their existing handling is preserved. |
+| `IncompleteTagSyntax`, `IncompleteAttributeSyntax`, `IncompletePrefixedAttributeSyntax` | Recovery/unsupported syntax; still conservative. |
+| Future, unclassified content, attribute or declaration subclasses | Still conservative through the explicit leaf allowlists. |
+
+The other inspected families retain their existing classification. All nine
+current `AkTopLevelMemberSyntax` leaves are explicitly recognized: using,
+namespace, param, state, command, inject, top-level C#, markup root and inline
+AKCSS. Top-level C# remains part of the declaration surface because it can
+introduce class members and inferred contracts. The five `AkcssBodyMemberSyntax`
+leaves (assignment, apply, intercept, if and pseudo block), the three AKCSS
+top-level leaves, and the four complete markup-attribute leaves retain their
+existing behavior. The two incomplete attribute leaves are not made safe.
+
+Previously, the four supported markup statement types entered the unknown-content
+fallback, and their entire bodies were also added to `SurfaceShape`. In the Purity
+fixture the exact triggers were `MarkupForeachStatementSyntax` in `NeedHelp` and
+`CreditCard`, and `MarkupIfStatementSyntax` plus `MarkupForeachStatementSyntax` in
+`Invoices`. All three documents were syntactically reusable; parser recovery was
+not the cause.
+
+`DocumentSyntaxVersion` now recognizes these four concrete implementation-only
+types. It does not suppress traversal: nested component tags, raw C# identifiers
+(including escaped identifiers), aliases, binding paths and potential identifiers
+from the meaningful source text are still collected. Param/state/command/inject
+declarations, namespace/imports and top-level C# keep their existing surface
+versions. `GenerationShape`, `BodyShape`, `SourceMapShape`, meaningful whitespace
+and `#line` source positions are unchanged.
+
+### How the graph propagates changes
+
+No dependency traversal or candidate-selection algorithm needed changing.
+`AkburaDependencyGraph` already distinguishes component-surface edges from
+whole-body AKCSS/global/fallback edges; removing the incorrect fallback restores
+that distinction for supported control flow.
+
+- In `AppShell -> Sidebar -> NeedHelp`, an internal property or line-mapping edit
+  in `NeedHelp` changes its generation version, not its exported surface. Only
+  `NeedHelp` needs generation.
+- A parameter type or other exported-contract change still invalidates consumers
+  and conservatively relevant transitive consumers. Expression-only references
+  inside a foreach remain component dependencies even without a matching tag.
+- Imported AKCSS bodies, transitive `@apply`, inline module ownership and source
+  mappings remain whole-body inputs. These edges can still propagate through
+  component dependencies where the existing module contract requires them.
+- Global using documents still have broad body dependencies. Additions, removals,
+  namespace/metadata-name changes and reordered/ambiguous declarations keep the
+  existing declaration-environment invalidation and deterministic candidate set.
+- Genuinely unknown syntax, missing meaningful tokens, incomplete elements,
+  malformed embedded C# and parser recovery still use conservative fallback.
+
+In particular, the graph does not pick the first matching short name or forget
+unresolved names. Its existing cycle handling, ordering, cancellation checks and
+snapshot publication rules are unchanged.
+
+### Inspecting conservative reasons
+
+`DebugStats` / `ReleaseStats` extend the existing `GenerationStatistics` session.
+After a generator call, `measurement.GetSnapshot().ConservativeDependencies`
+contains immutable rows with `SourcePath`, the parser's actual `SyntaxKind`,
+`Span` and `Cause`. A document can contribute several rows, for example a malformed
+raw C# token and an incomplete prefixed attribute. Causes distinguish recovery,
+missing tokens, malformed C#, incomplete elements, unknown syntax and empty
+dependency names.
+
+No compiler warning or normal application log is emitted. Recording calls are
+conditional on `STATS`; ordinary Debug/Release builds do not collect rows or
+allocate a per-document reason list. The optional measurement owns its rows,
+copies them under a lock for snapshots, and retains no syntax nodes. Supported
+control flow produces no conservative-reason rows.
+
+### Measured Purity workload
+
+Measurements were repeated on 15 October 2026 using a separate copy of
+`D:/Repos/ForVidos/PurityUIDashborad`, never editing the original. The copy uses
+the current local Akbura binaries/analyzers rather than its published beta.4
+packages. Environment: Windows 11, Intel i5-11400H / 12 logical processors,
+.NET SDK 10.0.401, CLR 10.0.12, Avalonia 12.0.4 and SDK Roslyn 5.9.0.0.
+
+There are 18 markup/style documents and 16 components. Only the Ellipse
+`StrokeThickness` inside `NeedHelp`'s foreach changes. GeneratorDriver measurements
+use DebugStats, ten successive edits, two warm-up edits and eight measured edits.
+The before/after rows below are repeated measurements from this implementation
+session, not a subtraction from the earlier investigation's independent results.
+
+| Metric | Before | After |
+| --- | ---: | ---: |
+| Components generated / reused per edit | 7 / 9 | 1 / 15 |
+| Semantic models created per edit | 14 | 2 |
+| Generated source texts created per edit | 7 | 1 |
+| Diagnostic documents evaluated / reused | 7 / 11 | 1 / 17 |
+| Generated files whose text actually changed | 1 | 1 |
+| GeneratorDriver warmed median | 2.413 s | 0.648 s |
+| GeneratorDriver warmed range | 2.225–3.735 s | 0.595–0.744 s |
+| SemanticBinding median | 2.271 s | 0.558 s |
+| ComponentPlanning median | 183.94 ms | 68.84 ms |
+| CSharpEmission median | 63.84 ms | 10.31 ms |
+| Cold GeneratorDriver initialization, single sample | 7.867 s | 11.161 s |
+| Actual dotnet watch warmed median, five edits | 5.312 s | 1.918 s |
+| Actual dotnet watch warmed range | 4.902–6.640 s | 1.613–2.276 s |
+| First dotnet watch edit, separate from warm samples | 24.368 s | 24.561 s |
+
+The originally reported medians were 3.632 s for GeneratorDriver, 3.433 s for
+SemanticBinding, and 5.317 s for watch. They remain historical observations, not
+the control samples used to compute this session's improvement. Cold runs are
+single observations and do not demonstrate an improvement; this change reduces
+repeat work, not cold initialization.
+
+All ten profiled edits confirmed exactly one generated component (`NeedHelp`),
+15 reused components, and one changed C# source. Before the change the unnecessary
+work also included `CreditCard`, `Invoices`, `MainContent`, `Sidebar`, `AppShell`
+and `MainView`. The exported `NeedHelp` contract did not change.
+
+Both watch runs applied `1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7` to the actual live
+Ellipse in an Avalonia.Headless window. Every update retained the PID and control
+identity within its session. Timing starts before file writing and ends when the
+UI thread observes the new property, with a 10 ms observation timer. Screen
+presentation is not measured. There was no process restart or replacement of
+the target control. Visual Studio was not measured.
+
+Stage statistics are nested and may accumulate across workers. Do not sum them,
+or subtract independent GeneratorDriver timings from watch latency. Remaining
+cost includes binding the genuinely changed component and the host's cold
+compilation/EnC path. C# probe binding, MSBuild manifest generation, runtime
+reconciliation and the unrelated styled-element Name failure are intentionally
+unchanged.
+
+### Correctness and regression checks
+
+New tests first reproduced the over-invalidation: 12 of the initial 21 cases
+failed on the unchanged baseline. The first corrected primary run passed 105
+cases. Additional coverage checks exported type changes, expression-only
+references, templates/deferred content, nested property/collection content,
+content parameters, imported `@apply`, aliases, source mapping, malformed syntax
+and repair, and twenty successive edits/reverts. Every successful incremental
+generation in these scenarios is compared to a fresh driver, including source
+identities/content and mapped diagnostic locations. Existing concurrency and
+cancellation scenarios now also exercise supported control flow.
+
+The actual Purity fixture was additionally compared to a fresh generator after
+each of six successive edits: all 17 generated sources and diagnostics matched.
+The independent watch run compiled the real project and applied all six deltas
+to the retained live control. Unit tests validate complete generated C#
+compilations, including contracts and mapped diagnostics; the standalone Purity
+driver is not a replacement for the other generators participating in an SDK
+build.
+
+Final targeted results: **119/119 Debug**, **119/119 Release**, and **16/16
+DebugStats** checks. The change adds 35 regression cases; the existing concurrent
+branch and canceled-publication fixtures also now use supported control flow.
+The statistics checks verify both exact recovery kinds/spans and that ordinary
+Debug/Release collect no reason rows. No timing threshold was introduced.
+
+The wider filter ran 577 cases in each of Debug and Release. Its initial result
+was 574 passed / 3 failed: a new content-parameter fixture was missing the
+presenter namespace and supplied no default for its required parameter, and two
+existing `ConditionalNameScopeTests` failed with a null key in
+`AkcssRuntime.BeginExistingUpdate`. The fixture was corrected, without weakening
+assertions, and the complete 119-case targeted set was rerun successfully in both
+configurations. The two runtime failures were reproduced separately with the
+baseline analyzer/generator binaries and the unchanged runtime; both fail before
+any generator work. They are outside this dependency-graph change and remain
+unfixed. Thus this is not a claim that the complete repository or the broad
+577-case set is entirely green.
+
+Validation commands, after rebuilding the changed generator/analyzer libraries
+for each configuration (untouched dependencies were already built):
+
+```powershell
+$dependencyTests = 'FullyQualifiedName~DocumentSyntaxVersionTests|FullyQualifiedName~AkburaDependencyGraphTests|FullyQualifiedName~BlackSilenceIncrementalGenerationTests|FullyQualifiedName~BlackSilenceDiagnosticSnapshotTests'
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj --no-restore -c Debug -p:BuildProjectReferences=false --filter $dependencyTests
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj --no-restore -c Release -p:BuildProjectReferences=false --filter $dependencyTests
+
+$statisticsTests = 'FullyQualifiedName~DocumentSyntaxVersionTests.ConservativeReasons|FullyQualifiedName~DocumentSyntaxVersionTests.SupportedControlFlow_DoesNotProduceConservativeReasonRows|FullyQualifiedName~BlackSilenceGenerationStatisticsTests|FullyQualifiedName~GenerationStatisticsOperationTests'
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj --no-restore -c DebugStats -p:BuildProjectReferences=false --filter $statisticsTests
+```
+
+Local raw logs and TRX results are under ignored `bin/HotReloadTimingProbe` and
+`bin/DependencyGraphOptimization`: `dependency-baseline.log`,
+`dependency-after.log`, `dependency-watch-before.log`,
+`dependency-watch-after.log`, and `dependency-purity-parity.log` record the
+measurement and real-fixture comparisons. No elapsed-time threshold is asserted
+in a unit test. The original Purity project and the unrelated Name failure have
+not been modified.
 
 <!-- Source references: implementation snapshot inspected for this guide. -->
 [baseline]: https://github.com/Asaicraft/Akbura/commit/959ae1590cce507bab17893da8284df69887120b

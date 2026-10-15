@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Threading;
@@ -85,6 +86,12 @@ internal static partial class GenerationStatistics
         s_current.Value?.Increment(counter);
     }
 
+    [Conditional("STATS")]
+    public static void RecordConservativeDependency(ConservativeDependencyReason reason)
+    {
+        s_current.Value?.RecordConservativeDependency(reason);
+    }
+
     public static GenerationStageMeasurement Measure(GenerationStatisticStage stage)
     {
         return s_current.Value is { IsActive: true } session
@@ -103,6 +110,8 @@ internal static partial class GenerationStatistics
 
 internal sealed class GenerationStatisticsSession : IDisposable
 {
+    private readonly object _conservativeDependencyGate = new();
+    private List<ConservativeDependencyReason>? _conservativeDependencies;
     private readonly GenerationStatisticsSession? _previous;
     private readonly long[] _counters = new long[(int)GenerationStatisticCounter.Count];
     private readonly long[] _elapsed = new long[(int)GenerationStatisticStage.Count];
@@ -157,7 +166,27 @@ internal sealed class GenerationStatisticsSession : IDisposable
             GetAllocatedBytes != null,
             Interlocked.Read(ref _invalidAllocationMeasurementCount),
             Operations != null,
-            Operations?.GetSnapshot() ?? ImmutableArray<GenerationOperationStatistics>.Empty);
+            Operations?.GetSnapshot() ?? ImmutableArray<GenerationOperationStatistics>.Empty,
+            GetConservativeDependencies());
+    }
+
+    internal void RecordConservativeDependency(ConservativeDependencyReason reason)
+    {
+        lock (_conservativeDependencyGate)
+        {
+            if (IsActive)
+            {
+                (_conservativeDependencies ??= []).Add(reason);
+            }
+        }
+    }
+
+    private ImmutableArray<ConservativeDependencyReason> GetConservativeDependencies()
+    {
+        lock (_conservativeDependencyGate)
+        {
+            return _conservativeDependencies?.ToImmutableArray() ?? [];
+        }
     }
 
     public void Dispose()
@@ -285,7 +314,8 @@ internal sealed class GenerationStatisticsSnapshot
         bool hasAllocationMeasurements,
         long invalidAllocationMeasurementCount,
         bool operationTrackingEnabled,
-        ImmutableArray<GenerationOperationStatistics> operationMeasurements)
+        ImmutableArray<GenerationOperationStatistics> operationMeasurements,
+        ImmutableArray<ConservativeDependencyReason> conservativeDependencies)
     {
         _counters = counters;
         _elapsed = elapsed;
@@ -296,6 +326,7 @@ internal sealed class GenerationStatisticsSnapshot
         InvalidAllocationMeasurementCount = invalidAllocationMeasurementCount;
         OperationTrackingEnabled = operationTrackingEnabled;
         OperationMeasurements = operationMeasurements;
+        ConservativeDependencies = conservativeDependencies;
     }
 
     public long ReadSourceTextCount => _counters[(int)GenerationStatisticCounter.ReadSourceText];
@@ -327,6 +358,7 @@ internal sealed class GenerationStatisticsSnapshot
     public long InvalidAllocationMeasurementCount { get; }
     public bool OperationTrackingEnabled { get; }
     public ImmutableArray<GenerationOperationStatistics> OperationMeasurements { get; }
+    public ImmutableArray<ConservativeDependencyReason> ConservativeDependencies { get; }
     public TimeSpan ParseElapsed => GetElapsed(GenerationStatisticStage.Parse);
     public TimeSpan CompilationElapsed => GetElapsed(GenerationStatisticStage.Compilation);
     public TimeSpan CatalogElapsed => GetElapsed(GenerationStatisticStage.Catalog);

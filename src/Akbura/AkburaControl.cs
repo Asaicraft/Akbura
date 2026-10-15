@@ -168,6 +168,12 @@ public abstract partial class AkburaControl : Control, IComponentTree
     }
 
     /// <summary>
+    /// Coalesces synchronous AKCSS invalidations for one target until the outermost
+    /// scope is disposed. Updates outside a scope remain immediate.
+    /// </summary>
+    public static IDisposable BeginAkcssUpdate(object target) => AkcssRuntime.BeginUpdate(target);
+
+    /// <summary>
     /// Refreshes Debug utility inputs without resetting unchanged class styles
     /// or recreating subscriptions whose value source remains stable.
     /// </summary>

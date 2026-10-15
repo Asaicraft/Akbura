@@ -56,6 +56,18 @@ public abstract class AkcssUtilityOperation : AkcssStyle
     public virtual bool SupportsOwnedContributions => false;
 
     /// <summary>
+    /// Opts into scalar publication without resetting the owned binding first.
+    /// Operations with target-dependent eligibility or arbitrary effects must opt out.
+    /// </summary>
+    public virtual bool SupportsContributionUpdates => false;
+
+    /// <summary>
+    /// Updates an existing owned scalar source, or returns false without effects.
+    /// </summary>
+    public virtual bool TryUpdateContribution(object target, IReadOnlyList<object?> arguments,
+        BindingPriority priority, IDisposable contribution) => false;
+
+    /// <summary>
     /// Gets the Avalonia property captured when a Debug candidate is constructed.
     /// </summary>
     public virtual AvaloniaProperty? HotReloadProperty => null;

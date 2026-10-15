@@ -1612,6 +1612,337 @@ zero-versus-nine replacement subscription, and one-versus-ten execution counts.
 All 15 changed/new files passed CRLF/final-newline checks; C# files passed braced
 if/for/foreach and multiline XML-summary checks. `git diff --check` passed.
 
+## 22. AKCSS update batching and indexed conflict resolution
+
+The implementation baseline for these optimizations is commit
+`6d905239d41feb5471c17fbb6ee989899019281e`. The checkout HEAD was verified before
+changes; the historical ownership measurements above are not universal targets.
+
+### Synchronous update boundaries
+
+`AkburaControl.BeginAkcssUpdate(target)` opens a target-local, nestable synchronous
+scope. Dispose the outermost scope to resolve pending conflict keys using their
+latest inputs. A key occurs only once in the pending set; background and padding
+still represent independent work. Disposing a scope twice is harmless. An ordinary
+unbatched notification continues to take effect before its publisher returns.
+Scopes must be used on the target's Avalonia thread and must not span asynchronous
+work. There is no Dispatcher-posted flush and no global reactive scheduler.
+
+```csharp
+using (AkburaControl.BeginAkcssUpdate(target))
+{
+    backgroundSource.Publish(first);
+    backgroundSource.Publish(latest);
+    paddingSource.Publish(padding);
+}
+```
+
+Structural render revisions hold existing styled targets from `BeginRevision`
+through commit or abort, including retained targets whose styling operation does
+not change. New reconciled targets join that boundary when styling is installed.
+Candidate refresh already provides an internal boundary. Pending reconciliation
+continues to isolate both candidate invalidations and resource publications.
+Commit drains against the new snapshot; rollback restores the old snapshot first.
+Removed source observers are deactivated before disposal and cannot enqueue work
+after retirement. Detached targets remain inactive until attachment.
+
+One iterative drain now handles full-cascade requests, individual keys and queued
+resource publications. A key is removed immediately before execution, so a real
+reentrant invalidation can enqueue it again without recursion or lost work.
+Invalidations for another still-pending key are naturally coalesced. There is no
+silent iteration cap: genuinely non-converging user feedback remains an application
+error, not work the scheduler discards. Explicit full refresh still resets/reapplies
+the cascade and preserves arbitrary class/interceptor execution semantics.
+
+### Snapshot-local candidate indexes
+
+Each target lazily indexes a conflict key to its candidate operation references,
+captured effective source order and static conflict-group slots. After the first
+lookup, reset and resolution visit only that key's operations, not unrelated
+background, typography or layout operations. Scratch group winners and insertion
+order arrays are reused and cleared after resolution, including exceptional exits.
+There is no cached dynamic winner: readiness, variants, operation eligibility and
+priority are evaluated on every invalidation.
+
+Resolution preserves operation priority, effective source order, application order,
+operation order, conflict-group order, prefix precedence and binding-layer behavior.
+In particular, group insertion order and the final ungrouped-prefixed tie break are
+preserved even when public callers supply equal source-order values.
+
+An incremental snapshot shallow-copies the key map and invalidates affected keys
+for additions, removals, revised metadata and conflicting declaration reorders.
+Unaffected indexes are shared only while their membership and relative order remain
+valid. A rebuilt key performs one snapshot scan; subsequent notifications do not.
+Rollback restores the original map with the original styles/descriptors. Full
+replacement or descriptor restoration invalidates the entire map. Runtime value,
+variant, frame-condition and binding-priority changes do not require rebuilding
+static membership: their dynamic eligibility is never assumed cached. Empty keys
+are not retained, preventing removed declaration names from accumulating.
+
+### Matching and allocation ownership
+
+Declaration matching now counts unique `(Family, SyntaxIdentity)` anchors directly,
+then matches only a single remaining old/new declaration per family. Ambiguous
+duplicates remain unmatched. This preserves the previous matching rules without
+per-family LINQ lookups, group arrays, filtered iterators and temporary integer
+hash sets. Known-size validation sets are pre-sized, and affected-operation cleanup
+uses direct exception handling instead of allocating closures for retained styles.
+
+Fresh private style/descriptor arrays transfer to immutable snapshots without a
+second copy. They are not subsequently mutated or shared with factory callers.
+The empty style array remains canonical for Avalonia's coerced attached property.
+Rollback storage remains owned by its transition until completion; no subscription,
+contribution, array or target is pooled. Map copying, initial key construction,
+factories, subscriptions and rollback snapshots still allocate. The optimization
+does not promise constant-memory reconciliation independent of cascade size.
+
+### Scalar contributions and equality contracts
+
+Generated Debug operations expose stable virtual publication hooks, including a
+false-returning hook for resource-backed/conditional/unsupported operations. This
+avoids deleting a virtual override when a real CLR edit changes operation shape.
+An eligible scalar operation can update an existing `AkcssPropertyContribution`
+only when the target, property and priority match exactly and the scalar handle is
+active, not suspended or disposed. Validation precedes publication. A changed
+winner, priority, missing handle or unsupported operation takes the existing
+replacement path. Target-dependent frame/operation eligibility and mixed conflict
+groups conservatively retain reset-before-resolution behavior.
+
+The optimization retains the independently owned Avalonia binding and publishes
+through its relay; it does not substitute direct SetValue/ClearValue calls.
+Transactions still suspend/capture old handles rather than updating rollback state
+in place. Dynamic resources retain live subscriptions and publish their latest
+queued values; they are not converted into scalar caches. Stale resource observers
+are deactivated. Ordinary LocalValue compatibility limitations are unchanged.
+
+`AkcssUtilityValueSource.WithEqualityPolicy(...)` is opt-in, before attachment:
+
+- `AlwaysNotify` is the existing default, including generated sources.
+- `ImmutableScalar` suppresses equal primitive, enum, string, decimal, date/time,
+  duration and Guid values, including boxed nullable scalars. It never invokes a
+  user-defined Equals implementation; unrecognized structs, brushes, collections
+  and other mutable/custom values continue notifying.
+- `ReferenceEquality` is an explicit caller-owned reference-identity contract. Do
+  not select it when in-place mutation must be observed.
+
+Converters still execute for every emission before the source compares its output.
+`RecreateOnRefresh` clears readiness before reattachment, so an equal refreshed
+value still notifies. Priority/activation changes and explicit full refresh are
+not bypassed. Automatically selecting equality from an argument's scalar type
+alone was rejected: arbitrary utility code can rely on each emission. Existing
+callers do not silently acquire value-suppression semantics.
+
+ReleaseDirect/ReleaseConditional output is unchanged; only Debug-generated scalar
+operations opt into relay reuse. Runtime indexing and explicit batches also work
+with compatible hand-written operations. Debug-generated components are validated
+against both Debug and Release runtime assemblies, without generated instance
+fields or mutable module caches that require rerunning a type initializer.
+
+### Measurement and lifetime methodology
+
+`AkcssOptimizationPerformanceTests` uses identical warmed inputs for unchanged
+refresh, one-of-ten/one-of-fifty reconciliation, observable emissions, same/different
+key bursts, fifty competing candidates, multi-property writes and failed updates.
+There are 100 warm-up iterations, 1000 allocation iterations and a separate 1000
+timing iterations. GC generation counts and deterministic construction, installation,
+release, source subscription/disposal, eligibility and effective property-change
+counts (including attached cascade publication) are reported outside timed loops. These single-key fixtures have one resolver
+call per eligible group pass; the fifty-contender fixture evaluates fifty operations
+per resolution. No elapsed-time assertions are used.
+
+A separate GCAllocationTick sampler profiles allocation types, not exact allocation
+stacks or retained memory. Before optimization, large samples came from integer
+arrays, LINQ Grouping/Lookup/GroupBy/Where structures and matching dictionaries.
+Afterward, remaining samples are principally snapshot/validation dictionaries and
+arrays. Sampling includes instrumentation overhead and is not part of timing runs.
+Pooling and persistent winner caching were not introduced: the measured reductions
+did not require either lifecycle complexity. Source observer epochs and binding
+ownership handles remain separate because stale callbacks and rollback can outlive
+an individual attachment.
+
+Runtime benchmarks exclude Roslyn compilation and CLR delta emission. A separate
+real-CLR fixture applies fifty consecutive deltas to the original owner/control,
+reorders conflicts, retains its reactive neighbor and checks retired activator
+lifetime. It measures handler allocation/time after five warm-up deltas. Its GC
+counts explicitly include compilation and must not be interpreted as handler-only
+GC cost. Additional CLR cases exercise synchronous scalar reuse/batching and real
+scalar/resource/conditional shape edits without replacing the loaded assembly.
+
+Lifetime tests use no-inline creation helpers, repeated collections and a later
+dispatcher turn. They cover removed controls/activators, committed/aborted
+transitions, discarded detached controls, disposed contributions and retired
+observable sources. Another test keeps the current target alive while collecting
+100 old activators and completed transitions, detecting snapshot chains rather
+than merely confirming the whole target cycle can be collected. Stress coverage
+uses 200 controls, 2000 utility applications and 20 reactive/structural cycles;
+failure stress checks 100 failed transactions, retry, stale observers and bounded
+index/queue storage. These tests check reachability and deterministic live-resource
+counts, not a fixed process working-set or a single GC result.
+
+### Recorded comparison
+
+Measurements were collected on 2026-10-15, Windows 11 build 26200, Intel i5-11400H
+(6 cores / 12 logical processors), win-x64, SDK 10.0.401, CLR 10.0.12, Avalonia
+12.0.4 and Roslyn 4.11. Defaults for GC/tiered compilation were retained. After
+validation and builds finished, baseline/final samples were alternated sequentially,
+three per configuration. Values below are medians of those three runs, not a claim
+of statistically established latency improvements. No compiler/test suites ran
+concurrently with these samples.
+
+The baseline was also extracted from Git into ignored
+`bin/AkcssOptimization/BaselineSource`. Runtime/generator source hashes, normalized
+with the repository's CRLF attributes, matched the baseline Git objects. Only
+measurement fixtures and output capture were added there. The common workloads
+use the same fixture inputs and instrumentation on both actual implementation
+versions; batching and publication-reuse cases require the new APIs and are
+reported separately. Initial pre-change measurements/profile were captured before
+runtime implementation began.
+
+| Runtime workload | Baseline B/update | Final B/update | Debug us/update, baseline -> final | Release us/update, baseline -> final |
+| --- | ---: | ---: | ---: | ---: |
+| Unchanged refresh, ten candidates | 0 | 0 | 0.30 -> 0.30 | 0.44 -> 0.45 |
+| One changed utility of ten | 26,420 | 9,202 | 58.26 -> 44.36 | 60.87 -> 47.48 |
+| One changed utility of fifty | 106,411 | 21,867 | 123.55 -> 84.33 | 167.96 -> 93.15 |
+| Reactive source notification | 952 | 656 | 5.09 -> 4.88 | 4.88 -> 4.28 |
+| Three unbatched notifications, same key | 2,856 | 1,968 | 14.87 -> 10.94 | 17.57 -> 13.14 |
+| Three unbatched notifications, distinct keys | 2,856 | 1,968 | 15.56 -> 9.95 | 16.18 -> 19.49 |
+| Fifty competing candidates | 108,724 | 20,315 | 135.58 -> 85.50 | 141.17 -> 93.09 |
+| Multi-property utility, ten candidates | 27,988 | 10,514 | 61.11 -> 44.64 | 65.29 -> 51.22 |
+| Failed reconciliation and rollback | 28,107 | 10,282 | 64.21 -> 48.58 | 67.86 -> 52.69 |
+
+The existing render-owned one-of-ten source benchmark changes from 29,892 to
+12,826 B/update (Debug 68.62 -> 53.27 us; Release 68.26 -> 54.69 us). It still
+constructs one candidate, replaces zero retained argument subscriptions and
+installs/releases one source contribution per update. Existing owned-reactive
+measurements change from 1,128 to 832 B/update (Debug 4.15 -> 3.27 us; Release
+4.55 -> 4.39 us). The source-based ownership gap remains 280 B relative to the
+disposable path; preserving independently suspendable source ownership still has
+a cost. Scalar reuse addresses repeated creation instead of deleting that handle.
+
+| Final-runtime comparison | B/update | Debug us/update | Release us/update | Deterministic work |
+| --- | ---: | ---: | ---: | --- |
+| Three same-key notifications without a batch | 1,968 | 10.94 | 13.14 | Three resolutions/installations |
+| Same burst in an explicit batch | 728 | 3.90 | 5.05 | One resolution/installation |
+| Three distinct keys in an explicit batch | 1,992 | 10.27 | 12.73 | Three resolutions/installations |
+| Scalar handle replacement | 512 | 3.29 | 4.12 | One installation, two effective changes |
+| Scalar publication through the retained handle | 104 | 1.88 | 1.69 | Zero installations, one effective change |
+
+These publication rows use the same final runtime and scalar fixture with opt-in
+reuse enabled/disabled, not different historical binaries or the older 1,128-byte
+fixture. Source-disposal counters instrument observable contributions; they are
+not an independent scalar-binding release counter. Scalar ownership is additionally
+checked through unchanged Apply/subscription counts, external-value restoration,
+explicit disposal and lifetime tests.
+
+In a representative 1000-update Debug allocation pass, one-of-fifty reconciliation
+went from 17 to 3 Gen0 collections, one-of-ten from 4 to 1, and the multi-property
+case from 5 to 2. Short reactive passes typically collected zero times. Detailed
+per-run GC and operation counters remain in TRX, not just elapsed-time summaries.
+The competing case performs fifty fresh eligibility checks per resolution;
+one-of-fifty invalidation evaluates only its one affected operation. The rollback
+fixture performs two group resolutions (provisional and restored) per failure.
+
+The first index implementation increased full-replacement allocations by about
+6%; it was refined rather than retained with that cost. The single-operation fast
+path avoids temporary lists/group dictionaries and empty scratch arrays. The
+final full-replacement compatibility benchmark measures 39,653 versus 40,093
+B/update (Debug 108.95 versus 115.09 us; Release 109.93 versus 119.28 us).
+
+Not every timing sample improved. In particular, Release distinct-key notifications
+were slower in the recorded medians, and older owned multi-property/rollback
+fixtures changed from 38.57 to 40.87 us and 53.44 to 55.86 us. Debug owned-conflict
+timing also changed from 40.95 to 41.53 us. These short samples are sensitive to
+JIT/GC/load and do not establish a universal speedup. The index is retained for
+its measured allocation/scanning reductions and unchanged semantics, not on a
+claim that every workload became faster. ReleaseDirect generation itself is
+unchanged; normal compatibility full replacement did not regress in these samples.
+
+Real CLR handler measurements are separate single 50-delta runs, averaged over
+the last 45 deltas after warm-up:
+
+| Runtime | Baseline handler B/update | Final handler B/update | Baseline handler us/update | Final handler us/update |
+| --- | ---: | ---: | ---: | ---: |
+| Debug | 29,140 | 26,087 | 2,614.37 | 2,680.47 |
+| Release | 29,152 | 26,091 | 2,734.10 | 2,744.29 |
+
+Handler allocation is lower, but handler latency did not improve in these samples.
+Reflection/metadata dispatch dominates this small component; no end-to-end edit
+latency gain is claimed. Whole-loop Gen0 counts were 258 -> 266 (Debug) and
+259 -> 265 (Release), including Roslyn compilation/delta creation; those figures
+must not be attributed to runtime reconciliation alone. All four isolated cases
+passed their 50-delta, original-control and retired-activator checks.
+
+### Validation commands and results
+
+The expanded regression filter passed 449 cases in both Debug and Release, zero
+failed/skipped. Two further index edge cases were then added and the complete
+25-case scheduling/lifetime/stress class passed in each configuration (23 overlap
+the broad run, two are additional). This validates 451 distinct unit cases, not
+474. Relative to the baseline filter, there are 25 scheduling/lifetime/stress,
+14 measurement/profile and one generator cases. The entire real CLR project
+passed all 48 cases against each runtime configuration (45 existing, three new).
+The repeated CLR and scalar/resource/conditional shape cases use actual
+EmitDifference/MetadataUpdater updates, not assembly replacement.
+
+All final TRX summaries report zero errors, timeouts, aborted and unexecuted cases.
+Unit/CLR runtime binaries were byte-identical within each configuration. The
+25-case targeted run includes 200 controls / 2000 utility applications over 20
+cycles, 100 repeated failures/retry, stale callbacks, and weak-reference lifetime
+checks, including 100 retired activators/transitions with a still-live target.
+No fixed working-set bound, whole-process object census or whole-repository
+passing claim is made.
+CLR and the test harness retain edit metadata while their assemblies are loaded;
+these lifetime checks bound AKCSS runtime snapshots, not CLR metadata storage.
+All 18 changed/new files passed CRLF/final-newline checks; C# files passed braced
+if/for/foreach and multiline XML-summary checks. `git diff --check` passed.
+
+Exact validation commands (run from repository root):
+
+```powershell
+$regression = 'FullyQualifiedName~Akcss|FullyQualifiedName~AkburaRenderState|FullyQualifiedName~AkburaHotReload|FullyQualifiedName~ComponentDocumentWriter|FullyQualifiedName~HotReloadServiceWriter|FullyQualifiedName~ComponentStructuralHotReload|FullyQualifiedName~GenerateSources_DebugCompilationRegistersHotReloadService'
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c Debug --no-restore --filter $regression --logger 'trx;LogFileName=regression-debug.trx' --results-directory bin/AkcssOptimization/VerifiedDebug -m:1 /nodeReuse:false
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c Release --no-restore --filter $regression --logger 'trx;LogFileName=regression-release.trx' --results-directory bin/AkcssOptimization/VerifiedRelease -m:1 /nodeReuse:false
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c Debug --no-restore --filter 'FullyQualifiedName~AkcssReactiveSchedulingTests' --logger 'trx;LogFileName=scheduling-final-debug.trx' --results-directory bin/AkcssOptimization/VerifiedSchedulingDebug -m:1 /nodeReuse:false -p:BuildProjectReferences=false
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c Release --no-restore --filter 'FullyQualifiedName~AkcssReactiveSchedulingTests' --logger 'trx;LogFileName=scheduling-final-release.trx' --results-directory bin/AkcssOptimization/VerifiedSchedulingRelease -m:1 /nodeReuse:false -p:BuildProjectReferences=false
+dotnet test src/Akbura.HotReloadIntegrationTests/Akbura.HotReloadIntegrationTests.csproj -c Debug --no-restore --logger 'trx;LogFileName=clr-debug.trx' --results-directory bin/AkcssOptimization/VerifiedClrDebug -m:1 /nodeReuse:false -p:BuildProjectReferences=false
+dotnet test src/Akbura.HotReloadIntegrationTests/Akbura.HotReloadIntegrationTests.csproj -c Release --no-restore --logger 'trx;LogFileName=clr-release.trx' --results-directory bin/AkcssOptimization/VerifiedClrRelease -m:1 /nodeReuse:false -p:BuildProjectReferences=false
+```
+
+`BuildProjectReferences=false` was used only after both configurations' dependencies
+had been rebuilt. Running the broad filter now also includes the two added edge
+cases. The initial baseline AKCSS filter passed 293 cases before implementation.
+Intermediate red tests included an empty-array coercion issue introduced by copy
+elision and test-registration mistakes; they were corrected before the verified
+runs. The first 50-delta fixture counted duplicate references to a retained
+candidate; its corrected version tracks each replaced slot and passes on both
+baseline and final versions. Existing unrelated Furioso/QuotedResourceRegressionTests
+warnings remain. No package/target-framework changes were made.
+
+For each Debug/Release configuration and samples 1..3, measurement runs used:
+
+```powershell
+$measurementFilter = 'FullyQualifiedName~AkcssOptimizationPerformanceTests.Workloads|FullyQualifiedName~AkcssReconciliationPerformanceTests|FullyQualifiedName~OwnedWorkloads'
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c $configuration --no-build --no-restore --filter $measurementFilter --logger "trx;LogFileName=final-$configuration-$sample.trx" --results-directory "bin/AkcssOptimization/Measurements/Final$configuration"
+dotnet test bin/AkcssOptimization/BaselineSource/src/Akbura.UnitTests/Akbura.UnitTests.csproj -c $configuration --no-build --no-restore --filter $measurementFilter --logger "trx;LogFileName=baseline-$configuration-$sample.trx" --results-directory "bin/AkcssOptimization/Measurements/Baseline$configuration"
+```
+
+Each final sample passed 19 cases and each baseline sample 15. The baseline-only
+fixture omits the four cases requiring batching/publication APIs; runtime and
+generator sources remain unchanged. CLR measurement commands replace the project
+path with each version's CLR project, select `FullyQualifiedName~FiftyDeltas`, and
+write `baseline-clr-$configuration.trx` / `final-clr-$configuration.trx` under
+`bin/AkcssOptimization/Measurements/Clr`. Detailed child output is captured for
+this measurement instead of being lost after a successful subprocess.
+
+Changed implementation files are `AkcssRuntime.cs`, its new `ConflictIndex` and
+`Updates` partials, `AkcssRuntime.Reconciliation.cs`, `AkcssPropertyContribution.cs`,
+`AkcssUtilityCandidateActivator.cs`, `AkcssUtilityOperation.cs`,
+`AkcssUtilityValueSource.cs`, `AkcssValueEqualityPolicy.cs`, `AkburaControl.cs`,
+`AkburaRenderState.cs` and `AkcssUtilityOperationWriter.cs`. Tests are in the new
+`AkcssReactiveSchedulingTests.cs` / `AkcssOptimizationPerformanceTests.cs`, plus
+`AkcssUtilityWriterTests.cs`, `AkcssIncrementalHotReloadTests.cs` and the child-output
+harness. This guide remains the canonical mechanism/measurement document.
+
 <!-- Source references: implementation snapshot inspected for this guide. -->
 [baseline]: https://github.com/Asaicraft/Akbura/commit/959ae1590cce507bab17893da8284df69887120b
 [generator]: https://github.com/Asaicraft/Akbura/blob/959ae1590cce507bab17893da8284df69887120b/src/Akbura.BlackSilence/AkburaBlackSilenceGenerator.cs

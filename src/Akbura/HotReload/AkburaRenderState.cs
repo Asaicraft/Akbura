@@ -106,6 +106,10 @@ public sealed partial class AkburaRenderState : IDisposable
 
         try
         {
+            foreach (var node in _nodes)
+            {
+                pendingRevision.HoldAkcssUpdate(node.Instance, existingOnly: true);
+            }
             MatchAndCreate(pendingRevision, factory);
             for (var i = 0; i < conditionalDefinitions.Length; i++)
             {
@@ -373,6 +377,7 @@ public sealed partial class AkburaRenderState : IDisposable
         try
         {
             ValidatePropertyOwner(pendingRevision, localId, target);
+            pendingRevision.HoldAkcssUpdate(target);
             var node = pendingRevision.Nodes[localId];
             if (!operationRegistered)
             {
@@ -2402,6 +2407,55 @@ public sealed partial class AkburaRenderState : IDisposable
         public List<PendingInitializer> NewInitializers { get; } = [];
 
         private List<RenderRevisionMutation> Mutations { get; } = [];
+        private List<(object Target, IDisposable Scope)>? _akcssUpdates;
+
+        public void HoldAkcssUpdate(object target, bool existingOnly = false)
+        {
+            if (_akcssUpdates != null)
+            {
+                foreach (var entry in _akcssUpdates)
+                {
+                    if (ReferenceEquals(entry.Target, target))
+                    {
+                        return;
+                    }
+                }
+            }
+            var scope = existingOnly ? AkcssRuntime.BeginExistingUpdate(target) : AkcssRuntime.BeginUpdate(target);
+            if (scope != null)
+            {
+                (_akcssUpdates ??= []).Add((target, scope));
+            }
+        }
+
+        private void CompleteAkcssUpdates()
+        {
+            var updates = _akcssUpdates;
+            _akcssUpdates = null;
+            List<Exception>? failures = null;
+            if (updates != null)
+            {
+                foreach (var entry in updates)
+                {
+                    try
+                    {
+                        entry.Scope.Dispose();
+                    }
+                    catch (Exception failure)
+                    {
+                        (failures ??= []).Add(failure);
+                    }
+                }
+            }
+            if (failures?.Count == 1)
+            {
+                ExceptionDispatchInfo.Capture(failures[0]).Throw();
+            }
+            if (failures != null)
+            {
+                throw new AggregateException("AKCSS render update completion failed.", failures);
+            }
+        }
 
         public void TrackMutation(RenderRevisionMutation mutation)
         {
@@ -2418,6 +2472,7 @@ public sealed partial class AkburaRenderState : IDisposable
             {
                 mutation.CompleteCommit();
             }
+            CompleteAkcssUpdates();
         }
 
         public bool ContainsOperation(in RenderSlotKey key)
@@ -2483,6 +2538,18 @@ public sealed partial class AkburaRenderState : IDisposable
                     {
                         exceptions.Add(exception);
                     }
+                }
+            }
+
+            try
+            {
+                CompleteAkcssUpdates();
+            }
+            catch (Exception exception)
+            {
+                if (throwOnFailure)
+                {
+                    (exceptions ??= []).Add(exception);
                 }
             }
 

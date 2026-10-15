@@ -239,6 +239,19 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
         ResetOperationCore(index, target);
     }
 
+    internal bool CanUpdateContribution(int index) => UsesBindingPriority && _condition == null &&
+        _operations[index].SupportsContributionUpdates;
+
+    internal bool TryUpdateOperation(int index, object target)
+    {
+        if (!CanUpdateContribution(index) || _operationContributions[index] is not AkcssPropertyContribution contribution)
+        {
+            return false;
+        }
+        CopyArgumentValues();
+        return _operations[index].TryUpdateContribution(target, _values, GetBindingPriority(), contribution);
+    }
+
     internal void Attach(
         object target,
         Action<AkcssUtilityCandidateActivator> changed)
@@ -670,6 +683,12 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
         public int Order { get; }
 
         public bool SupportsHotReloadReconciliation => _resetProperty != null;
+
+        public bool SupportsContributionUpdates => _operation?.SupportsContributionUpdates == true;
+
+        public bool TryUpdateContribution(object target, IReadOnlyList<object?> arguments,
+            BindingPriority priority, IDisposable contribution) =>
+            _operation!.TryUpdateContribution(target, arguments, priority, contribution);
 
         public bool IsActive(object target, IReadOnlyList<object?> arguments)
         {

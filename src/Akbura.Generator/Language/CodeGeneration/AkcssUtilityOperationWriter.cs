@@ -149,10 +149,26 @@ internal ref struct AkcssUtilityOperationWriter
         _writer.WriteLine();
         WriteUpdate(setter, value);
 
+        if (_hotReload && (!hasAvaloniaTarget || value.DynamicResource != null || _conditionOrders.Count != 0))
+        {
+            _writer.WriteLine("public override bool SupportsContributionUpdates => false;");
+            _writer.WriteLine("public override bool TryUpdateContribution(object __target,");
+            _writer.CurrentIndent += _writer.TabSize;
+            _writer.WriteLine("global::System.Collections.Generic.IReadOnlyList<object?> __arguments,");
+            _writer.WriteLine("global::Avalonia.Data.BindingPriority __bindingPriority, global::System.IDisposable __contribution) => false;");
+            _writer.CurrentIndent -= _writer.TabSize;
+        }
+
         if (hasAvaloniaTarget)
         {
             _writer.WriteLine();
             WriteApply(setter, property, targetProperty, value);
+
+            if (_hotReload && value.DynamicResource == null && _conditionOrders.Count == 0)
+            {
+                _writer.WriteLine();
+                WriteContributionUpdate(setter, targetProperty, value.Expression);
+            }
 
             _writer.WriteLine();
 
@@ -367,6 +383,36 @@ internal ref struct AkcssUtilityOperationWriter
             "\"Avalonia did not return a reversible AKCSS utility contribution.\");");
 
         _writer.CurrentIndent = indent;
+    }
+
+    private void WriteContributionUpdate(IAkcssPropertySetterOperation setter,
+        in MarkupTargetPropertyPlan targetProperty, string expression)
+    {
+        _writer.WriteLine("public override bool SupportsContributionUpdates => true;");
+        _writer.WriteLine("public override bool TryUpdateContribution(object __target,");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine("global::System.Collections.Generic.IReadOnlyList<object?> __arguments,");
+        _writer.WriteLine("global::Avalonia.Data.BindingPriority __bindingPriority, global::System.IDisposable __contribution)");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.Write("if (!global::Akbura.Akcss.AkcssPropertyContribution.CanUpdate(__contribution, (global::Avalonia.AvaloniaObject)__target, ");
+        _targetPropertyWriter.Write(targetProperty);
+        _writer.WriteLine(", __bindingPriority))");
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine("return false;");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
+        _writer.Write("global::Akbura.Akcss.AkcssPropertyContribution.Update(__contribution, ");
+        using (_sourceMappingWriter.WriteStart(setter.Syntax?.Expression))
+        {
+            _writer.Write(expression);
+        }
+        _writer.WriteLine(");");
+        _writer.WriteLine("return true;");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
     }
 
     private void WriteDynamicResourceContribution(

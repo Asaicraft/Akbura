@@ -19,6 +19,25 @@ public sealed class AkcssUtilityWriterTests
     private static Task OnDispatcher(Action action) => AvaloniaHeadlessTestSession.GetSession().Dispatch(action, CancellationToken.None);
 
     [Fact]
+    public Task DebugScalarOperations_UpdateOnlyMatchingActiveScalarHandles() => OnDispatcher(() =>
+    {
+        var utility = Assert.Single(CompileUtilities("@using Avalonia.Controls; @utilities { Border.size-(double value) { Width: value; } }", hotReload: true));
+        var operation = Assert.Single(utility.Operations);
+        var target = new Border { Width = 73 };
+        using var contribution = operation.Apply(target, [12d], BindingPriority.Animation);
+        Assert.True(operation.SupportsContributionUpdates);
+        Assert.True(operation.TryUpdateContribution(target, [24d], BindingPriority.Animation, contribution));
+        Assert.Equal(24, target.Width);
+        Assert.False(operation.TryUpdateContribution(target, [31d], BindingPriority.Style, contribution));
+        Assert.False(operation.TryUpdateContribution(new Border(), [31d], BindingPriority.Animation, contribution));
+        contribution.Dispose();
+        Assert.False(operation.TryUpdateContribution(target, [31d], BindingPriority.Animation, contribution));
+        Assert.Equal(73, target.Width);
+        var release = Assert.Single(CompileUtilities("@using Avalonia.Controls; @utilities { Border.size-(double value) { Width: value; } }"));
+        Assert.False(Assert.Single(release.Operations).SupportsContributionUpdates);
+    });
+
+    [Fact]
     public void UtilityOperations_UpdateResetAndApplyPropertiesIndependently()
     {
         const string source =

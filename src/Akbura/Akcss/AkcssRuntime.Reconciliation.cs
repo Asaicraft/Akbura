@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using System.Collections.Immutable;
+using System.Runtime.InteropServices;
 
 namespace Akbura.Akcss;
 
@@ -70,7 +71,7 @@ internal static partial class AkcssRuntime
 
         public bool QueueContribution(AkcssPropertyContribution contribution)
         {
-            if (_activeTransition == null)
+            if (!CannotFlush)
             {
                 return false;
             }
@@ -80,7 +81,7 @@ internal static partial class AkcssRuntime
 
         private void FlushContributions()
         {
-            if (_pendingContributions == null)
+            if (_pendingContributions == null || _updateDepth != 0)
             {
                 return;
             }
@@ -123,6 +124,7 @@ internal static partial class AkcssRuntime
         public void SetDescriptors(ImmutableArray<AkcssActivatorDescriptor> descriptors)
         {
             _descriptors = descriptors;
+            _conflictIndex = new(StringComparer.Ordinal);
         }
 
         public Reconciliation Reconcile(ImmutableArray<AkcssActivatorDescriptor> descriptors, Func<int, AkcssStyleActivator> factory, bool propertySet)
@@ -189,6 +191,7 @@ internal static partial class AkcssRuntime
             private readonly ImmutableArray<AkcssActivatorDescriptor> _oldDescriptors;
             private readonly ImmutableArray<AkcssStyleActivator> _newStyles;
             private readonly ImmutableArray<AkcssActivatorDescriptor> _newDescriptors;
+            private readonly Dictionary<string, ConflictIndex> _oldIndex;
             private readonly List<AkcssUtilityCandidateActivator> _added = [];
             private readonly List<AkcssUtilityCandidateActivator> _removed = [];
             private readonly List<AkcssUtilityCandidateActivator> _retired = [];
@@ -209,6 +212,7 @@ internal static partial class AkcssRuntime
                 _propertySet = propertySet;
                 _oldStyles = runtime._styles;
                 _oldDescriptors = runtime._descriptors;
+                _oldIndex = runtime._conflictIndex;
                 _oldPropertySet = runtime._target is not Control control ||
                     control.GetBaseValue(AkburaControl.AkcssStylesProperty).HasValue;
                 foreach (var descriptor in desired)
@@ -222,9 +226,9 @@ internal static partial class AkcssRuntime
                 var canRetain = (_oldStyles.IsEmpty || !_oldDescriptors.IsDefault) &&
                     _oldStyles.All(IsSupported) && desired.All(static value => value.Revision != null);
                 var styles = new AkcssStyleActivator[desired.Length];
-                var instances = new HashSet<AkcssStyleActivator>(ReferenceEqualityComparer.Instance);
+                var instances = new HashSet<AkcssStyleActivator>(desired.Length, ReferenceEqualityComparer.Instance);
                 var metadata = desired.ToArray();
-                var retained = new HashSet<AkcssStyleActivator>();
+                var retained = new HashSet<AkcssStyleActivator>(Math.Min(_oldStyles.Length, desired.Length));
                 for (var index = 0; index < styles.Length; index++)
                 {
                     var previous = matches[index];
@@ -255,7 +259,7 @@ internal static partial class AkcssRuntime
                     }
                     retained.Clear();
                 }
-                var identities = new HashSet<string>(StringComparer.Ordinal);
+                var identities = new HashSet<string>(metadata.Length, StringComparer.Ordinal);
                 for (var index = 0; index < metadata.Length; index++)
                 {
                     if (matches[index] >= 0)
@@ -277,7 +281,7 @@ internal static partial class AkcssRuntime
                     }
                     metadata[index] = metadata[index] with { Identity = identity };
                 }
-                _newStyles = ImmutableArray.Create(styles);
+                _newStyles = styles.Length == 0 ? [] : ImmutableCollectionsMarshal.AsImmutableArray(styles);
                 foreach (var style in styles)
                 {
                     if (style == null || !instances.Add(style))
@@ -285,7 +289,7 @@ internal static partial class AkcssRuntime
                         throw new InvalidOperationException("An AKCSS declaration must own a distinct activator instance.");
                     }
                 }
-                _newDescriptors = ImmutableArray.Create(metadata);
+                _newDescriptors = ImmutableCollectionsMarshal.AsImmutableArray(metadata);
                 if (!_partial)
                 {
                     return;
@@ -370,6 +374,11 @@ internal static partial class AkcssRuntime
                     Reset(_oldStyles);
                     _runtime._styles = _newStyles;
                     _runtime._descriptors = _newDescriptors;
+                    _runtime._conflictIndex = new(_oldIndex, StringComparer.Ordinal);
+                    foreach (var key in _affected)
+                    {
+                        _runtime._conflictIndex.Remove(key);
+                    }
                     foreach (var key in _affected)
                     {
                         if (!_runtime._isDetached)
@@ -426,7 +435,6 @@ internal static partial class AkcssRuntime
                     Attempt(update.Complete, ref failures);
                 }
                 _runtime._activeTransition = null;
-                Attempt(_runtime.FlushContributions, ref failures);
                 ThrowFailures(failures);
                 _runtime.ApplyPendingCandidates();
             }
@@ -459,6 +467,7 @@ internal static partial class AkcssRuntime
                     Attempt(() => Reset(_newStyles), ref failures);
                     _runtime._styles = _oldStyles;
                     _runtime._descriptors = _oldDescriptors;
+                    _runtime._conflictIndex = _oldIndex;
                     if (!_runtime._isDetached)
                     {
                         foreach (var candidate in _retired)
@@ -555,8 +564,14 @@ internal static partial class AkcssRuntime
                     {
                         if (_affected.Contains(candidate.GetOperationConflictKey(operation)))
                         {
-                            var current = operation;
-                            Attempt(() => candidate.ResetOperation(current, _runtime._target), ref failures);
+                            try
+                            {
+                                candidate.ResetOperation(operation, _runtime._target);
+                            }
+                            catch (Exception failure)
+                            {
+                                (failures ??= []).Add(failure);
+                            }
                         }
                     }
                 }
@@ -565,51 +580,73 @@ internal static partial class AkcssRuntime
 
             private static int[] Match(ImmutableArray<AkcssActivatorDescriptor> old, ImmutableArray<AkcssActivatorDescriptor> desired)
             {
-                var matches = Enumerable.Repeat(-1, desired.Length).ToArray();
+                var matches = new int[desired.Length];
+                Array.Fill(matches, -1);
                 if (old.IsDefaultOrEmpty)
                 {
                     return matches;
                 }
-                var families = new Dictionary<string, (List<int> Old, List<int> New)>(StringComparer.Ordinal);
+                var anchors = new Dictionary<(string Family, string Syntax), (int Old, int New)>(Math.Max(old.Length, desired.Length));
                 for (var index = 0; index < old.Length; index++)
                 {
-                    GetGroup(old[index].Family).Old.Add(index);
+                    var key = (old[index].Family, old[index].SyntaxIdentity);
+                    if (anchors.TryGetValue(key, out var anchor))
+                    {
+                        anchors[key] = (-2, anchor.New);
+                    }
+                    else
+                    {
+                        anchors.Add(key, (index, -1));
+                    }
                 }
                 for (var index = 0; index < desired.Length; index++)
                 {
-                    GetGroup(desired[index].Family).New.Add(index);
+                    var key = (desired[index].Family, desired[index].SyntaxIdentity);
+                    if (anchors.TryGetValue(key, out var anchor))
+                    {
+                        anchors[key] = (anchor.Old, anchor.New == -1 ? index : -2);
+                    }
+                    else
+                    {
+                        anchors.Add(key, (-1, index));
+                    }
+                }
+                var used = new bool[old.Length];
+                foreach (var anchor in anchors.Values)
+                {
+                    if (anchor.Old >= 0 && anchor.New >= 0)
+                    {
+                        matches[anchor.New] = anchor.Old;
+                        used[anchor.Old] = true;
+                    }
+                }
+                var families = new Dictionary<string, (int Old, int New)>(StringComparer.Ordinal);
+                for (var index = 0; index < old.Length; index++)
+                {
+                    if (!used[index])
+                    {
+                        var family = old[index].Family;
+                        var group = families.GetValueOrDefault(family, (Old: -1, New: -1));
+                        families[family] = (group.Old == -1 ? index : -2, group.New);
+                    }
+                }
+                for (var index = 0; index < desired.Length; index++)
+                {
+                    if (matches[index] < 0)
+                    {
+                        var family = desired[index].Family;
+                        var group = families.GetValueOrDefault(family, (Old: -1, New: -1));
+                        families[family] = (group.Old, group.New == -1 ? index : -2);
+                    }
                 }
                 foreach (var group in families.Values)
                 {
-                    var oldAnchors = group.Old.GroupBy(index => old[index].SyntaxIdentity)
-                        .ToDictionary(values => values.Key, values => values.ToArray(), StringComparer.Ordinal);
-                    var used = new HashSet<int>();
-                    foreach (var anchor in group.New.GroupBy(index => desired[index].SyntaxIdentity))
+                    if (group.Old >= 0 && group.New >= 0)
                     {
-                        if (anchor.Count() == 1 && oldAnchors.TryGetValue(anchor.Key, out var previous) && previous.Length == 1)
-                        {
-                            matches[anchor.Single()] = previous[0];
-                            used.Add(previous[0]);
-                        }
-                    }
-                    var remainingOld = group.Old.Where(index => !used.Contains(index)).ToArray();
-                    var remainingNew = group.New.Where(index => matches[index] < 0).ToArray();
-                    if (remainingOld.Length == 1 && remainingNew.Length == 1)
-                    {
-                        matches[remainingNew[0]] = remainingOld[0];
+                        matches[group.New] = group.Old;
                     }
                 }
                 return matches;
-
-                (List<int> Old, List<int> New) GetGroup(string family)
-                {
-                    if (!families.TryGetValue(family, out var group))
-                    {
-                        group = ([], []);
-                        families.Add(family, group);
-                    }
-                    return group;
-                }
             }
         }
     }

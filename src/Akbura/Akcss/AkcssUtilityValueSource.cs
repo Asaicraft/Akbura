@@ -17,6 +17,7 @@ namespace Akbura.Akcss;
 public abstract class AkcssUtilityValueSource
 {
     private Action? _changed;
+    private AkcssValueEqualityPolicy _equalityPolicy;
 
     private protected AkcssUtilityValueSource(
         bool recreateOnRefresh,
@@ -35,6 +36,24 @@ public abstract class AkcssUtilityValueSource
     internal bool HasBindingPriorityMetadata { get; }
 
     internal BindingPriority BindingPriority { get; private protected set; }
+
+    /// <summary>
+    /// Selects an equality contract before attachment. ImmutableScalar never invokes
+    /// equality on mutable or user-defined values; ReferenceEquality is explicitly caller-owned.
+    /// </summary>
+    public AkcssUtilityValueSource WithEqualityPolicy(AkcssValueEqualityPolicy policy)
+    {
+        if (_changed != null)
+        {
+            throw new InvalidOperationException("An attached AKCSS source cannot change its equality policy.");
+        }
+        if (!Enum.IsDefined(policy))
+        {
+            throw new ArgumentOutOfRangeException(nameof(policy));
+        }
+        _equalityPolicy = policy;
+        return this;
+    }
 
     /// <summary>
     /// Converts generated object values without a converter lambda that CLR edits can retire.
@@ -79,6 +98,10 @@ public abstract class AkcssUtilityValueSource
 
     private protected void SetValue(object? value)
     {
+        if (HasValue && AkcssValueEquality.IsEquivalent(Value, value, _equalityPolicy))
+        {
+            return;
+        }
         HasValue = true;
         Value = value;
         _changed?.Invoke();

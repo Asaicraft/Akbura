@@ -3,11 +3,140 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using System.Reflection;
+using System.Diagnostics;
+using Xunit.Abstractions;
 
 namespace Akbura.HotReloadIntegrationTests;
 
-public sealed class AkcssIncrementalHotReloadTests
+public sealed class AkcssIncrementalHotReloadTests(ITestOutputHelper output)
 {
+    [Fact]
+    [Trait("Category", "ClrHotReload")]
+    public Task OwnedModuleChanges_SwitchScalarResourceAndConditionalPublicationSafely() =>
+        Scenario(nameof(OwnedModuleChanges_SwitchScalarResourceAndConditionalPublicationSafely),
+            "${Owned}:w-12 h-24", (source, reload, owner, target, window) =>
+        {
+            target.Resources["size"] = 2d;
+            var resource = Styles.Replace("Border.w-(double value) { Width: value; }",
+                "Border.w-(double value) { Width: Amx.DynamicResource<double>(\"size\") * value; }", StringComparison.Ordinal);
+            reload.ApplyUpdate(source.UpdateAkcss("Styles.akcss", resource));
+            reload.DispatchMetadataUpdateHandlers();
+            Assert.Equal(24, target.Width);
+            target.Resources["size"] = 3d;
+            Assert.Equal(36, target.Width);
+            var conditional = Styles.Replace("Border.w-(double value) { Width: value; }",
+                "Border.w-(double value) { @if(IsEnabled) { Width: value; } }", StringComparison.Ordinal);
+            reload.ApplyUpdate(source.UpdateAkcss("Styles.akcss", conditional));
+            reload.DispatchMetadataUpdateHandlers();
+            Assert.Equal(12, target.Width);
+            target.Resources["size"] = 5d;
+            Assert.Equal(12, target.Width);
+            target.IsEnabled = false;
+            AkburaControl.RefreshAkcssStylesForHotReload(target);
+            Assert.True(double.IsNaN(target.Width));
+            reload.ApplyUpdate(source.UpdateAkcss("Styles.akcss", Styles));
+            reload.DispatchMetadataUpdateHandlers();
+            Assert.Equal(12, target.Width);
+            Assert.Equal(24, target.Height);
+            Assert.Same(target, owner.Child);
+        });
+
+    [Fact]
+    [Trait("Category", "ClrHotReload")]
+    public Task OwnedReactiveScalar_RemainsSynchronousAndBatchesAfterRealDelta() =>
+        Scenario(nameof(OwnedReactiveScalar_RemainsSynchronousAndBatchesAfterRealDelta),
+            "${Owned}:w-${Stream} h-24", (source, reload, owner, target, window) =>
+        {
+            target.Width = 73;
+            var original = AkburaControl.GetAkcssStyles(target)[0];
+            var subscriptions = Count(reload, "Subscriptions");
+            Update(source, reload, "${Owned}:w-${Stream} h-25");
+            Assert.Same(original, AkburaControl.GetAkcssStyles(target)[0]);
+            var writes = 0;
+            target.PropertyChanged += (_, args) =>
+            {
+                if (args.Property == Control.WidthProperty)
+                {
+                    writes++;
+                }
+            };
+            for (var value = 42; value < 52; value++)
+            {
+                Publish(reload, "Publish", (double)value);
+                Assert.Equal(value, target.Width);
+            }
+            Assert.Equal(10, writes);
+            using (AkburaControl.BeginAkcssUpdate(target))
+            {
+                Publish(reload, "Publish", 61d);
+                Publish(reload, "Publish", 62d);
+                Publish(reload, "Publish", 63d);
+                Assert.Equal(51, target.Width);
+            }
+            Assert.Equal(63, target.Width);
+            Assert.Equal(11, writes);
+            Assert.Equal(subscriptions, Count(reload, "Subscriptions"));
+            Update(source, reload, "h-25");
+            Assert.Equal(73, target.Width);
+            Publish(reload, "PublishStale", 999d);
+            Assert.Equal(73, target.Width);
+        });
+
+    [Fact]
+    [Trait("Category", "ClrHotReload")]
+    public Task FiftyDeltas_ReorderRemoveAndRetainLiveOwnedAndReactiveCandidates() =>
+        Scenario(nameof(FiftyDeltas_ReorderRemoveAndRetainLiveOwnedAndReactiveCandidates),
+            "${Owned}:w-12 ${Owned}:w-13 h-${Stream}", (source, reload, owner, target, window) =>
+        {
+            var height = AkburaControl.GetAkcssStyles(target)[2];
+            var subscriptions = Count(reload, "Subscriptions");
+            var retired = new List<WeakReference>();
+            long allocated = 0;
+            long ticks = 0;
+            var collections = GC.CollectionCount(0);
+            for (var index = 0; index < 50; index++)
+            {
+                var previousSlot = index == 0 ? 0 : (index - 1) % 2;
+                retired.Add(new WeakReference(AkburaControl.GetAkcssStyles(target)[previousSlot]));
+                var value = index + 20;
+                var declarations = index % 2 == 0
+                    ? "${Owned}:w-" + value + " ${Owned}:w-13 h-${Stream}"
+                    : "${Owned}:w-13 ${Owned}:w-" + value + " h-${Stream}";
+                var updated = source.Update(Component(declarations));
+                reload.ApplyUpdate(updated);
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                var start = Stopwatch.GetTimestamp();
+                reload.DispatchMetadataUpdateHandlers();
+                if (index >= 5)
+                {
+                    ticks += Stopwatch.GetTimestamp() - start;
+                    allocated += GC.GetAllocatedBytesForCurrentThread() - before;
+                }
+                Assert.Same(target, owner.Child);
+                Assert.Equal(index % 2 == 0 ? 13 : value, target.Width);
+                Assert.Equal(3, AkburaControl.GetAkcssStyles(target).Length);
+                Assert.Same(height, AkburaControl.GetAkcssStyles(target)[2]);
+                Assert.Equal(subscriptions, Count(reload, "Subscriptions"));
+                Assert.Equal(1, Count(reload, "Subscribers"));
+            }
+            output.WriteLine($"CLR handler only, 45 measured of 50 deltas: {allocated / 45} B/update; " +
+                $"{ticks * 1_000_000d / Stopwatch.Frequency / 45:F2} us/update; Gen0 delta (includes compilation)={GC.CollectionCount(0) - collections}");
+            Update(source, reload, "h-${Stream}");
+            Assert.True(double.IsNaN(target.Width));
+            Update(source, reload, "${Owned}:w-31");
+            Assert.Equal(0, Count(reload, "Subscribers"));
+            Publish(reload, "PublishStale", 999d);
+            Assert.True(double.IsNaN(target.Height));
+            Assert.Equal(31, target.Width);
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+            }
+            Assert.True(retired.Count(reference => reference.IsAlive) <= 2,
+                "Retired activators must not accumulate in the live runtime snapshot.");
+        });
+
     [Fact]
     [Trait("Category", "ClrHotReload")]
     public Task ModifyOneUtility_RetainsNeighborsAndOnlyTouchesItsProperty() =>
@@ -507,13 +636,18 @@ public sealed class AkcssIncrementalHotReloadTests
         Assert.Equal(expected.Order(StringComparer.Ordinal), keys.Order(StringComparer.Ordinal));
     }
 
-    private static async Task Scenario(string name, string attributes,
+    private async Task Scenario(string name, string attributes,
         Action<AkburaCompilationSession, ClrHotReloadSession, AkburaControl, Border, Window> action, bool wrap = false)
     {
         var testName = typeof(AkcssIncrementalHotReloadTests).FullName + "." + name;
         if (!HotReloadChildProcess.IsChild(testName))
         {
-            await HotReloadChildProcess.RunAsync(testName);
+            var childOutput = await HotReloadChildProcess.RunAsync(testName,
+                detailedOutput: name == nameof(FiftyDeltas_ReorderRemoveAndRetainLiveOwnedAndReactiveCandidates));
+            if (name == nameof(FiftyDeltas_ReorderRemoveAndRetainLiveOwnedAndReactiveCandidates))
+            {
+                output.WriteLine(childOutput);
+            }
             return;
         }
         var component = Component(attributes);

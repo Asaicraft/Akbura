@@ -63,6 +63,29 @@ public sealed class AkcssPropertyContribution : IDisposable, IObservable<object?
 
     internal bool IsActive => _active && !_disposed;
 
+    /// <summary>
+    /// Checks the exact installed identity before generated code evaluates a replacement scalar.
+    /// Resource bindings and suspended or disposed handles cannot use scalar publication.
+    /// </summary>
+    public static bool CanUpdate(IDisposable contribution, AvaloniaObject target, AvaloniaProperty property, BindingPriority priority) =>
+        contribution is AkcssPropertyContribution current && current.IsActive && current._source == null &&
+        ReferenceEquals(current._target, target) && ReferenceEquals(current._property, property) && current._priority == priority;
+
+    /// <summary>
+    /// Publishes a scalar through the existing owned binding after validating the value.
+    /// </summary>
+    public static void Update(IDisposable contribution, object? value)
+    {
+        if (contribution is not AkcssPropertyContribution current || !current.IsActive || current._source != null)
+        {
+            throw new InvalidOperationException("Only an active scalar AKCSS contribution can be updated.");
+        }
+        current._target.VerifyAccess();
+        current.Validate(value);
+        current._value = value;
+        current.PublishLatest();
+    }
+
     private void Validate(object? value)
     {
         if (!ReferenceEquals(value, AvaloniaProperty.UnsetValue) && !_property.IsValidValue(value))

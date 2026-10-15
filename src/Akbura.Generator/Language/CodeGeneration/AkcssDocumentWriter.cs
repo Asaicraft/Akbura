@@ -66,7 +66,8 @@ internal static class AkcssDocumentWriter
 #endif
             using var writer = new CodeWriter();
 
-            var moduleWriter = new AkcssModuleWriter(writer, sourceMap);
+            var moduleWriter = new AkcssModuleWriter(writer, sourceMap,
+                hotReload: generationMode == ComponentGenerationMode.DebugStructural);
 
             WriteHeader(writer, input);
 

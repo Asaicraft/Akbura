@@ -1,6 +1,7 @@
 using Akbura.CompilerAnotations;
 using Akbura.Markup;
 using Akbura.RuntimePools;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
 using System.Collections.Immutable;
@@ -14,8 +15,7 @@ namespace Akbura.Akcss;
 /// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
 [Browsable(false)]
-public sealed class AkcssUtilityCandidateActivator
-    : AkcssStyleActivator
+public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
 {
     private readonly ImmutableArray<AkcssUtilityApplication> _applications;
     private readonly ImmutableArray<CandidateOperation> _operations;
@@ -25,9 +25,11 @@ public sealed class AkcssUtilityCandidateActivator
     private readonly AkcssUtilityValueSource? _variant;
     private readonly BindingPriority? _bindingPriority;
     private readonly List<IDisposable> _subscriptions = [];
+    private readonly List<CandidateObserver> _observers = [];
     private readonly object?[] _values;
     private readonly IDisposable?[] _operationContributions;
     private Action<AkcssUtilityCandidateActivator>? _changed;
+    private bool? _lastFrameCondition;
 
     public AkcssUtilityCandidateActivator(
         string conflictKey,
@@ -101,6 +103,20 @@ public sealed class AkcssUtilityCandidateActivator
 
     internal int OperationCount => _operations.Length;
 
+    internal bool SupportsHotReloadReconciliation => _operations.Length != 0 &&
+        _operations.All(static operation => operation.SupportsHotReloadReconciliation);
+
+    internal bool RefreshFrameCondition()
+    {
+        if (_condition == null)
+        {
+            return false;
+        }
+        var previous = _lastFrameCondition;
+        _lastFrameCondition = _condition();
+        return previous != _lastFrameCondition;
+    }
+
     internal bool UsesBindingPriority =>
         _bindingPriority.HasValue ||
         _variant?.HasBindingPriorityMetadata == true;
@@ -130,9 +146,13 @@ public sealed class AkcssUtilityCandidateActivator
     {
         get
         {
-            if (_condition != null && !_condition())
+            if (_condition != null)
             {
-                return false;
+                _lastFrameCondition = _condition();
+                if (!_lastFrameCondition.Value)
+                {
+                    return false;
+                }
             }
 
             return _variant == null ||
@@ -240,9 +260,9 @@ public sealed class AkcssUtilityCandidateActivator
             var signal = application.Utility.Watch(target) ??
                 throw new InvalidOperationException(
                     $"AKCSS utility '{application.Utility.Name}' returned a null Watch signal.");
-            _subscriptions.Add(
-                signal.Subscribe(
-                    new CandidateObserver(this)));
+            var observer = new CandidateObserver(this);
+            _observers.Add(observer);
+            _subscriptions.Add(signal.Subscribe(observer));
         }
 
         foreach (var argument in _arguments)
@@ -271,22 +291,68 @@ public sealed class AkcssUtilityCandidateActivator
 
     internal void Detach(object target)
     {
-        DisposeContributions();
+        _changed = null;
+        foreach (var observer in _observers)
+        {
+            observer.Deactivate();
+        }
+        _observers.Clear();
+        List<Exception>? failures = null;
+        for (var index = _operationContributions.Length - 1; index >= 0; index--)
+        {
+            try
+            {
+                DisposeContribution(index);
+            }
+            catch (Exception failure)
+            {
+                (failures ??= []).Add(failure);
+            }
+        }
 
         foreach (var subscription in _subscriptions)
         {
-            subscription.Dispose();
+            try
+            {
+                subscription.Dispose();
+            }
+            catch (Exception failure)
+            {
+                (failures ??= []).Add(failure);
+            }
         }
 
         _subscriptions.Clear();
 
         foreach (var argument in _arguments)
         {
-            argument.Detach(target);
+            DetachSource(argument);
         }
 
-        _variant?.Detach(target);
-        _changed = null;
+        if (_variant != null)
+        {
+            DetachSource(_variant);
+        }
+        if (failures?.Count == 1)
+        {
+            ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        }
+        if (failures != null)
+        {
+            throw new AggregateException("AKCSS candidate cleanup failed.", failures);
+        }
+
+        void DetachSource(AkcssUtilityValueSource source)
+        {
+            try
+            {
+                source.Detach(target);
+            }
+            catch (Exception failure)
+            {
+                (failures ??= []).Add(failure);
+            }
+        }
     }
 
     private void ExecuteOperationCore(int index, object target)
@@ -343,8 +409,9 @@ public sealed class AkcssUtilityCandidateActivator
 
     private void DisposeContribution(int index)
     {
-        _operationContributions[index]?.Dispose();
+        var contribution = _operationContributions[index];
         _operationContributions[index] = null;
+        contribution?.Dispose();
     }
 
     private void CopyArgumentValues()
@@ -448,6 +515,8 @@ public sealed class AkcssUtilityCandidateActivator
     {
         private readonly AkcssUtilityOperation? _operation;
         private readonly AkcssUtilityApplication? _legacyApplication;
+        private readonly AvaloniaProperty? _resetProperty;
+        private readonly Type? _resetTargetType;
 
         public CandidateOperation(
             int applicationOrder,
@@ -457,6 +526,8 @@ public sealed class AkcssUtilityCandidateActivator
             _operation = operation ??
                 throw new ArgumentNullException(nameof(operation));
             _legacyApplication = null;
+            _resetProperty = operation.SupportsHotReloadReconciliation ? operation.HotReloadProperty : null;
+            _resetTargetType = _resetProperty != null ? operation.HotReloadResetTargetType : null;
             ConflictKey = operation.ConflictKey;
             Priority = operation.Priority;
             Order = operation.Order;
@@ -469,6 +540,8 @@ public sealed class AkcssUtilityCandidateActivator
         {
             ApplicationOrder = applicationOrder;
             _operation = null;
+            _resetProperty = null;
+            _resetTargetType = null;
             _legacyApplication = legacyApplication ??
                 throw new ArgumentNullException(nameof(legacyApplication));
             ConflictKey = conflictKey;
@@ -484,16 +557,14 @@ public sealed class AkcssUtilityCandidateActivator
 
         public int Order { get; }
 
-        public bool IsActive(
-            object target,
-            IReadOnlyList<object?> arguments)
+        public bool SupportsHotReloadReconciliation => _resetProperty != null;
+
+        public bool IsActive(object target, IReadOnlyList<object?> arguments)
         {
             return _operation?.IsActive(target, arguments) ?? true;
         }
 
-        public void Execute(
-            object target,
-            IReadOnlyList<object?> arguments)
+        public void Execute(object target, IReadOnlyList<object?> arguments)
         {
             if (_operation != null)
             {
@@ -522,7 +593,17 @@ public sealed class AkcssUtilityCandidateActivator
         {
             if (_operation != null)
             {
-                _operation.Reset(target);
+                if (_resetProperty != null)
+                {
+                    if (_resetTargetType!.IsInstanceOfType(target))
+                    {
+                        _operation.Reset(target, _resetProperty);
+                    }
+                }
+                else
+                {
+                    _operation.Reset(target);
+                }
                 return;
             }
 
@@ -533,7 +614,7 @@ public sealed class AkcssUtilityCandidateActivator
     private sealed class CandidateObserver
         : IObserver<object?>
     {
-        private readonly AkcssUtilityCandidateActivator _owner;
+        private AkcssUtilityCandidateActivator? _owner;
 
         public CandidateObserver(
             AkcssUtilityCandidateActivator owner)
@@ -543,16 +624,21 @@ public sealed class AkcssUtilityCandidateActivator
 
         public void OnNext(object? value)
         {
-            _owner.OnChanged();
+            _owner?.OnChanged();
         }
 
         public void OnError(Exception error)
         {
-            ExceptionDispatchInfo.Capture(error).Throw();
+            if (_owner != null)
+            {
+                ExceptionDispatchInfo.Capture(error).Throw();
+            }
         }
 
         public void OnCompleted()
         {
         }
+
+        public void Deactivate() => _owner = null;
     }
 }

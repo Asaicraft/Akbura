@@ -356,6 +356,42 @@ public sealed partial class AkburaRenderState : IDisposable
     }
 
     /// <summary>
+    /// Reconciles lazy Debug activators accepted by the owned-operation revision guard.
+    /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    public void ReconcileAkcssStylesOperation(
+        int localId,
+        object target,
+        ImmutableArray<AkcssActivatorDescriptor> descriptors,
+        Func<int, AkcssStyleActivator> factory,
+        bool operationRegistered)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(factory);
+        var pendingRevision = GetMutablePendingRevision();
+        try
+        {
+            ValidatePropertyOwner(pendingRevision, localId, target);
+            var node = pendingRevision.Nodes[localId];
+            if (!operationRegistered)
+            {
+                node.RegisterOwnedOperationForReplacement(AkcssOperationSlot, AkcssOperationIdentity);
+            }
+            var previous = FindAppliedOperation(CreateSlotKey(pendingRevision, localId, AkcssOperationSlot))?.Resource as AkcssStylesOperation;
+            var resource = new ReconciledAkcssStylesOperation(target, descriptors, factory, previous);
+            var prior = node.SetOwnedOperationResource(AkcssOperationSlot, resource);
+            pendingRevision.TrackMutation(new AkcssReconciliationMutation(prior, resource));
+            resource.Apply();
+        }
+        catch (Exception failure)
+        {
+            AbortPendingRevisionAfterFailure(pendingRevision, failure);
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Applies an Avalonia binding previously accepted by
     /// <see cref="ShouldApplyOwnedOperation(int, string, string)"/>.
     /// </summary>
@@ -1323,6 +1359,15 @@ public sealed partial class AkburaRenderState : IDisposable
     {
         PrepareRevisionCompletion();
         var pendingRevision = GetPendingRevision();
+        try
+        {
+            pendingRevision.CommitMutations();
+        }
+        catch (Exception failure)
+        {
+            AbortPendingRevisionAfterFailure(pendingRevision, failure);
+            throw;
+        }
         CompleteConditionalRenderCaptureRevision(pendingRevision);
 
         _nodes = pendingRevision.Nodes;
@@ -2363,6 +2408,14 @@ public sealed partial class AkburaRenderState : IDisposable
             Mutations.Add(mutation);
         }
 
+        public void CommitMutations()
+        {
+            foreach (var mutation in Mutations)
+            {
+                mutation.Commit();
+            }
+        }
+
         public bool ContainsOperation(in RenderSlotKey key)
         {
             for (var index = 0; index < Nodes.Length; index++)
@@ -3293,6 +3346,11 @@ public sealed partial class AkburaRenderState : IDisposable
     {
         public bool IsApplied { get; private set; }
 
+        public void SetAppliedState(bool applied)
+        {
+            IsApplied = applied;
+        }
+
         public void Apply()
         {
             if (IsApplied)
@@ -3483,10 +3541,10 @@ public sealed partial class AkburaRenderState : IDisposable
         }
     }
 
-    private sealed class AkcssStylesOperation : RenderOperationResource
+    private class AkcssStylesOperation : RenderOperationResource
     {
-        private readonly object _target;
-        private readonly ImmutableArray<AkcssStyleActivator> _styles;
+        protected readonly object _target;
+        protected ImmutableArray<AkcssStyleActivator> _styles;
         private readonly bool _baselineWasSet;
         private readonly ImmutableArray<AkcssStyleActivator> _baselineStyles;
 
@@ -3546,6 +3604,10 @@ public sealed partial class AkburaRenderState : IDisposable
     private abstract class RenderRevisionMutation
     {
         public abstract void Rollback();
+
+        public virtual void Commit()
+        {
+        }
     }
 
     private sealed class RenderOperationMutation : RenderRevisionMutation
@@ -3600,8 +3662,7 @@ public sealed partial class AkburaRenderState : IDisposable
         }
     }
 
-    private sealed class RenderCollectionMutation<T> :
-        RenderRevisionMutation
+    private sealed class RenderCollectionMutation<T> : RenderRevisionMutation
     {
         private readonly IList<T> _collection;
         private readonly AkburaControl? _component;
@@ -3639,8 +3700,7 @@ public sealed partial class AkburaRenderState : IDisposable
         }
     }
 
-    private sealed class UntypedRenderCollectionMutation :
-        RenderRevisionMutation
+    private sealed class UntypedRenderCollectionMutation : RenderRevisionMutation
     {
         private readonly System.Collections.IList _collection;
         private readonly AkburaControl? _component;
@@ -3700,8 +3760,7 @@ public sealed partial class AkburaRenderState : IDisposable
         }
     }
 
-    private sealed class AvaloniaRenderPropertyMutation :
-        RenderRevisionMutation
+    private sealed class AvaloniaRenderPropertyMutation : RenderRevisionMutation
     {
         private readonly AvaloniaObject _target;
         private readonly AvaloniaProperty _property;

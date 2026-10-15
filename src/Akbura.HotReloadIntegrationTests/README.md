@@ -99,6 +99,28 @@ descriptors have initialized, without adding a field or a static constructor to
 the component. Descriptor rebuilds publish the new shape and manifest only after
 all descriptor and array assignments succeed.
 
+## AKCSS incremental reconciliation
+
+`AkcssIncrementalHotReloadTests` covers selective utility edits,
+addition/removal, conflict reordering, retained reactive variants, module-only
+updates, multi-property utilities, exposed shadowed winners, failed replacement,
+20 successive updates, mixed-cascade fallback, detached catch-up and duplicate
+declarations with changing module indexes. Tests count actual generated utility
+construction and Reset/Update/Apply calls, subscriptions and affected keys.
+An additional module-only regression migrates both properties of a utility and
+verifies resets use the captured original properties, not replaced CLR method bodies.
+Another retains compatible factories through structural local-ID movement and
+checks that detach/reattach does not invoke deleted lambdas.
+
+The optional fixture instrumentation only inserts counters into generated method
+bodies. The production generator, original assembly, CLR deltas and generated
+handlers still perform the actual updates. Syntax maps include named local
+factories and scoped lambdas. Destructive factory edits use the same Roslyn 4.11
+split-delta workaround as complete-cascade tests, with one handler dispatch per logical update.
+
+See [AKCSS incremental reconciliation](../../For%20Contributors/hot-reload.md#20-akcss-incremental-reconciliation)
+for eligibility, ownership boundaries, measurements and exact validation results.
+
 ## Harness and boundaries
 
 `AkburaCompilationSession` keeps the same incremental driver and replaces the

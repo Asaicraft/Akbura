@@ -36,6 +36,16 @@ public abstract class AkcssUtilityValueSource
 
     internal BindingPriority BindingPriority { get; private protected set; }
 
+    /// <summary>
+    /// Converts generated object values without a converter lambda that CLR edits can retire.
+    /// </summary>
+    public static TValue CastObject<TValue>(object? value) => (TValue)value!;
+
+    /// <summary>
+    /// Preserves generated typed observable values without a component-owned converter lambda.
+    /// </summary>
+    public static TValue Identity<TValue>(TValue value) => value;
+
     internal void Attach(object target, Action changed)
     {
         _changed = changed ?? throw new ArgumentNullException(nameof(changed));
@@ -55,10 +65,16 @@ public abstract class AkcssUtilityValueSource
 
     internal void Detach(object target)
     {
-        DetachCore(target);
-        HasValue = false;
-        Value = null;
-        _changed = null;
+        try
+        {
+            DetachCore(target);
+        }
+        finally
+        {
+            HasValue = false;
+            Value = null;
+            _changed = null;
+        }
     }
 
     private protected void SetValue(object? value)

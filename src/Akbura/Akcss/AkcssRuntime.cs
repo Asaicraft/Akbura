@@ -9,7 +9,7 @@ using System.Runtime.ExceptionServices;
 
 namespace Akbura.Akcss;
 
-internal static class AkcssRuntime
+internal static partial class AkcssRuntime
 {
     private static readonly ConditionalWeakTable<object, TargetRuntime> s_targets = new();
 
@@ -19,8 +19,12 @@ internal static class AkcssRuntime
     {
         ArgumentNullException.ThrowIfNull(target);
 
-        s_targets.GetValue(target, static value => new TargetRuntime(value))
-            .SetStyles(styles.IsDefault ? [] : styles);
+        var runtime = s_targets.GetValue(target, static value => new TargetRuntime(value));
+        if (runtime.IsReconcilingStyles)
+        {
+            throw new InvalidOperationException("An AKCSS cascade cannot be replaced during reconciliation.");
+        }
+        runtime.SetStyles(styles.IsDefault ? [] : styles);
     }
 
     public static ImmutableArray<AkcssStyleActivator> GetStyles(object target)
@@ -47,7 +51,7 @@ internal static class AkcssRuntime
             .RefreshForHotReload();
     }
 
-    private sealed class TargetRuntime : IObserver<object?>
+    private sealed partial class TargetRuntime : IObserver<object?>
     {
         private readonly object _target;
         private readonly List<IDisposable> _subscriptions = [];
@@ -73,6 +77,7 @@ internal static class AkcssRuntime
 
         public void SetStyles(ImmutableArray<AkcssStyleActivator> styles)
         {
+            _descriptors = default;
             _isChanging = true;
             _applyPending = false;
             try
@@ -163,7 +168,7 @@ internal static class AkcssRuntime
                     if (style is AkcssUtilityCandidateActivator candidate)
                     {
                         candidate.Refresh(_target);
-                        if (candidate.HasFrameCondition)
+                        if (candidate.RefreshFrameCondition())
                         {
                             RequestApplyCandidate(candidate);
                         }
@@ -273,6 +278,10 @@ internal static class AkcssRuntime
         private void RequestApplyCandidate(
             AkcssUtilityCandidateActivator candidate)
         {
+            if (!_styles.Contains(candidate))
+            {
+                return;
+            }
             if (_applyPending)
             {
                 return;
@@ -390,15 +399,14 @@ internal static class AkcssRuntime
             return result;
         }
 
-        private UtilityOperationWinner? ResolveUtilityWinner(
-            string conflictKey)
+        private UtilityOperationWinner? ResolveUtilityWinner(string conflictKey)
         {
             var contenders = new List<UtilityOperationWinner>();
             AkcssOperationPriority? highestPriority = null;
 
-            foreach (var style in _styles)
+            for (var styleIndex = 0; styleIndex < _styles.Length; styleIndex++)
             {
-                if (style is not
+                if (_styles[styleIndex] is not
                     AkcssUtilityCandidateActivator candidate)
                 {
                     continue;
@@ -434,7 +442,8 @@ internal static class AkcssRuntime
                         contenders.Add(
                             new UtilityOperationWinner(
                                 candidate,
-                                operationIndex));
+                                operationIndex,
+                                _descriptors.IsDefault ? candidate.SourceOrder : styleIndex));
                     }
                 }
             }
@@ -539,11 +548,9 @@ internal static class AkcssRuntime
             UtilityOperationWinner left,
             UtilityOperationWinner right)
         {
-            if (left.Candidate.SourceOrder !=
-                right.Candidate.SourceOrder)
+            if (left.SourceOrder != right.SourceOrder)
             {
-                return left.Candidate.SourceOrder >
-                    right.Candidate.SourceOrder;
+                return left.SourceOrder > right.SourceOrder;
             }
 
             var leftApplication =
@@ -601,19 +608,21 @@ internal static class AkcssRuntime
         {
             public UtilityOperationWinner(
                 AkcssUtilityCandidateActivator candidate,
-                int operationIndex)
+                int operationIndex,
+                int sourceOrder = 0)
             {
                 Candidate = candidate;
                 OperationIndex = operationIndex;
+                SourceOrder = sourceOrder;
             }
 
             public AkcssUtilityCandidateActivator Candidate { get; }
 
             public int OperationIndex { get; }
 
-            public bool Is(
-                AkcssUtilityCandidateActivator candidate,
-                int operationIndex)
+            public int SourceOrder { get; }
+
+            public bool Is(AkcssUtilityCandidateActivator candidate, int operationIndex)
             {
                 return ReferenceEquals(Candidate, candidate) &&
                     OperationIndex == operationIndex;

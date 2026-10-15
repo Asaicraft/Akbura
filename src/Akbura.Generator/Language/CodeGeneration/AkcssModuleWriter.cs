@@ -12,15 +12,12 @@ namespace Akbura.Language.CodeGeneration;
 /// </summary>
 internal readonly ref struct AkcssModuleWriter
 {
-    internal const string DebugStyleAccessorName =
-        "__AkburaGetStyle";
+    internal const string DebugStyleAccessorName = "__AkburaGetStyle";
     internal const string DebugStyleRevisionName = "__AkburaStyleRevision";
 
-    private const string RuntimeStyleType =
-        "global::Akbura.Akcss.AkcssStyle";
+    private const string RuntimeStyleType = "global::Akbura.Akcss.AkcssStyle";
 
-    private const string AkcssModuleReferenceAttribute =
-        "global::Akbura.CompilerAnotations.AkcssModuleReferenceAttribute";
+    private const string AkcssModuleReferenceAttribute = "global::Akbura.CompilerAnotations.AkcssModuleReferenceAttribute";
 
     private readonly CodeWriter _writer;
     private readonly CSharpValueWriter _valueWriter;
@@ -30,7 +27,7 @@ internal readonly ref struct AkcssModuleWriter
     private readonly AkcssUtilityWriter _utilityWriter;
     private readonly AkcssGenerationSourceMap _sourceMap;
 
-    public AkcssModuleWriter(CodeWriter writer, AkcssGenerationSourceMap sourceMap)
+    public AkcssModuleWriter(CodeWriter writer, AkcssGenerationSourceMap sourceMap, bool hotReload = false)
     {
         AkburaDebug.Assert(writer != null);
         AkburaDebug.Assert(sourceMap != null);
@@ -40,7 +37,7 @@ internal readonly ref struct AkcssModuleWriter
         _metadataWriter = new AkcssDeclarationMetadataWriter(_writer);
         _operationMetadataWriter = new AkcssOperationMetadataWriter(_writer, sourceMap);
         _styleWriter = new AkcssStyleWriter(_writer, sourceMap);
-        _utilityWriter = new AkcssUtilityWriter(_writer, sourceMap);
+        _utilityWriter = new AkcssUtilityWriter(_writer, sourceMap, hotReload);
         _sourceMap = sourceMap;
     }
 

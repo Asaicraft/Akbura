@@ -204,14 +204,13 @@ public abstract partial class AkburaControl : Control, IComponentTree
         return styles;
     }
 
-    private static void OnAkcssStylesChanged(
-        Control control,
-        AvaloniaPropertyChangedEventArgs args)
+    private static void OnAkcssStylesChanged(Control control, AvaloniaPropertyChangedEventArgs args)
     {
         var styles = args.NewValue is ImmutableArray<AkcssStyleActivator> value
             ? value
             : ImmutableArray<AkcssStyleActivator>.Empty;
-        AkcssRuntime.SetStyles(control, styles);
+
+        AkcssRuntime.SetStylesFromProperty(control, styles);
     }
 
     private readonly AkburaEngine _engine;

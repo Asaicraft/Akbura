@@ -59,8 +59,11 @@ internal sealed class ClrHotReloadSession : IDisposable
         var removedLambdas = edits.Where(edit =>
             edit.Kind == SemanticEditKind.Update && edit.OldSymbol is IMethodSymbol &&
             edit.NewSymbol is IMethodSymbol &&
-            Syntax(edit.OldSymbol).DescendantNodes().OfType<LambdaExpressionSyntax>().Count() >
-            Syntax(edit.NewSymbol).DescendantNodes().OfType<LambdaExpressionSyntax>().Count()).ToArray();
+            (Syntax(edit.OldSymbol).DescendantNodes().OfType<LambdaExpressionSyntax>().Count() >
+            Syntax(edit.NewSymbol).DescendantNodes().OfType<LambdaExpressionSyntax>().Count() ||
+            Syntax(edit.OldSymbol).DescendantNodes().OfType<LocalFunctionStatementSyntax>().Any(function =>
+                !Syntax(edit.NewSymbol).DescendantNodes().OfType<LocalFunctionStatementSyntax>()
+                    .Any(current => current.Identifier.ValueText == function.Identifier.ValueText)))).ToArray();
         if (_includeAkcssTypes && removedLambdas.Length > 1)
         {
             // Roslyn emits duplicate deleted-lambda rows when the same generated
@@ -326,23 +329,32 @@ internal sealed class ClrHotReloadSession : IDisposable
     private static Func<SyntaxNode, SyntaxNode?> CreateSyntaxMap(SyntaxNode oldSyntax, SyntaxNode newSyntax)
     {
         var map = new Dictionary<SyntaxNode, SyntaxNode> { [newSyntax] = oldSyntax };
-        Map<VariableDeclaratorSyntax>(node => node.Identifier.ValueText);
-        Map<ParameterSyntax>(node => node.Identifier.ValueText);
-        Map<LambdaExpressionSyntax>(node => node switch
+        Map<LocalFunctionStatementSyntax>(node => node.Identifier.ValueText);
+        Map<VariableDeclaratorSyntax>(node => Scope(node) + node.Identifier.ValueText);
+        Map<ParameterSyntax>(node => Scope(node) + node.Identifier.ValueText);
+        Map<LambdaExpressionSyntax>(node => Scope(node) + (node switch
         {
             SimpleLambdaExpressionSyntax simple => simple.Parameter.Identifier.ValueText,
             ParenthesizedLambdaExpressionSyntax parenthesized => string.Join(",",
                 parenthesized.ParameterList.Parameters.Select(parameter => parameter.Identifier.ValueText)),
             _ => throw new InvalidOperationException(),
-        });
+        }));
         foreach (var (current, previous) in map.ToArray())
         {
             if (current is LambdaExpressionSyntax currentLambda && previous is LambdaExpressionSyntax previousLambda)
             {
                 map[currentLambda.Body] = previousLambda.Body;
             }
+            if (current is LocalFunctionStatementSyntax { Body: { } currentBody } &&
+                previous is LocalFunctionStatementSyntax { Body: { } previousBody })
+            {
+                map[currentBody] = previousBody;
+            }
         }
         return node => map.GetValueOrDefault(node);
+
+        static string Scope(SyntaxNode node) => string.Join("/", node.Ancestors().OfType<LocalFunctionStatementSyntax>()
+            .Select(function => function.Identifier.ValueText)) + ":";
 
         void Map<T>(Func<T, string> key) where T : SyntaxNode
         {

@@ -11,7 +11,9 @@ internal readonly ref partial struct ComponentScopeWriter
         }
 
         _writer.Write("var ").Write(name).Write(" = ")
-            .Write(ComponentStructuralHotReloadWriter.RenderStateFieldName).WriteLine(".GetLocalNameScope(null);");
+            .Write(ComponentStructuralHotReloadWriter.RenderStateFieldName).Write(".GetLocalNameScope(null, ");
+        WriteNameScopeRegistrations(plan, scope, null);
+        _writer.WriteLine(");");
         WriteNativeNameScopeContents(plan, scope, name, parentNameScope: null);
         return context.WithNameScope(name);
     }
@@ -30,45 +32,11 @@ internal readonly ref partial struct ComponentScopeWriter
             }
         }
 
-        var hasComponentNames = false;
         foreach (var reference in plan.ElementReferences)
         {
             if (reference.IsClassMember && reference.IsComponentRuntimeStorage)
             {
-                hasComponentNames = true;
-                break;
-            }
-        }
-        if (!hasComponentNames)
-        {
-            return false;
-        }
-
-        foreach (var element in plan.Elements)
-        {
-            if (!element.UsesRuntimeStorage || element.RuntimeStorageRootScopeId <= 0)
-            {
-                continue;
-            }
-            for (var i = 0; i < element.PropertyWrites.Length; i++)
-            {
-                ref readonly var property = ref plan.PropertyWrites.ItemRef(element.PropertyWrites.Start + i);
-                if (property.ValueKind != ComponentPropertyValueKind.MarkupBinding)
-                {
-                    continue;
-                }
-                ref readonly var binding = ref plan.Bindings.ItemRef(property.PayloadIndex);
-                if (binding.SourceExpression != null)
-                {
-                    continue;
-                }
-                foreach (var extensionProperty in binding.Extension.Properties)
-                {
-                    if (extensionProperty.Name == "ElementName")
-                    {
-                        return true;
-                    }
-                }
+                return true;
             }
         }
         return false;
@@ -83,7 +51,9 @@ internal readonly ref partial struct ComponentScopeWriter
         _writer.Write("var ").Write(name).Write(" = ")
             .Write(ComponentStructuralHotReloadWriter.RenderStateFieldName)
             .Write(".GetConditionalNameScope(").WriteIntegerLiteral(runtimeId).Write(", ")
-            .WriteIntegerLiteral(branchId).Write(", ").Write(context.NameScopeExpression ?? "null").WriteLine(");");
+            .WriteIntegerLiteral(branchId).Write(", ").Write(context.NameScopeExpression ?? "null").Write(", ");
+        WriteNameScopeRegistrations(plan, scope, context.NameScopeExpression);
+        _writer.WriteLine(");");
         WriteNativeNameScopeContents(plan, scope, name, context.NameScopeExpression);
         return name;
     }
@@ -95,8 +65,55 @@ internal readonly ref partial struct ComponentScopeWriter
         _writer.WriteLine("__parentRenderState.GetNameScopeForNode(__parentOwner) ??");
         _writer.WriteLine("__services?.GetService(typeof(global::Avalonia.Controls.INameScope)) as global::Avalonia.Controls.INameScope ?? __nameScope;");
         _writer.CurrentIndent -= _writer.TabSize;
-        _writer.WriteLine("var __localNameScope = __akburaRenderState.GetLocalNameScope(__localParentNameScope);");
+        _writer.Write("var __localNameScope = __akburaRenderState.GetLocalNameScope(__localParentNameScope, ");
+        WriteNameScopeRegistrations(plan, scope, "__localParentNameScope");
+        _writer.WriteLine(");");
         WriteNativeNameScopeContents(plan, scope, "__localNameScope", "__localParentNameScope");
+    }
+
+    private void WriteNameScopeRegistrations(in ComponentPlan plan, in ComponentScopePlan scope, string? parentNameScope)
+    {
+        _writer.WriteLine("[");
+        _writer.CurrentIndent += _writer.TabSize;
+        for (var ancestorId = scope.Id; ancestorId >= 0; ancestorId = plan.Scopes.ItemRef(ancestorId).ParentScopeId)
+        {
+            ref readonly var ancestor = ref plan.Scopes.ItemRef(ancestorId);
+            for (var i = 0; i < ancestor.Elements.Length; i++)
+            {
+                ref readonly var element = ref plan.Elements.ItemRef(GetScopeElementId(plan, ancestor, i));
+                if (ancestorId == scope.Id ? !element.UsesRuntimeStorage : parentNameScope == null &&
+                    (!element.UsesRuntimeStorage || scope.OwnerElementId < 0 ||
+                        element.RuntimeStorageRootScopeId != plan.Elements.ItemRef(scope.OwnerElementId).RuntimeStorageRootScopeId))
+                {
+                    continue;
+                }
+                for (var actionIndex = 0; actionIndex < element.FirstUpdateActions.Length; actionIndex++)
+                {
+                    ref readonly var action = ref plan.FirstUpdateActions.ItemRef(element.FirstUpdateActions.Start + actionIndex);
+                    if (action.Kind != ComponentFirstUpdateActionKind.NameAssignment)
+                    {
+                        continue;
+                    }
+                    ref readonly var assignment = ref plan.NameAssignments.ItemRef(action.Index);
+                    _writer.Write("(").WriteStringLiteral(assignment.Name).Write(", ");
+                    if (ancestorId != scope.Id && parentNameScope != null)
+                    {
+                        _writer.Write(parentNameScope).Write(".Find(").WriteStringLiteral(assignment.Name).Write(")");
+                    }
+                    else
+                    {
+                        _writer.Write(element.Identifier);
+                    }
+                    _writer.WriteLine("),");
+                }
+            }
+            if (ancestorId == 0)
+            {
+                break;
+            }
+        }
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.Write("]");
     }
 
     private void WriteNativeNameScopeContents(in ComponentPlan plan, in ComponentScopePlan scope, string name,
@@ -126,19 +143,21 @@ internal readonly ref partial struct ComponentScopeWriter
                     .Write(", ").Write(element.Identifier).WriteLine(");");
             }
 
-            if (element.IsControl && IsNativeNameScopeRoot(plan, scope, element))
-            {
-                _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName)
-                    .Write(".ReconcileConditionalAvaloniaValue(").WriteIntegerLiteral(element.RuntimeStorageId)
-                    .Write(", \"$conditional-name-scope\", ").Write(element.Identifier)
-                    .Write(", global::Avalonia.Controls.NameScope.NameScopeProperty, \"lexical-branch\", ")
-                    .Write(name).WriteLine(");");
-            }
         }
         WriteNativeAncestorNames(plan, scope, name, parentNameScope);
         _writer.Write(name).WriteLine(".Complete();");
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");
+        for (var i = 0; i < scope.Elements.Length; i++)
+        {
+            ref readonly var element = ref plan.Elements.ItemRef(GetScopeElementId(plan, scope, i));
+            if (element.UsesRuntimeStorage && element.IsControl && IsNativeNameScopeRoot(plan, scope, element))
+            {
+                _writer.Write(ComponentStructuralHotReloadWriter.RenderStateFieldName)
+                    .Write(".ReconcileNameScope(").WriteIntegerLiteral(element.RuntimeStorageId)
+                    .Write(", ").Write(element.Identifier).Write(", ").Write(name).WriteLine(");");
+            }
+        }
     }
 
     private void WriteNativeAncestorNames(in ComponentPlan plan, in ComponentScopePlan scope, string name,

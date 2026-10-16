@@ -23,12 +23,13 @@ internal sealed class AkburaCompilationSession
         string componentSource,
         string ownerSource,
         IReadOnlyDictionary<string, string>? stylesheetSources = null,
-        bool instrumentAkcss = false)
+        bool instrumentAkcss = false,
+        bool debug = true)
     {
         _instrumentAkcss = instrumentAkcss;
         var projectDirectory = Path.Combine(Path.GetTempPath(), "AkburaClrHotReload", Guid.NewGuid().ToString("N"));
         var options = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview)
-            .WithPreprocessorSymbols("DEBUG");
+            .WithPreprocessorSymbols(debug ? new[] { "DEBUG" } : Array.Empty<string>());
         _baseCompilation = CSharpCompilation.Create("AkburaClrHotReload_" + Guid.NewGuid().ToString("N"),
             [CSharpSyntaxTree.ParseText(SourceText.From(ownerSource, Encoding.UTF8), options,
                 Path.Combine(projectDirectory, "Counter.akbura.cs"))],

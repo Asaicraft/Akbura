@@ -41,6 +41,7 @@ Diagrams use Mermaid and are embedded directly in this Markdown file. GitHub can
 - [22. AKCSS update batching and indexed conflict resolution](#22-akcss-update-batching-and-indexed-conflict-resolution)
 - [23. BlackSilence document dependencies and reload latency](#23-blacksilence-document-dependencies-and-reload-latency)
 - [24. C# semantic probes and compilation latency](#24-c-semantic-probes-and-compilation-latency)
+- [25. Immutable element names](#25-immutable-element-names)
 
 ## 1. The two layers of Hot Reload
 
@@ -2330,6 +2331,97 @@ The implementation changes only these files:
 | `For Contributors/hot-reload.md` | This design, validation and measurement record. |
 
 The dependency graph, manifest builder/task, Avalonia runtime reconciliation, language syntax and unrelated `StyledElement.Name` behavior are unchanged. All added/modified source files use CRLF and multiline XML summaries; changed C# files were syntax-scanned with both `STATS` and `DEBUG` enabled to verify braces for every `if`, `for` and `foreach` body.
+
+## 25. Immutable element names
+
+This correction was developed on `feature/improve-hot-reload`, based on `8a126abaf5ce32f66017e7afdca5340065e2993a`. It changes name initialization and lexical scope ownership, not the dependency graph, C# probe binder or manifest generator.
+
+### Initialization versus reconciliation
+
+Avalonia 12.0.4's [StyledElement.Name setter](https://github.com/AvaloniaUI/Avalonia/blob/12.0.4/src/Avalonia.Base/StyledElement.cs#L146-L158) rejects **every** assignment after styling, even assigning the same string. A name comparison or swallowing the exception is therefore not a lifecycle strategy.
+
+The preserved Purity generator output showed the precise failure in `Sidebar.__AkburaHotReloadUpdateInitialValues`: runtime node 9 was a `NavButton`, and its `x.Name="dashboard"` action was guarded by `IsNew(9) || ShouldApplyInitialValues(9)`. Editing its ordinary `Text` parameter changed its syntax identity, so the retained, already styled button received another `Name` assignment. `Sidebar.Update` called that helper during the normal metadata-handler refresh.
+
+Structural name actions now use **only `IsNew(localId)`** during source reconciliation. Ordinary property initialization/reconciliation still uses its existing declaration and value rules. First construction retains the original ordered assignment pipeline, before `EndInit` and styling. The same distinction applies to DebugStructural and ReleaseConditional, including conditional, local-template and foreach-owned render stores. ReleaseDirect's ordered direct initialization is unchanged. No generated instance fields or static-initializer replay were introduced.
+
+No extra node compatibility key is necessary for `x.Name`: it already supplies `AkburaRenderNodeDefinition.ExplicitKey`. Explicit matching requires the same key and exact type, and the fallback passes never reuse a keyed node as an unkeyed node. Consequently, changing, adding or removing that declaration creates a new incompatible node. Its descendants follow the new parent's runtime identity, while compatible parents and siblings remain retained. Current generated named accessors resolve through the current render store; old resources retire through existing operation ownership.
+
+This contract concerns markup name declarations (`x.Name`), not an API for dynamically renaming already styled objects through user C#, a `Name` binding, or arbitrary external setters. Such in-place mutations remain subject to Avalonia's restriction. NameScope registration is a separate operation from CLR Name assignment.
+
+### Scope identity and rollback
+
+Generated component and local/conditional scopes supply the exact ordered `(name, instance)` registration candidates and parent scope to new render-state overloads. The runtime compares strings ordinally and targets/parents by reference. An unchanged map returns the same completed native NameScope: no new Register/Complete calls are made. A changed map uses a separate candidate lookup. Ancestor entries preserve the existing lexical shadowing and fallback rules; template instances retain independent storage and lookup objects.
+
+Every structural component with component-level named references now exposes its native scope on its root. `ReconcileNameScope` attaches it through existing owned-property machinery, once per pending revision, even when both source initialization and Update visit it. A newly replaced unnamed root also receives a retained compatible lookup. Repeated attempts with different roots/scopes in one pending slot are rejected rather than silently overwriting ownership.
+
+The transaction records scopes actually visited, so a reused base scope survives commit without pretending it was newly allocated. Replacement scopes and root attachments participate in existing rollback. Aborting after preparation restores the previous collection, lookup and attached scope; no illegal attempt is made to restore an old control's Name. Retired scope holders release candidate entries and parent references. This is render-transaction recovery, not rollback of CLR metadata.
+
+Foreach retains its existing transaction-local lookup lifetime per source occurrence. Its evolving multi-root registrations are not merged into a component-global scope. Retained foreach controls still use new-node-only Name initialization, and names from different occurrences remain isolated.
+
+Conditional source refresh also skips inactive placeholder nodes when acquiring existing AKCSS update leases. Those nodes deliberately have no instance; passing their null placeholder to the weak-table lookup previously prevented the conditional regression from reaching name reconciliation. No AKCSS contribution or scheduling semantics were changed.
+
+### Regression coverage
+
+`NameReconciliationTests` covers generated initialization guards, ReleaseDirect output, source syntax changes with retained nodes, name changes/addition/removal, unchanged scopes, exact instance/parent identity, idempotent scope attachment, replacement unnamed roots, and abort/retry after collection and scope preparation.
+
+`NameHotReloadTests` uses the production generator, Portable PDB baseline, actual `EmitDifference` deltas, `MetadataUpdater.ApplyUpdate`, and an Avalonia Headless window. Debug cases dispatch the actual generated metadata handlers. ReleaseConditional intentionally has no Debug metadata-handler attribute, so its test applies a real delta and requests the ordinary render path explicitly.
+
+A tracked TextBlock counts generated Name setter calls and delegates to Avalonia's real setter. The first regression was red on the base implementation with the reported styled-element exception (`Before/names-before.trx`); the new-node-only guard made its twenty updates pass. Further cases cover exact Dashboard → Dashboard Overview edits, multiple changed ordinary attributes, retained owner/state/control/siblings, live native ElementName observers, rename → ordinary edit → removal → addition, retired event callbacks, conditional branch exit/re-entry, two independent local templates, and two named foreach occurrences. Checking only final Name strings would not establish this result.
+
+The CLR harness now maps retained method-body blocks as well as declarations/lambda/local-function bodies. That is required to preserve existing template closure identities while updating their bodies; without the block mapping the fixture kept executing old template literals. It follows the already established syntax-map pattern in the unit-suite CLR template smoke tests.
+
+Validation records and temporary Purity files are under ignored `bin/NameHotReloadVerification` and `bin/HotReloadTimingProbe`. The original `D:/Repos/ForVidos/PurityUIDashborad` was not edited. The attempted real Sidebar watch run applied its delta and passed the former Name failure, but then failed on a separate duplicate `property:ToggleSidebar` reconciliation. It did **not** demonstrate a successful live Sidebar text update; see `purity-sidebar-watch.log`. No successful Purity outcome is claimed for that run.
+
+The initial two new files contain 15 cases, including parameterized unit rows. The broad Debug render/template/foreach selection passed 288/288 before the final extra scope-attachment case. Final focused selections then passed 25/25 in Debug and 25/25 in Release, including that case. The full CLR integration project passed 54/54 after the method-body syntax-map correction; all six new CLR cases were repeated successfully on that implementation, including twenty exact-name-preserving updates with a retained ordinary State value. Three existing conditional CLR smoke tests also passed. The subsequent command correction and its additional checks are recorded below. These are explicit selections and one complete integration project, not a claim that the whole repository suite was executed. Existing Furioso nullable and QuotedResourceRegressionTests analyzer warnings were unchanged.
+
+Executed validation commands:
+
+```powershell
+dotnet test src/Akbura.HotReloadIntegrationTests/Akbura.HotReloadIntegrationTests.csproj -c Debug --no-restore --filter FullyQualifiedName~NameHotReloadTests --logger 'trx;LogFileName=names-before.trx' --results-directory bin/NameHotReloadVerification/Before --nologo -v:q
+
+$nameFilter = 'FullyQualifiedName~NameReconciliationTests|FullyQualifiedName~AkburaRenderStateTests|FullyQualifiedName~ConditionalNameScopeTests|FullyQualifiedName~RetainedFactoryNameScopeTests|FullyQualifiedName~ComponentFirstUpdateActionTests|FullyQualifiedName~ConditionalTemplateWriterTests|FullyQualifiedName~ComponentStructuralHotReload|FullyQualifiedName~MarkupForeach'
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c Debug --no-restore -p:BuildProjectReferences=false --filter $nameFilter --logger 'trx;LogFileName=names-regression-debug.trx' --results-directory bin/NameHotReloadVerification/Debug --nologo -v:q
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c Release --no-restore --filter 'FullyQualifiedName~NameReconciliationTests|FullyQualifiedName~ConditionalNameScopeTests|FullyQualifiedName~RetainedFactoryNameScopeTests|FullyQualifiedName~ComponentFirstUpdateActionTests' --logger 'trx;LogFileName=names-unit-release.trx' --results-directory bin/NameHotReloadVerification/Release --nologo -v:q
+dotnet test src/Akbura.HotReloadIntegrationTests/Akbura.HotReloadIntegrationTests.csproj -c Debug --no-restore -p:BuildProjectReferences=false --logger 'trx;LogFileName=names-clr-regression.trx' --results-directory bin/NameHotReloadVerification/ClrRegression --nologo -v:q
+
+$nameFinalFilter = 'FullyQualifiedName~NameReconciliationTests|FullyQualifiedName~ConditionalNameScopeTests|FullyQualifiedName~RetainedFactoryNameScopeTests|FullyQualifiedName~ComponentFirstUpdateActionTests'
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c Debug --no-restore --filter $nameFinalFilter --logger 'trx;LogFileName=names-final-debug.trx' --results-directory bin/NameHotReloadVerification/FinalDebug --nologo -v:q
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c Release --no-restore --filter $nameFinalFilter --logger 'trx;LogFileName=names-final-release.trx' --results-directory bin/NameHotReloadVerification/FinalRelease --nologo -v:q
+dotnet test src/Akbura.HotReloadIntegrationTests/Akbura.HotReloadIntegrationTests.csproj -c Debug --no-restore --filter FullyQualifiedName~NameHotReloadTests --logger 'trx;LogFileName=names-final-clr.trx' --results-directory bin/NameHotReloadVerification/FinalClr --nologo -v:q
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c Debug --no-build --no-restore --filter FullyQualifiedName~ConditionalClrHotReloadSmokeTests --logger 'trx;LogFileName=names-existing-clr-smokes.trx' --results-directory bin/NameHotReloadVerification/ExistingClr --nologo -v:q
+
+dotnet build src/Akbura.Diagnostics/Akbura.Diagnostics.csproj -c Debug --no-restore --no-incremental --nologo -v:q
+dotnet build bin/HotReloadTimingProbe/HotReloadTimingProbe.csproj --no-restore --nologo -v:q
+$env:TimingAnalyzerDirectory = Join-Path (Get-Location) 'src/Akbura.BlackSilence/bin/Debug/netstandard2.0'
+dotnet build bin/HotReloadTimingProbe/Purity/TimingHost/TimingHost.csproj --no-restore --no-incremental --nologo -v:q
+dotnet bin/HotReloadTimingProbe/bin/Debug/net10.0/HotReloadTimingProbe.dll watch bin/HotReloadTimingProbe/Purity/TimingHost/TimingHost.csproj bin/HotReloadTimingProbe/Purity/PurityUIDashborad/Components/Sidebar.akbura
+```
+
+### Fresh command closures within a revision
+
+The first real Purity attempt reached a second, independent lifecycle error after passing name initialization: `property:ToggleSidebar` was reconciled twice. A component-level command referencing a captured render local function was assigned by structural revision initialization, then assigned again by `WriteRefreshCallbackClosures` before the same revision completed. The runtime correctly rejected the duplicate slot. In single-pass conditional generation, this could also fail during the initial frame, without any metadata update.
+
+`ComponentLifecycleWriter` now supplies the current revision-changed flag to the callback writer. For structurally owned component-level commands, the callback pass runs only when revision initialization has not already reconciled the command. Initial source-order assignment remains in place; ordinary frames still refresh captured values. Conditional/local commands continue using their existing scope-local callback path, and ReleaseDirect behavior is unchanged. The runtime's duplicate-slot validation was not relaxed.
+
+Revision initialization also uses desired-value comparison for commands marked `RefreshClosure`. Comparing only binding syntax would retain an old callback even if the same `ToggleSidebar={ToggleSidebar}` expression now captures different render-local values. Thus the source pass publishes one fresh callback, rather than either duplicating the slot or retaining stale captures.
+
+`CommandClosureHotReloadTests` adds three actual CLR cases: ordinary DebugStructural, single-pass DebugStructural, and ReleaseConditional. All three reproduced the duplicate-slot exception before this correction. Each applies three real deltas and verifies both ordinary-frame refresh and an input change immediately before a delta, with no intervening render. After the correction they passed 3/3; the combined new name/command selection passed 9/9. The focused command/name unit selection then passed 109/109 in Debug and 109/109 in Release. There are now 18 added regression cases across the three new files. All 12 added/modified files were verified as CRLF-terminated; the eleven C# files were syntax-scanned for braced if/for/foreach bodies, and `git diff --check` passed.
+
+The repeated real Sidebar watch run succeeded for all six updates, starting with the exact `Dashboard` → `Dashboard Overview` edit and continuing through `Dashboard 7`. Every observation kept PID 19824, the same Sidebar owner, the same `dashboard` NavButton, and the same existing TextBlock (identity hash 47314927). There were six applied metadata batches, no restart and no Name/duplicate-slot exceptions. At a 1,100-pixel viewport the probe executed the actual `ToggleSidebar` command twice after every observed value: the live `isExpanded` value changed and returned, and the observed AKCSS foreground value was preserved. `purity-sidebar-watch-fixed.log` contains this evidence; the earlier failed log remains a record of the blocker, not the final outcome. The copied markup was restored in the harness's finally block and the original application remained unmodified. This is headless property/state verification, not screen-presentation or performance benchmarking.
+
+Additional validation commands:
+
+```powershell
+dotnet test src/Akbura.HotReloadIntegrationTests/Akbura.HotReloadIntegrationTests.csproj -c Debug --no-restore -p:BuildProjectReferences=false --filter FullyQualifiedName~CommandClosureHotReloadTests --logger 'trx;LogFileName=commands-before.trx' --results-directory bin/NameHotReloadVerification/CommandsBefore --nologo -v:q
+dotnet test src/Akbura.HotReloadIntegrationTests/Akbura.HotReloadIntegrationTests.csproj -c Debug --no-restore --filter FullyQualifiedName~CommandClosureHotReloadTests --logger 'trx;LogFileName=commands-after.trx' --results-directory bin/NameHotReloadVerification/CommandsAfter --nologo -v:q
+dotnet test src/Akbura.HotReloadIntegrationTests/Akbura.HotReloadIntegrationTests.csproj -c Debug --no-build --no-restore --filter 'FullyQualifiedName~CommandClosureHotReloadTests|FullyQualifiedName~NameHotReloadTests' --logger 'trx;LogFileName=commands-and-names.trx' --results-directory bin/NameHotReloadVerification/CommandsAndNames --nologo -v:q
+
+$commandFilter = 'FullyQualifiedName~ComponentFirstUpdateActionTests|FullyQualifiedName~MarkupCommandBindingRuntimeTests|FullyQualifiedName~MarkupConditionalCommandCaptureTests|FullyQualifiedName~ICommandHandlerBindingTests|FullyQualifiedName~NameReconciliationTests'
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c Debug --no-restore -p:BuildProjectReferences=false --filter $commandFilter --logger 'trx;LogFileName=commands-unit-debug.trx' --results-directory bin/NameHotReloadVerification/CommandsUnitDebug --nologo -v:q
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c Release --no-restore --filter $commandFilter --logger 'trx;LogFileName=commands-unit-release.trx' --results-directory bin/NameHotReloadVerification/CommandsUnitRelease --nologo -v:q
+```
+
+Changed implementation files: `ComponentScopeWriter.Assignments.cs`, `ComponentScopeWriter.NameScopes.cs`, `ComponentScopeWriter.cs`, `ComponentLifecycleWriter.cs`, `AkburaRenderState.NameScopes.cs`, and the inactive-node guard in `AkburaRenderState.cs`. Test infrastructure changes are in `AkburaCompilationSession.cs` (generation-mode option) and `ClrHotReloadSession.cs` (method-body mapping). Regression cases are in `NameReconciliationTests.cs`, `NameHotReloadTests.cs` and `CommandClosureHotReloadTests.cs`; this guide contains the design and evidence record.
 
 <!-- Source references: implementation snapshot inspected for this guide. -->
 [baseline]: https://github.com/Asaicraft/Akbura/commit/959ae1590cce507bab17893da8284df69887120b

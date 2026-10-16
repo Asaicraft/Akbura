@@ -8,9 +8,43 @@ public sealed partial class AkburaRenderState
     private Dictionary<long, ConditionalNameScope>? _conditionalNameScopes;
 
     /// <summary>
+    /// Attaches a lexical scope once per pending revision, including retained scopes on new roots.
+    /// </summary>
+    public void ReconcileNameScope(int localId, Control target, INameScope scope)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(scope);
+        const string slot = "$conditional-name-scope";
+        if (_pendingRevision is { } pending &&
+            pending.Properties.TryGetValue(new RenderSlotKey(GetNodeId(localId), slot), out var applied))
+        {
+            if (ReferenceEquals(applied.DesiredValue, scope) && ReferenceEquals(pending.Nodes[localId].Instance, target))
+            {
+                return;
+            }
+            throw new InvalidOperationException("A render root cannot attach different lexical scopes in one revision.");
+        }
+        ReconcileConditionalAvaloniaValue(localId, slot, target, NameScope.NameScopeProperty, "lexical-branch", scope);
+    }
+
+    /// <summary>
     /// Gets the native name scope owned by the selected lexical branch.
     /// </summary>
     public INameScope GetConditionalNameScope(int regionId, int branchId, INameScope? parent)
+    {
+        return GetConditionalNameScopeCore(GetConditionalNameScopeIdentity(regionId, branchId), parent);
+    }
+
+    /// <summary>
+    /// Reuses a completed lexical scope only while its registrations and parent remain unchanged.
+    /// </summary>
+    public INameScope GetConditionalNameScope(int regionId, int branchId, INameScope? parent,
+        ReadOnlySpan<(string Name, object? Element)> names)
+    {
+        return GetConditionalNameScopeCore(GetConditionalNameScopeIdentity(regionId, branchId), parent, names, true);
+    }
+
+    private long GetConditionalNameScopeIdentity(int regionId, int branchId)
     {
         var regions = _pendingRevision?.ConditionalRegions ?? _conditionalRegions;
         ValidateLocalId(regionId, regions.Length);
@@ -22,7 +56,7 @@ public sealed partial class AkburaRenderState
             throw new InvalidOperationException("An inactive branch cannot create a name scope.");
         }
 
-        return GetConditionalNameScopeCore(key, parent);
+        return key;
     }
 
     /// <summary>
@@ -31,6 +65,14 @@ public sealed partial class AkburaRenderState
     public INameScope GetLocalNameScope(INameScope? parent)
     {
         return GetConditionalNameScopeCore(0, parent);
+    }
+
+    /// <summary>
+    /// Reuses the storage-local scope when the desired registrations and parent are unchanged.
+    /// </summary>
+    public INameScope GetLocalNameScope(INameScope? parent, ReadOnlySpan<(string Name, object? Element)> names)
+    {
+        return GetConditionalNameScopeCore(0, parent, names, true);
     }
 
     /// <summary>
@@ -98,19 +140,26 @@ public sealed partial class AkburaRenderState
         return null;
     }
 
-    private INameScope GetConditionalNameScopeCore(long key, INameScope? parent)
+    private INameScope GetConditionalNameScopeCore(long key, INameScope? parent,
+        ReadOnlySpan<(string Name, object? Element)> names = default, bool compareNames = false)
     {
         var scopes = _conditionalNameScopes ??= [];
         scopes.TryGetValue(key, out var previous);
         var pending = _pendingRevision;
-        if (previous != null && (pending == null || pending.IsActivation || ReferenceEquals(previous.Revision, pending)))
+        if (previous != null && (compareNames
+            ? previous.Matches(parent, names)
+            : pending == null || pending.IsActivation || ReferenceEquals(previous.Revision, pending)))
         {
+            if (pending != null)
+            {
+                (pending.UsedConditionalNameScopes ??= []).Add(previous);
+            }
             return previous.Scope!;
         }
 
         // A source transaction gets a separate immutable lookup object. Old
         // bindings keep their old scope while replacement bindings are prepared.
-        var scope = new ConditionalNameScope(pending);
+        var scope = new ConditionalNameScope(pending, parent, compareNames ? names.ToArray() : null);
         scopes[key] = scope;
         if (pending != null)
         {
@@ -147,7 +196,8 @@ public sealed partial class AkburaRenderState
         foreach (var entry in _conditionalNameScopes)
         {
             var active = entry.Key == 0 &&
-                (pending.IsActivation || ReferenceEquals(entry.Value.Revision, pending));
+                (pending.IsActivation || ReferenceEquals(entry.Value.Revision, pending) ||
+                    pending.UsedConditionalNameScopes?.Contains(entry.Value) == true);
             entry.Value.Revision = null;
             foreach (var region in _conditionalRegions)
             {
@@ -188,16 +238,39 @@ public sealed partial class AkburaRenderState
         }
     }
 
-    private sealed class ConditionalNameScope(PendingRevision? revision)
+    private sealed class ConditionalNameScope(PendingRevision? revision, INameScope? parent,
+        (string Name, object? Element)[]? names)
     {
         public NameScope? Scope { get; private set; } = new();
 
         public PendingRevision? Revision { get; set; } = revision;
 
+        private INameScope? _parent = parent;
+        private (string Name, object? Element)[]? _names = names;
+
+        public bool Matches(INameScope? desiredParent, ReadOnlySpan<(string Name, object? Element)> desiredNames)
+        {
+            if (!ReferenceEquals(_parent, desiredParent) || _names == null || _names.Length != desiredNames.Length)
+            {
+                return false;
+            }
+            for (var index = 0; index < desiredNames.Length; index++)
+            {
+                if (!string.Equals(_names[index].Name, desiredNames[index].Name, StringComparison.Ordinal) ||
+                    !ReferenceEquals(_names[index].Element, desiredNames[index].Element))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         public void Release()
         {
             Scope = null;
             Revision = null;
+            _parent = null;
+            _names = null;
         }
     }
 
@@ -221,5 +294,6 @@ public sealed partial class AkburaRenderState
     private sealed partial class PendingRevision
     {
         public List<ConditionalNameScope>? ReplacedConditionalNameScopes { get; set; }
+        public HashSet<ConditionalNameScope>? UsedConditionalNameScopes { get; set; }
     }
 }

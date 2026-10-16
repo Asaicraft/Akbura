@@ -329,6 +329,11 @@ internal sealed class ClrHotReloadSession : IDisposable
     private static Func<SyntaxNode, SyntaxNode?> CreateSyntaxMap(SyntaxNode oldSyntax, SyntaxNode newSyntax)
     {
         var map = new Dictionary<SyntaxNode, SyntaxNode> { [newSyntax] = oldSyntax };
+        if (oldSyntax is MethodDeclarationSyntax { Body: { } oldBody } &&
+            newSyntax is MethodDeclarationSyntax { Body: { } newBody })
+        {
+            map[newBody] = oldBody;
+        }
         Map<LocalFunctionStatementSyntax>(node => node.Identifier.ValueText);
         Map<VariableDeclaratorSyntax>(node => Scope(node) + node.Identifier.ValueText);
         Map<ParameterSyntax>(node => Scope(node) + node.Identifier.ValueText);

@@ -152,7 +152,7 @@ internal readonly ref partial struct ComponentScopeWriter
         }
     }
 
-    public void WriteRefreshCallbackClosures(in ComponentPlan plan)
+    public void WriteRefreshCallbackClosures(in ComponentPlan plan, string? revisionChangedExpression)
     {
         var writer = new ComponentFirstUpdateActionWriter(_writer, _sourceMap);
         for (var elementIndex = 0; elementIndex < plan.Elements.Length; elementIndex++)
@@ -182,9 +182,20 @@ internal readonly ref partial struct ComponentScopeWriter
                     if (_generationMode.UsesStructuralRuntime() &&
                         ComponentFirstUpdateActionWriter.CanWriteStructuralCommandBinding(command))
                     {
+                        if (revisionChangedExpression != null)
+                        {
+                            _writer.Write("if (!").Write(revisionChangedExpression).WriteLine(")");
+                            _writer.WriteLine("{");
+                            _writer.CurrentIndent += _writer.TabSize;
+                        }
                         writer.WriteStructuralCommandBinding(
                             command, element.RuntimeStorageId, element.Identifier,
                             refreshClosure: true);
+                        if (revisionChangedExpression != null)
+                        {
+                            _writer.CurrentIndent -= _writer.TabSize;
+                            _writer.WriteLine("}");
+                        }
                     }
                     else
                     {

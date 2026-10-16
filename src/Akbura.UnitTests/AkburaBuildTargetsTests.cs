@@ -9,7 +9,7 @@ using System.Xml.Linq;
 
 namespace Akbura.UnitTests;
 
-public sealed class AkburaBuildTargetsTests
+public sealed partial class AkburaBuildTargetsTests
 {
     [Fact]
     public void AkburaAssembly_EmbedsItsOwnAkburaModuleManifest()

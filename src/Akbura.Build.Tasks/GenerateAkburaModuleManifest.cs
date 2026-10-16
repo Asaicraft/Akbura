@@ -7,41 +7,28 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
 
 namespace Akbura.Build;
 
-public sealed class GenerateAkburaModuleManifest : Microsoft.Build.Utilities.Task
+public sealed class GenerateAkburaModuleManifest : AkburaManifestTask
 {
-    [Required]
-    public ITaskItem[] Sources { get; set; } = [];
-
-    public ITaskItem[] CSharpSources { get; set; } = [];
-
-    public ITaskItem[] References { get; set; } = [];
-
-    [Required]
-    public string OutputPath { get; set; } = string.Empty;
-
-    [Required]
-    public string AssemblyName { get; set; } = string.Empty;
-
-    [Required]
-    public string ProjectDirectory { get; set; } = string.Empty;
-
-    public string RootNamespace { get; set; } = string.Empty;
-
-    public string DefineConstants { get; set; } = string.Empty;
-
-    public string LanguageVersion { get; set; } = string.Empty;
-
-    public string Nullable { get; set; } = string.Empty;
-
-    public bool AllowUnsafeBlocks { get; set; }
+    public string InputFingerprint { get; set; } = string.Empty;
 
     public override bool Execute()
     {
+        var cache = new AkburaManifestCache(this);
         try
         {
+            using var outputLock = cache.AcquireOutputLock();
+            cache.Invalidate();
+            var fingerprint = cache.ComputeFingerprint();
+            if (InputFingerprint.Length != 0 && InputFingerprint != fingerprint)
+            {
+                throw new IOException("Akbura manifest inputs changed during the build. Retry with stable inputs.");
+            }
+
             var sourceTexts = ReadSources();
             if (Log.HasLoggedErrors)
             {
@@ -60,6 +47,12 @@ public sealed class GenerateAkburaModuleManifest : Microsoft.Build.Utilities.Tas
                 sourceTexts,
                 csharpCompilation);
             WriteIfChanged(manifest);
+            if (fingerprint != cache.ComputeFingerprint())
+            {
+                throw new IOException("Akbura manifest inputs changed during generation. No cache was published; retry the build.");
+            }
+
+            cache.Publish(fingerprint);
             return !Log.HasLoggedErrors;
         }
         catch (Exception exception)
@@ -120,7 +113,7 @@ public sealed class GenerateAkburaModuleManifest : Microsoft.Build.Utilities.Tas
         foreach (var source in CSharpSources)
         {
             var fullPath = GetFullPath(source);
-            if (!File.Exists(fullPath) || !sourcePaths.Add(fullPath))
+            if (!sourcePaths.Add(fullPath))
             {
                 continue;
             }
@@ -142,9 +135,16 @@ public sealed class GenerateAkburaModuleManifest : Microsoft.Build.Utilities.Tas
         foreach (var reference in References)
         {
             var fullPath = GetFullPath(reference);
-            if (!File.Exists(fullPath) || !referencePaths.Add(fullPath))
+            if (!referencePaths.Add(fullPath))
             {
                 continue;
+            }
+
+            // CreateFromFile is lazy; validate the image before publishing a successful manifest.
+            using (var stream = File.OpenRead(fullPath))
+            using (var image = new PEReader(stream))
+            {
+                _ = image.GetMetadataReader();
             }
 
             references.Add(MetadataReference.CreateFromFile(fullPath));
@@ -203,14 +203,6 @@ public sealed class GenerateAkburaModuleManifest : Microsoft.Build.Utilities.Tas
         };
     }
 
-    private string GetFullPath(ITaskItem item)
-    {
-        var fullPath = item.GetMetadata("FullPath");
-        return string.IsNullOrWhiteSpace(fullPath)
-            ? Path.GetFullPath(item.ItemSpec, ProjectDirectory)
-            : fullPath;
-    }
-
     private void WriteIfChanged(AkburaModuleManifest manifest)
     {
         using var stream = new MemoryStream();
@@ -229,7 +221,7 @@ public sealed class GenerateAkburaModuleManifest : Microsoft.Build.Utilities.Tas
             Directory.CreateDirectory(directory);
         }
 
-        File.WriteAllBytes(OutputPath, content);
+        AkburaManifestCache.WriteAtomically(OutputPath, content);
     }
 
     private static string GetSourceCodePath(ITaskItem source)

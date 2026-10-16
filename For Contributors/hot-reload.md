@@ -42,6 +42,7 @@ Diagrams use Mermaid and are embedded directly in this Markdown file. GitHub can
 - [23. BlackSilence document dependencies and reload latency](#23-blacksilence-document-dependencies-and-reload-latency)
 - [24. C# semantic probes and compilation latency](#24-c-semantic-probes-and-compilation-latency)
 - [25. Immutable element names](#25-immutable-element-names)
+- [26. Incremental module manifests during MSBuild](#26-incremental-module-manifests-during-msbuild)
 
 ## 1. The two layers of Hot Reload
 
@@ -2422,6 +2423,118 @@ dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c Release --no-restore
 ```
 
 Changed implementation files: `ComponentScopeWriter.Assignments.cs`, `ComponentScopeWriter.NameScopes.cs`, `ComponentScopeWriter.cs`, `ComponentLifecycleWriter.cs`, `AkburaRenderState.NameScopes.cs`, and the inactive-node guard in `AkburaRenderState.cs`. Test infrastructure changes are in `AkburaCompilationSession.cs` (generation-mode option) and `ClrHotReloadSession.cs` (method-body mapping). Regression cases are in `NameReconciliationTests.cs`, `NameHotReloadTests.cs` and `CommandClosureHotReloadTests.cs`; this guide contains the design and evidence record.
+
+## 26. Incremental module manifests during MSBuild
+
+Module manifest construction is a build-time cost, distinct from BlackSilence's incremental generator and runtime reconciliation. Previously, `GenerateAkburaModuleManifest` always read sources, created a Roslyn compilation, bound module signatures and serialized XML. Its byte comparison only prevented rewriting the final file. A no-op C# build therefore still paid the complete manifest cost for every importing project.
+
+### Targets and resource ordering
+
+`Akbura.targets` separates three responsibilities:
+
+1. `_CheckAkburaModuleManifest` resolves **current** reference assemblies and runs the SDK's global-using, assembly-info and target-framework-attribute generation before capturing `@(Compile)`. `CheckAkburaModuleManifest` validates inputs without parsing Akbura/C# or constructing a Roslyn compilation.
+2. `GenerateAkburaModuleManifest` invokes the expensive task only when that check reports a miss. The public target remains callable; skipping the task does not skip registration.
+3. `_RegisterAkburaModuleResources` runs before `AssignTargetPaths` on every qualifying build, after generation/reuse. It registers `!Akbura` with `WithCulture=false` and `Visible=false`, and embeds the current source items with their logical paths. Existing entries for those files are replaced to avoid double inclusion. Resource naming and `CoreCompile` therefore see the resources even when the consuming DLL must be recompiled on a manifest cache hit.
+
+All three retain the existing `AkburaEmbedSourceFiles=true`, `BuildingProject=true`, `DesignTimeBuild!=true` gate. Editor `AdditionalFiles` and source discoverability remain unchanged. Both tasks retain `Runtime="NET"`, `Architecture="CurrentArchitecture"`, `TaskFactory="TaskHostFactory"`; compiler/task assemblies are not pinned inside long-lived MSBuild nodes. A hit still starts the lightweight validation task, but never invokes the expensive generation task.
+
+Custom targets that generate/add `Compile` items needed by module signatures must run before `_CheckAkburaModuleManifest`, so their files and resolved items belong to the captured input set. Roslyn analyzer-generated sources are not separate `@(Compile)` items and the manifest task does not run analyzers; this preserves the existing binder boundary rather than promising a second full Csc pipeline.
+
+### Complete content-based invalidation
+
+The versioned, length-prefixed fingerprint includes:
+
+- The complete ordered source, C# and resolved-reference lists, normalized full paths, source `LogicalName` values and SHA-256 file contents. Lists retain their supplied order, conservatively invalidating even order-only changes. Additions, removals, renames, aliases/global usings and changed project-reference outputs are not reduced to a newest-file timestamp.
+- `AssemblyName`, `RootNamespace`, `ProjectDirectory`, `DefineConstants`, `LangVersion`, `Nullable`, `AllowUnsafeBlocks`, and the project/configuration/TFM/RID/intermediate/output context.
+- Cache schema version 1 and manifest format version 3 (the manifest format is unchanged).
+- Paths and contents of the deployed task directory's DLL/JSON files, including the generator, Roslyn and their dependencies. Rebuilding an implementation with the same assembly version still invalidates the cache.
+
+Timestamp/size caching was considered but deliberately not used across builds: equal size and last-write time cannot prove equal contents after an in-place or atomic replacement. Each check reads current bytes; a small per-check dictionary avoids hashing the same physical path twice. It is discarded after the check, not shared process-wide. This trades a measured, bounded amount of sequential I/O for detecting metadata-preserving replacements. Touching a file without changing its contents does not invalidate the manifest. No semantic dependency graph was added.
+
+Native `Inputs`/`Outputs` was also considered. Its [timestamp-based incrementality and output inference](https://learn.microsoft.com/en-us/visualstudio/msbuild/incremental-builds) do not alone establish the complete current item/option/content contract. A synthetic timestamp marker would still require the same input check. The implementation therefore uses a conditional expensive task after one explicit validation step, rather than adding another timestamp protocol or conditionally skipping the resource-registration target.
+
+The default output is `$(IntermediateOutputPath)Akbura.module.xml`, evaluated inside the target after SDK path initialization. This preserves the usual `obj/<configuration>/<TFM>` location while honoring custom intermediate directories and RID suffixes. Explicit `AkburaModuleManifestPath` remains supported. Successful state lives beside other intermediates as `Akbura.module.<context-hash>.cache.json`; the context also includes the manifest output path, so switching outputs cannot reuse another output's state. The small JSON stores schema version, complete input SHA-256 and successful XML SHA-256. It contains no serialized Roslyn state or per-reference timestamp trust.
+
+### Publication, recovery and ownership
+
+A miss removes previous successful state before generation. The generator takes an exclusive output lock, checks the fingerprint again, builds the existing manifest, atomically replaces changed XML, rechecks inputs, then atomically publishes state. Identical XML retains its existing bytes and modification time. A hit must match both the complete input fingerprint and the actual output checksum; missing XML, modified/truncated XML, missing state, unsupported schema or corrupt JSON causes regeneration.
+
+Missing/unreadable inputs, duplicate logical names, invalid metadata references, I/O errors and exceptions cannot publish successful state. Cancellation is supported and checked during input traversal and publication. Ordinary failed writes remove their uniquely named temporary files. An abrupt process kill can leave an unused `.tmp` file, but it cannot turn a partially written state into a cache hit; there is no recovery path that trusts temporary files. Parser/semantic recovery behavior is unchanged: the existing builder may emit recovery types before Csc/source generators report diagnostics. A later compiler error does not retroactively invalidate a successfully constructed manifest; reuse still requires identical current inputs/output.
+
+`<manifest>.lock` is a small checksummed ownership marker, opened with exclusive sharing during validation and generation. A busy output fails clearly. A valid marker owned by another project/configuration/TFM/RID/intermediate context also fails, including sequential attempts to reuse a common custom path. Use distinct output paths for those contexts. To deliberately transfer an output, remove its specific `.lock` file only after all builds using it have finished. Truncated ownership records are repaired while holding the exclusive lock. Normal concurrent builds in distinct contexts never share cache or lock files. This is an operation-level lock, not an end-to-end lease of the SDK/Csc output directory: simultaneous builds of the identical context with different item/property sets must also use distinct intermediate/output paths. As with Csc, source/reference files should not be edited concurrently with an active build; changes detected between checks fail with a retry diagnostic rather than publishing success.
+
+The old unconditional deletion of `$(IntermediateOutputPath)Akbura` is removed. No such directory is created. Manifest, state and lock paths are registered as `FileWrites` on every qualifying build, including hits, for SDK clean/incremental-clean tracking. The SDK only cleans tracked files under its output/intermediate roots; an explicitly placed external manifest/lock may survive clean, but the removed intermediate state forces regeneration and checksum verification on the next build. No unrelated directory is deleted.
+
+### Verification and measurements
+
+The real SDK-project regression suite is in `AkburaBuildTargetsIncrementalTests.cs`, extending `AkburaBuildTargetsTests`. It counts diagnostic-log task-start events, not XML timestamps or elapsed-time guesses, and reads actual PE manifest resources without loading/locking the output assemblies. Fresh-versus-reused XML is compared byte for byte and deserialized/reserialized through the production serializer.
+
+The 21 added cases cover first/no-op/forced-Csc builds; component and utility edits; adding, removing all, renaming and changing logical identities; C# changes with preserved size/timestamps; reference content/path/membership and current project-reference outputs; six compiler options; missing/corrupt XML, truncated/unsupported state and interrupted ownership writes; duplicate/missing sources; invalid PE references and locked outputs; clean/rebuild; concurrent independent projects; custom intermediate/output paths; distinct `net10.0`/`net10.0-windows` conditional signatures and embedded resources; design-time and embedding opt-out; same-version tool deployment changes; and a locally packed NuGet consumed outside the repository. Reference images are explicitly read through `PEReader.GetMetadataReader()` on generation: merely creating a Roslyn reference/metadata wrapper does not reliably reject malformed images before Csc.
+
+The package case runs actual `dotnet pack` into a unique local feed, restores a temporary SDK consumer using that feed (dependencies already restored by this test project's restore), and uses **only** `PackageReference` for Akbura. There is no consumer-side task path override or direct import. It verifies generation, no-op reuse, forced recompilation with generation skipped, embedded bytes and fresh parity. SDK child node reuse is disabled for temporary test projects; cleanup is best effort if a compiler/telemetry child still holds a working directory.
+
+Measurements below were collected on 2026-10-16, Windows 11 / Intel i5-11400H / 12 logical processors, SDK 10.0.401 / CLR 10.0.12, Avalonia 12.0.4. The exact before revision was `473bd2b2023af3d5d1839a1c110fea1d3a4b1fe3`, branch `feature/improve-hot-reload`; the after result is the uncommitted implementation in this section. No merge/rebase was performed. The entry point was `src/Akbura.FeatureGallery/Akbura.FeatureGallery.Desktop/Akbura.FeatureGallery.Desktop.csproj`, Debug, restored first. Times come from binary-log build/task start/finish events, not summed compiler-target durations.
+
+| Metric | Historical observation | Verified before, runs 1 / 2 | After, runs 1 / 2 |
+| --- | ---: | ---: | ---: |
+| Unchanged FeatureGallery Desktop build | 47.280 s | 33.619 / 40.167 s | 3.293 / 3.050 s |
+| Akbura manifest generation | 1.685 s | 1.275 / 1.017 s | skipped / skipped |
+| Diagnostics manifest generation | 18.273 s | 13.123 / 13.688 s | skipped / skipped |
+| FeatureGallery manifest generation | 24.222 s | 16.838 / 23.407 s | skipped / skipped |
+| Sum of expensive manifest tasks | 44.179 s | 31.237 / 38.113 s | 0 / 0 s |
+| Expensive manifest task executions | 3 | 3 / 3 | 0 / 0 |
+| Actual Csc task executions | effectively skipped | 0 / 0 | 0 / 0 |
+| Validation inside tasks, all three projects | not isolated | not applicable | 0.568 / 0.479 s |
+| Validation including task-host/IPC overhead, all three | not isolated | not applicable | 1.279 / 1.161 s |
+| First build after clean, warmed environment | not supplied | 90.878 s | 92.340 s |
+
+Each no-op check hashes about 24.24 / 27.64 / 33.04 MB respectively (84.93 MB total), including sources, references and tool deployment. Subtracting the logged in-task timers from task durations leaves approximately 0.68–0.71 s for task startup, marshalling and MSBuild instrumentation across all three projects; this is **not** a separately isolated pure process-startup measurement. The original source-read/parse/binding/serialization substeps were not independently instrumented. These timings establish a cheap no-Roslyn hit path, not a promise about network filesystems or cold disks.
+
+The initial before warm-up took 123.22 s and is not included in the no-op comparison. The clean-build row is also separate: all seven Csc tasks and all three manifest tasks ran both before and after clean. This optimization does not make initial semantic construction faster; its clean-build manifest sums were 33.279 s before and 33.308 s after. No controlled OS/page-cache-cold benchmark was performed.
+
+In the required edit sequence, adding an unused `string ManifestProbe = "manifest"` parameter to `OverviewPage.akbura` caused **one** manifest task (FeatureGallery, 18.029 s) and two Csc tasks (FeatureGallery and Desktop), for 37.970 s total. The following unchanged build took 3.336 s with zero manifest/Csc tasks. Adding a public `int ManifestProbe` property to the existing `StateBindingDemoModel` declaration likewise ran only FeatureGallery's manifest task (18.025 s) plus those two Csc tasks, taking 38.180 s. Akbura and Diagnostics reused their manifests in both edits. Both temporary edits were restored exactly; they are not part of the change. Changed-input semantic generation remains expensive and is not hidden by the no-op improvement.
+
+Reproduction commands (from the repository root):
+
+```powershell
+$gallery = 'src/Akbura.FeatureGallery/Akbura.FeatureGallery.Desktop/Akbura.FeatureGallery.Desktop.csproj'
+dotnet restore $gallery --nologo -v:q
+dotnet build $gallery --no-restore --nologo -v:q -bl:bin/ManifestIncrementalVerification/before-warm.binlog
+dotnet clean $gallery --nologo -v:q
+dotnet build $gallery --no-restore --nologo -v:q -bl:bin/ManifestIncrementalVerification/before-clean.binlog
+dotnet build $gallery --no-restore --nologo -v:q -bl:bin/ManifestIncrementalVerification/before-noop-1.binlog
+dotnet build $gallery --no-restore --nologo -v:q -bl:bin/ManifestIncrementalVerification/before-noop-2.binlog
+
+# After implementing the targets/tasks, repeat clean/build/no-op/no-op:
+dotnet clean $gallery --nologo -v:q
+dotnet build $gallery --no-restore --nologo -v:q -bl:bin/ManifestIncrementalVerification/after-clean.binlog
+dotnet build $gallery --no-restore --nologo -v:q -bl:bin/ManifestIncrementalVerification/after-noop-1.binlog
+dotnet build $gallery --no-restore --nologo -v:q -bl:bin/ManifestIncrementalVerification/after-noop-2.binlog
+
+# Add the OverviewPage parameter, then:
+dotnet build $gallery --no-restore --nologo -v:q -bl:bin/ManifestIncrementalVerification/after-akbura-edit.binlog
+dotnet build $gallery --no-restore --nologo -v:q -bl:bin/ManifestIncrementalVerification/after-akbura-noop.binlog
+# Add the StateBindingDemoModel property, then:
+dotnet build $gallery --no-restore --nologo -v:q -bl:bin/ManifestIncrementalVerification/after-csharp-edit.binlog
+# Restore both source files, then build once to restore outputs.
+dotnet build $gallery --no-restore --nologo -v:q -bl:bin/ManifestIncrementalVerification/after-restored-sources.binlog
+```
+
+During the source-level task API upgrade, an old reusable MSBuild node retained the previous task parameter metadata and rejected `RuntimeIdentifier`. A fresh `-nr:false -m:1` diagnostic build passed; the one remaining idle node created by this measurement was stopped before repeating the **normal default-command** clean/no-op sequence above. Failed attempts were excluded, and the table is not comparing a single-node after build against a parallel before build. Package consumers use a version-specific tool path and the isolated tasks remain rebuildable. After changing a task's public parameter surface in place, developers may need a fresh MSBuild node.
+
+Changed production files are `Akbura.targets`, `AkburaManifestTask.cs`, `CheckAkburaModuleManifest.cs`, `AkburaManifestCache.cs` and `GenerateAkburaModuleManifest.cs`. Tests are in the two partial `AkburaBuildTargetsTests` files; this guide is the only added documentation section. No BlackSilence graph, probe binder, runtime reconciliation, NameScope or manifest-format code was changed.
+
+An additional real-project fresh-parity check removed only the three owned manifest state files under the projects' `obj/Debug/net10.0` directories. It ran all three manifest tasks, **zero Csc tasks**, and took 34.909 s; the following no-op took 3.084 s, with all three expensive tasks skipped. Before/after XML SHA-256 values were identical for all three projects. PE inspection also compared the embedded XML and all raw embedded sources against disk: Akbura 1 source, Diagnostics 8, FeatureGallery 32. Manifest declaration-source counts were 1 / 6 / 31 respectively because global-using files are embedded but deliberately not exported as module declarations.
+
+The final Debug selection used already restored/built repository dependencies. `BuildProjectReferences=false` keeps those shared outputs stable while the tests launch their own independent SDK builds:
+
+```powershell
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj --no-restore --nologo -v:minimal -p:BuildProjectReferences=false --filter 'FullyQualifiedName~AkburaBuildTargetsTests|FullyQualifiedName~ModuleManifest|FullyQualifiedName~AkburaDiagnosticReferenceTests|FullyQualifiedName~CrossAssemblySemanticTests' --logger 'trx;LogFileName=manifest-regression-final.trx' --diag bin/ManifestIncrementalVerification/final-vstest.diag.log --results-directory bin/ManifestIncrementalVerification
+```
+
+The temporary projects run `dotnet restore ManifestProbe.csproj`, `dotnet build ManifestProbe.csproj --no-restore --nologo -v:diag -t:Build`, `dotnet clean --nologo -v:q`, and the SDK's actual rebuild command `dotnet build ManifestProbe.csproj --no-restore --nologo -v:diag -t:Rebuild`. The package probe additionally executes `dotnet pack src/Akbura/Akbura.csproj --no-restore --nologo -v:q -c Debug -o <temporary-feed> -p:PackageVersion=<unique-test-version>`, then restores its consumer against that feed. There is no `dotnet rebuild` CLI subcommand; the test invokes the `Rebuild` target explicitly.
+
+The final selection passed **30/30**, with zero failures or skips, in 5 min 9 s: 21 new SDK integration cases, three existing build-target tests, and six related manifest/reference cases. This includes the packed consumer, fully skipped generation with forced Csc, conditional multi-TFM signatures, invalid-PE failure/recovery, and complete fresh/reused byte comparisons. The first no-op regression failed before implementation (`expected 0` generation tasks, `actual 1`); its TRX remains the red-test evidence. Earlier diagnostic failures were resolved; one interrupted final-run attempt produced no TRX and is not counted as completed validation. The entire repository test suite and Release configuration were not run for this change. Binary logs and final TRX/diagnostic logs remain under the ignored `bin/ManifestIncrementalVerification` directory. All eight added/modified repository files were checked for CRLF termination; the six C# files were syntax-scanned for braced if/for/foreach bodies, and `git diff --check` passed. No implementation commit has been created.
 
 <!-- Source references: implementation snapshot inspected for this guide. -->
 [baseline]: https://github.com/Asaicraft/Akbura/commit/959ae1590cce507bab17893da8284df69887120b

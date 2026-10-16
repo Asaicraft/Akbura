@@ -34,6 +34,15 @@ internal enum GenerationStatisticCounter : byte
     DiagnosticPublished,
     AkcssLookupRequest,
     AkcssLookupReused,
+    ProbeRequest,
+    ProbeSyntaxTreeCreated,
+    ProbeCompilationCreated,
+    ProbeSemanticModelAcquired,
+    ProbeDiagnosticsRequested,
+    ProbeDiagnosticQuery,
+    ProbeContextReused,
+    ProbeBindingResultReused,
+    ProbeDiagnosticsReused,
     Count,
 }
 
@@ -61,6 +70,14 @@ internal enum GenerationStatisticStage : byte
     CSharpProbeDiagnostics,
     CSharpTypeResolution,
     CSharpUtilityParameters,
+    ProbeScopeConstruction,
+    ProbeSyntaxConstruction,
+    ProbeSyntaxTreeCreation,
+    ProbeCompilationDerivation,
+    ProbeSemanticModelAcquisition,
+    ProbeSymbolBinding,
+    ProbeOperationBinding,
+    ProbeStateRewriting,
     Count,
 }
 
@@ -378,6 +395,16 @@ internal sealed class GenerationStatisticsSnapshot
     public TimeSpan DiagnosticPublishElapsed => GetElapsed(GenerationStatisticStage.DiagnosticPublish);
 
     public TimeSpan GetStageElapsed(GenerationStatisticStage stage) => ToTimeSpan(_elapsed[GetStageIndex(stage)]);
+
+    public long GetCounterCount(GenerationStatisticCounter counter)
+    {
+        if (counter >= GenerationStatisticCounter.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(counter));
+        }
+
+        return _counters[(int)counter];
+    }
 
     public long GetStageAllocatedBytes(GenerationStatisticStage stage) => _allocatedBytes[GetStageIndex(stage)];
 

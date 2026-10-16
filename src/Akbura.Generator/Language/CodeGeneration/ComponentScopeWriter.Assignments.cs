@@ -221,7 +221,13 @@ internal readonly ref partial struct ComponentScopeWriter
             switch (action.Kind)
             {
                 case ComponentFirstUpdateActionKind.NameAssignment:
-                    WriteConditionalInitialStart(element, conditionalOneTime);
+                    if (conditionalOneTime)
+                    {
+                        _writer.Write("if (").Write(ComponentStructuralHotReloadWriter.RenderStateFieldName)
+                            .Write(".IsNew(").WriteIntegerLiteral(element.RuntimeStorageId).WriteLine("))");
+                        _writer.WriteLine("{");
+                        _writer.CurrentIndent += _writer.TabSize;
+                    }
                     actions.WriteNameAssignment(plan.NameAssignments.ItemRef(action.Index), element.Identifier, null);
                     WriteConditionalInitialEnd(conditionalOneTime);
                     break;
@@ -251,7 +257,8 @@ internal readonly ref partial struct ComponentScopeWriter
                     ref readonly var command = ref plan.CommandBindings.ItemRef(action.Index);
                     if (ComponentFirstUpdateActionWriter.CanWriteStructuralCommandBinding(command))
                     {
-                        actions.WriteStructuralCommandBinding(command, element.RuntimeStorageId, element.Identifier);
+                        actions.WriteStructuralCommandBinding(command, element.RuntimeStorageId, element.Identifier,
+                            refreshClosure: command.RefreshClosure);
                     }
                     else
                     {

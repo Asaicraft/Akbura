@@ -1,0 +1,3 @@
+[submodule "benchmarks/HotReload/Akbura-PurityUI-Tutorial"]
+	path = benchmarks/HotReload/Akbura-PurityUI-Tutorial
+	url = https://github.com/Asaicraft/Akbura-PurityUI-Tutorial.git

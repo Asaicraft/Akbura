@@ -108,7 +108,10 @@ public sealed partial class AkburaRenderState : IDisposable
         {
             foreach (var node in _nodes)
             {
-                pendingRevision.HoldAkcssUpdate(node.Instance, existingOnly: true);
+                if (node.Instance is { } instance)
+                {
+                    pendingRevision.HoldAkcssUpdate(instance, existingOnly: true);
+                }
             }
             MatchAndCreate(pendingRevision, factory);
             for (var i = 0; i < conditionalDefinitions.Length; i++)

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Demo</RootNamespace>
+    <AkburaRepositoryRoot Condition="'$(AkburaRepositoryRoot)' == ''">$(MSBuildThisFileDirectory)../../..</AkburaRepositoryRoot>
+    <AkburaBuildTasksAssembly>$(AkburaRepositoryRoot)/src/Akbura.Build.Tasks/bin/Debug/net10.0/Akbura.Build.Tasks.dll</AkburaBuildTasksAssembly>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Headless" />
+    <Reference Include="Akbura" HintPath="$(AkburaRepositoryRoot)/src/Akbura/bin/Debug/net10.0/Akbura.dll" />
+    <Analyzer Include="$(AkburaRepositoryRoot)/src/Akbura.BlackSilence/bin/Debug/netstandard2.0/Akbura.BlackSilence.dll" />
+    <Analyzer Include="$(AkburaRepositoryRoot)/src/Akbura.Generator/bin/Debug/netstandard2.0/Akbura.Generator.dll" />
+  </ItemGroup>
+  <Import Project="$(AkburaRepositoryRoot)/src/Akbura/buildTransitive/Akbura.targets" />
+</Project>

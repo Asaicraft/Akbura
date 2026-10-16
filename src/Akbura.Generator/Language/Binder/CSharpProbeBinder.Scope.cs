@@ -14,6 +14,9 @@ using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFacts = Microsoft.CodeAnalysis.CSharp.SyntaxFacts;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using CSharpSyntaxKind = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
+#if STATS
+using Akbura.Language.CodeGeneration;
+#endif
 
 namespace Akbura.Language.Binder;
 
@@ -48,6 +51,9 @@ internal sealed partial class CSharpProbeBinder
         SyntaxNode csharpNode,
         ImmutableArray<string> excludedNames = default)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.ProbeScopeConstruction);
+#endif
         if (scope == null ||
             csharpNode == null)
         {
@@ -189,7 +195,7 @@ internal sealed partial class CSharpProbeBinder
         foreach (var member in SemanticModel.SyntaxTree.GetRoot().Members)
         {
             if (member is CSharpStatementSyntax statement &&
-                TryCreateComponentMethodProbe(statement, out var method) &&
+                SemanticModel.BindingSession.ProbeContext.GetMethodSignature(statement) is { } method &&
                 string.Equals(
                     method.Identifier.ValueText,
                     name,
@@ -212,9 +218,7 @@ internal sealed partial class CSharpProbeBinder
         foreach (var member in SemanticModel.SyntaxTree.GetRoot().Members)
         {
             if (member is CSharpStatementSyntax statement &&
-                TryCreateComponentMethodProbe(
-                    statement,
-                    out var method))
+                SemanticModel.BindingSession.ProbeContext.GetMethodSignature(statement) is { } method)
             {
                 memberDeclarations.Add(method);
             }
@@ -389,7 +393,30 @@ internal sealed partial class CSharpProbeBinder
         return CSharpSyntaxFactory.Block(CSharpSyntaxFactory.List(builder.ToImmutable()));
     }
 
-    private static void AddProbeSymbol(
+    private void AddProbeSymbol(
+        AkburaSymbol? symbol,
+        ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax> memberDeclarations,
+        ImmutableArrayBuilder<CSharp.StatementSyntax> localStatements)
+    {
+        if (symbol == null)
+        {
+            return;
+        }
+
+        var scope = SemanticModel.BindingSession.ProbeContext.GetSymbolScope(symbol);
+        memberDeclarations.AddRange(scope.MemberDeclarations);
+        localStatements.AddRange(scope.LocalStatements);
+    }
+
+    internal static CSharpProbeScope CreateSymbolProbeScope(AkburaSymbol symbol)
+    {
+        using var members = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
+        using var locals = ImmutableArrayBuilder<CSharp.StatementSyntax>.Rent();
+        AddProbeSymbolCore(symbol, members, locals);
+        return new CSharpProbeScope(members.ToImmutable(), locals.ToImmutable());
+    }
+
+    private static void AddProbeSymbolCore(
         AkburaSymbol? symbol,
         ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax> memberDeclarations,
         ImmutableArrayBuilder<CSharp.StatementSyntax> localStatements)

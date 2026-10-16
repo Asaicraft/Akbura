@@ -14,12 +14,17 @@
 
 	<PropertyGroup>
 		<AkburaEmbedSourceFiles Condition="'$(AkburaEmbedSourceFiles)' == ''">true</AkburaEmbedSourceFiles>
-		<AkburaModuleManifestPath Condition="'$(AkburaModuleManifestPath)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\Akbura.module.xml</AkburaModuleManifestPath>
 		<AkburaBuildTasksAssembly Condition="'$(AkburaBuildTasksAssembly)' == ''">$(MSBuildThisFileDirectory)..\tools\net10.0\Akbura.Build.Tasks.dll</AkburaBuildTasksAssembly>
 	</PropertyGroup>
 
 	<!-- Keep the task isolated from long-lived MSBuild nodes so its assemblies remain rebuildable. -->
 	<UsingTask TaskName="Akbura.Build.GenerateAkburaModuleManifest"
+			   AssemblyFile="$(AkburaBuildTasksAssembly)"
+			   Runtime="NET"
+			   Architecture="CurrentArchitecture"
+			   TaskFactory="TaskHostFactory"
+			   Condition="'$(AkburaEmbedSourceFiles)' == 'true'" />
+	<UsingTask TaskName="Akbura.Build.CheckAkburaModuleManifest"
 			   AssemblyFile="$(AkburaBuildTasksAssembly)"
 			   Runtime="NET"
 			   Architecture="CurrentArchitecture"
@@ -54,20 +59,17 @@
 		</ItemGroup>
 	</Target>
 
-	<Target Name="GenerateAkburaModuleManifest"
-		  BeforeTargets="AssignTargetPaths"
-		  DependsOnTargets="FindReferenceAssembliesForReferences"
+	<Target Name="_CheckAkburaModuleManifest"
+		  DependsOnTargets="FindReferenceAssembliesForReferences;GenerateGlobalUsings;GenerateAssemblyInfo;GenerateTargetFrameworkMonikerAttribute"
 		  Condition="'$(AkburaEmbedSourceFiles)' == 'true'
 				   and '$(BuildingProject)' == 'true'
 				   and '$(DesignTimeBuild)' != 'true'">
 
-		<RemoveDir
-			Directories="$(IntermediateOutputPath)Akbura"
-			Condition="Exists('$(IntermediateOutputPath)Akbura')" />
-		<MakeDir
-			Directories="$([System.IO.Path]::GetDirectoryName('$(AkburaModuleManifestPath)'))" />
+		<PropertyGroup>
+			<AkburaModuleManifestPath Condition="'$(AkburaModuleManifestPath)' == ''">$(IntermediateOutputPath)Akbura.module.xml</AkburaModuleManifestPath>
+		</PropertyGroup>
 
-		<GenerateAkburaModuleManifest
+		<CheckAkburaModuleManifest
 			Sources="@(_AkburaModuleSource)"
 			CSharpSources="@(Compile)"
 			References="@(ReferencePathWithRefAssemblies)"
@@ -75,12 +77,59 @@
 			AssemblyName="$(AssemblyName)"
 			RootNamespace="$(RootNamespace)"
 			ProjectDirectory="$(MSBuildProjectDirectory)"
+			ProjectPath="$(MSBuildProjectFullPath)"
+			IntermediatePath="$(IntermediateOutputPath)"
+			Configuration="$(Configuration)"
+			TargetFramework="$(TargetFramework)"
+			RuntimeIdentifier="$(RuntimeIdentifier)"
+			DefineConstants="$(DefineConstants)"
+			LanguageVersion="$(LangVersion)"
+			Nullable="$(Nullable)"
+			AllowUnsafeBlocks="$(AllowUnsafeBlocks)">
+			<Output TaskParameter="RequiresGeneration" PropertyName="_AkburaManifestRequiresGeneration" />
+			<Output TaskParameter="InputFingerprint" PropertyName="_AkburaManifestInputFingerprint" />
+			<Output TaskParameter="CacheStatePath" PropertyName="_AkburaManifestCacheStatePath" />
+			<Output TaskParameter="OutputLockPath" PropertyName="_AkburaManifestOutputLockPath" />
+		</CheckAkburaModuleManifest>
+	</Target>
+
+	<Target Name="GenerateAkburaModuleManifest"
+		  DependsOnTargets="_CheckAkburaModuleManifest"
+		  Condition="'$(AkburaEmbedSourceFiles)' == 'true'
+				   and '$(BuildingProject)' == 'true'
+				   and '$(DesignTimeBuild)' != 'true'">
+
+		<GenerateAkburaModuleManifest
+			Condition="'$(_AkburaManifestRequiresGeneration)' == 'true'"
+			InputFingerprint="$(_AkburaManifestInputFingerprint)"
+			Sources="@(_AkburaModuleSource)"
+			CSharpSources="@(Compile)"
+			References="@(ReferencePathWithRefAssemblies)"
+			OutputPath="$(AkburaModuleManifestPath)"
+			AssemblyName="$(AssemblyName)"
+			RootNamespace="$(RootNamespace)"
+			ProjectDirectory="$(MSBuildProjectDirectory)"
+			ProjectPath="$(MSBuildProjectFullPath)"
+			IntermediatePath="$(IntermediateOutputPath)"
+			Configuration="$(Configuration)"
+			TargetFramework="$(TargetFramework)"
+			RuntimeIdentifier="$(RuntimeIdentifier)"
 			DefineConstants="$(DefineConstants)"
 			LanguageVersion="$(LangVersion)"
 			Nullable="$(Nullable)"
 			AllowUnsafeBlocks="$(AllowUnsafeBlocks)" />
+	</Target>
+
+	<Target Name="_RegisterAkburaModuleResources"
+		  BeforeTargets="AssignTargetPaths"
+		  DependsOnTargets="GenerateAkburaModuleManifest"
+		  Condition="'$(AkburaEmbedSourceFiles)' == 'true'
+				   and '$(BuildingProject)' == 'true'
+				   and '$(DesignTimeBuild)' != 'true'">
 
 		<ItemGroup>
+			<!-- Replace existing entries for our files rather than embedding them twice. -->
+			<EmbeddedResource Remove="$(AkburaModuleManifestPath);@(_AkburaModuleSource)" />
 			<EmbeddedResource Include="$(AkburaModuleManifestPath)">
 				<LogicalName>!Akbura</LogicalName>
 				<WithCulture>false</WithCulture>
@@ -88,6 +137,7 @@
 			</EmbeddedResource>
 
 			<EmbeddedResource Include="@(_AkburaModuleSource)" />
+			<FileWrites Include="$(AkburaModuleManifestPath);$(_AkburaManifestCacheStatePath);$(_AkburaManifestOutputLockPath)" />
 		</ItemGroup>
 	</Target>
 

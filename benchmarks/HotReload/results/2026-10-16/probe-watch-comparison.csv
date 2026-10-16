@@ -1,0 +1,13 @@
+Version,EditIndex,IncludedInMean,ElapsedMs
+before,0,false,15659.281
+before,1,true,5496.997
+before,2,true,4188.352
+before,3,true,3962.988
+before,4,true,3564.053
+before,5,true,3507.405
+after,0,false,12888.005
+after,1,true,4849.473
+after,2,true,3724.354
+after,3,true,3450.840
+after,4,true,2991.171
+after,5,true,2796.783

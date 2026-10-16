@@ -4,6 +4,14 @@ Date: 16 October 2026. These measurements describe the current implementation, n
 
 Main result: repeated property edits through real watch had median latencies of 107 ms on the small fixture, 1.249 s on NeedHelp, and 2.016 s on Sidebar. The first Purity update was substantially slower: 12.8–13.9 s. A successful minute-long CLR update was not reproduced; a full FeatureGallery rebuild took 70.8 s.
 
+## Retained controlled comparison
+
+The retained probe-optimization comparison shows **14.0% lower mean edit-to-UI latency** for `NeedHelp` under real `dotnet watch`. The arithmetic mean of five repeated edits is 4,143.9590 ms before and 3,562.5242 ms after. The single aggregate is calculated as `100 * (1 - mean_after / mean_before)`. This is a reduction in elapsed time, not a percentage increase in throughput, and not an average of stage timings.
+
+The [comparison observations](probe-watch-comparison.csv) preserve all six edits per side. Index 0 is the first update and is excluded from both means by the same rule. The workload edits `Ellipse.StrokeThickness` in `NeedHelp`; timing runs from file write to the observed value on the same live control. Both retained runs were rebuilt with `--no-incremental` and frozen analyzer directories; neither contains a metadata-handler exception. Earlier discarded runs with mismatched runtime/diagnostics dependencies are not used.
+
+Both sides use the same pre-graph-merge source setup based on `7d36b62cee088c9df8b42ea42a8812fc3cb0c408`, regenerate seven components, and hold manifest behavior constant. Only the probe optimization differs. These observations come from the retained 15 October comparison, not the newer submodule-based matrix below. They do **not** establish an overall improvement across all scenarios or measure the current `master` against the final branch head. No before/after baseline exists for every scenario in the full matrix, so no full-matrix percentage is claimed. Five repetitions and uncontrolled desktop activity also limit generalization.
+
 ## Environment and methodology
 
 Windows 11, build 26200; Intel Core i5-11400H, 12 logical processors. .NET SDK 10.0.401, runtime 10.0.12, SDK Roslyn 5.9.0.0, Avalonia 12.0.4. Akbura and BlackSilence were built in Debug without STATS. The three library copies loaded by the harness matched the current repository build outputs byte-for-byte.

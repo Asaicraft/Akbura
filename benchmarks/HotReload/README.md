@@ -12,25 +12,52 @@ The generator-only compilation does not run other projects' source generators (f
 
 ## Run
 
-Requirements: Windows, PowerShell, the repository's .NET 10 SDK and package restore access. Commands below run from the repository root. No IDE automation is used.
+Requirements: Windows, PowerShell, Git, the repository's .NET 10 SDK and package restore access. Commands below run from the repository root. No IDE automation is used.
 
 ```powershell
+git submodule update --init -- benchmarks/HotReload/Akbura-PurityUI-Tutorial
 powershell -NoProfile -ExecutionPolicy Bypass -File benchmarks/HotReload/Run.ps1 -Prepare
 powershell -NoProfile -ExecutionPolicy Bypass -File benchmarks/HotReload/Summarize.ps1
 ```
 
-`-Prepare` builds the current Debug runtime, build tasks, BlackSilence and this executable. Debug is intentional: structural Hot Reload requires the generated debug contract. The benchmark loads the SDK's Roslyn assemblies, so record the SDK version when comparing machines. Run suites sequentially, without concurrent builds or tests. The fixed scenario order shares process/JIT state inside the CLR suite; this is a latency probe, not a statistically isolated BenchmarkDotNet comparison.
+`-Prepare` builds the current Debug runtime, diagnostics, build tasks, BlackSilence and this executable. Debug is intentional: structural Hot Reload requires the generated debug contract. The benchmark loads the SDK's Roslyn assemblies, so record the SDK version when comparing machines. Run suites sequentially, without concurrent builds or tests. The fixed scenario order shares process/JIT state inside the CLR suite; this is a latency probe, not a statistically isolated BenchmarkDotNet comparison.
 
 Use `-Suite runtime`, `-Suite generator`, `-Suite graph`, `-Suite build`, or `-Suite watch` to run a subset. The graph suite separately inspects the generation request's recompute/reuse decisions for a scalar edit; it is not an instrumentation-based count of executed methods. Outputs default to ignored `bin/HotReloadBenchmarks`; `-OutputDirectory` overrides that location. The executable references built repository assemblies, so rerun `-Prepare` after changing implementation code. The runner copies the watch fixture into its output directory and restores temporary edits byte-for-byte in `finally` blocks. Do not terminate it forcibly while an edit is in progress.
 
-The optional `-PurityRoot <path>` accepts an **isolated prepared copy**, never the user's original checkout. It must reference current repository runtime/analyzers/build targets and contain `TimingHost/TimingHost.csproj`. That host must emit `PROBE_READY pid=...` and `PROBE_VALUE <n> pid=... same_control=True ...` after observing `NeedHelp`'s `StrokeThickness` or `Sidebar`'s dashboard text. This external fixture is not bundled; the built-in fixture and FeatureGallery require no external repository.
+## Purity tutorial submodule
+
+The [Akbura-PurityUI-Tutorial](https://github.com/Asaicraft/Akbura-PurityUI-Tutorial) repository is a Git submodule at `Akbura-PurityUI-Tutorial/`. This repository tracks its URL and a specific commit, not a vendored copy of its files. Clone with `git clone --recurse-submodules` or initialize it with the command above. Use `git submodule update --init` to check out the recorded revision; the runner does not fetch or follow upstream automatically.
+
+Generator, graph and watch suites include Purity by default. `Prepare-Purity.ps1` exports the tutorial's checked-out committed revision with `git archive` into a uniquely named directory under the ignored output directory. Only that disposable snapshot is adapted: Akbura NuGet references are replaced with the current local Debug runtime/diagnostics/analyzers/build targets, and the tracked `PurityHost` adapter is added. The host is restored and built before measurement. Its output validates live `NeedHelp` and `Sidebar` updates. The submodule checkout is never edited or built, including during watch file edits.
+
+Only the shared dashboard, ViewModels and headless host are built; mobile/browser workloads are not required. Use a fresh `-OutputDirectory` for a self-contained archived run: reusing an output directory retains logs from suites that were not rerun.
+
+The selected source revision and prepared path are recorded in `purity-source.json`. `Summarize.ps1` includes the repository URL and revision in its portable results, without the machine-specific prepared path. Snapshots and archives remain in the output directory for inspection. Modified tracked files in the source checkout cause an explicit error rather than silently benchmarking different content. Untracked source files are not exported.
+
+Use `-SkipPurity` to run only the built-in fixture and FeatureGallery, without initializing the submodule. `-PurityRoot <path>` optionally selects another clean tutorial Git checkout; it now accepts source repositories, not manually adapted copies. Both the default and override go through the same automatic preparation.
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File benchmarks/HotReload/Run.ps1 -Suite watch -PurityRoot <prepared-copy>
+powershell -NoProfile -ExecutionPolicy Bypass -File benchmarks/HotReload/Run.ps1 -Suite watch -Prepare
+powershell -NoProfile -ExecutionPolicy Bypass -File benchmarks/HotReload/Run.ps1 -Suite watch -SkipPurity
 powershell -NoProfile -ExecutionPolicy Bypass -File benchmarks/HotReload/Summarize.ps1 -OutputDirectory benchmarks/HotReload/results/local
 ```
 
 `WatchFixture.csproj` can also be run directly. The runner puts the absolute repository root into its isolated copy so custom output directories resolve the same runtime and build tasks.
+
+## Partially generated reports
+
+`Summarize.ps1` writes the CSV artifacts and then calls `Update-Report.ps1` to create or update `README.md` in the results directory. Watch timings and send boundaries, generator/CLR/build tables, graph decisions, observation/parity counts, and available tutorial provenance are generated from recorded artifacts. Missing suites are shown as unmeasured, not as zero-cost results. Variable graph counts are displayed as ranges.
+
+New reports start with an English scaffold. Machine-specific environment notes, methodology, interpretations and limitations remain manual. Existing reports are updated only between paired HTML comments such as `<!-- BEGIN GENERATED: watch -->` and `<!-- END GENERATED: watch -->`; all text outside marked blocks is preserved. Report-specific selections may omit blocks. Unknown, duplicate, nested or unpaired markers fail without replacing the report. An existing unmarked README is never overwritten automatically.
+
+Archived CSV results can be rendered without rerunning any benchmark:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File benchmarks/HotReload/Update-Report.ps1 -ResultDirectory benchmarks/HotReload/results/2026-10-16
+powershell -NoProfile -ExecutionPolicy Bypass -File benchmarks/HotReload/Test-Report.ps1
+```
+
+The update is deterministic, uses invariant numeric formatting and preserves CRLF. Always review manual conclusions after changing the data: generated tables do not update prose or prove that the full benchmark matrix completed. The regression checks exercise the archived measurements, manual-text preservation, idempotence, incomplete datasets, graph ranges, Markdown escaping, malformed markers and the automatic summarizer integration.
 
 ## Sampling and boundaries
 

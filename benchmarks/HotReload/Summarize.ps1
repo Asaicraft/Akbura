@@ -63,7 +63,7 @@ foreach ($file in Get-ChildItem -LiteralPath $InputDirectory -Filter '*.jsonl' -
         }
     }
 }
-if ($rows.Count -eq 0) {
+if ($rows.Count -eq 0 -and $graphRows.Count -eq 0) {
     throw 'No benchmark samples found.'
 }
 $rows | Export-Csv -LiteralPath (Join-Path $OutputDirectory 'samples.csv') -NoTypeInformation -Encoding UTF8
@@ -96,7 +96,13 @@ $watchEvents | Export-Csv -LiteralPath (Join-Path $OutputDirectory 'watch-events
 $graphRows | Export-Csv -LiteralPath (Join-Path $OutputDirectory 'graph.csv') -NoTypeInformation -Encoding UTF8
 [IO.File]::WriteAllText((Join-Path $OutputDirectory 'environment.json'),
     ($environmentRows | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
-foreach ($path in @('samples.csv', 'summary.csv', 'environment.json', 'build-tasks.csv', 'startup.csv', 'validation.csv', 'watch-events.csv', 'graph.csv')) {
+$puritySource = Join-Path $InputDirectory 'purity-source.json'
+if (Test-Path -LiteralPath $puritySource) {
+    $source = [IO.File]::ReadAllText($puritySource) | ConvertFrom-Json
+    $portableSource = @{ Repository = $source.Repository; Revision = $source.Revision } | ConvertTo-Json
+    [IO.File]::WriteAllText((Join-Path $OutputDirectory 'purity-source.json'), $portableSource, [Text.UTF8Encoding]::new($false))
+}
+foreach ($path in @('samples.csv', 'summary.csv', 'environment.json', 'build-tasks.csv', 'startup.csv', 'validation.csv', 'watch-events.csv', 'graph.csv', 'purity-source.json')) {
     if (-not (Test-Path -LiteralPath (Join-Path $OutputDirectory $path))) {
         continue;
     }
@@ -105,3 +111,4 @@ foreach ($path in @('samples.csv', 'summary.csv', 'environment.json', 'build-tas
     [IO.File]::WriteAllText($absolute, $text.TrimEnd("`r", "`n") + "`r`n", [Text.UTF8Encoding]::new($false))
 }
 Write-Host "$($rows.Count) samples; $($summaries.Count) metric summaries written to $OutputDirectory"
+& (Join-Path $PSScriptRoot 'Update-Report.ps1') -ResultDirectory $OutputDirectory

@@ -3,6 +3,7 @@ param(
     [string[]]$Suite = @('runtime', 'generator', 'graph', 'build', 'watch'),
     [string]$OutputDirectory,
     [string]$PurityRoot,
+    [switch]$SkipPurity,
     [switch]$Prepare
 )
 
@@ -63,11 +64,20 @@ function Measure-Build([string]$Name, [string]$Project, [string[]]$Extra = @()) 
 Push-Location $repository
 try {
     if ($Prepare) {
-        Invoke-Dotnet @('build', 'src/Akbura/Akbura.csproj', '--nologo', '-v:minimal') (Join-Path $OutputDirectory 'prepare-runtime.log')
+        Invoke-Dotnet @('build', 'src/Akbura.Diagnostics/Akbura.Diagnostics.csproj', '--nologo', '-v:minimal') (Join-Path $OutputDirectory 'prepare-runtime.log')
         Invoke-Dotnet @('build', $toolProject, '--nologo', '-v:minimal') (Join-Path $OutputDirectory 'prepare-tool.log')
     }
     if (-not (Test-Path -LiteralPath $tool)) {
         throw 'Run with -Prepare to build the runtime and benchmark executable first.'
+    }
+    $usePurity = -not $SkipPurity -and @($Suite | Where-Object { $_ -in @('generator', 'graph', 'watch') }).Count -gt 0
+    if ($usePurity) {
+        if (-not $PurityRoot) {
+            $PurityRoot = Join-Path $PSScriptRoot 'Akbura-PurityUI-Tutorial'
+        }
+        $PurityRoot = & (Join-Path $PSScriptRoot 'Prepare-Purity.ps1') -SourceRoot $PurityRoot -OutputDirectory $OutputDirectory -RepositoryRoot $repository
+        $hostProject = Join-Path $PurityRoot 'PurityHost/PurityHost.csproj'
+        Invoke-Dotnet @('build', $hostProject, '--nologo', '-v:minimal') (Join-Path $OutputDirectory 'purity-prepare.log')
     }
     if ('runtime' -in $Suite) {
         $previousModifiable = $env:DOTNET_MODIFIABLE_ASSEMBLIES
@@ -139,7 +149,7 @@ try {
         foreach ($scenario in @('cold', 'noop', 'whitespace', 'scalar', 'csharp', 'diagnostics-off')) {
             Invoke-Dotnet @($tool, 'generator', $galleryInputs, 'Counter.akbura', $scenario) (Join-Path $OutputDirectory "generator-gallery-$scenario.jsonl")
         }
-        if ($PurityRoot) {
+        if ($usePurity) {
             $purityProject = Join-Path $PurityRoot 'PurityUIDashborad/PurityUIDashborad.csproj'
             $purityInputs = Export-Inputs $purityProject 'purity'
             foreach ($file in @('NeedHelp.akbura', 'Sidebar.akbura')) {
@@ -155,7 +165,7 @@ try {
             $galleryInputs = Export-Inputs $gallery 'gallery'
         }
         Invoke-Dotnet @($tool, 'graph', $galleryInputs, 'Counter.akbura') (Join-Path $OutputDirectory 'graph-gallery.jsonl')
-        if ($PurityRoot) {
+        if ($usePurity) {
             if (-not $purityInputs) {
                 $purityInputs = Export-Inputs (Join-Path $PurityRoot 'PurityUIDashborad/PurityUIDashborad.csproj') 'purity'
             }
@@ -166,8 +176,7 @@ try {
     }
     if ('watch' -in $Suite) {
         Invoke-Dotnet @($tool, 'watch', $fixtureProject, (Join-Path $fixture 'Counter.akbura'), 'Fixture') (Join-Path $OutputDirectory 'watch-fixture.jsonl')
-        if ($PurityRoot) {
-            $hostProject = Join-Path $PurityRoot 'TimingHost/TimingHost.csproj'
+        if ($usePurity) {
             foreach ($component in @('NeedHelp', 'Sidebar')) {
                 Invoke-Dotnet @($tool, 'watch', $hostProject, (Join-Path $PurityRoot "PurityUIDashborad/Components/$component.akbura"), $component) (Join-Path $OutputDirectory "watch-$component.jsonl")
             }

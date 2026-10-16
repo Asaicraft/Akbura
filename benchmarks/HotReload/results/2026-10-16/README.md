@@ -21,11 +21,13 @@ For an even sample count, the median is the average of the two central values. p
 
 All values are in seconds. Startup is measured separately, from launching watch until the application is ready; it is not included in edit latency.
 
-| Application / edit | Startup | First edit | Median of next 8 | Range of next 8 | max/p95 |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| WatchFixture / Counter text | 8.320 | 1.760 | 0.107 | 0.078–0.184 | 0.184 |
-| Purity / NeedHelp StrokeThickness | 21.424 | 12.810 | 1.249 | 0.909–1.936 | 1.936 |
-| Purity / Sidebar Dashboard text | 9.731 | 13.888 | 2.016 | 1.643–4.542 | 4.542 |
+<!-- BEGIN GENERATED: watch -->
+| Scenario | Startup (s) | First recorded edit (s) | Measured n | Repeat median (s) | Repeat range (s) | Repeat p95 (s) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Fixture | 8.320 | 1.760 | 8 | 0.107 | 0.078–0.184 | 0.184 |
+| NeedHelp | 21.424 | 12.810 | 8 | 1.249 | 0.909–1.936 | 1.936 |
+| Sidebar | 9.731 | 13.888 | 8 | 2.016 | 1.643–4.542 | 4.542 |
+<!-- END GENERATED: watch -->
 
 All 27 edits completed without restarting the application or replacing the target control. Fixture also checks user input and state; Sidebar checks the named control, foreground/state preservation, and ToggleSidebar execution followed by restoring the state. Sidebar's checks are included in its path to the observation log line. The hosts use Avalonia.Headless and 10 ms polling; physical frame presentation is not measured.
 
@@ -33,11 +35,15 @@ Warm-up does not end precisely after the first edit: Sidebar's second edit took 
 
 Timestamps from **the same run**, for the eight repeated edits:
 
-| Scenario | Before the `Sending update batch` message, median | From that message to UI observation, median |
-| --- | ---: | ---: |
-| Fixture | 93.30 ms | 11.61 ms |
-| NeedHelp | 1240.21 ms | 8.74 ms |
-| Sidebar | 1992.08 ms | 24.41 ms |
+<!-- BEGIN GENERATED: watch-boundary -->
+| Scenario | Matched measured n | Before send message, median (ms) | After message to UI, median (ms) |
+| --- | --- | --- | --- |
+| Fixture | 8 | 93.30 | 11.61 |
+| NeedHelp | 8 | 1240.21 | 8.74 |
+| Sidebar | 8 | 1992.08 | 24.41 |
+
+Missing or unmatched send logs are shown as —; no boundary is inferred from independent runs.
+<!-- END GENERATED: watch-boundary -->
 
 This is a boundary observed through asynchronous logs, not the exact duration of MetadataUpdater or a handler: output delivery and polling are included. Nevertheless, most latency in these scenarios occurs **before sending** the update to the application. Subtracting the independent generator measurements below from watch latency would not yield an exact EnC duration.
 
@@ -47,24 +53,26 @@ FeatureGallery: 32 additional files, 28 components, 18 C# files, 190 metadata re
 
 Times are in milliseconds. The initial pass is index=0 in a separate process for each series; median/max cover eight warm passes. The last column counts generated sources whose **text changed**, not backend operations executed again.
 
-| Project / series | Initial pass | Median | max/p95 | Changed / total |
-| --- | ---: | ---: | ---: | ---: |
-| Gallery: fresh driver | 15119.57 | 8664.80 | 9193.91 | 0/34 |
-| Gallery: no-op | 14270.23 | 12.67 | 14.95 | 0/34 |
-| Gallery: whitespace | 14031.84 | 14.61 | 15.46 | 0/34 |
-| Gallery: Counter text | 14630.86 | 284.99 | 380.46 | 1/34 |
-| Gallery: C# | 14339.04 | 8410.99 | 8626.89 | 0/34 |
-| Gallery: Counter text, diagnostics Off | 14411.67 | 290.12 | 369.49 | 1/34 |
-| Purity / NeedHelp: no-op | 5617.30 | 2.96 | 3.01 | 0/17 |
-| Purity / NeedHelp: whitespace | 5966.79 | 6.17 | 9.81 | 0/17 |
-| Purity / NeedHelp: StrokeThickness | 6393.49 | 383.90 | 390.14 | 1/17 |
-| Purity / NeedHelp: C# | 5612.73 | 2238.12 | 3224.96 | 0/17 |
-| Purity / NeedHelp: StrokeThickness, diagnostics Off | 5685.31 | 343.56 | 350.46 | 1/17 |
-| Purity / Sidebar: no-op | 5707.28 | 2.83 | 3.00 | 0/17 |
-| Purity / Sidebar: whitespace | 5655.82 | 8.38 | 11.05 | 0/17 |
-| Purity / Sidebar: Dashboard text | 5664.40 | 1237.91 | 1357.48 | 1/17 |
-| Purity / Sidebar: C# | 5536.70 | 2191.59 | 3345.99 | 0/17 |
-| Purity / Sidebar: Dashboard text, diagnostics Off | 5627.18 | 1229.12 | 1278.28 | 1/17 |
+<!-- BEGIN GENERATED: generator -->
+| Project / scenario | Initial pass (ms) | Measured n | Median (ms) | p95 (ms) | Text changed / total |
+| --- | --- | --- | --- | --- | --- |
+| Gallery / Counter.akbura:cold | 15119.57 | 8 | 8664.80 | 9193.91 | 0/34 |
+| Gallery / Counter.akbura:csharp | 14339.04 | 8 | 8410.99 | 8626.89 | 0/34 |
+| Gallery / Counter.akbura:diagnostics-off | 14411.67 | 8 | 290.12 | 369.49 | 1/34 |
+| Gallery / Counter.akbura:noop | 14270.23 | 8 | 12.67 | 14.95 | 0/34 |
+| Gallery / Counter.akbura:scalar | 14630.86 | 8 | 284.99 | 380.46 | 1/34 |
+| Gallery / Counter.akbura:whitespace | 14031.84 | 8 | 14.61 | 15.46 | 0/34 |
+| Purity / NeedHelp.akbura:csharp | 5612.73 | 8 | 2238.12 | 3224.96 | 0/17 |
+| Purity / NeedHelp.akbura:diagnostics-off | 5685.31 | 8 | 343.56 | 350.46 | 1/17 |
+| Purity / NeedHelp.akbura:noop | 5617.30 | 8 | 2.96 | 3.01 | 0/17 |
+| Purity / NeedHelp.akbura:scalar | 6393.49 | 8 | 383.90 | 390.14 | 1/17 |
+| Purity / NeedHelp.akbura:whitespace | 5966.79 | 8 | 6.17 | 9.81 | 0/17 |
+| Purity / Sidebar.akbura:csharp | 5536.70 | 8 | 2191.59 | 3345.99 | 0/17 |
+| Purity / Sidebar.akbura:diagnostics-off | 5627.18 | 8 | 1229.12 | 1278.28 | 1/17 |
+| Purity / Sidebar.akbura:noop | 5707.28 | 8 | 2.83 | 3.00 | 0/17 |
+| Purity / Sidebar.akbura:scalar | 5664.40 | 8 | 1237.91 | 1357.48 | 1/17 |
+| Purity / Sidebar.akbura:whitespace | 5655.82 | 8 | 8.38 | 11.05 | 0/17 |
+<!-- END GENERATED: generator -->
 
 In the fresh-driver series, every pass starts the incremental graph again, but the process, Roslyn/JIT, and static parse cache may already be warm. A zero text diff does not mean no generation occurred: the same source set was generated again.
 
@@ -74,11 +82,13 @@ An ordinary property edit changes one generated source. A C# edit leaves all gen
 
 A separate run reads generation-request decisions rather than inferring work from text diffs:
 
-| Edit | Components recomputed | Components reused | Diagnostic documents recomputed | AKCSS modules recomputed |
-| --- | ---: | ---: | ---: | ---: |
-| Gallery / Counter | 1/28 | 27 | 1 | 0 |
-| Purity / NeedHelp | 1/16 | 15 | 1 | 0 |
-| Purity / Sidebar | 1/16 | 15 | 1 | 0 |
+<!-- BEGIN GENERATED: graph -->
+| Scenario | Measured n | Components | Recomputed | Reused | Diagnostic documents recomputed | AKCSS modules recomputed |
+| --- | --- | --- | --- | --- | --- | --- |
+| Counter.akbura:scalar | 8 | 28 | 1 | 27 | 1 | 0 |
+| NeedHelp.akbura:scalar | 8 | 16 | 1 | 15 | 1 | 0 |
+| Sidebar.akbura:scalar | 8 | 16 | 1 | 15 | 1 | 0 |
+<!-- END GENERATED: graph -->
 
 These counts are identical across all eight repeated edits in each series. They represent logical graph decisions, not an execution profiler. The tested ordinary edits do not broadly recompute dependent components; this finding must not be generalized to every C# environment or declaration change.
 
@@ -88,27 +98,29 @@ BlackSilence reported no errors in any series, and the final incremental output 
 
 All values are in milliseconds. Stage columns show medians of eight observations. `Total` is measured independently; the sum of stage medians need not equal the median total.
 
-| Scenario | Generator | Compilation validation | Delta + CLR | Akbura handlers | Total | Total max/p95 |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| property-1 | 19.71 | 30.09 | 12.86 | 1.00 | 69.07 | 87.18 |
-| property-100 | 344.98 | 137.89 | 105.28 | 6.87 | 612.34 | 673.93 |
-| property-500 | 859.44 | 239.36 | 154.25 | 44.36 | 1295.20 | 1516.34 |
-| akcss-token-1 | 38.53 | 40.37 | 44.04 | 1.68 | 121.35 | 155.28 |
-| akcss-token-100 | 296.45 | 135.19 | 129.85 | 7.81 | 567.48 | 606.31 |
-| akcss-token-500 | 839.46 | 217.70 | 197.77 | 55.01 | 1324.48 | 1463.30 |
-| insert-remove | 32.66 | 14.62 | 10.45 | 2.06 | 67.81 | 75.18 |
-| reorder | 35.15 | 18.34 | 9.22 | 2.07 | 71.57 | 77.08 |
-| replace-type | 30.11 | 16.13 | 9.28 | 2.30 | 61.81 | 71.37 |
-| binding | 30.35 | 15.35 | 4.86 | 1.20 | 54.28 | 64.10 |
-| event | 30.70 | 13.92 | 12.04 | 1.93 | 65.44 | 95.73 |
-| conditional | 32.56 | 18.66 | 18.65 | 2.40 | 73.65 | 100.79 |
-| foreach | 16.48 | 12.00 | 12.26 | 1.68 | 45.88 | 53.60 |
-| state-initializer | 27.72 | 18.12 | 3.13 | 0.24 | 48.25 | 57.29 |
-| state-add-remove | 28.99 | 18.82 | 9.43 | 1.74 | 60.77 | 68.64 |
-| akcss-definition | 45.57 | 24.31 | 7.01 | 0.86 | 74.84 | 100.43 |
-| akcss-order | 37.71 | 28.13 | 18.71 | 2.24 | 86.22 | 132.63 |
-| property-10-owners | 28.54 | 18.58 | 8.33 | 2.42 | 61.94 | 99.62 |
-| property-100-owners | 33.30 | 12.67 | 10.66 | 7.97 | 69.91 | 73.55 |
+<!-- BEGIN GENERATED: runtime -->
+| Scenario | Measured n | Generator (ms) | Validation (ms) | Delta + CLR (ms) | Handlers (ms) | Total (ms) | Total p95 (ms) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| akcss-definition | 8 | 45.57 | 24.31 | 7.01 | 0.86 | 74.84 | 100.43 |
+| akcss-order | 8 | 37.71 | 28.13 | 18.71 | 2.24 | 86.22 | 132.63 |
+| akcss-token-1 | 8 | 38.53 | 40.37 | 44.04 | 1.68 | 121.35 | 155.28 |
+| akcss-token-100 | 8 | 296.45 | 135.19 | 129.85 | 7.81 | 567.48 | 606.31 |
+| akcss-token-500 | 8 | 839.46 | 217.70 | 197.77 | 55.01 | 1324.48 | 1463.30 |
+| binding | 8 | 30.35 | 15.35 | 4.86 | 1.20 | 54.28 | 64.10 |
+| conditional | 8 | 32.56 | 18.66 | 18.65 | 2.40 | 73.65 | 100.79 |
+| event | 8 | 30.70 | 13.92 | 12.04 | 1.93 | 65.44 | 95.73 |
+| foreach | 8 | 16.48 | 12.00 | 12.26 | 1.68 | 45.88 | 53.60 |
+| insert-remove | 8 | 32.66 | 14.62 | 10.45 | 2.06 | 67.81 | 75.18 |
+| property-1 | 8 | 19.71 | 30.09 | 12.86 | 1.00 | 69.07 | 87.18 |
+| property-100 | 8 | 344.98 | 137.89 | 105.28 | 6.87 | 612.34 | 673.93 |
+| property-100-owners | 8 | 33.30 | 12.67 | 10.66 | 7.97 | 69.91 | 73.55 |
+| property-10-owners | 8 | 28.54 | 18.58 | 8.33 | 2.42 | 61.94 | 99.62 |
+| property-500 | 8 | 859.44 | 239.36 | 154.25 | 44.36 | 1295.20 | 1516.34 |
+| reorder | 8 | 35.15 | 18.34 | 9.22 | 2.07 | 71.57 | 77.08 |
+| replace-type | 8 | 30.11 | 16.13 | 9.28 | 2.30 | 61.81 | 71.37 |
+| state-add-remove | 8 | 28.99 | 18.82 | 9.43 | 1.74 | 60.77 | 68.64 |
+| state-initializer | 8 | 27.72 | 18.12 | 3.13 | 0.24 | 48.25 | 57.29 |
+<!-- END GENERATED: runtime -->
 
 `property-N` and `akcss-token-N` change one property on the common root of a tree with N TextBlock children, not N independent properties. Other structural scenarios use 20 children. Multi-owner scenarios update 10/100 live instances of one component, each with 20 children.
 
@@ -122,16 +134,22 @@ In this set, Akbura handler time is substantially smaller than update preparatio
 
 Values here are in seconds, from CLI launch to completion; restore is excluded. `Rebuild` also rebuilds dependencies but does not clear OS filesystem caches. This is not ordinary CLR delta latency.
 
-| Condition | WatchFixture | FeatureGallery |
-| --- | ---: | ---: |
-| Rebuild, n=1 | 4.811 | 70.789 |
-| No-op, median n=3 | 1.281 | 2.528 |
-| No-op, range | 1.279–1.321 | 2.494–2.731 |
-| No-op with `-nr:false`, n=1 | 1.282 | 4.193 |
-| `.akbura` property edit, n=1 | 4.565 | — |
-| `.cs` comment edit, n=1 | 4.620 | — |
-| Corrupted XML manifest, n=1 | 4.770 | — |
-| No-op after recovery, n=1 | 1.319 | — |
+<!-- BEGIN GENERATED: builds -->
+| Condition | n | CLI median (s) | CLI range (s) | Csc task events | Manifest generation task events |
+| --- | --- | --- | --- | --- | --- |
+| fixture-component-edit | 1 | 4.565 | 4.565–4.565 | 1 | 1 |
+| fixture-corrupt-manifest | 1 | 4.770 | 4.770–4.770 | 1 | 1 |
+| fixture-csharp-edit | 1 | 4.620 | 4.620–4.620 | 1 | 1 |
+| fixture-no-node-reuse | 1 | 1.282 | 1.282–1.282 | 0 | 0 |
+| fixture-noop | 3 | 1.281 | 1.279–1.321 | 0 | 0 |
+| fixture-rebuild | 1 | 4.811 | 4.811–4.811 | 1 | 1 |
+| fixture-recovered-noop | 1 | 1.319 | 1.319–1.319 | 0 | 0 |
+| gallery-no-node-reuse | 1 | 4.193 | 4.193–4.193 | 0 | 0 |
+| gallery-noop | 3 | 2.528 | 2.494–2.731 | 0 | 0 |
+| gallery-rebuild | 1 | 70.789 | 70.789–70.789 | 6 | 3 |
+
+Task event counts span all builds in the row; — means task evidence was not recorded.
+<!-- END GENERATED: builds -->
 
 In every no-op case, the binlog contains manifest checks but neither `GenerateAkburaModuleManifest` nor `Csc`. Recovering the corrupted manifest did trigger generation (2.761 s inside the task), and the next no-op skipped it again. The `.cs` edit here deliberately changes only text; C# method-body changes are covered separately by the generator matrix.
 
@@ -161,6 +179,15 @@ These are investigation directions supported by measurements, not a diagnosis of
 
 Full local logs and binlogs are in the ignored `bin/HotReloadBenchmarks` directory. The repository contains portable CSV files and run conditions rather than absolute links to machine-specific artifacts.
 
-The archive contains 407 primary observations including warm-ups: 190 CLR, 176 generator, 27 watch, and 14 builds. The graph is recorded separately with 33 observations. All 19 final fresh-driver parity checks passed (16 primary series + 3 graph series).
+<!-- BEGIN GENERATED: coverage -->
+| Series | All observations | Measured observations |
+| --- | --- | --- |
+| runtime | 190 | 152 |
+| generator | 176 | 128 |
+| watch | 27 | 24 |
+| build-wall | 14 | 14 |
+
+Primary observations: 407. Graph observations: 33. Fresh-driver parity: 19/19 passed. Counts do not imply complete scenario coverage.
+<!-- END GENERATED: coverage -->
 
 This is a finite matrix: Visual Studio/Rider, Release, physical GPU/screen presentation, templates and every resource/binding-priority variant, network delays, cold disks, concurrent edits, and rude edits are not covered. Unmeasured conditions are not treated as zero-cost or successfully verified. The full functional test suite was not run: this is a separate timing harness with its own result checks.

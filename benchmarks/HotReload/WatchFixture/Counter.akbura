@@ -1,0 +1,12 @@
+using Avalonia.Controls;
+namespace Demo;
+
+state int count = 7;
+
+<Border Width="100">
+    <StackPanel>
+        <TextBlock Text="Akbura Counter" />
+        <TextBox Text="User input" />
+        <TextBlock Text={count.ToString()} />
+    </StackPanel>
+</Border>

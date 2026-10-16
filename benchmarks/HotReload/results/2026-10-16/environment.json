@@ -1,0 +1,520 @@
+[
+    {
+        "Log":  "fixture-component-edit.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:18:30.6468942Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "fixture-corrupt-manifest.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:18:40.3474016Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "fixture-csharp-edit.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:18:35.4181153Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "fixture-no-node-reuse.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:18:25.9203104Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "fixture-noop-1.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:18:21.6292401Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "fixture-noop-2.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:18:23.0597709Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "fixture-noop-3.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:18:24.4911559Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "fixture-rebuild.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:18:20.1506505Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "fixture-recovered-noop.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:18:41.8162019Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "gallery-no-node-reuse.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:20:59.1948018Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "gallery-noop-1.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:20:49.4692846Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "gallery-noop-2.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:20:52.17023Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "gallery-noop-3.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:20:54.8336703Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "gallery-rebuild.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:20:46.5630996Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "generator-gallery-cold.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:21:04.574378Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "generator-gallery-csharp.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:24:51.1978591Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "generator-gallery-diagnostics-off.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:26:48.1972658Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "generator-gallery-noop.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:23:06.5742168Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "generator-gallery-scalar.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:24:14.2626706Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "generator-gallery-whitespace.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:23:40.5727613Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "generator-purity-NeedHelp.akbura-csharp.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:28:07.9115501Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "generator-purity-NeedHelp.akbura-diagnostics-off.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:28:44.244154Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "generator-purity-NeedHelp.akbura-noop.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:27:26.6523254Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "generator-purity-NeedHelp.akbura-scalar.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:27:51.3805404Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "generator-purity-NeedHelp.akbura-whitespace.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:27:38.5484768Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "generator-purity-Sidebar.akbura-csharp.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:29:46.9475568Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "generator-purity-Sidebar.akbura-diagnostics-off.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:30:22.7308787Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "generator-purity-Sidebar.akbura-noop.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:28:59.491473Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "generator-purity-Sidebar.akbura-scalar.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:29:23.6838845Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "generator-purity-Sidebar.akbura-whitespace.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:29:11.6332964Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "graph-gallery.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:33:42.4425984Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "graph-purity-NeedHelp.akbura.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:34:21.5200856Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "graph-purity-Sidebar.akbura.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:34:37.5699911Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "runtime.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:16:55.7171948Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  true,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "watch-fixture.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:30:45.9208658Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "watch-NeedHelp.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:31:06.1327781Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    },
+    {
+        "Log":  "watch-Sidebar.jsonl",
+        "Environment":  {
+                            "Kind":  "environment",
+                            "Utc":  "2026-10-16T06:31:59.9599673Z",
+                            "Runtime":  "10.0.12",
+                            "CpuCount":  12,
+                            "OS":  "Microsoft Windows NT 10.0.26200.0",
+                            "Roslyn":  "5.9.0.0",
+                            "ClrHotReload":  false,
+                            "Warmup":  2,
+                            "Samples":  8
+                        }
+    }
+]

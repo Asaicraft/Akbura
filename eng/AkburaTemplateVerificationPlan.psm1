@@ -1,3 +1,5 @@
+#requires -Version 7.1
+
 Set-StrictMode -Version Latest
 
 $script:SchemaVersion = 1

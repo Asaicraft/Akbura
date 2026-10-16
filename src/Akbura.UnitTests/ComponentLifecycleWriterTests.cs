@@ -351,7 +351,7 @@ public sealed class ComponentLifecycleWriterTests
     }
 
     [Fact]
-    public void WriteMembers_DebugStructuralOwnsStylesOutsideInitialValueGuard()
+    public void WriteMembers_DebugStructuralOwnsStylesOutsideNameInitializationGuard()
     {
         using var fixture = CreateFixture(
             """
@@ -375,7 +375,7 @@ public sealed class ComponentLifecycleWriterTests
         var methods = SplitLifecycleMethods(
             fixture.CodeWriter.GetText().ToString());
         var guardStart = methods.HotReload.IndexOf(
-            ".ShouldApplyInitialValues(0)",
+            ".IsNew(0)",
             StringComparison.Ordinal);
         Assert.True(guardStart >= 0, methods.HotReload);
         var guardOpen = methods.HotReload.IndexOf(
@@ -393,6 +393,10 @@ public sealed class ComponentLifecycleWriterTests
         Assert.True(guardClose > guardOpen, methods.HotReload);
         Assert.Contains(".Name = \"root\";", methods.HotReload[guardOpen..guardClose], StringComparison.Ordinal);
         Assert.True(applyStyles > guardClose, methods.HotReload);
+        var retainedNodeBranch = methods.HotReload.IndexOf("else", applyStyles, StringComparison.Ordinal);
+        Assert.True(retainedNodeBranch > applyStyles, methods.HotReload);
+        Assert.Contains(".ApplyAkcssStylesOperation(", methods.HotReload[retainedNodeBranch..], StringComparison.Ordinal);
+        Assert.Equal(2, CountOccurrences(methods.HotReload, ".ApplyAkcssStylesOperation("));
         Assert.Contains(
             ".ApplyAkcssStylesOperation(",
             methods.FirstUpdate,

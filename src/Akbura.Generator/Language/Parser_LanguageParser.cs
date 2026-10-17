@@ -1978,6 +1978,8 @@ partial class Parser
     {
         return CurrentToken.Kind switch
         {
+            SyntaxKind.DollarToken when IsMarkupExpressionBindingStart() =>
+                ParseMarkupExpressionBindingSyntax(),
             SyntaxKind.DollarToken => GreenSyntaxFactory.MarkupExtensionAttributeValueSyntax(
                 ParseMarkupExtensionSyntax()),
             SyntaxKind.OpenBraceToken => GreenSyntaxFactory.MarkupDynamicAttributeValueSyntax(
@@ -1988,6 +1990,56 @@ partial class Parser
                 value: ParseQuotedMarkupTextLiteralSyntax()),
             _ => null,
         };
+    }
+
+    private bool IsMarkupExpressionBindingStart()
+    {
+        // Read fresh lexical tokens through the normal buffer, also during
+        // incremental parsing. An old markup-extension type can contain a
+        // parser-converted IdentifierToken spelling "bind", not a BindToken.
+        var isBinding = PeekToken(0).Kind == SyntaxKind.DollarToken &&
+            PeekToken(1).Kind == SyntaxKind.OpenBraceToken &&
+            PeekToken(2) is { Kind: SyntaxKind.IdentifierToken, Text: "x" } &&
+            PeekToken(3).Kind == SyntaxKind.DotToken &&
+            PeekToken(4).Kind == SyntaxKind.BindToken;
+
+        if (!isBinding && _isIncremental)
+        {
+            // Restore the blender before ordinary extension parsing so its
+            // unaffected type and argument nodes remain available for reuse.
+            ResetLookaheadForLexerModeChange();
+        }
+
+        return isBinding;
+    }
+
+    private GreenMarkupExpressionBindingSyntax ParseMarkupExpressionBindingSyntax()
+    {
+        var dollar = EatToken(SyntaxKind.DollarToken);
+        var openBrace = EatToken(SyntaxKind.OpenBraceToken);
+        var xIdentifier = ParseMarkupSimpleName();
+        var dot = EatToken(SyntaxKind.DotToken);
+        var bind = EatToken(SyntaxKind.BindToken);
+
+        // The introducer lookahead was lexed in markup mode. None of its
+        // unconsumed tokens may enter the C# expression scanner.
+        ResetLookaheadForLexerModeChange();
+        var expression = ParseCSharpExpressionInMode(Lexer.LexerMode.InExpressionBinding);
+        var closeBrace = EatToken(SyntaxKind.CloseBraceToken);
+        var binding = GreenSyntaxFactory.MarkupExpressionBindingSyntax(
+            dollar, openBrace, xIdentifier, dot, bind, expression, closeBrace);
+        return ReportEmptyExpressionBinding(binding);
+    }
+
+    private GreenMarkupExpressionBindingSyntax ReportEmptyExpressionBinding(GreenMarkupExpressionBindingSyntax binding)
+    {
+        return binding.Expression.Tokens[0] is GreenSyntaxToken.CSharpRawToken
+            { RawNode: CSharp.ExpressionSyntax { Span.Length: 0 } }
+            ? AddError(binding,
+                binding.DollarToken.FullWidth + binding.OpenBrace.FullWidth + binding.XIdentifier.FullWidth +
+                binding.DotToken.FullWidth + binding.BindKeyword.FullWidth,
+                binding.Expression.FullWidth, ErrorCodes.ERR_SyntaxError, "expression")
+            : binding;
     }
 
     private static bool IsMarkupAttributeValueStart(GreenSyntaxToken token)
@@ -2692,17 +2744,20 @@ partial class Parser
     private GreenCSharpExpressionSyntax ParseCSharpExpressionInMode(Lexer.LexerMode expressionMode)
     {
         var mode = _mode;
-
         _mode = expressionMode;
 
-        var token = EatToken();
+        try
+        {
+            var token = EatToken();
 
-        AkburaDebug.Assert(token.Kind == SyntaxKind.CSharpRawToken, "Expected CSharpRawToken");
-        AkburaDebug.Assert(((GreenSyntaxToken.CSharpRawToken)token).RawNode is CSharp.ExpressionSyntax, "Exprected Expression");
-
-        _mode = mode;
-
-        return GreenSyntaxFactory.CSharpExpressionSyntax(token);
+            AkburaDebug.Assert(token.Kind == SyntaxKind.CSharpRawToken, "Expected CSharpRawToken");
+            AkburaDebug.Assert(((GreenSyntaxToken.CSharpRawToken)token).RawNode is CSharp.ExpressionSyntax, "Exprected Expression");
+            return GreenSyntaxFactory.CSharpExpressionSyntax(token);
+        }
+        finally
+        {
+            _mode = mode;
+        }
     }
 
     #endregion

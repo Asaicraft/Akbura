@@ -1240,6 +1240,8 @@ internal sealed partial class Parser
 
         return PeekIncrementalTokenKind() switch
         {
+            SyntaxKind.DollarToken when IsMarkupExpressionBindingStart() =>
+                ParseIncrementalMarkupExpressionBindingSyntax(),
             SyntaxKind.DollarToken => GreenSyntaxFactory.MarkupExtensionAttributeValueSyntax(
                 ParseIncrementalMarkupExtensionSyntax()),
             SyntaxKind.OpenBraceToken => GreenSyntaxFactory.MarkupDynamicAttributeValueSyntax(
@@ -1250,6 +1252,26 @@ internal sealed partial class Parser
                 value: ParseIncrementalQuotedMarkupTextLiteralSyntax()),
             _ => null,
         };
+    }
+
+    private GreenMarkupExpressionBindingSyntax ParseIncrementalMarkupExpressionBindingSyntax()
+    {
+        if (TryReadReusableIncrementalNode<GreenMarkupExpressionBindingSyntax>(out var binding))
+        {
+            return binding;
+        }
+
+        var dollar = ReadRequiredIncrementalToken(SyntaxKind.DollarToken);
+        var openBrace = ReadRequiredIncrementalToken(SyntaxKind.OpenBraceToken);
+        var xIdentifier = ParseIncrementalMarkupSimpleName();
+        var dot = ReadRequiredIncrementalToken(SyntaxKind.DotToken);
+        var bind = ReadRequiredIncrementalToken(SyntaxKind.BindToken);
+        ResetLookaheadForLexerModeChange();
+        var expression = ParseIncrementalCSharpExpressionInMode(Lexer.LexerMode.InExpressionBinding);
+        var closeBrace = ReadRequiredIncrementalToken(SyntaxKind.CloseBraceToken);
+        binding = GreenSyntaxFactory.MarkupExpressionBindingSyntax(
+            dollar, openBrace, xIdentifier, dot, bind, expression, closeBrace);
+        return ReportEmptyExpressionBinding(binding);
     }
 
     private GreenMarkupTextLiteralSyntax ParseIncrementalQuotedMarkupTextLiteralSyntax()
@@ -1975,7 +1997,7 @@ internal sealed partial class Parser
     private GreenCSharpExpressionSyntax ParseIncrementalCSharpExpressionInMode(
         Lexer.LexerMode expressionMode)
     {
-        if (expressionMode != Lexer.LexerMode.InInlineExpression &&
+        if (expressionMode is not (Lexer.LexerMode.InInlineExpression or Lexer.LexerMode.InExpressionBinding) &&
             TryReadReusableIncrementalNode<GreenCSharpExpressionSyntax>(
                 out var expression))
         {

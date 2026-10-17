@@ -61,6 +61,30 @@ The separate summarizer exports compressed raw JSONL, samples, stage timings/all
 
 `Verify-SdkRoslyn.ps1 -Prepare` runs the instrumentation/statistics checks in an isolated copy of the existing test output with the active SDK's Roslyn assemblies. It leaves the original test output and repository package versions unchanged and records assembly hashes, versions, host-resolution evidence and TRX results. This complements the ordinary package-based unit-test host; run it after benchmarks, not concurrently with timing samples. The verification and invalidation-report scripts require PowerShell 7.2 or later.
 
+## Cross-compilation artifact reuse
+
+The `artifacts` suite runs the existing C# invalidation matrix with `AkburaCrossCompilationReuse=false` and `true` on identical evaluated inputs. Modes are paired per scenario. It uses the same `DebugStats` binary for both: `off` disables measurement collection, not instrumentation call sites. Use `stats` for counters without full trace events or `trace` for reasons. The optimization is a conservative isolated-leaf proof, not a general method-body shortcut; see [the mechanism](../../For%20Contributors/hot-reload.md#reusing-artifacts-after-a-c-edit).
+
+```powershell
+& ./benchmarks/HotReload/Run.ps1 -Suite artifacts -Prepare -OutputDirectory bin/CrossCompilationReuse/matrix -InvalidationProfiling stats
+& ./benchmarks/HotReload/Summarize-Invalidation.ps1 -InputDirectory bin/CrossCompilationReuse/matrix -ResultDirectory benchmarks/HotReload/results/local-artifact-reuse
+& ./benchmarks/HotReload/Run.ps1 -Suite retention -RetentionRevisions 100 -OutputDirectory bin/CrossCompilationReuse/lifetime
+```
+
+The default matrix includes unchanged inputs, unrelated/referenced bodies, whitespace/comments, signatures, overloads, constants, attributes, global usings, references, files added/removed, unresolved/repaired code, repeated/reverted edits, options and markup. `-ArtifactOptimization disabled,enabled` selects modes (pass arrays from within PowerShell, as above). `retention` also forks two concurrent real-project driver branches. This opt-in suite is not part of the default timing run.
+
+Every artifact-matrix update, including initial/warm-up runs, is compared with a cache-disabled fresh driver. The oracle compares all generated hint names and characters, compiler/generator diagnostics, descriptor fields, mapped/primary/additional locations and every diagnostic property except the transient `akbura.document-version` stamp. Stamps are independently checked as positive and not newer than the current request; a cached publication can legitimately retain an older publication stamp. JSON serialization makes property/message comparisons unambiguous. Fresh generation is verification only, never the runtime reuse algorithm, and runs outside the recorded interval.
+
+The raw rows/CSVs include wall time, actual semantic preparation/model/probe/query/emission/text counts, validated hits/fallbacks, validation/capture timings, allocations and post-GC heap/working set. Stage measurements are inclusive; never add nested times to estimate a wall-time saving. Forced GC and verification also run outside timed intervals, but affect subsequent heap/JIT state equally in both modes. The summary requires all 11 fresh checks and all 11 post-GC observations per artifact group; legacy invalidation runs keep their two-final-check protocol. Report generation preserves manual prose.
+
+`artifact-memory <inputs.json> <file> <revisions> <enabled|disabled>` is the executable counterpart of `-Suite retention`. It performs a fresh oracle on every revision, records heap after forced full GC, then releases every driver/compiler inside a non-inlined helper while deliberately retaining the newest artifact owner. Weak observations cover C# and Akbura compilations, indexes, bound/detached snapshots, created semantic models and probe contexts. The final row asserts that no compilation-bound target remains and at most one distinct detached generation survives. Active-driver heap samples and this isolated-owner proof answer different questions. Working set includes the GC allocator/native runtime and is not evidence of a retained compiler graph by itself.
+
+The unit tests independently cover 100/500 revisions, canceled attempts, stale/concurrent publications, removed artifacts and request lifetime. To repeat them under SDK Roslyn without changing repository packages:
+
+```powershell
+& ./benchmarks/HotReload/Verify-SdkRoslyn.ps1 -Prepare -TestFilter 'FullyQualifiedName~InvalidationTrace_|FullyQualifiedName~BlackSilenceGenerationStatisticsTests|FullyQualifiedName~DetachedArtifacts_' -ExpectedTestCount 61
+```
+
 ## Partially generated reports
 
 `Summarize.ps1` writes the CSV artifacts and then calls `Update-Report.ps1` to create or update `README.md` in the results directory. Watch timings and send boundaries, generator/CLR/build tables, graph decisions, observation/parity counts, and available tutorial provenance are generated from recorded artifacts. Missing suites are shown as unmeasured, not as zero-cost results. Variable graph counts are displayed as ranges.
@@ -84,9 +108,10 @@ The `cold` generator scenario creates a fresh `GeneratorDriver` each time **insi
 
 CLR scenarios cover scalar properties and AKCSS tokens at 1/100/500 child controls, insertion/removal, reordering, control-type replacement, bindings, event closures, conditionals, foreach, state initializers and state addition/removal, AKCSS definitions/order, and 1/10/100 live owners. Tree-size cases change one property on the common root; they do not change 500 independent properties. Other structural cases use 20 children. Verification runs after the measured interval; compiler diagnostics are timed explicitly inside it.
 
-This finite matrix does not claim to enumerate every program, unsupported edit, binding priority, template, resource, operating system, or IDE. Physical screen presentation, Visual Studio/Rider, production Release code, concurrent editing, network/restore latency and cold disk caches are not measured. Unsupported/rude edits and failures must not be reported as successful timing samples. Functional regression tests remain separate from this latency harness.
+This finite matrix does not claim to enumerate every program, unsupported edit, binding priority, template, resource, operating system, or IDE. Physical screen presentation, Visual Studio/Rider, production Release code, concurrent IDE editing, network/restore latency and cold disk caches are not measured. The retention suite's concurrent generator-driver forks are not a measurement of IDE scheduling. Unsupported/rude edits and failures must not be reported as successful timing samples. Functional regression tests remain separate from this latency harness.
 
 Checked-in runs:
 
 - [2026-10-16 results](results/2026-10-16/README.md)
 - [C# invalidation investigation and profiling controls](results/2026-10-16-csharp-invalidation/README.md)
+- [Bounded cross-compilation artifact reuse](results/2026-10-17-artifact-reuse/README.md)

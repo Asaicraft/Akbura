@@ -986,7 +986,8 @@ public sealed partial class BlackSilenceIncrementalGenerationTests
         }
     }
 
-    private sealed class TestOptions(string rootNamespace, string projectDirectory, bool publishDiagnostics = false, bool debugStructural = false) : AnalyzerConfigOptionsProvider
+    private sealed class TestOptions(string rootNamespace, string projectDirectory, bool publishDiagnostics = false, bool debugStructural = false,
+        bool crossCompilationReuse = true, string? diagnosticMode = null) : AnalyzerConfigOptionsProvider
     {
         private static readonly AnalyzerConfigOptions s_empty = new Values(new Dictionary<string, string>());
 
@@ -997,7 +998,8 @@ public sealed partial class BlackSilenceIncrementalGenerationTests
         {
             ["build_property.RootNamespace"] = rootNamespace,
             ["build_property.ProjectDir"] = projectDirectory,
-            ["build_property.AkburaBlackSilenceDiagnostics"] = publishDiagnostics ? "Publish" : "Shadow",
+            ["build_property.AkburaBlackSilenceDiagnostics"] = diagnosticMode ?? (publishDiagnostics ? "Publish" : "Shadow"),
+            ["build_property.AkburaCrossCompilationReuse"] = crossCompilationReuse.ToString(),
         });
 
         public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => s_empty;

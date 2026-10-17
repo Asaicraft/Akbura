@@ -14,7 +14,10 @@ internal sealed class BlackSilenceProjectSnapshot
         object declarationEnvironment,
         ImmutableDictionary<string, GeneratedDocumentEntry> entries,
         ImmutableDictionary<AkburaSyntaxTree, SemanticModelState> semanticStates,
-        ImmutableDictionary<string, DiagnosticDocumentEntry>? diagnosticEntries = null)
+        ImmutableDictionary<string, DiagnosticDocumentEntry>? diagnosticEntries = null,
+        ImmutableArray<ArtifactIdentity> identities = default,
+        DetachedCSharpInputs? artifactInputs = null,
+        DetachedProjectArtifacts? detachedArtifacts = null)
     {
         Version = version;
         Options = options;
@@ -24,6 +27,9 @@ internal sealed class BlackSilenceProjectSnapshot
         Entries = entries;
         SemanticStates = semanticStates;
         DiagnosticEntries = diagnosticEntries ?? ImmutableDictionary<string, DiagnosticDocumentEntry>.Empty;
+        Identities = identities.IsDefault ? [] : identities;
+        ArtifactInputs = artifactInputs;
+        DetachedArtifacts = detachedArtifacts;
     }
 
     public long Version { get; }
@@ -34,4 +40,7 @@ internal sealed class BlackSilenceProjectSnapshot
     public ImmutableDictionary<string, GeneratedDocumentEntry> Entries { get; }
     public ImmutableDictionary<AkburaSyntaxTree, SemanticModelState> SemanticStates { get; }
     public ImmutableDictionary<string, DiagnosticDocumentEntry> DiagnosticEntries { get; }
+    internal ImmutableArray<ArtifactIdentity> Identities { get; }
+    internal DetachedCSharpInputs? ArtifactInputs { get; }
+    internal DetachedProjectArtifacts? DetachedArtifacts { get; }
 }

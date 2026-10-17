@@ -17,6 +17,7 @@ public sealed class BlackSilenceDiagnosticSnapshotTests
     {
         var project = new SnapshotProject();
         var initial = project.Warm();
+        var initialArtifacts = project.State.Artifacts.Latest;
         var first = new ControlledSourceText("using System;\r\n<object />\r\n");
         var second = new ControlledSourceText("using System;\r\n<string />\r\n");
         var request = project.CreateRequest(first, second, width: 20);
@@ -36,6 +37,7 @@ public sealed class BlackSilenceDiagnosticSnapshotTests
         Assert.Contains("Synthetic source snapshot read failed.", failure.Message, StringComparison.Ordinal);
         Assert.Empty(failed.Components);
         Assert.Same(initial, project.State.TryGetSnapshot(project.Options));
+        Assert.Same(initialArtifacts, project.State.Artifacts.Latest);
         Assert.Empty(initial.DiagnosticEntries[project.FirstGlobalPath].Diagnostics);
         Assert.Single(initial.Entries);
 
@@ -45,6 +47,7 @@ public sealed class BlackSilenceDiagnosticSnapshotTests
         var current = Assert.IsType<BlackSilenceProjectSnapshot>(project.State.TryGetSnapshot(project.Options));
 
         Assert.NotSame(initial, current);
+        Assert.NotSame(initialArtifacts, project.State.Artifacts.Latest);
         Assert.Equal(2, retried.Diagnostics.Length);
         Assert.All(retried.Diagnostics, diagnostic =>
             Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_GlobalUsingsFileContainsNonUsing, diagnostic.Id));

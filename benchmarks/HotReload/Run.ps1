@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('runtime', 'generator', 'graph', 'build', 'watch', 'invalidation')]
+    [ValidateSet('runtime', 'generator', 'graph', 'build', 'watch', 'invalidation', 'artifacts', 'retention')]
     [string[]]$Suite = @('runtime', 'generator', 'graph', 'build', 'watch'),
     [string]$OutputDirectory,
     [string]$PurityRoot,
@@ -7,7 +7,9 @@ param(
     [switch]$Prepare,
     [string[]]$InvalidationScenario = @(),
     [ValidateSet('off', 'stats', 'trace')][string[]]$InvalidationProfiling = @('trace'),
-    [ValidateSet('NeedHelp.akbura', 'Sidebar.akbura')][string[]]$InvalidationPurityFile = @('Sidebar.akbura')
+    [ValidateSet('NeedHelp.akbura', 'Sidebar.akbura')][string[]]$InvalidationPurityFile = @('Sidebar.akbura'),
+    [ValidateSet('disabled', 'enabled')][string[]]$ArtifactOptimization = @('disabled', 'enabled'),
+    [ValidateRange(1, 10000)][int]$RetentionRevisions = 100
 )
 
 $ErrorActionPreference = 'Stop'
@@ -76,7 +78,7 @@ try {
     if ($Prepare) {
         Invoke-Dotnet @('build', 'src/Akbura.Diagnostics/Akbura.Diagnostics.csproj', '--nologo', '-v:minimal') (Join-Path $OutputDirectory 'prepare-runtime.log')
         $toolArguments = @('build', $toolProject, '--nologo', '-v:minimal')
-        if ('invalidation' -in $Suite) {
+        if (@($Suite | Where-Object { $_ -in @('invalidation', 'artifacts', 'retention') }).Count -gt 0) {
             Invoke-Dotnet @('build', 'src/Akbura.BlackSilence/Akbura.BlackSilence.csproj', '-c', 'DebugStats', '--nologo', '-v:minimal') (Join-Path $OutputDirectory 'prepare-invalidation.log')
             $toolArguments += '-p:BlackSilenceConfiguration=DebugStats'
         }
@@ -85,7 +87,7 @@ try {
     if (-not (Test-Path -LiteralPath $tool)) {
         throw 'Run with -Prepare to build the runtime and benchmark executable first.'
     }
-    $usePurity = -not $SkipPurity -and @($Suite | Where-Object { $_ -in @('generator', 'graph', 'watch', 'invalidation') }).Count -gt 0
+    $usePurity = -not $SkipPurity -and @($Suite | Where-Object { $_ -in @('generator', 'graph', 'watch', 'invalidation', 'artifacts', 'retention') }).Count -gt 0
     if ($usePurity) {
         if (-not $PurityRoot) {
             $PurityRoot = Join-Path $PSScriptRoot 'Akbura-PurityUI-Tutorial'
@@ -189,7 +191,7 @@ try {
             }
         }
     }
-    if ('invalidation' -in $Suite) {
+    if (@($Suite | Where-Object { $_ -in @('invalidation', 'artifacts', 'retention') }).Count -gt 0) {
         if (-not $galleryInputs) {
             Invoke-Dotnet @('build', $gallery, '--nologo', '-v:minimal') (Join-Path $OutputDirectory 'invalidation-gallery-prepare.log')
             $galleryInputs = Export-Inputs $gallery 'gallery'
@@ -231,10 +233,26 @@ try {
         [IO.File]::WriteAllText((Join-Path $OutputDirectory 'invalidation-environment.json'),
             ($environment | ConvertTo-Json -Depth 10) + "`r`n", [Text.UTF8Encoding]::new($false))
         foreach ($workload in $workloads) {
-            foreach ($scenario in $scenarios) {
-                foreach ($profiling in $InvalidationProfiling) {
-                    Invoke-Dotnet @($tool, 'invalidation', $workload.Inputs, $workload.File, $scenario, $profiling) (
-                        Join-Path $OutputDirectory "invalidation-$($workload.Name)-$scenario-$profiling.jsonl")
+            if ('invalidation' -in $Suite -or 'artifacts' -in $Suite) {
+                foreach ($scenario in $scenarios) {
+                    foreach ($profiling in $InvalidationProfiling) {
+                        if ('invalidation' -in $Suite) {
+                            Invoke-Dotnet @($tool, 'invalidation', $workload.Inputs, $workload.File, $scenario, $profiling) (
+                                Join-Path $OutputDirectory "invalidation-$($workload.Name)-$scenario-$profiling.jsonl")
+                        }
+                        if ('artifacts' -in $Suite) {
+                            foreach ($optimization in $ArtifactOptimization) {
+                                Invoke-Dotnet @($tool, 'artifacts', $workload.Inputs, $workload.File, $scenario, $profiling, $optimization) (
+                                    Join-Path $OutputDirectory "invalidation-$($workload.Name)-$scenario-$profiling-$optimization.jsonl")
+                            }
+                        }
+                    }
+                }
+            }
+            if ('retention' -in $Suite) {
+                foreach ($optimization in $ArtifactOptimization) {
+                    Invoke-Dotnet @($tool, 'artifact-memory', $workload.Inputs, $workload.File, "$RetentionRevisions", $optimization) (
+                        Join-Path $OutputDirectory "artifact-memory-$($workload.Name)-$optimization.jsonl")
                 }
             }
         }

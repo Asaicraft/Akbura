@@ -44,6 +44,10 @@ internal enum GenerationStatisticCounter : byte
     ProbeBindingResultReused,
     ProbeDiagnosticsReused,
     SourcePublished,
+    CrossCompilationArtifactHit,
+    ArtifactValidationFallback,
+    DetachedDiagnosticsReused,
+    DetachedSourceTextCreated,
     Count,
 }
 
@@ -109,6 +113,8 @@ internal enum GenerationStatisticStage : byte
     CSharpEnvironmentNamespaceComparison,
     CSharpEnvironmentTreeComparison,
     SourcePublication,
+    ArtifactValidation,
+    ArtifactCapture,
     Count,
 }
 

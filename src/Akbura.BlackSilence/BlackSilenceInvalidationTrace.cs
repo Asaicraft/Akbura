@@ -83,7 +83,7 @@ internal static class BlackSilenceInvalidationTrace
             DiagnosticDocumentEntry? old = null;
             previous?.DiagnosticEntries.TryGetValue(diagnostic.Document.FilePath, out old);
             Record("DiagnosticDecision", diagnostic.Document.FilePath, diagnostic.Previous == null ? "Evaluate" : "Reuse",
-                old == null ? [previous == null ? "PreviousSnapshotUnavailable" : "PreviousDiagnosticEntryUnavailable"] :
+                old == null ? [diagnostic.Previous != null ? "DetachedArtifactValidated" : previous == null ? "PreviousSnapshotUnavailable" : "PreviousDiagnosticEntryUnavailable"] :
                     diagnostic.Version.DescribeChanges(old.Version),
                 ("EntryAvailable", old != null), ("CSharpCompilation", Id(request.State.CSharpCompilation)));
         }
@@ -93,7 +93,7 @@ internal static class BlackSilenceInvalidationTrace
             GeneratedDocumentEntry? old = null;
             previous?.Entries.TryGetValue(identity, out old);
             Record("GenerationDecision", version.Document.FilePath, reused ? "Reuse" : "Generate",
-                old == null ? [previous == null ? "PreviousSnapshotUnavailable" : "PreviousGeneratedEntryUnavailable"] :
+                old == null ? [reused ? "DetachedArtifactValidated" : previous == null ? "PreviousSnapshotUnavailable" : "PreviousGeneratedEntryUnavailable"] :
                     version.DescribeChanges(old.Version),
                 ("Identity", identity), ("EntryAvailable", old != null),
                 ("Dependencies", version.DescribeDependencies()), ("DeclarationEnvironment", Id(request.DeclarationEnvironment)));

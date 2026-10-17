@@ -51,6 +51,14 @@ internal static partial class Program
             case "invalidation":
                 MeasureInvalidation(args[1], args[2], args.ElementAtOrDefault(3), args.ElementAtOrDefault(4) ?? "trace");
                 break;
+            case "artifacts":
+                Assert.Contains(args[5], new[] { "enabled", "disabled" });
+                MeasureInvalidation(args[1], args[2], args[3], args[4], args[5] == "enabled", verifyEveryUpdate: true);
+                break;
+            case "artifact-memory":
+                Assert.Contains(args[4], new[] { "enabled", "disabled" });
+                MeasureArtifactRetention(args[1], args[2], int.Parse(args[3]), args[4] == "enabled");
+                break;
             case "watch":
                 MeasureWatch(args[1], args[2], args[3]).GetAwaiter().GetResult();
                 break;
@@ -68,7 +76,7 @@ internal static partial class Program
                 }
                 break;
             default:
-                throw new ArgumentException("runtime [filter] | generator <MSBuild-items.json> <file> <scenario> | graph <MSBuild-items.json> <file> | invalidation <MSBuild-items.json> <file> [scenario] [off|stats|trace] | watch <project> <file> <component> | binlog <path> | style <files...>");
+                throw new ArgumentException("runtime [filter] | generator <MSBuild-items.json> <file> <scenario> | graph <MSBuild-items.json> <file> | invalidation <MSBuild-items.json> <file> [scenario] [off|stats|trace] | artifacts <MSBuild-items.json> <file> <scenario> <off|stats|trace> <enabled|disabled> | artifact-memory <MSBuild-items.json> <file> <revisions> <enabled|disabled> | watch <project> <file> <component> | binlog <path> | style <files...>");
         }
         return 0;
     }
@@ -460,9 +468,9 @@ internal static partial class Program
         static string Key(Microsoft.Build.Framework.BuildEventContext context) => $"{context.NodeId}:{context.ProjectContextId}:{context.TaskId}";
     }
 
-    private static GeneratorDriver Driver(IEnumerable<AdditionalText> files, string directory, string rootNamespace = "Demo", string mode = "Publish", CSharpParseOptions? parse = null) =>
+    private static GeneratorDriver Driver(IEnumerable<AdditionalText> files, string directory, string rootNamespace = "Demo", string mode = "Publish", CSharpParseOptions? parse = null, bool reuse = true) =>
         CSharpGeneratorDriver.Create([new AkburaBlackSilenceGenerator().AsSourceGenerator()], files, parse ?? ParseOptions,
-            new ProjectOptions(directory, rootNamespace, mode), driverOptions: new GeneratorDriverOptions(default, true));
+            new ProjectOptions(directory, rootNamespace, mode, reuse), driverOptions: new GeneratorDriverOptions(default, true));
 
     private static SyntaxTree Tree(string text, string path) => CSharpSyntaxTree.ParseText(SourceText.From(text, Encoding.UTF8), ParseOptions, path);
     private static double Elapsed(long started) => Stopwatch.GetElapsedTime(started).TotalMilliseconds;
@@ -502,7 +510,7 @@ internal static partial class Program
         public override string Path => path;
         public override SourceText GetText(CancellationToken cancellationToken = default) => _text;
     }
-    private sealed class ProjectOptions(string directory, string rootNamespace, string mode) : AnalyzerConfigOptionsProvider
+    private sealed class ProjectOptions(string directory, string rootNamespace, string mode, bool reuse = true) : AnalyzerConfigOptionsProvider
     {
         private static readonly AnalyzerConfigOptions Empty = new Options(new Dictionary<string, string>());
         public override AnalyzerConfigOptions GlobalOptions { get; } = new Options(new Dictionary<string, string>
@@ -510,6 +518,7 @@ internal static partial class Program
             ["build_property.RootNamespace"] = rootNamespace,
             ["build_property.ProjectDir"] = directory + Path.DirectorySeparatorChar,
             ["build_property.AkburaBlackSilenceDiagnostics"] = mode,
+            ["build_property.AkburaCrossCompilationReuse"] = reuse.ToString(),
         });
         public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => Empty;
         public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => Empty;

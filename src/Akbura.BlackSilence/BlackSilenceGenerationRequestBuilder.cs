@@ -107,6 +107,7 @@ internal static class BlackSilenceGenerationRequestBuilder
             previous,
             diagnostics.ToImmutableArrayUnsafe(),
             computeDiagnostics);
+        request.InitializeArtifacts(cancellationToken);
 #if STATS
         if (GenerationStatistics.IsInvalidationTrackingEnabled)
         {

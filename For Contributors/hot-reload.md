@@ -65,6 +65,31 @@ AKCSS implementation dependencies include imported definitions and transitive `@
 
 Incomplete markup, malformed embedded C# and unclassified syntax use conservative invalidation. The graph prefers additional work over incorrectly reusing a document whose dependencies are uncertain.
 
+### Reusing artifacts after a C# edit
+
+A new C# compilation gets a new compilation-specific project state. A separate per-project/options incremental node owns one latest detached artifact generation. It contains generated characters, exact input facts and diagnostic value records, not semantic models, symbols, syntax nodes or old project snapshots.
+
+BlackSilence validates source artifacts and diagnostics separately before skipping binding. The supported changed-C# subset is deliberately narrow: a standalone explicitly `internal static` class with one static, parameterless `int` method returning an integer literal. Only that method body or trivia may change. The declaration tokens must remain exact, no other C# input may mention the type, and each reused document's complete lookup-name set must exclude it. Global imports from any markup document contribute names to every consumer; an unclassified global dependency disables the proof for all consumers. Directives, attributes, other members, inheritance, generics, imports or unknown dependencies reject this proof.
+
+All other C# trees must have exact text, paths/order, parse-options and encoding identities. Compiler options and ordered portable-executable references require exact reference identity. Custom resolvers/providers, compilation references, script inputs, changed document mappings, project options or document membership use full regeneration. General application method-body edits are not currently optimized by this proof. Equivalent final generated text is never used as evidence that binding could have been skipped.
+
+Detached diagnostics preserve IDs, severities, messages, primary/additional locations, mappings, provenance and properties. Their eligibility does not follow from source-text eligibility: missing diagnostic artifacts or a location tied to a changed C# file requires diagnostic evaluation. The transient publication-version stamp follows the current publisher's revision policy. Diagnostics can therefore require binding even when source generation reuses its characters.
+
+Successful generation replaces the entire detached publication under a short lock. Cancellation or failure leaves the previous complete publication intact. Concurrent branches revalidate all inputs and publish by monotonically reserved attempt version; an older completed attempt cannot replace a newer publication. Cache misses and races affect work performed, not output correctness.
+
+Ordinary markup edits avoid rebuilding every detached value. The current bound snapshot also references its current detached values: unchanged document objects can share their scalar facts while the complete global-import set is unchanged. Capture can share an already detached text when the current generation selected the exact same source object. This only avoids copying an already chosen result; it never decides whether semantic binding can be skipped. Fresh maps contain only current entries, and no old snapshot is linked into the next one.
+
+```text
+Roslyn driver tables -> current request/state -> current index/compilation/models
+                    -> project/options artifact owner
+                         -> ONE latest detached generation
+                              -> strings, current facts, generated characters
+                              -> diagnostic value records
+                         -> current identity IDs + WEAK input handles
+```
+
+There is no snapshot-history link or per-compilation cache dictionary. A request's optional previous bound snapshot is weak; the same-compilation owner supplies its current bound snapshot when available. Artifact identities use weak, exact-reference handles replaced with each publication, not an accumulating historical registry. No `ComponentPlan`, `SemanticModelState` or probe context crosses compilation boundaries, and semantic-state compatibility is unchanged. Holding old drivers externally can legitimately keep their compiler graphs alive; retaining only the artifact owner must not. The [ownership audit and verification](csharp-invalidation-investigation.md#detached-artifact-ownership-and-validation) and [benchmark harness](../benchmarks/HotReload/README.md#cross-compilation-artifact-reuse) describe how this is tested.
+
 ### Binding embedded C#
 
 Akbura binds embedded C# using synthetic Roslyn syntax trees and semantic models. Those probes must preserve the document's imports, namespace, declarations, lexical scope, preceding statements, local functions, state substitutions and target conversions.

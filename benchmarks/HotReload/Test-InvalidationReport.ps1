@@ -81,4 +81,75 @@ catch {
 Check $failed 'Incomplete sampling must fail.'
 Check ((Get-FileHash -LiteralPath $reportPath).Hash -eq $before) 'A failed run replaced the report.'
 [IO.File]::WriteAllText($path, $original, $encoding)
+foreach ($optimization in @('disabled', 'enabled')) {
+    $lines = [Collections.Generic.List[string]]::new()
+    foreach ($index in 0..10) {
+        $row = ([IO.File]::ReadLines($path) | Select-Object -First 1) | ConvertFrom-Json
+        $row | Add-Member -NotePropertyName Optimization -NotePropertyValue $optimization
+        $row | Add-Member -NotePropertyName VerifyEveryUpdate -NotePropertyValue $true
+        $row.Index = $index; $row.First = $index -eq 0; $row.Warmup = $index -in @(1, 2)
+        $lines.Add(($row | ConvertTo-Json -Depth 10 -Compress))
+        $lines.Add((@{ Kind = 'invalidation-parity'; Project = $row.Project; File = $row.File; Scenario = $row.Scenario
+            Profiling = $row.Profiling; BinaryFlavor = $row.BinaryFlavor; Optimization = $optimization
+            Index = $index; EqualSources = $true; EqualDiagnostics = $true } | ConvertTo-Json -Compress))
+        $lines.Add((@{ Kind = 'artifact-heap'; Project = $row.Project; File = $row.File; Scenario = $row.Scenario
+            Profiling = $row.Profiling; BinaryFlavor = $row.BinaryFlavor; Optimization = $optimization
+            Index = $index; PostGcHeapBytes = 1234; WorkingSetBytes = 5678; Entries = 2; IdentitySlots = 4 } | ConvertTo-Json -Compress))
+    }
+    [IO.File]::WriteAllText((Join-Path $raw "invalidation-artifacts-$optimization.jsonl"), ($lines -join "`r`n") + "`r`n", $encoding)
+}
+& $summarizer -InputDirectory $raw -ResultDirectory $result
+$summary = @(Import-Csv -LiteralPath (Join-Path $result 'invalidation-summary.csv'))
+Check ($summary.Count -eq 5) 'Enabled and disabled artifacts must not be merged with each other or legacy runs.'
+Check (@($summary | Where-Object { $_.Optimization -ne 'legacy' -and $_.MedianPostGcHeapBytes -eq '1234' }).Count -eq 2) 'Post-GC heap rows were not joined to the correct samples.'
+$path = Join-Path $raw 'invalidation-artifacts-enabled.jsonl'
+$original = [IO.File]::ReadAllText($path)
+foreach ($kind in @('invalidation-parity', 'artifact-heap')) {
+    $filtered = @($original.Split("`n", [StringSplitOptions]::RemoveEmptyEntries) | Where-Object {
+        $row = $_ | ConvertFrom-Json
+        -not ($row.Kind -eq $kind -and $row.Index -eq 4)
+    })
+    [IO.File]::WriteAllText($path, ($filtered -join "`r`n") + "`r`n", $encoding)
+    $failed = $false
+    try {
+        & $summarizer -InputDirectory $raw -ResultDirectory $result
+    }
+    catch {
+        $failed = $true
+    }
+    Check $failed "Missing intermediate $kind must fail, even if the final two parity checks exist."
+    [IO.File]::WriteAllText($path, $original, $encoding)
+}
+$memoryPath = Join-Path $raw 'artifact-memory-synthetic-enabled.jsonl'
+$memory = @(
+    @{ Kind = 'artifact-memory-sample'; Project = 'Synthetic'; Optimization = 'enabled'; Index = 0
+        CumulativeCollections = @(1, 2, 3); CollectionsSinceUpdateStartIncludingOracle = @(1, 2, 3) }
+    @{ Kind = 'artifact-memory-sample'; Project = 'Synthetic'; Optimization = 'enabled'; Index = 1
+        CumulativeCollections = @(4, 5, 6); CollectionsSinceUpdateStartIncludingOracle = @(3, 3, 3) }
+    @{ Kind = 'artifact-concurrent'; Project = 'Synthetic'; Optimization = 'enabled'; BranchCompletionMs = @(10, 11)
+        BranchGeneratorMs = @(9, 10); Collections = @(1, 2, 3)
+        Counters = @{ ProbeCompilationCreated = 0 }; Stages = @(@{ Stage = 'SemanticBinding'; Count = 0; InclusiveMs = 0 }) }
+    @{ Kind = 'artifact-memory-result'; Project = 'Synthetic'; Optimization = 'enabled'; Revisions = 1
+        Objects = @{ CSharpCompilation = @{ Observed = 4; Alive = 0 }; DetachedSnapshot = @{ Observed = 4; Alive = 1 } } }
+)
+function Save-MemoryFixture {
+    $lines = @($memory | ForEach-Object { $_ | ConvertTo-Json -Depth 12 -Compress })
+    [IO.File]::WriteAllText($memoryPath, ($lines -join "`r`n") + "`r`n", $encoding)
+}
+Save-MemoryFixture
+& $summarizer -InputDirectory $raw -ResultDirectory $result
+$fork = Import-Csv -LiteralPath (Join-Path $result 'artifact-concurrent.csv') | Select-Object -First 1
+Check ($fork.ProbeCompilationCreated -eq '0' -and $fork.BranchCompletionMs -eq '10/11') 'Concurrent counters or timing arrays were lost.'
+$forkStage = Import-Csv -LiteralPath (Join-Path $result 'artifact-concurrent-stages.csv') | Select-Object -First 1
+Check ($forkStage.Stage -eq 'SemanticBinding' -and $forkStage.Count -eq '0') 'Concurrent inclusive stages were lost.'
+$memory[-1].Objects.CSharpCompilation.Alive = 1
+Save-MemoryFixture
+$failed = $false
+try {
+    & $summarizer -InputDirectory $raw -ResultDirectory $result
+}
+catch {
+    $failed = $true
+}
+Check $failed 'A surviving compilation in an isolated-cache proof must fail.'
 Write-Host "$checks invalidation-report checks passed. Synthetic fixtures: $root"

@@ -12,14 +12,14 @@ internal sealed class BlackSilenceProjectState
 {
     private readonly object _gate = new();
     private BlackSilenceProjectSnapshot? _snapshot;
-    private long _nextVersion;
 
-    public BlackSilenceProjectState(CSharpCompilation compilation)
+    public BlackSilenceProjectState(CSharpCompilation compilation, BoundedArtifactStore? artifacts = null)
     {
 #if STATS
         using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.ProjectStateConstruction);
 #endif
         CSharpCompilation = compilation;
+        Artifacts = artifacts ?? new BoundedArtifactStore();
 #if STATS
         if (GenerationStatistics.IsInvalidationTrackingEnabled)
         {
@@ -30,6 +30,7 @@ internal sealed class BlackSilenceProjectState
     }
 
     public CSharpCompilation CSharpCompilation { get; }
+    public BoundedArtifactStore Artifacts { get; }
 
     public BlackSilenceProjectSnapshot? TryGetSnapshot(GeneratorProjectOptions options)
     {
@@ -50,7 +51,7 @@ internal sealed class BlackSilenceProjectState
         }
     }
 
-    public long GetNextVersion() => Interlocked.Increment(ref _nextVersion);
+    public long GetNextVersion() => Artifacts.GetNextVersion();
 
     public void Publish(BlackSilenceProjectSnapshot snapshot)
     {

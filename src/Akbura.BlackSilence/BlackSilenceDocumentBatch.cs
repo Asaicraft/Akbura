@@ -193,18 +193,37 @@ internal sealed partial class BlackSilenceDocumentBatch
                 componentTypeNames.ToImmutable(),
                 akcssModuleTypeNamesByComponent)],
             GetDiagnostics(request, diagnosticEntries));
+        var generatedEntries = entries.ToImmutable();
+        DetachedProjectArtifacts? artifacts = null;
+        if (request.ArtifactInputs != null)
+        {
+#if STATS
+            using var artifactMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.ArtifactCapture);
+#endif
+            artifacts = DetachedProjectArtifacts.Create(request, generatedEntries, diagnosticEntries);
+        }
         var snapshot = new BlackSilenceProjectSnapshot(
             request.Version,
             request.Options,
             request.Index,
             request.Documents,
             request.DeclarationEnvironment,
-            entries.ToImmutable(),
+            generatedEntries,
             request.Index.Compilation.GetReusableSemanticStates(),
-            diagnosticEntries);
+            diagnosticEntries,
+            request.ArtifactIdentities,
+            request.ArtifactInputs,
+            artifacts);
 
         cancellationToken.ThrowIfCancellationRequested();
-        request.State.Publish(snapshot);
+        if (artifacts != null)
+        {
+            request.State.Artifacts.Publish(artifacts, request.State, snapshot, cancellationToken);
+        }
+        else
+        {
+            request.State.Publish(snapshot);
+        }
         return batch;
 
         AkcssGenerationRequest GetAkcssRequest(int index)

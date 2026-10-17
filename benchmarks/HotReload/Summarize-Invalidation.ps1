@@ -18,6 +18,7 @@ $steps = [Collections.Generic.List[object]]::new()
 $causes = [Collections.Generic.List[object]]::new()
 $parity = [Collections.Generic.List[object]]::new()
 $provenance = [Collections.Generic.List[object]]::new()
+$heaps = @{}
 $rawPath = Join-Path $ResultDirectory 'invalidation-traces.jsonl.gz'
 $stream = [IO.File]::Create($rawPath)
 $gzip = [IO.Compression.GZipStream]::new($stream, [IO.Compression.CompressionLevel]::SmallestSize)
@@ -29,7 +30,14 @@ try {
                 continue
             }
             $row = $line | ConvertFrom-Json
+            if (-not $row.PSObject.Properties['Optimization']) {
+                $row | Add-Member -NotePropertyName Optimization -NotePropertyValue 'legacy'
+            }
             $writer.WriteLine($line)
+            if ($row.Kind -eq 'artifact-heap') {
+                $key = @($row.Project, $row.File, $row.Scenario, $row.Profiling, $row.BinaryFlavor, $row.Optimization, $row.Index) -join '|'
+                $heaps[$key] = $row
+            }
             if ($row.Kind -eq 'invalidation-provenance') {
                 $provenance.Add($row)
             }
@@ -44,7 +52,8 @@ try {
             }
             $sample = [ordered]@{
                 Project = $row.Project; File = $row.File; Scenario = $row.Scenario; Profiling = $row.Profiling
-                BinaryFlavor = $row.BinaryFlavor
+                BinaryFlavor = $row.BinaryFlavor; Optimization = $row.Optimization; VerifyEveryUpdate = $row.VerifyEveryUpdate
+                PostGcHeapBytes = $null; PostGcWorkingSetBytes = $null; ArtifactEntries = $null; IdentitySlots = $null
                 Index = $row.Index; First = $row.First; Warmup = $row.Warmup; GeneratorMs = $row.GeneratorMs
                 OutsideDocumentBatchMs = $row.OutsideDocumentBatchMs
                 ExpectedIncompleteInput = $row.ExpectedIncompleteInput; GeneratorErrors = $row.GeneratorErrors
@@ -70,7 +79,7 @@ try {
             foreach ($stage in $row.Stages) {
                 $stages.Add([PSCustomObject]@{
                     Project = $row.Project; File = $row.File; Scenario = $row.Scenario; Profiling = $row.Profiling
-                    BinaryFlavor = $row.BinaryFlavor
+                    BinaryFlavor = $row.BinaryFlavor; Optimization = $row.Optimization
                     Index = $row.Index; First = $row.First; Warmup = $row.Warmup; Stage = $stage.Stage
                     Count = $stage.Count; InclusiveMs = $stage.InclusiveMs; InclusiveCurrentThreadBytes = $stage.InclusiveCurrentThreadBytes
                 })
@@ -79,7 +88,7 @@ try {
                 foreach ($reason in $step.Value.PSObject.Properties) {
                     $steps.Add([PSCustomObject]@{
                         Project = $row.Project; File = $row.File; Scenario = $row.Scenario; Profiling = $row.Profiling
-                        BinaryFlavor = $row.BinaryFlavor
+                        BinaryFlavor = $row.BinaryFlavor; Optimization = $row.Optimization
                         Index = $row.Index; Stage = $step.Name; Reason = $reason.Name; Count = $reason.Value
                     })
                 }
@@ -88,7 +97,7 @@ try {
                 foreach ($reason in $event.Reasons) {
                     $causes.Add([PSCustomObject]@{
                         Project = $row.Project; File = $row.File; Scenario = $row.Scenario; Profiling = $row.Profiling
-                        BinaryFlavor = $row.BinaryFlavor
+                        BinaryFlavor = $row.BinaryFlavor; Optimization = $row.Optimization
                         Index = $row.Index; Reason = $reason
                     })
                 }
@@ -103,6 +112,18 @@ finally {
 }
 if ($samples.Count -eq 0) {
     throw 'No invalidation measurements found.'
+}
+foreach ($sample in $samples) {
+    $key = @($sample.Project, $sample.File, $sample.Scenario, $sample.Profiling, $sample.BinaryFlavor, $sample.Optimization, $sample.Index) -join '|'
+    if ($sample.VerifyEveryUpdate -and -not $heaps.ContainsKey($key)) {
+        throw "Missing post-GC measurement: $key"
+    }
+    if ($heaps.ContainsKey($key)) {
+        $sample.PostGcHeapBytes = $heaps[$key].PostGcHeapBytes
+        $sample.PostGcWorkingSetBytes = $heaps[$key].WorkingSetBytes
+        $sample.ArtifactEntries = $heaps[$key].Entries
+        $sample.IdentitySlots = $heaps[$key].IdentitySlots
+    }
 }
 
 function Median($Values) {
@@ -139,7 +160,7 @@ function Count-Cell($Value) {
     return [Convert]::ToString($Value, $culture)
 }
 
-$summaries = foreach ($group in $samples | Group-Object Project, File, Scenario, Profiling, BinaryFlavor | Sort-Object Name) {
+$summaries = foreach ($group in $samples | Group-Object Project, File, Scenario, Profiling, BinaryFlavor, Optimization | Sort-Object Name) {
     $measured = @($group.Group | Where-Object { -not $_.First -and -not $_.Warmup })
     $initial = @($group.Group | Where-Object First)
     $warmups = @($group.Group | Where-Object Warmup)
@@ -147,15 +168,19 @@ $summaries = foreach ($group in $samples | Group-Object Project, File, Scenario,
         throw "Incomplete sampling in $($group.Name): expected 1 initial + 2 warm-ups + 8 measured."
     }
     $first = $group.Group[0]
-    $checks = @($parity | Where-Object { $_.Project -eq $first.Project -and $_.File -eq $first.File -and $_.Scenario -eq $first.Scenario -and $_.Profiling -eq $first.Profiling -and $_.BinaryFlavor -eq $first.BinaryFlavor })
-    if ($checks.Count -ne 2 -or @($checks.Index | Sort-Object -Unique).Count -ne 2 -or
-        @($checks | Where-Object { $_.Index -notin @(9, 10) }).Count -gt 0) {
-        throw "Expected two final fresh-driver parity checks for $($group.Name)."
+    $checks = @($parity | Where-Object { $_.Project -eq $first.Project -and $_.File -eq $first.File -and $_.Scenario -eq $first.Scenario -and $_.Profiling -eq $first.Profiling -and $_.BinaryFlavor -eq $first.BinaryFlavor -and $_.Optimization -eq $first.Optimization })
+    $expectedIndices = if ($first.VerifyEveryUpdate) { @(0..10) } else { @(9, 10) }
+    if ($checks.Count -ne $expectedIndices.Count -or @($checks.Index | Sort-Object -Unique).Count -ne $expectedIndices.Count -or
+        @($checks | Where-Object { $_.Index -notin $expectedIndices }).Count -gt 0) {
+        throw "Expected fresh-driver parity at indices $($expectedIndices -join ', ') for $($group.Name)."
     }
     $values = @($measured.GeneratorMs | Sort-Object)
+    $groupStages = @($stages | Where-Object { $_.Project -eq $first.Project -and $_.File -eq $first.File -and
+        $_.Scenario -eq $first.Scenario -and $_.Profiling -eq $first.Profiling -and $_.BinaryFlavor -eq $first.BinaryFlavor -and
+        $_.Optimization -eq $first.Optimization -and $_.Index -in 3..10 })
     [PSCustomObject]@{
         Project = $first.Project; File = $first.File; Scenario = $first.Scenario; Profiling = $first.Profiling
-        BinaryFlavor = $first.BinaryFlavor
+        BinaryFlavor = $first.BinaryFlavor; Optimization = $first.Optimization
         Count = $values.Count; InitialMs = $initial[0].GeneratorMs; MedianMs = Median $values
         MinMs = $values[0]; MaxMs = $values[-1]; P95Ms = $values[[int][Math]::Ceiling(0.95 * $values.Count) - 1]
         MedianProcessAllocatedBytes = Median $measured.ProcessAllocatedBytes
@@ -165,6 +190,23 @@ $summaries = foreach ($group in $samples | Group-Object Project, File, Scenario,
         MedianAkcssGenerated = Median $measured.AkcssGenerated
         MedianDiagnosticsEvaluated = Median $measured.DiagnosticDocumentEvaluated
         MedianChangedSources = Median $measured.ChangedSources
+        MedianPostGcHeapBytes = Median $measured.PostGcHeapBytes
+        MedianWorkingSetBytes = Median $measured.PostGcWorkingSetBytes
+        MedianArtifactHits = Median $measured.CrossCompilationArtifactHit
+        MedianArtifactFallbacks = Median $measured.ArtifactValidationFallback
+        MedianDetachedDiagnosticsReused = Median $measured.DetachedDiagnosticsReused
+        MedianSemanticModels = Median $measured.SemanticModelCreated
+        MedianProbeCompilations = Median $measured.ProbeCompilationCreated
+        MedianProbeSemanticModels = Median $measured.ProbeSemanticModelAcquired
+        MedianDiagnosticQueries = Median $measured.ProbeDiagnosticQuery
+        MedianGeneratedTexts = Median $measured.GeneratedSourceTextCreated
+        MedianDetachedTextsCreated = Median $measured.DetachedSourceTextCreated
+        MedianSemanticPreparationMs = Median @($groupStages | Where-Object Stage -eq 'SemanticBinding' | ForEach-Object InclusiveMs)
+        MedianSemanticPreparationCount = Median @($groupStages | Where-Object Stage -eq 'SemanticBinding' | ForEach-Object Count)
+        MedianEmissionMs = Median @($groupStages | Where-Object Stage -eq 'CSharpEmission' | ForEach-Object InclusiveMs)
+        MedianEmissionCount = Median @($groupStages | Where-Object Stage -eq 'CSharpEmission' | ForEach-Object Count)
+        MedianArtifactValidationMs = Median @($groupStages | Where-Object Stage -eq 'ArtifactValidation' | ForEach-Object InclusiveMs)
+        MedianArtifactCaptureMs = Median @($groupStages | Where-Object Stage -eq 'ArtifactCapture' | ForEach-Object InclusiveMs)
     }
 }
 Save-Csv $samples 'invalidation-samples.csv'
@@ -176,11 +218,11 @@ $trackedBoundaries = @('BlackSilence.CSharpEnvironment', 'BlackSilence.ProjectSt
     'BlackSilence.GeneratedBatch', 'BlackSilence.GeneratedComponents', 'BlackSilence.GeneratedExternalAkcss',
     'BlackSilence.GeneratedInlineAkcss', 'BlackSilence.GeneratedProjectSources', 'BlackSilence.Diagnostics', 'SourceOutput')
 $transitions = foreach ($group in $steps | Where-Object { $_.Index -in 3..10 -and $_.Stage -in $trackedBoundaries } |
-    Group-Object Project, File, Scenario, Profiling, BinaryFlavor, Stage | Sort-Object Name) {
+    Group-Object Project, File, Scenario, Profiling, BinaryFlavor, Optimization, Stage | Sort-Object Name) {
     $first = $group.Group[0]
     $values = [ordered]@{
         Project = $first.Project; File = $first.File; Scenario = $first.Scenario; Profiling = $first.Profiling
-        BinaryFlavor = $first.BinaryFlavor; Stage = $first.Stage
+        BinaryFlavor = $first.BinaryFlavor; Optimization = $first.Optimization; Stage = $first.Stage
     }
     foreach ($reason in @('Cached', 'Unchanged', 'Modified', 'New', 'Removed')) {
         $counts = foreach ($index in 3..10) {
@@ -198,6 +240,69 @@ $transitions = foreach ($group in $steps | Where-Object { $_.Index -in 3..10 -an
     [PSCustomObject]$values
 }
 Save-Csv $transitions 'invalidation-transitions.csv'
+$memorySamples = [Collections.Generic.List[object]]::new()
+$memoryResults = [Collections.Generic.List[object]]::new()
+$concurrent = [Collections.Generic.List[object]]::new()
+$concurrentStages = [Collections.Generic.List[object]]::new()
+$memoryFiles = @(Get-ChildItem -LiteralPath $InputDirectory -Filter 'artifact-memory-*.jsonl' -File | Sort-Object Name)
+if ($memoryFiles.Count -gt 0) {
+    $memoryStream = [IO.File]::Create((Join-Path $ResultDirectory 'artifact-memory-traces.jsonl.gz'))
+    $memoryGzip = [IO.Compression.GZipStream]::new($memoryStream, [IO.Compression.CompressionLevel]::SmallestSize)
+    $memoryWriter = [IO.StreamWriter]::new($memoryGzip, [Text.UTF8Encoding]::new($false))
+    try {
+        foreach ($file in $memoryFiles) {
+            $rows = @([IO.File]::ReadLines($file.FullName) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object {
+                $memoryWriter.WriteLine($_)
+                $_ | ConvertFrom-Json
+            })
+            $final = @($rows | Where-Object Kind -eq 'artifact-memory-result')
+            if ($final.Count -ne 1) {
+                throw "Missing completed lifetime proof: $($file.Name)"
+            }
+            foreach ($property in $final[0].Objects.PSObject.Properties) {
+                $limit = if ($property.Name -eq 'DetachedSnapshot' -and $final[0].Optimization -eq 'enabled') { 1 } else { 0 }
+                if ($property.Value.Alive -gt $limit) {
+                    throw "Unexpected retained $($property.Name) in $($file.Name)"
+                }
+            }
+            $observations = @($rows | Where-Object Kind -eq 'artifact-memory-sample')
+            if ($observations.Count -ne $final[0].Revisions + 1) {
+                throw "Missing lifetime samples in $($file.Name)"
+            }
+            foreach ($row in $observations) {
+                $row.CumulativeCollections = $row.CumulativeCollections -join '/'
+                $row.CollectionsSinceUpdateStartIncludingOracle = $row.CollectionsSinceUpdateStartIncludingOracle -join '/'
+                $memorySamples.Add($row)
+            }
+            $memoryResults.Add($final[0])
+            foreach ($row in $rows | Where-Object Kind -eq 'artifact-concurrent') {
+                $row.BranchCompletionMs = @($row.BranchCompletionMs | ForEach-Object { [Convert]::ToString($_, $culture) }) -join '/'
+                $row.BranchGeneratorMs = @($row.BranchGeneratorMs | ForEach-Object { [Convert]::ToString($_, $culture) }) -join '/'
+                $row.Collections = $row.Collections -join '/'
+                foreach ($counter in $row.Counters.PSObject.Properties) {
+                    $row | Add-Member -NotePropertyName $counter.Name -NotePropertyValue $counter.Value
+                }
+                foreach ($stage in $row.Stages) {
+                    $concurrentStages.Add([PSCustomObject]@{ Project = $row.Project; Optimization = $row.Optimization
+                        Stage = $stage.Stage; Count = $stage.Count; InclusiveMs = $stage.InclusiveMs })
+                }
+                $row.PSObject.Properties.Remove('Counters')
+                $row.PSObject.Properties.Remove('Stages')
+                $concurrent.Add($row)
+            }
+        }
+    }
+    finally {
+        $memoryWriter.Dispose()
+        $memoryGzip.Dispose()
+        $memoryStream.Dispose()
+    }
+    Save-Csv $memorySamples 'artifact-memory-samples.csv'
+    Save-Csv $concurrent 'artifact-concurrent.csv'
+    Save-Csv $concurrentStages 'artifact-concurrent-stages.csv'
+    [IO.File]::WriteAllText((Join-Path $ResultDirectory 'artifact-memory-results.json'),
+        (ConvertTo-Json -InputObject @($memoryResults) -Depth 12) + "`r`n", [Text.UTF8Encoding]::new($false))
+}
 [IO.File]::WriteAllText((Join-Path $ResultDirectory 'invalidation-provenance.json'), ($provenance | ConvertTo-Json -Depth 10) + "`r`n", [Text.UTF8Encoding]::new($false))
 if (Test-Path -LiteralPath (Join-Path $InputDirectory 'invalidation-environment.json')) {
     Copy-Item -LiteralPath (Join-Path $InputDirectory 'invalidation-environment.json') -Destination $ResultDirectory -Force
@@ -219,7 +324,7 @@ $table = @(
     '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |'
 )
 foreach ($row in $summaries) {
-    $table += '| ' + $row.Project + ' / ' + $row.File + ' | ' + $row.Scenario + ' | ' + $row.BinaryFlavor + ' / ' + $row.Profiling + ' | ' +
+    $table += '| ' + $row.Project + ' / ' + $row.File + ' | ' + $row.Scenario + ' | ' + $row.BinaryFlavor + ' / ' + $row.Profiling + ' / ' + $row.Optimization + ' | ' +
         $row.InitialMs.ToString('F2', $culture) + ' | ' + $row.MedianMs.ToString('F2', $culture) + ' | ' +
         $row.MinMs.ToString('F2', $culture) + ' - ' + $row.MaxMs.ToString('F2', $culture) + ' | ' +
         $row.P95Ms.ToString('F2', $culture) + ' | ' + (Count-Cell $row.MedianComponentsGenerated) + ' / ' + (Count-Cell $row.MedianComponentsReused) + ' | ' +

@@ -1,10 +1,12 @@
 using Akbura.Language.CodeGeneration;
 using System.Collections.Immutable;
+using System;
 
 namespace Akbura.BlackSilence;
 
 internal sealed class BlackSilenceGenerationRequest
 {
+    private readonly WeakReference<BlackSilenceProjectSnapshot>? _previousSnapshot;
     public BlackSilenceGenerationRequest(
         BlackSilenceProjectState state,
         long version,
@@ -28,7 +30,7 @@ internal sealed class BlackSilenceGenerationRequest
         Components = components;
         ExternalAkcss = externalAkcss;
         InlineAkcss = inlineAkcss;
-        PreviousSnapshot = previousSnapshot;
+        _previousSnapshot = previousSnapshot == null ? null : new WeakReference<BlackSilenceProjectSnapshot>(previousSnapshot);
         Diagnostics = diagnostics.IsDefault ? [] : diagnostics;
         ComputeDiagnostics = computeDiagnostics;
     }
@@ -39,10 +41,55 @@ internal sealed class BlackSilenceGenerationRequest
     public AkburaProjectIndex Index { get; }
     public ImmutableArray<DocumentSyntaxVersion> Documents { get; }
     public object DeclarationEnvironment { get; }
-    public ImmutableArray<ComponentGenerationRequest> Components { get; }
-    public ImmutableArray<AkcssGenerationRequest> ExternalAkcss { get; }
-    public ImmutableArray<AkcssGenerationRequest> InlineAkcss { get; }
-    public BlackSilenceProjectSnapshot? PreviousSnapshot { get; }
-    public ImmutableArray<DocumentDiagnosticRequest> Diagnostics { get; }
+    public ImmutableArray<ComponentGenerationRequest> Components { get; private set; }
+    public ImmutableArray<AkcssGenerationRequest> ExternalAkcss { get; private set; }
+    public ImmutableArray<AkcssGenerationRequest> InlineAkcss { get; private set; }
+    public BlackSilenceProjectSnapshot? PreviousSnapshot => _previousSnapshot != null && _previousSnapshot.TryGetTarget(out var snapshot) ? snapshot : null;
+    public ImmutableArray<DocumentDiagnosticRequest> Diagnostics { get; private set; }
     public bool ComputeDiagnostics { get; }
+
+    // Initialized before publication into the incremental graph, immutable thereafter.
+    internal DetachedCSharpInputs? ArtifactInputs { get; private set; }
+    internal ImmutableArray<DetachedDocumentInput> DetachedDocuments { get; private set; }
+    internal ArtifactValidation ArtifactValidation { get; private set; }
+    internal bool HasArtifactCandidate { get; private set; }
+    internal ImmutableArray<ArtifactIdentity> ArtifactIdentities { get; private set; }
+
+    internal void InitializeArtifacts(System.Threading.CancellationToken cancellationToken)
+    {
+        if (!Options.CrossCompilationReuse)
+        {
+            return;
+        }
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.ArtifactValidation);
+#endif
+        DetachedDocuments = DetachedDocumentInput.Create(this);
+        var publication = State.Artifacts.Read();
+        var context = PreviousSnapshot;
+        if (context?.ArtifactInputs != null && ReferenceEquals(context.Index.Compilation.CSharpCompilation, State.CSharpCompilation))
+        {
+            // Same-compilation markup edits do not rescan unrelated C# files.
+            // Only detached facts and weak identity handles are shared here.
+            ArtifactInputs = context.ArtifactInputs;
+            ArtifactIdentities = context.Identities;
+        }
+        else
+        {
+            var identities = new ArtifactIdentitySession(State.Artifacts, publication);
+            ArtifactInputs = DetachedCSharpInputs.Create(State.CSharpCompilation, identities, cancellationToken);
+            ArtifactIdentities = identities.Detach();
+        }
+        var candidate = publication?.Artifacts;
+        HasArtifactCandidate = candidate != null;
+        ArtifactValidation = DetachedArtifactReuse.Validate(this, candidate);
+        if (PreviousSnapshot == null)
+        {
+            Components = DetachedArtifactReuse.Components(this, candidate);
+            ExternalAkcss = DetachedArtifactReuse.Akcss(this, ExternalAkcss, candidate);
+            InlineAkcss = DetachedArtifactReuse.Akcss(this, InlineAkcss, candidate);
+            Diagnostics = DetachedArtifactReuse.Diagnostics(this, candidate);
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+    }
 }

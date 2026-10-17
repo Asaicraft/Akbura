@@ -77,8 +77,12 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
             .WithComparer(CSharpEnvironmentSnapshotComparer.Instance)
             .WithTrackingName("BlackSilence.CSharpEnvironment");
 
-        var projectState = csharpEnvironment
-            .Select(static (environment, _) => new BlackSilenceProjectState(environment.Compilation))
+        var artifactStore = projectOptions
+            .Select(static (_, _) => new BoundedArtifactStore())
+            .WithTrackingName("BlackSilence.ArtifactStore");
+
+        var projectState = csharpEnvironment.Combine(artifactStore)
+            .Select(static (input, _) => new BlackSilenceProjectState(input.Left.Compilation, input.Right))
             .WithTrackingName("BlackSilence.ProjectState");
 
         var generationRequests = collectedDocuments

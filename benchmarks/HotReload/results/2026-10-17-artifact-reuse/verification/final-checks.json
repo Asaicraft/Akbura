@@ -1,0 +1,75 @@
+{
+  "CheckedUtc": "2026-10-17T16:08:29.5915380Z",
+  "BenchmarkCompletedUtc": "2026-10-17T12:56:48.3865282Z",
+  "PipelineGroups": 68,
+  "PrimaryGroups": 64,
+  "PrimarySamples": 704,
+  "PrimaryFreshParityChecks": 704,
+  "PrimaryHeapObservations": 704,
+  "LifetimeSequentialObservations": 206,
+  "LifetimeFreshParityChecksIncludingForks": 214,
+  "ConcurrentGroups": 4,
+  "FrozenSourceHashesVerified": 28,
+  "AnalyzerHashesVerified": 2,
+  "ToolSha256Verified": "219925E5B5C3C17DC77179CF78291227CCFBD3588242384AFAF04A2FE6C0F4F6",
+  "PrimaryCompressedRowCounts": {
+    "invalidation-validation": 704,
+    "invalidation": 704,
+    "invalidation-parity": 704,
+    "invalidation-provenance": 64,
+    "environment": 64,
+    "artifact-heap": 704
+  },
+  "LifetimeCompressedRowCounts": {
+    "artifact-concurrent": 4,
+    "artifact-memory-result": 4,
+    "environment": 4,
+    "artifact-memory-sample": 206,
+    "artifact-memory-provenance": 4
+  },
+  "FinalTestRuns": [
+    {
+      "File": "artifact-regression-memo-final.trx",
+      "Executed": 274,
+      "Passed": 274,
+      "Failed": 0,
+      "Skipped": 0
+    },
+    {
+      "File": "sdk-invalidation.trx",
+      "Executed": 61,
+      "Passed": 61,
+      "Failed": 0,
+      "Skipped": 0
+    },
+    {
+      "File": "artifact-release-memo-final.trx",
+      "Executed": 39,
+      "Passed": 39,
+      "Failed": 0,
+      "Skipped": 0
+    },
+    {
+      "File": "markup-memo-focused.trx",
+      "Executed": 5,
+      "Passed": 5,
+      "Failed": 0,
+      "Skipped": 0
+    }
+  ],
+  "ReportChecksPassed": {
+    "RepeatedAfterTiming": true,
+    "Existing": 17,
+    "Invalidation": 19
+  },
+  "ChangedCSharpFilesChecked": 22,
+  "BraceViolations": 0,
+  "SingleLineXmlDocumentationViolations": 0,
+  "ChangedTextFilesCheckedBeforeThisGeneratedLedger": 55,
+  "CrLfAndFinalCrLfVerified": true,
+  "HistoricalArchivesUnchanged": true,
+  "DiffWhitespaceCheckPassed": true,
+  "ObsoleteCompilationBoundTargetsAliveInOwnerOnlyProof": 0,
+  "EnabledDistinctDetachedGenerationsAlivePerProject": 1,
+  "Limitations": "Selected relevant test suites, not the entire repository. No new dotnet-watch or IDE measurement. Concurrent timings are single pairs; the slower enabled Purity observation is reported."
+}

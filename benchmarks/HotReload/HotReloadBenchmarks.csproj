@@ -21,5 +21,6 @@
     <Reference Include="Akbura.BlackSilence" HintPath="../../src/Akbura.BlackSilence/bin/$(BlackSilenceConfiguration)/netstandard2.0/Akbura.BlackSilence.dll" />
     <Reference Include="Akbura.Generator" HintPath="../../src/Akbura.Generator/bin/$(BlackSilenceConfiguration)/netstandard2.0/Akbura.Generator.dll" />
     <Compile Include="../../src/Akbura.HotReloadIntegrationTests/ClrHotReloadSession.cs" Link="ClrHotReloadSession.cs" />
+    <Compile Include="../../src/Akbura.TestUtilities/DiagnosticParity.cs" Link="DiagnosticParity.cs" />
   </ItemGroup>
 </Project>

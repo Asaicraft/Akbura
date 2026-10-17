@@ -51,6 +51,7 @@
 	<ItemGroup>
 		<Using Include="Xunit" />
 		<Compile Include="..\Akbura.TestUtilities\RealisticIncrementalScenario.cs" Link="RealisticIncrementalScenario.cs" />
+		<Compile Include="..\Akbura.TestUtilities\DiagnosticParity.cs" Link="DiagnosticParity.cs" />
 		<ProjectReference Include="..\Akbura.Generator\Akbura.Generator.csproj" />
 	</ItemGroup>
 

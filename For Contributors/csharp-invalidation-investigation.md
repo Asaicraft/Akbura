@@ -2,9 +2,9 @@
 
 ## Scope and baseline
 
-This is an investigation, not a caching optimization. The baseline is `feature/improve-hot-reload` at `7e3967f82c3da21c8755a0323ad66e36617b7418`. Measurements use that tree with the instrumentation and benchmark changes accompanying this report. Source provenance records identify the measured working files; a HEAD hash alone does not identify uncommitted instrumentation.
+This document records the original invalidation investigation and the implemented bounded artifact reuse described [below](#detached-artifact-ownership-and-validation). The historical baseline is `feature/improve-hot-reload` at `7e3967f82c3da21c8755a0323ad66e36617b7418`. Historical measurements use that tree with their accompanying instrumentation. Source provenance records identify measured working files; a HEAD hash alone does not identify uncommitted changes. The original result archives are unchanged; new comparisons use same-session cache-disabled controls rather than historical timings as a denominator.
 
-No environment equivalence, generation-version equivalence, parse cache, diagnostic publication rule, runtime, AKCSS reconciliation, manifest, or NameScope behavior is intentionally changed. In particular, no old `SemanticModel`, symbol, operation, probe context, or compilation is transferred into a new C# environment.
+The historical investigation changed no environment/generation-version equivalence or runtime behavior. The current implementation adds a separate detached artifact owner and an explicit conservative proof before binding. It does not weaken semantic-model compatibility, change runtime/AKCSS reconciliation, manifest or NameScope behavior, or use generated-output equality as semantic proof. No old `SemanticModel`, symbol, operation, probe context or compilation is transferred into a new C# environment.
 
 The question is why changing C# that does not change generated text can still be expensive. Equal generated text is an observation **after** generation; it does not prove that semantic inputs or diagnostics were equivalent before generation.
 
@@ -301,7 +301,7 @@ For a distinct SDK-host check, `pwsh -NoProfile -File benchmarks/HotReload/Verif
 - `BlackSilenceIncrementalGenerationTests.Invalidation.cs` and `BlackSilenceGenerationStatisticsTests.cs`: instrumentation and fixture regressions.
 - Existing Hot Reload program/project/runner and documentation, new invalidation summarizer/report checks/SDK verification, solution items and the separate results archive.
 
-## Future architecture options — not implemented
+## Architecture alternatives evaluated
 
 Simply retaining the old project owner or copying its snapshot is not a safe fix. `DocumentGenerationVersion` has no separate C# compilation field: the current owner/declaration-environment boundary indirectly supplies broad C# invalidation. Preserving that declaration token without adding explicit semantic validation could incorrectly reuse generated text after a meaningful C# change. `DocumentDiagnosticVersion` already has a separate C# environment identity. Any ownership redesign must preserve both contracts rather than merely make `previous != null`.
 
@@ -327,7 +327,69 @@ Expected eliminable work: semantic preparation and probe work for genuinely unaf
 
 The measurable success condition is a reduction from 33/15 prepared semantic inputs to the actually affected subset in these unrelated-edit workloads, accompanied by fewer actual probe compilations/diagnostic queries. Revalidation overhead and fallback rate must be included in the driver measurement. This is the option addressing the primary time cost; there is no measured speedup or justified percentage estimate until it exists and passes the same parity/lifetime matrix.
 
-Neither option is implemented here. Further cache reuse should be evaluated against the measured dominant stages and independently verified correctness, not sold as an assumed speedup.
+The alternatives above describe the original investigation's design space. The implementation below chooses a bounded detached layer and a narrow exact dependency proof, not a reusable semantic plan or general query-replay engine. Further expansion requires additional proofs and measurements.
+
+## Detached artifact ownership and validation
+
+The project/options incremental node creates one `BoundedArtifactStore`, independently of `CompilationProvider`. Each new C# environment still creates its own `BlackSilenceProjectState`; it receives that store but does not inherit the old bound snapshot. Independent drivers, including drivers using the same generator adapter, have independent owners. Options changes establish a new owner. There is no static project/driver registry.
+
+### Field and indirect-reference audit
+
+| Owner / value | Actual reachable state | Cross-compilation retention policy |
+| --- | --- | --- |
+| Roslyn driver tables | Current provider outputs, requests, tracked steps and generated sources | Roslyn/caller-owned; old externally retained drivers can retain old compiler contexts. No cache stores a driver. |
+| `BlackSilenceProjectState._snapshot` | Index, documents/ASTs, versioned source/diagnostic entries, semantic-state dictionary and its current detached values | Current same-compilation context only; never placed in the detached store. The detached-value reference has no reverse edge into this bound snapshot. |
+| Request `Index`, `Documents`, declaration token | `AkburaCompilation`, source trees, declarations, resolvers and current C# compilation | Compilation-specific. Optional previous bound snapshot is a weak reference, avoiding a full previous-context root in retained request outputs. |
+| `AkburaCompilation` / index | Semantic models, syntax/declaration manager, reference manager, lazy probe compilation and resolver closures | Never detached. In particular, reference-manager lazy closures capture the originating C# compilation. |
+| `SemanticModelState` | Source tree, C# compilation and symbol/diagnostic caches | Same-compilation import checks unchanged; never copied across C# environments. |
+| `ComponentPlan` | Symbols, operations, bound definitions and AST nodes | Short-lived preparation only. No plan is retained in the artifact layer. |
+| Generated / diagnostic entries | Version objects with AST/dependency documents and, for diagnostics, C# environment identity | Entries are not detached artifacts. A cache hit constructs a new entry with the **current** request's version. |
+| `BoundedArtifactStore._latest` | One `ArtifactPublication`: current detached artifact snapshot and current weak identity handles | Replaced atomically; no previous pointer, historic map, LRU or event/delegate capture. Only two monotonic scalar counters accompany it. |
+| `DetachedProjectArtifacts` | Schema/options values, exact C# source strings/token/name arrays, document identities/shapes/lookups, generated characters and diagnostic records | Fresh current maps on every successful publication; removed documents/keys do not survive structural sharing. No compiler-backed descriptors or version objects. |
+| Detached source | `SourceText.From(string, UTF8, checksumAlgorithm)` | Explicitly materialized `StringText`, never an arbitrary writer/custom `SourceText`. The audited [Roslyn implementation](https://github.com/dotnet/roslyn/blob/7ed110c0f961a5f8800139bc2df914ffb0099aca/src/Compilers/Core/Portable/Text/StringText.cs) and [SDK implementation](https://github.com/dotnet/dotnet/blob/e34a38d2ae1fc26406a317517196e55c68ff83ab/src/roslyn/src/Compilers/Core/Portable/Text/StringText.cs) contain character/encoding data, not compiler ownership. |
+| `AkburaDiagnosticRecord` | String IDs/messages/paths, scalar severity/kind/provenance/version, spans/line spans, immutable location records and string properties | All nested fields are values. Primary and additional mapping dependencies are separately validated. No `Diagnostic`, syntax location or descriptor retaining a compiler graph is cached. |
+| Identity validation session | Temporary reference-identity dictionary and a captured publication | Lives only during current capture. Export contains IDs and **weak** handles for currently used inputs only; session is not a pipeline output. |
+
+```text
+caller -> current Roslyn driver -> current request -> current state / bound snapshot
+                                                   -> index -> AkburaCompilation
+                                                               -> models / probes / C# compilation
+                            current bound snapshot -> its current detached values
+                            \-> options node -> BoundedArtifactStore
+                                                  -> latest publication
+                                                       -> detached scalar facts / text / diagnostics
+                                                       -> current IDs + WEAK option/reference handles
+
+No detached arrow returns to the bound graph. No successful snapshot links backward.
+```
+
+The `SourceText` audit includes inherited lazy fields, not just the `StringText` type name: the string factory supplies no custom container, line information refers only to that text and scalar positions, and the default static container refers only to that text and ignores event subscriptions. Checksum/content-hash and embedded-text storage contains bytes, not semantic objects. See the pinned [Roslyn base implementation](https://github.com/dotnet/roslyn/blob/7ed110c0f961a5f8800139bc2df914ffb0099aca/src/Compilers/Core/Portable/Text/SourceText.cs) and [SDK base implementation](https://github.com/dotnet/dotnet/blob/e34a38d2ae1fc26406a317517196e55c68ff83ab/src/roslyn/src/Compilers/Core/Portable/Text/SourceText.cs). An arbitrary `SourceText` subclass or caller-supplied container would not satisfy this ownership argument and is never retained as an artifact.
+
+The identity window replaces all keys each publication. Its size is at most the current reference count plus twice the C# tree count plus one compiler-options slot (shared objects can reduce this). Exact `ReferenceEquals` checks recover IDs from live weak handles; new objects receive never-reused IDs. Runtime identity hashes only select a temporary dictionary bucket, never prove equality. A collected input causes a safe miss. No historical weak-key registry or `ConditionalWeakTable` capacity accumulates with revisions.
+
+Same-compilation markup edits memoize detached capture, not semantic equivalence. The current bound snapshot holds its current detached values. Unchanged document identities can share scalar facts only while every global document identity is unchanged; changing a global import recomputes all consumers' lookup facts. Capture can share an existing detached generated-text record when the current output uses the exact source object from the corresponding bound entry, or the exact detached text already published. Every new artifact snapshot still has fresh current-key maps and no link to the prior snapshot. `DetachedSourceTextCreated` counts actual new wrappers separately from component/AKCSS-writer text creation. This prevents a normal edit from reparsing every lookup name and repeatedly flattening every unchanged generated text.
+
+### Proof boundary and independent diagnostics
+
+See the canonical [Hot Reload mechanism](hot-reload.md#reusing-artifacts-after-a-c-edit) for the exact supported leaf subset. The validator compares complete source text for every unchanged tree, exact declaration token arrays for the changed leaf, current paths/order, options/encoding identities and ordered PE-reference identities. It excludes the changed type from every other C# identifier set, implicit generated component/module names, and each eligible document's full positive/negative lookup-name universe. Identifier `ValueText` normalization handles escaped names. No signature hash or output hash participates in the proof.
+
+This does not claim that arbitrary method bodies, partial classes, extension scopes or positive symbol references alone are a sufficient dependency model. Overloads/extensions, missing/ambiguous names, constants, aliases/global usings, attributes, base/target types, nullability, constraints, hooks, reference identity, parse/compiler options and file membership changes conservatively reject the proof. Global imports from another markup document belong to every consumer's lookup universe; unclassified global dependencies disable reuse for every consumer. Unsupported/custom compiler providers/resolvers also reject it. Unsupported documents stay dirty even when other documents hit. The decision states and scalar reason events distinguish validated equivalence, required rebinding, unsupported dependencies and missing artifacts.
+
+Diagnostics have a separate missing-artifact/mapping check. Reusing source does not suppress a needed diagnostic evaluation. A source-only cached publication followed by an isolated C# edit in publish mode is explicitly tested: source generation hits, diagnostics bind and probe the current compilation. Diagnostic-only C# changes and invalid/repaired inputs are fresh-checked even when emitted source is identical. The oracle compares complete descriptor/diagnostic/location/property values using escaped JSON; only `akbura.document-version` is excluded from equality because it is a transient last-publication revision, independently checked as positive and not in the future. Provenance and all other properties remain in the oracle.
+
+### Publication, failures and forks
+
+All source and diagnostic work completes before detached materialization. Publication holds only a brief per-owner lock, checks cancellation, publishes the bound current snapshot, then replaces the detached publication if its reserved attempt version is newer. Candidate lookup and generation execute outside the lock. An older successful attempt can keep its own correct result but cannot overwrite a newer artifact publication. Attempt versions order starts within an owner, not a global IDE edit chronology. Incompatible forks can miss/replace the cache, but exact validation prevents poisoning another fork's output. Exceptions and cancellation leave the previous complete publication intact; interrupted identity allocation only consumes scalar IDs.
+
+### Verification and measurements
+
+The implementation adds independent exact-output/diagnostic and ownership tests, including 100/500 successive revisions with a fresh oracle after **every** update, cancellation during lookup/validation/preparation, out-of-order/concurrent branches, retained current requests, removed documents, schema changes, independent drivers and adversarial dependency edits. The GC tests retain only the newest store after a non-inlined session helper returns, force repeated full collections and observe obsolete objects through weak references, not full context lists. A recursive detached-value audit rejects compiler/model/syntax/symbol/operation/plan/version/delegate graphs. Cache-entry counts alone are not the proof.
+
+The [separate implementation measurements](../benchmarks/HotReload/results/2026-10-17-artifact-reuse/README.md) record same-binary enabled/disabled latency, counters, retained heap, large Gallery lifetime/concurrency, test commands/counts and limitations. The original archives below remain historical evidence, not a mixed-configuration speedup denominator. The new [harness protocol](../benchmarks/HotReload/README.md#cross-compilation-artifact-reuse) explains the per-update oracle and GC boundaries.
+
+In the completed paired `stats` matrix, the isolated unrelated-body median fell from 9,015.43 to 23.04 ms for Gallery and 1,951.83 to 10.59 ms for Purity. Semantic source preparation fell from 33/15 inputs to zero, along with probe/model/query work. These reductions apply to the explicit isolated-leaf proof, not arbitrary application methods. Ordinary markup medians were 243.25 to 240.72 ms for Gallery and 610.82 to 627.30 ms for Purity; the small fixed-order sample does not prove neutral tail latency. The single Purity concurrent fallback pair was slower with reuse enabled and is explicitly reported, not included in a generalized speedup claim.
+
+All 704 primary and 214 lifetime/fork fresh comparisons passed. The 100-revision Gallery sequence kept exactly two observed compilation owners during active edits, then collected every observed compilation-bound target when only the newest store remained. One detached generation with 33 entries survived intentionally. Independent 100/500-revision package/SDK unit tests passed as well. The enabled owner's whole-process post-GC heap was approximately 51.34 MiB versus 32.49 MiB disabled in the real Gallery check: current reusable artifacts cost memory even though historical compiler graphs are not retained.
 
 ## Archived results
 

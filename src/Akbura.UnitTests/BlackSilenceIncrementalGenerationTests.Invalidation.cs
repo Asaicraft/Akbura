@@ -68,7 +68,7 @@ public sealed partial class BlackSilenceIncrementalGenerationTests
         Assert.Contains(trace, observation => observation.Kind == "CSharpEnvironmentComparison" && observation.Reasons.Contains("TreeTextChanged"));
         var context = trace.Single(observation => observation.Kind == "ProjectContext");
         var decision = trace.Single(observation => observation.Kind == "GenerationDecision");
-        if (context.Decision == "NoPreviousSnapshot")
+        if (context.Decision == "NoPreviousSnapshot" && decision.Decision == "Generate")
         {
             Assert.Equal("False", decision.Data["EntryAvailable"]);
             Assert.Contains("PreviousSnapshotUnavailable", decision.Reasons);

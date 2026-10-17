@@ -1,0 +1,34 @@
+{
+  "Reason": "The paired Gallery markup regression guard runs before the remaining frozen matrix.",
+  "InterruptedGroupsRestartedInFull": [],
+  "ModeOrder": [
+    "disabled",
+    "enabled"
+  ],
+  "SourceAndAnalyzerHashesRevalidated": true,
+  "ScenarioOrder": [
+    "akbura",
+    "unchanged",
+    "unrelated-body",
+    "referenced-body",
+    "csharp-whitespace",
+    "csharp-trivia",
+    "referenced-signature",
+    "overload",
+    "const",
+    "global-using",
+    "reference-compatible",
+    "add-tree",
+    "remove-tree",
+    "unresolved",
+    "repeat",
+    "revert"
+  ],
+  "OriginalEnvironmentFile": "invalidation-environment.json",
+  "OSVersion": "Microsoft Windows NT 10.0.26200.0",
+  "AvailableMemoryKiB": 4004968,
+  "ToolSha256": "219925E5B5C3C17DC77179CF78291227CCFBD3588242384AFAF04A2FE6C0F4F6",
+  "RunnerSha256": "E96AE5BF1FC013B4625FDBC838F07E9E58B0672EDA9CC9F8C06D74783F6FEBBB",
+  "StartedUtc": "2026-10-17T08:21:06.1474300Z",
+  "PreservedCompleteGroups": []
+}

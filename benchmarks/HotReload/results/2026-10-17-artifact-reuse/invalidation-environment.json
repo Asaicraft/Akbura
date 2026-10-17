@@ -1,0 +1,137 @@
+{
+  "PhysicalMemoryKiB": 16493344,
+  "LogicalProcessors": 12,
+  "OS": "Майкрософт Windows 11 Pro",
+  "StartedUtc": "2026-10-17T08:07:52.7670902Z",
+  "AnalyzerHashes": [
+    {
+      "Name": "Akbura.BlackSilence",
+      "Sha256": "8CB73BE9D4AD3444D149335B9724DC4054E5BF8370896E2EAFDF3808EDDD351A"
+    },
+    {
+      "Name": "Akbura.Generator",
+      "Sha256": "42BC2310F16B5B0502B6D0E0AA4319EE9F1E8DDDD97E180296A621A1E470D11B"
+    }
+  ],
+  "Cpu": "11th Gen Intel(R) Core(TM) i5-11400H @ 2.70GHz",
+  "AvailableMemoryKiB": 1284988,
+  "OSVersion": "10.0.26200",
+  "SourceHashes": [
+    {
+      "Sha256": "3BCACCE030EC2419401AF75A8ABA696781B4BCE0331ADAB37882A6A8F5781C5C",
+      "Path": "benchmarks/HotReload/HotReloadBenchmarks.csproj"
+    },
+    {
+      "Sha256": "4AB2BA5AC754ADE46EC384172B2F800B86F7D66B22DCC1E960BD4D44BAA0455D",
+      "Path": "benchmarks/HotReload/Program.ArtifactRetention.cs"
+    },
+    {
+      "Sha256": "AB58D9F87453612D8D54A2EA26AD5EB7E5E1B26F66E6CE5B6CAF619D96E55961",
+      "Path": "benchmarks/HotReload/Program.cs"
+    },
+    {
+      "Sha256": "2C199BCBB04DACBDACAB52610E640EDBB070EBADD96EA04E94C359CBD11378FC",
+      "Path": "benchmarks/HotReload/Program.Invalidation.cs"
+    },
+    {
+      "Sha256": "F82B4C533D302E008E51BCF91FD542AC985347919D4AAFD35FF2E61225B71291",
+      "Path": "benchmarks/HotReload/Run.ps1"
+    },
+    {
+      "Sha256": "00296297555AD5BAE47F253165AAE5DFFE5F2444303762AFD2E0C1D2AF560118",
+      "Path": "benchmarks/HotReload/Summarize-Invalidation.ps1"
+    },
+    {
+      "Sha256": "6C04948E78601AD76E2F0707CED33B2C7D4EFA371695520CEFAF43CE40E697C4",
+      "Path": "benchmarks/HotReload/Test-InvalidationReport.ps1"
+    },
+    {
+      "Sha256": "ED0B5EC15A176768897AF7C410A5D02DB9953E78B2A3FA1F20B5C3093624882A",
+      "Path": "benchmarks/HotReload/Verify-SdkRoslyn.ps1"
+    },
+    {
+      "Sha256": "F0053CA0D49465C2644F972F97F14A95FFA2368E9BCB493B0987A6A4543B6CDF",
+      "Path": "src/Akbura.BlackSilence/AkburaBlackSilenceGenerator.cs"
+    },
+    {
+      "Sha256": "056561F580FC693D9C97D4A22B13CB6EFC3C7B4840AF52CFD0C7C4C519017D58",
+      "Path": "src/Akbura.BlackSilence/BlackSilenceDocumentBatch.cs"
+    },
+    {
+      "Sha256": "AC9449CF172F21D04C8D66014EDF92D5D97E8A47ECBFE05B00D2BCFC29EB9A65",
+      "Path": "src/Akbura.BlackSilence/BlackSilenceGenerationRequest.cs"
+    },
+    {
+      "Sha256": "ED165E567B6D2252A9B20067CBB7F51D9EF8B9065A089CB8EBBCBCF54553C366",
+      "Path": "src/Akbura.BlackSilence/BlackSilenceGenerationRequestBuilder.cs"
+    },
+    {
+      "Sha256": "4916D334B2F03B6F0B273FE06AFB7B029BD208FC31FD44A62CE50065DCFA082A",
+      "Path": "src/Akbura.BlackSilence/BlackSilenceInvalidationTrace.cs"
+    },
+    {
+      "Sha256": "A3C752324BB2CCC30201A01E2E72D1DCABFA280D56F40E6E86F04ED77E45CC50",
+      "Path": "src/Akbura.BlackSilence/BlackSilenceProjectSnapshot.cs"
+    },
+    {
+      "Sha256": "3092DAF53E038FF56F2D3EC796FB32E0C03B9A7C15A8222E0CD2026225F2568D",
+      "Path": "src/Akbura.BlackSilence/BlackSilenceProjectState.cs"
+    },
+    {
+      "Sha256": "2791F7832E6453294AC13A1993B5C05B580B1708E51CFE9AC0DB34EF2F6A277C",
+      "Path": "src/Akbura.BlackSilence/DetachedArtifactReuse.cs"
+    },
+    {
+      "Sha256": "A30DD667600A7A7E39F379CCC6BDCD79A6806715DE754C5B4206DBCBEC9E7642",
+      "Path": "src/Akbura.BlackSilence/DetachedCSharpInputs.cs"
+    },
+    {
+      "Sha256": "76252CF1B2EE49FDE2F97E2F6172F1FD679CD381DA319A7E9B4289BF700ACF29",
+      "Path": "src/Akbura.BlackSilence/DetachedProjectArtifacts.cs"
+    },
+    {
+      "Sha256": "C87D56836969FDC1521678C019D933027EF666EC1AEAD47B96DE4DB54654C881",
+      "Path": "src/Akbura.BlackSilence/GeneratorProjectOptions.cs"
+    },
+    {
+      "Sha256": "9683CDCC030D6832700E86E20A6A41216119DE0A278AE9B152B7FD4AA4C540EE",
+      "Path": "src/Akbura.Generator/Language/CodeGeneration/GenerationStatistics.cs"
+    },
+    {
+      "Sha256": "21C5EA21FD31B673C1C45A295F18FD79159332B6DF64D0E5798DFF9E67A9F0FB",
+      "Path": "src/Akbura.TestUtilities/DiagnosticParity.cs"
+    },
+    {
+      "Sha256": "96EF350A9F1F7D78E74467E7F52231FB203F3B7F0DC3BD588399F3629604A8E6",
+      "Path": "src/Akbura.UnitTests/Akbura.UnitTests.csproj"
+    },
+    {
+      "Sha256": "9BE9EADA4B0F7804975680D32C38DFA6215CA5EFB2A4649E0E2F5CEBC0982077",
+      "Path": "src/Akbura.UnitTests/BlackSilenceDiagnosticSnapshotTests.cs"
+    },
+    {
+      "Sha256": "08FE6DEC859827A03D84C197684A8B2790EDBB836D1FB642CB77D56509B0B86F",
+      "Path": "src/Akbura.UnitTests/BlackSilenceIncrementalGenerationTests.ArtifactLifetime.cs"
+    },
+    {
+      "Sha256": "3B336224BAF2FB9C3F06E8324A27D3D194B796B4527DC9471A235F0DD98CCE4C",
+      "Path": "src/Akbura.UnitTests/BlackSilenceIncrementalGenerationTests.ArtifactPublication.cs"
+    },
+    {
+      "Sha256": "816CAC49E7D5B1139E94F9A286C11004E2D8F825EA28EE54BDA7C26E5268F886",
+      "Path": "src/Akbura.UnitTests/BlackSilenceIncrementalGenerationTests.Artifacts.cs"
+    },
+    {
+      "Sha256": "A07321A6389A4F995C0DBCD2CEA26D5A9AB5D68BAE5A0956CAF8FFE88635F76C",
+      "Path": "src/Akbura.UnitTests/BlackSilenceIncrementalGenerationTests.cs"
+    },
+    {
+      "Sha256": "ACEB6A22A076C85D210C937A113BBEEC239EC903385445E19C54B8B0F7D4F24E",
+      "Path": "src/Akbura.UnitTests/BlackSilenceIncrementalGenerationTests.Invalidation.cs"
+    }
+  ],
+  "Sdk": "10.0.401",
+  "RepositoryRevision": "ad27592712009e2959fe47eb0913c7ce5b16981f",
+  "TimingStartedUtc": "2026-10-17T08:21:05.4596766Z",
+  "AvailableMemoryAtTimingStartKiB": 4037408
+}

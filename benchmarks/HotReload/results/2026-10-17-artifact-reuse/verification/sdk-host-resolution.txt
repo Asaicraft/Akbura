@@ -1,0 +1,218 @@
+Processing package Microsoft.CodeAnalysis.Common/5.9.0-1.26423.113
+    lib/net10.0/Microsoft.CodeAnalysis.dll assemblyVersion=5.9.0.0 fileVersion=5.900.26.42413 localPath=(not set)
+Processing package Microsoft.CodeAnalysis.CSharp/5.9.0-1.26423.113
+    lib/net10.0/Microsoft.CodeAnalysis.CSharp.dll assemblyVersion=5.9.0.0 fileVersion=5.900.26.42413 localPath=(not set)
+Reconciling library Microsoft.CodeAnalysis.Common/5.9.0-1.26423.113
+  package: Microsoft.CodeAnalysis.Common, version: 5.9.0-1.26423.113
+    Entry 7 for asset name: Microsoft.CodeAnalysis, relpath: lib/net10.0/Microsoft.CodeAnalysis.dll, assemblyVersion 5.9.0.0, fileVersion 5.900.26.42413, localPath (not set)
+Reconciling library Microsoft.CodeAnalysis.CSharp/5.9.0-1.26423.113
+  package: Microsoft.CodeAnalysis.CSharp, version: 5.9.0-1.26423.113
+    Entry 8 for asset name: Microsoft.CodeAnalysis.CSharp, relpath: lib/net10.0/Microsoft.CodeAnalysis.CSharp.dll, assemblyVersion 5.9.0.0, fileVersion 5.900.26.42413, localPath (not set)
+Processing TPA for deps entry [Microsoft.CodeAnalysis.Common, 5.9.0-1.26423.113, lib/net10.0/Microsoft.CodeAnalysis.dll, local_path: <not_set>] with fx level: 0
+  Computed relative path: Microsoft.CodeAnalysis.dll
+    Skipped file existence check: C:\Program Files\dotnet\sdk\10.0.401\Microsoft.CodeAnalysis.dll
+    Probed deps dir and matched 'C:\Program Files\dotnet\sdk\10.0.401\Microsoft.CodeAnalysis.dll'
+Processing TPA for deps entry [Microsoft.CodeAnalysis.CSharp, 5.9.0-1.26423.113, lib/net10.0/Microsoft.CodeAnalysis.CSharp.dll, local_path: <not_set>] with fx level: 0
+  Computed relative path: Microsoft.CodeAnalysis.CSharp.dll
+    Skipped file existence check: C:\Program Files\dotnet\sdk\10.0.401\Microsoft.CodeAnalysis.CSharp.dll
+    Probed deps dir and matched 'C:\Program Files\dotnet\sdk\10.0.401\Microsoft.CodeAnalysis.CSharp.dll'
+Processing package Microsoft.CodeAnalysis.Common/4.11.0
+    lib/net8.0/Microsoft.CodeAnalysis.dll assemblyVersion=4.11.0.0 fileVersion=4.1100.24.37604 localPath=(not set)
+    lib/net8.0/cs/Microsoft.CodeAnalysis.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/de/Microsoft.CodeAnalysis.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/es/Microsoft.CodeAnalysis.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/fr/Microsoft.CodeAnalysis.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/it/Microsoft.CodeAnalysis.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/ja/Microsoft.CodeAnalysis.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/ko/Microsoft.CodeAnalysis.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/pl/Microsoft.CodeAnalysis.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/pt-BR/Microsoft.CodeAnalysis.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/ru/Microsoft.CodeAnalysis.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/tr/Microsoft.CodeAnalysis.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/zh-Hans/Microsoft.CodeAnalysis.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/zh-Hant/Microsoft.CodeAnalysis.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+Processing package Microsoft.CodeAnalysis.CSharp/4.11.0
+    lib/net8.0/Microsoft.CodeAnalysis.CSharp.dll assemblyVersion=4.11.0.0 fileVersion=4.1100.24.37604 localPath=(not set)
+    lib/net8.0/cs/Microsoft.CodeAnalysis.CSharp.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/de/Microsoft.CodeAnalysis.CSharp.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/es/Microsoft.CodeAnalysis.CSharp.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/fr/Microsoft.CodeAnalysis.CSharp.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/it/Microsoft.CodeAnalysis.CSharp.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/ja/Microsoft.CodeAnalysis.CSharp.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/ko/Microsoft.CodeAnalysis.CSharp.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/pl/Microsoft.CodeAnalysis.CSharp.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/pt-BR/Microsoft.CodeAnalysis.CSharp.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/ru/Microsoft.CodeAnalysis.CSharp.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/tr/Microsoft.CodeAnalysis.CSharp.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/zh-Hans/Microsoft.CodeAnalysis.CSharp.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+    lib/net8.0/zh-Hant/Microsoft.CodeAnalysis.CSharp.resources.dll assemblyVersion= fileVersion= localPath=(not set)
+Reconciling library Microsoft.CodeAnalysis.Common/4.11.0
+  package: Microsoft.CodeAnalysis.Common, version: 4.11.0
+    Entry 20 for asset name: Microsoft.CodeAnalysis, relpath: lib/net8.0/Microsoft.CodeAnalysis.dll, assemblyVersion 4.11.0.0, fileVersion 4.1100.24.37604, localPath (not set)
+    Entry 0 for asset name: Microsoft.CodeAnalysis.resources, relpath: lib/net8.0/cs/Microsoft.CodeAnalysis.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 1 for asset name: Microsoft.CodeAnalysis.resources, relpath: lib/net8.0/de/Microsoft.CodeAnalysis.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 2 for asset name: Microsoft.CodeAnalysis.resources, relpath: lib/net8.0/es/Microsoft.CodeAnalysis.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 3 for asset name: Microsoft.CodeAnalysis.resources, relpath: lib/net8.0/fr/Microsoft.CodeAnalysis.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 4 for asset name: Microsoft.CodeAnalysis.resources, relpath: lib/net8.0/it/Microsoft.CodeAnalysis.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 5 for asset name: Microsoft.CodeAnalysis.resources, relpath: lib/net8.0/ja/Microsoft.CodeAnalysis.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 6 for asset name: Microsoft.CodeAnalysis.resources, relpath: lib/net8.0/ko/Microsoft.CodeAnalysis.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 7 for asset name: Microsoft.CodeAnalysis.resources, relpath: lib/net8.0/pl/Microsoft.CodeAnalysis.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 8 for asset name: Microsoft.CodeAnalysis.resources, relpath: lib/net8.0/pt-BR/Microsoft.CodeAnalysis.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 9 for asset name: Microsoft.CodeAnalysis.resources, relpath: lib/net8.0/ru/Microsoft.CodeAnalysis.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 10 for asset name: Microsoft.CodeAnalysis.resources, relpath: lib/net8.0/tr/Microsoft.CodeAnalysis.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 11 for asset name: Microsoft.CodeAnalysis.resources, relpath: lib/net8.0/zh-Hans/Microsoft.CodeAnalysis.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 12 for asset name: Microsoft.CodeAnalysis.resources, relpath: lib/net8.0/zh-Hant/Microsoft.CodeAnalysis.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+Reconciling library Microsoft.CodeAnalysis.CSharp/4.11.0
+  package: Microsoft.CodeAnalysis.CSharp, version: 4.11.0
+    Entry 21 for asset name: Microsoft.CodeAnalysis.CSharp, relpath: lib/net8.0/Microsoft.CodeAnalysis.CSharp.dll, assemblyVersion 4.11.0.0, fileVersion 4.1100.24.37604, localPath (not set)
+    Entry 13 for asset name: Microsoft.CodeAnalysis.CSharp.resources, relpath: lib/net8.0/cs/Microsoft.CodeAnalysis.CSharp.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 14 for asset name: Microsoft.CodeAnalysis.CSharp.resources, relpath: lib/net8.0/de/Microsoft.CodeAnalysis.CSharp.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 15 for asset name: Microsoft.CodeAnalysis.CSharp.resources, relpath: lib/net8.0/es/Microsoft.CodeAnalysis.CSharp.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 16 for asset name: Microsoft.CodeAnalysis.CSharp.resources, relpath: lib/net8.0/fr/Microsoft.CodeAnalysis.CSharp.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 17 for asset name: Microsoft.CodeAnalysis.CSharp.resources, relpath: lib/net8.0/it/Microsoft.CodeAnalysis.CSharp.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 18 for asset name: Microsoft.CodeAnalysis.CSharp.resources, relpath: lib/net8.0/ja/Microsoft.CodeAnalysis.CSharp.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 19 for asset name: Microsoft.CodeAnalysis.CSharp.resources, relpath: lib/net8.0/ko/Microsoft.CodeAnalysis.CSharp.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 20 for asset name: Microsoft.CodeAnalysis.CSharp.resources, relpath: lib/net8.0/pl/Microsoft.CodeAnalysis.CSharp.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 21 for asset name: Microsoft.CodeAnalysis.CSharp.resources, relpath: lib/net8.0/pt-BR/Microsoft.CodeAnalysis.CSharp.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 22 for asset name: Microsoft.CodeAnalysis.CSharp.resources, relpath: lib/net8.0/ru/Microsoft.CodeAnalysis.CSharp.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 23 for asset name: Microsoft.CodeAnalysis.CSharp.resources, relpath: lib/net8.0/tr/Microsoft.CodeAnalysis.CSharp.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 24 for asset name: Microsoft.CodeAnalysis.CSharp.resources, relpath: lib/net8.0/zh-Hans/Microsoft.CodeAnalysis.CSharp.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+    Entry 25 for asset name: Microsoft.CodeAnalysis.CSharp.resources, relpath: lib/net8.0/zh-Hant/Microsoft.CodeAnalysis.CSharp.resources.dll, assemblyVersion , fileVersion , localPath (not set)
+Processing TPA for deps entry [Microsoft.CodeAnalysis.Common, 4.11.0, lib/net8.0/Microsoft.CodeAnalysis.dll, local_path: <not_set>] with fx level: 0
+  Computed relative path: Microsoft.CodeAnalysis.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\Microsoft.CodeAnalysis.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\Microsoft.CodeAnalysis.dll'
+Processing TPA for deps entry [Microsoft.CodeAnalysis.CSharp, 4.11.0, lib/net8.0/Microsoft.CodeAnalysis.CSharp.dll, local_path: <not_set>] with fx level: 0
+  Computed relative path: Microsoft.CodeAnalysis.CSharp.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\Microsoft.CodeAnalysis.CSharp.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\Microsoft.CodeAnalysis.CSharp.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.Common, 4.11.0, lib/net8.0/cs/Microsoft.CodeAnalysis.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: cs asset: Microsoft.CodeAnalysis.resources
+  Computed relative path: cs\Microsoft.CodeAnalysis.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\cs\Microsoft.CodeAnalysis.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\cs\Microsoft.CodeAnalysis.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.Common, 4.11.0, lib/net8.0/de/Microsoft.CodeAnalysis.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: de asset: Microsoft.CodeAnalysis.resources
+  Computed relative path: de\Microsoft.CodeAnalysis.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\de\Microsoft.CodeAnalysis.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\de\Microsoft.CodeAnalysis.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.Common, 4.11.0, lib/net8.0/es/Microsoft.CodeAnalysis.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: es asset: Microsoft.CodeAnalysis.resources
+  Computed relative path: es\Microsoft.CodeAnalysis.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\es\Microsoft.CodeAnalysis.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\es\Microsoft.CodeAnalysis.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.Common, 4.11.0, lib/net8.0/fr/Microsoft.CodeAnalysis.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: fr asset: Microsoft.CodeAnalysis.resources
+  Computed relative path: fr\Microsoft.CodeAnalysis.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\fr\Microsoft.CodeAnalysis.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\fr\Microsoft.CodeAnalysis.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.Common, 4.11.0, lib/net8.0/it/Microsoft.CodeAnalysis.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: it asset: Microsoft.CodeAnalysis.resources
+  Computed relative path: it\Microsoft.CodeAnalysis.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\it\Microsoft.CodeAnalysis.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\it\Microsoft.CodeAnalysis.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.Common, 4.11.0, lib/net8.0/ja/Microsoft.CodeAnalysis.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: ja asset: Microsoft.CodeAnalysis.resources
+  Computed relative path: ja\Microsoft.CodeAnalysis.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ja\Microsoft.CodeAnalysis.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ja\Microsoft.CodeAnalysis.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.Common, 4.11.0, lib/net8.0/ko/Microsoft.CodeAnalysis.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: ko asset: Microsoft.CodeAnalysis.resources
+  Computed relative path: ko\Microsoft.CodeAnalysis.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ko\Microsoft.CodeAnalysis.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ko\Microsoft.CodeAnalysis.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.Common, 4.11.0, lib/net8.0/pl/Microsoft.CodeAnalysis.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: pl asset: Microsoft.CodeAnalysis.resources
+  Computed relative path: pl\Microsoft.CodeAnalysis.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\pl\Microsoft.CodeAnalysis.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\pl\Microsoft.CodeAnalysis.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.Common, 4.11.0, lib/net8.0/pt-BR/Microsoft.CodeAnalysis.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: pt-BR asset: Microsoft.CodeAnalysis.resources
+  Computed relative path: pt-BR\Microsoft.CodeAnalysis.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\pt-BR\Microsoft.CodeAnalysis.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\pt-BR\Microsoft.CodeAnalysis.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.Common, 4.11.0, lib/net8.0/ru/Microsoft.CodeAnalysis.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: ru asset: Microsoft.CodeAnalysis.resources
+  Computed relative path: ru\Microsoft.CodeAnalysis.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ru\Microsoft.CodeAnalysis.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ru\Microsoft.CodeAnalysis.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.Common, 4.11.0, lib/net8.0/tr/Microsoft.CodeAnalysis.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: tr asset: Microsoft.CodeAnalysis.resources
+  Computed relative path: tr\Microsoft.CodeAnalysis.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\tr\Microsoft.CodeAnalysis.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\tr\Microsoft.CodeAnalysis.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.Common, 4.11.0, lib/net8.0/zh-Hans/Microsoft.CodeAnalysis.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: zh-Hans asset: Microsoft.CodeAnalysis.resources
+  Computed relative path: zh-Hans\Microsoft.CodeAnalysis.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\zh-Hans\Microsoft.CodeAnalysis.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\zh-Hans\Microsoft.CodeAnalysis.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.Common, 4.11.0, lib/net8.0/zh-Hant/Microsoft.CodeAnalysis.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: zh-Hant asset: Microsoft.CodeAnalysis.resources
+  Computed relative path: zh-Hant\Microsoft.CodeAnalysis.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\zh-Hant\Microsoft.CodeAnalysis.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\zh-Hant\Microsoft.CodeAnalysis.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.CSharp, 4.11.0, lib/net8.0/cs/Microsoft.CodeAnalysis.CSharp.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: cs asset: Microsoft.CodeAnalysis.CSharp.resources
+  Computed relative path: cs\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\cs\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\cs\Microsoft.CodeAnalysis.CSharp.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.CSharp, 4.11.0, lib/net8.0/de/Microsoft.CodeAnalysis.CSharp.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: de asset: Microsoft.CodeAnalysis.CSharp.resources
+  Computed relative path: de\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\de\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\de\Microsoft.CodeAnalysis.CSharp.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.CSharp, 4.11.0, lib/net8.0/es/Microsoft.CodeAnalysis.CSharp.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: es asset: Microsoft.CodeAnalysis.CSharp.resources
+  Computed relative path: es\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\es\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\es\Microsoft.CodeAnalysis.CSharp.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.CSharp, 4.11.0, lib/net8.0/fr/Microsoft.CodeAnalysis.CSharp.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: fr asset: Microsoft.CodeAnalysis.CSharp.resources
+  Computed relative path: fr\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\fr\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\fr\Microsoft.CodeAnalysis.CSharp.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.CSharp, 4.11.0, lib/net8.0/it/Microsoft.CodeAnalysis.CSharp.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: it asset: Microsoft.CodeAnalysis.CSharp.resources
+  Computed relative path: it\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\it\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\it\Microsoft.CodeAnalysis.CSharp.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.CSharp, 4.11.0, lib/net8.0/ja/Microsoft.CodeAnalysis.CSharp.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: ja asset: Microsoft.CodeAnalysis.CSharp.resources
+  Computed relative path: ja\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ja\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ja\Microsoft.CodeAnalysis.CSharp.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.CSharp, 4.11.0, lib/net8.0/ko/Microsoft.CodeAnalysis.CSharp.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: ko asset: Microsoft.CodeAnalysis.CSharp.resources
+  Computed relative path: ko\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ko\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ko\Microsoft.CodeAnalysis.CSharp.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.CSharp, 4.11.0, lib/net8.0/pl/Microsoft.CodeAnalysis.CSharp.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: pl asset: Microsoft.CodeAnalysis.CSharp.resources
+  Computed relative path: pl\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\pl\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\pl\Microsoft.CodeAnalysis.CSharp.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.CSharp, 4.11.0, lib/net8.0/pt-BR/Microsoft.CodeAnalysis.CSharp.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: pt-BR asset: Microsoft.CodeAnalysis.CSharp.resources
+  Computed relative path: pt-BR\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\pt-BR\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\pt-BR\Microsoft.CodeAnalysis.CSharp.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.CSharp, 4.11.0, lib/net8.0/ru/Microsoft.CodeAnalysis.CSharp.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: ru asset: Microsoft.CodeAnalysis.CSharp.resources
+  Computed relative path: ru\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ru\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ru\Microsoft.CodeAnalysis.CSharp.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.CSharp, 4.11.0, lib/net8.0/tr/Microsoft.CodeAnalysis.CSharp.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: tr asset: Microsoft.CodeAnalysis.CSharp.resources
+  Computed relative path: tr\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\tr\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\tr\Microsoft.CodeAnalysis.CSharp.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.CSharp, 4.11.0, lib/net8.0/zh-Hans/Microsoft.CodeAnalysis.CSharp.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: zh-Hans asset: Microsoft.CodeAnalysis.CSharp.resources
+  Computed relative path: zh-Hans\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\zh-Hans\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\zh-Hans\Microsoft.CodeAnalysis.CSharp.resources.dll'
+Processing native/culture for deps entry [Microsoft.CodeAnalysis.CSharp, 4.11.0, lib/net8.0/zh-Hant/Microsoft.CodeAnalysis.CSharp.resources.dll, local_path: <not_set>]
+  Detected a resource asset, will query <base>/<ietf>/<file_name> base: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\ ietf: zh-Hant asset: Microsoft.CodeAnalysis.CSharp.resources
+  Computed relative path: zh-Hant\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Skipped file existence check: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\zh-Hant\Microsoft.CodeAnalysis.CSharp.resources.dll
+    Probed deps dir and matched 'C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CrossCompilationReuse\sdk-tests-memo\9b4d2255a2db4f449958a12d25502687\test-host\zh-Hant\Microsoft.CodeAnalysis.CSharp.resources.dll'

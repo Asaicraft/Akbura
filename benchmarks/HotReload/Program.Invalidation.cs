@@ -7,6 +7,8 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using System.Runtime.CompilerServices;
+using Akbura.TestUtilities;
 
 internal static partial class Program
 {
@@ -21,8 +23,10 @@ internal static partial class Program
         "preprocessor", "language", "compilation-options", "add-tree", "remove-tree", "repeat", "revert", "multi-tree",
     ];
 
-    private static void MeasureInvalidation(string itemsPath, string fileName, string? selectedScenario, string profiling)
+    private static void MeasureInvalidation(string itemsPath, string fileName, string? selectedScenario, string profiling,
+        bool reuse = true, bool verifyEveryUpdate = false)
     {
+        var optimization = reuse ? "enabled" : "disabled";
         Assert.Contains(profiling, new[] { "off", "stats", "trace" });
         if (selectedScenario != null)
         {
@@ -40,6 +44,7 @@ internal static partial class Program
         var sourceFiles = Paths("AdditionalFiles").Select(path => new Input(path, File.ReadAllText(path))).ToArray();
         var selected = sourceFiles.Single(file => Path.GetFileName(file.Path) == fileName);
         Write(new { Kind = "invalidation-provenance", Project = rootNamespace, File = fileName, Profiling = profiling, BinaryFlavor = InvalidationBinaryFlavor,
+            Optimization = optimization, VerifyEveryUpdate = verifyEveryUpdate,
             RepositoryRevision = GitRevision(), Sdk = typeof(CSharpCompilation).Assembly.GetCustomAttributes(false)
                 .OfType<System.Reflection.AssemblyInformationalVersionAttribute>().Single().InformationalVersion,
             CSharpTrees = trees.Length, AdditionalFiles = sourceFiles.Length,
@@ -71,7 +76,7 @@ internal static partial class Program
             {
                 initialCompilation = initialCompilation.AddReferences(reference0);
             }
-            GeneratorDriver driver = Driver(files, directory, rootNamespace, parse: parse);
+            GeneratorDriver driver = Driver(files, directory, rootNamespace, parse: parse, reuse: reuse);
             var previousInput = original;
             var previousSources = new Dictionary<string, string>();
             var previousInputs = new Dictionary<string, GenerationInvalidationEvent>();
@@ -92,7 +97,7 @@ internal static partial class Program
                     switch (scenario)
                     {
                         case "fresh-driver":
-                            driver = Driver(files, directory, rootNamespace, parse: parse);
+                            driver = Driver(files, directory, rootNamespace, parse: parse, reuse: reuse);
                             break;
                         case "akbura":
                         case "akbura-whitespace":
@@ -194,6 +199,7 @@ internal static partial class Program
                 }
                 var result = driver.GetRunResult().Results.Single();
                 Assert.Null(result.Exception);
+                ValidateArtifactDiagnosticStamps(diagnostics, ArtifactRequest(driver).Version);
                 Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "AKBURA_GENERATOR_FAILURE");
                 var expectedIncompleteInput = scenario == "unresolved" && index % 2 == 0;
                 if (!expectedIncompleteInput)
@@ -245,7 +251,7 @@ internal static partial class Program
                         (bool?)(old.Data["Dependencies"] != pair.Value.Data["Dependencies"]) : null,
                 }).ToArray();
                 Write(new { Kind = "invalidation", Project = rootNamespace, File = fileName, Scenario = scenario, Profiling = profiling,
-                    BinaryFlavor = InvalidationBinaryFlavor,
+                    BinaryFlavor = InvalidationBinaryFlavor, Optimization = optimization, VerifyEveryUpdate = verifyEveryUpdate,
                     Index = index, First = index == 0, Warmup = index is > 0 and <= Warmup, GeneratorMs = wallMs,
                     ExpectedIncompleteInput = expectedIncompleteInput, GeneratorErrors = diagnostics.Count(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
                     OutsideDocumentBatchMs = statistics == null ? (double?)null : wallMs - statistics.DocumentBatchElapsed.TotalMilliseconds,
@@ -274,7 +280,7 @@ internal static partial class Program
                     previousDecisions = currentDecisions;
                     previousContext = context;
                 }
-                if (index == 0 || index >= Warmup + Samples - 1)
+                if (verifyEveryUpdate || index == 0 || index >= Warmup + Samples - 1)
                 {
                     var diagnosticKeys = DiagnosticKeys(diagnostics.Concat(output.GetDiagnostics()));
                     var compilerErrors = DiagnosticKeys(output.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
@@ -288,28 +294,30 @@ internal static partial class Program
                         baselineDiagnostics = diagnosticKeys;
                     }
                     Write(new { Kind = "invalidation-validation", Project = rootNamespace, File = fileName, Scenario = scenario, Profiling = profiling,
-                        BinaryFlavor = InvalidationBinaryFlavor,
+                        BinaryFlavor = InvalidationBinaryFlavor, Optimization = optimization, VerifyEveryUpdate = verifyEveryUpdate,
                         Index = index, Diagnostics = diagnosticKeys, AddedDiagnostics = diagnosticKeys.Except(baselineDiagnostics).ToArray(),
                         RemovedDiagnostics = baselineDiagnostics.Except(diagnosticKeys).ToArray() });
-                    if (index >= Warmup + Samples - 1)
+                    if (verifyEveryUpdate || index >= Warmup + Samples - 1)
                     {
                         var freshFiles = files.Select(file => file.Path == original.Path ? previousInput : file);
-                        var fresh = Driver(freshFiles, directory, rootNamespace, parse: currentParse)
-                            .RunGeneratorsAndUpdateCompilation(compilation, out var freshOutput, out var freshDiagnostics);
-                        Assert.Null(fresh.GetRunResult().Results.Single().Exception);
-                        Assert.DoesNotContain(freshDiagnostics, diagnostic => diagnostic.Id == "AKBURA_GENERATOR_FAILURE");
-                        if (!expectedIncompleteInput)
-                        {
-                            Clean(freshDiagnostics);
-                        }
-                        var freshSources = fresh.GetRunResult().Results.Single().GeneratedSources.ToDictionary(source => source.HintName, source => source.SourceText.ToString());
-                        Assert.Equal(generated.OrderBy(pair => pair.Key), freshSources.OrderBy(pair => pair.Key));
-                        Assert.Equal(diagnosticKeys, DiagnosticKeys(freshDiagnostics.Concat(freshOutput.GetDiagnostics())));
+                        VerifyFreshArtifacts(freshFiles, directory, rootNamespace, currentParse, compilation, generated, diagnosticKeys, expectedIncompleteInput);
                         Write(new { Kind = "invalidation-parity", Project = rootNamespace, File = fileName, Scenario = scenario, Profiling = profiling,
-                            BinaryFlavor = InvalidationBinaryFlavor, Index = index, EqualSources = true, EqualDiagnostics = true,
+                            BinaryFlavor = InvalidationBinaryFlavor, Optimization = optimization, VerifyEveryUpdate = verifyEveryUpdate,
+                            Index = index, EqualSources = true, EqualDiagnostics = true,
                             DiagnosticCount = diagnosticKeys.Length, SourceDigests = generated.ToDictionary(pair => pair.Key,
                                 pair => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(pair.Value)))) });
                     }
+                }
+                if (verifyEveryUpdate)
+                {
+                    ForceArtifactGc();
+                    var request = ArtifactRequest(driver);
+                    Write(new { Kind = "artifact-heap", Project = rootNamespace, File = fileName, Scenario = scenario,
+                        Profiling = profiling, BinaryFlavor = InvalidationBinaryFlavor, Optimization = optimization, Index = index,
+                        PostGcHeapBytes = GC.GetTotalMemory(false), WorkingSetBytes = Environment.WorkingSet,
+                        Entries = request.State.Artifacts.Latest?.Entries.Count ?? 0,
+                        IdentitySlots = request.State.Artifacts.Read()?.Identities.Length ?? 0 });
+                    GC.KeepAlive(driver);
                 }
             }
 
@@ -350,16 +358,37 @@ internal static partial class Program
         return source.Replace(original, "Text={" + expression + "}", StringComparison.Ordinal);
     }
 
-    private static string[] DiagnosticKeys(IEnumerable<Diagnostic> diagnostics) => diagnostics.Select(diagnostic =>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void VerifyFreshArtifacts(IEnumerable<AdditionalText> files, string directory, string rootNamespace,
+        CSharpParseOptions parse, CSharpCompilation compilation, Dictionary<string, string> generated, string[] diagnostics, bool incomplete)
     {
-        return diagnostic.Id + "|" + diagnostic.Severity + "|" + diagnostic.WarningLevel + "|" + diagnostic.IsSuppressed + "|" +
-            diagnostic.GetMessage(CultureInfo.InvariantCulture) + "|" + LocationKey(diagnostic.Location) + "|" +
-            string.Join(";", diagnostic.AdditionalLocations.Select(LocationKey));
-    }).Order(StringComparer.Ordinal).ToArray();
+        using var isolatedMeasurement = GenerationStatistics.BeginMeasurement();
+        var fresh = Driver(files, directory, rootNamespace, parse: parse, reuse: false)
+            .RunGeneratorsAndUpdateCompilation(compilation, out var output, out var currentDiagnostics);
+        Assert.Null(fresh.GetRunResult().Results.Single().Exception);
+        ValidateArtifactDiagnosticStamps(currentDiagnostics, ArtifactRequest(fresh).Version);
+        Assert.DoesNotContain(currentDiagnostics, diagnostic => diagnostic.Id == "AKBURA_GENERATOR_FAILURE");
+        if (!incomplete)
+        {
+            Clean(currentDiagnostics);
+        }
+        Assert.Equal(generated.OrderBy(pair => pair.Key), fresh.GetRunResult().Results.Single().GeneratedSources
+            .ToDictionary(source => source.HintName, source => source.SourceText.ToString()).OrderBy(pair => pair.Key));
+        Assert.Equal(diagnostics, DiagnosticKeys(currentDiagnostics.Concat(output.GetDiagnostics())));
+    }
 
-    private static string LocationKey(Location location) => location.Kind + "|" + location.SourceSpan + "|" +
-        location.GetLineSpan() + "|" + location.GetLineSpan().HasMappedPath + "|" +
-        location.GetMappedLineSpan() + "|" + location.GetMappedLineSpan().HasMappedPath;
+    private static string[] DiagnosticKeys(IEnumerable<Diagnostic> diagnostics) => diagnostics.Select(DiagnosticParity.Key).Order(StringComparer.Ordinal).ToArray();
+
+    private static void ValidateArtifactDiagnosticStamps(IEnumerable<Diagnostic> diagnostics, long version)
+    {
+        foreach (var diagnostic in diagnostics)
+        {
+            if (diagnostic.Properties.TryGetValue("akbura.document-version", out var stamp))
+            {
+                Assert.InRange(long.Parse(stamp!, CultureInfo.InvariantCulture), 1, version);
+            }
+        }
+    }
 
     private static string FileDigest(string path) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
 

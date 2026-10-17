@@ -1,7 +1,9 @@
 #requires -Version 7.2
 param(
     [string]$OutputDirectory = (Join-Path $PSScriptRoot '../../bin/CSharpInvalidationInvestigation/sdk-tests'),
-    [switch]$Prepare
+    [switch]$Prepare,
+    [string]$TestFilter = 'FullyQualifiedName~InvalidationTrace_|FullyQualifiedName~BlackSilenceGenerationStatisticsTests',
+    [int]$ExpectedTestCount = 17
 )
 
 $ErrorActionPreference = 'Stop'
@@ -48,7 +50,7 @@ try {
     $env:DOTNET_HOST_TRACEFILE = Join-Path $root 'host-resolution.log'
     $env:AKBURA_TEST_EXPECTED_ROSLYN_VERSION = $assemblies[0].AssemblyVersion
     & dotnet vstest (Join-Path $shadow 'Akbura.UnitTests.dll') `
-        '--TestCaseFilter:FullyQualifiedName~InvalidationTrace_|FullyQualifiedName~BlackSilenceGenerationStatisticsTests' `
+        "--TestCaseFilter:$TestFilter" `
         '--Logger:trx;LogFileName=sdk-invalidation.trx' "--ResultsDirectory:$root" `
         -- xUnit.MaxParallelThreads=4 2>&1 | ForEach-Object { "$_" } |
         Tee-Object -FilePath (Join-Path $root 'tests.log')
@@ -64,8 +66,8 @@ if ($exitCode -ne 0) {
 }
 [xml]$result = Get-Content -LiteralPath (Join-Path $root 'sdk-invalidation.trx') -Raw
 $counters = $result.TestRun.ResultSummary.Counters
-if ([int]$counters.failed -ne 0 -or [int]$counters.executed -ne 17) {
-    throw 'Expected all 17 instrumentation/statistics checks to pass.'
+if ([int]$counters.failed -ne 0 -or [int]$counters.executed -ne $ExpectedTestCount) {
+    throw "Expected all $ExpectedTestCount selected checks to pass."
 }
 $resolution = [IO.File]::ReadAllText((Join-Path $root 'host-resolution.log'))
 foreach ($name in @('Microsoft.CodeAnalysis', 'Microsoft.CodeAnalysis.CSharp')) {
@@ -79,6 +81,7 @@ $metadata = @{
     Executed = [int]$counters.executed
     Passed = [int]$counters.passed
     Failed = [int]$counters.failed
+    TestFilter = $TestFilter
     TestAssemblySha256 = (Get-FileHash -LiteralPath (Join-Path $shadow 'Akbura.UnitTests.dll')).Hash
     RuntimeVersionAssertion = 'InvalidationTrace_UnchangedCompilationSkipsCallbacks asserts the SDK assembly version inside the executing test host.'
     Mode = 'Isolated copy of the existing tests; SDK Roslyn replaces only the two host assemblies. Repository package references and original test output remain unchanged.'

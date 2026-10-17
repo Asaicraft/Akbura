@@ -43,6 +43,7 @@ internal enum GenerationStatisticCounter : byte
     ProbeContextReused,
     ProbeBindingResultReused,
     ProbeDiagnosticsReused,
+    SourcePublished,
     Count,
 }
 
@@ -78,6 +79,36 @@ internal enum GenerationStatisticStage : byte
     ProbeSymbolBinding,
     ProbeOperationBinding,
     ProbeStateRewriting,
+    CSharpEnvironmentConstruction,
+    CSharpEnvironmentComparison,
+    CSharpEnvironmentTraceComparison,
+    CSharpEnvironmentGetRoot,
+    CSharpEnvironmentTreeEnumeration,
+    CSharpEnvironmentReferences,
+    CSharpEnvironmentNamespaces,
+    CSharpEnvironmentIdentifiers,
+    CSharpEnvironmentInertCandidates,
+    CSharpEnvironmentReferenceCollisions,
+    CSharpEnvironmentRetainedTrees,
+    ProjectStateConstruction,
+    PreviousSnapshotLookup,
+    GenerationRequests,
+    GenerationVersionComparison,
+    DiagnosticVersionComparison,
+    GeneratedOutputComparison,
+    InvalidationTrace,
+    ProjectDescriptors,
+    DependencyGraph,
+    SyntaxDeclarationManager,
+    DeclarationStateConstruction,
+    ReferenceManagerInitialization,
+    ReferenceModulesLoading,
+    CSharpEnvironmentOptionsComparison,
+    CSharpEnvironmentReferenceComparison,
+    CSharpEnvironmentParseOptionsComparison,
+    CSharpEnvironmentNamespaceComparison,
+    CSharpEnvironmentTreeComparison,
+    SourcePublication,
     Count,
 }
 
@@ -91,11 +122,28 @@ internal static partial class GenerationStatistics
 
     internal static GenerationStatisticsSession? Current => s_current.Value;
 
-    public static GenerationStatisticsSession BeginMeasurement(Func<long>? getAllocatedBytes = null, bool trackOperations = false)
+    public static GenerationStatisticsSession BeginMeasurement(
+        Func<long>? getAllocatedBytes = null,
+        bool trackOperations = false,
+        bool trackInvalidation = false,
+        string? documentFilter = null)
     {
-        var session = new GenerationStatisticsSession(s_current.Value, getAllocatedBytes, trackOperations);
+        var session = new GenerationStatisticsSession(s_current.Value, getAllocatedBytes, trackOperations, trackInvalidation, documentFilter);
         s_current.Value = session;
         return session;
+    }
+
+    // Preserve the pre-existing two-parameter instrumentation ABI for analyzer hosts.
+    public static GenerationStatisticsSession BeginMeasurement(Func<long>? getAllocatedBytes, bool trackOperations)
+    {
+        return BeginMeasurement(getAllocatedBytes, trackOperations, trackInvalidation: false, documentFilter: null);
+    }
+
+    public static bool IsInvalidationTrackingEnabled => s_current.Value is { IsActive: true, TrackInvalidation: true };
+
+    public static void RecordInvalidation(GenerationInvalidationEvent observation)
+    {
+        s_current.Value?.RecordInvalidation(observation);
     }
 
     public static void Increment(GenerationStatisticCounter counter)
@@ -127,6 +175,9 @@ internal static partial class GenerationStatistics
 
 internal sealed class GenerationStatisticsSession : IDisposable
 {
+    private readonly object _invalidationGate = new();
+    private readonly List<GenerationInvalidationEvent>? _invalidationEvents;
+    private readonly string? _documentFilter;
     private readonly object _conservativeDependencyGate = new();
     private List<ConservativeDependencyReason>? _conservativeDependencies;
     private readonly GenerationStatisticsSession? _previous;
@@ -138,16 +189,50 @@ internal sealed class GenerationStatisticsSession : IDisposable
     private long _endTimestamp;
     private long _invalidAllocationMeasurementCount;
 
-    internal GenerationStatisticsSession(GenerationStatisticsSession? previous, Func<long>? getAllocatedBytes, bool trackOperations)
+    internal GenerationStatisticsSession(
+        GenerationStatisticsSession? previous,
+        Func<long>? getAllocatedBytes,
+        bool trackOperations,
+        bool trackInvalidation,
+        string? documentFilter)
     {
         _previous = previous;
         GetAllocatedBytes = getAllocatedBytes;
         Operations = trackOperations ? new GenerationOperationTracker() : null;
+        _invalidationEvents = trackInvalidation ? [] : null;
+        _documentFilter = documentFilter;
     }
 
     internal bool IsActive => Volatile.Read(ref _endTimestamp) == 0;
     internal Func<long>? GetAllocatedBytes { get; }
     internal GenerationOperationTracker? Operations { get; }
+    internal bool TrackInvalidation => _invalidationEvents != null;
+
+    internal void RecordInvalidation(GenerationInvalidationEvent observation)
+    {
+        if (!IsActive || _invalidationEvents == null ||
+            (observation.Path.Length != 0 && _documentFilter != null &&
+             observation.Path.IndexOf(_documentFilter, StringComparison.OrdinalIgnoreCase) < 0))
+        {
+            return;
+        }
+
+        lock (_invalidationGate)
+        {
+            if (IsActive)
+            {
+                _invalidationEvents.Add(observation);
+            }
+        }
+    }
+
+    private ImmutableArray<GenerationInvalidationEvent> GetInvalidationEvents()
+    {
+        lock (_invalidationGate)
+        {
+            return _invalidationEvents?.ToImmutableArray() ?? [];
+        }
+    }
 
     public GenerationStatisticsSnapshot GetSnapshot()
     {
@@ -184,7 +269,9 @@ internal sealed class GenerationStatisticsSession : IDisposable
             Interlocked.Read(ref _invalidAllocationMeasurementCount),
             Operations != null,
             Operations?.GetSnapshot() ?? ImmutableArray<GenerationOperationStatistics>.Empty,
-            GetConservativeDependencies());
+            GetConservativeDependencies(),
+            TrackInvalidation,
+            GetInvalidationEvents());
     }
 
     internal void RecordConservativeDependency(ConservativeDependencyReason reason)
@@ -332,7 +419,9 @@ internal sealed class GenerationStatisticsSnapshot
         long invalidAllocationMeasurementCount,
         bool operationTrackingEnabled,
         ImmutableArray<GenerationOperationStatistics> operationMeasurements,
-        ImmutableArray<ConservativeDependencyReason> conservativeDependencies)
+        ImmutableArray<ConservativeDependencyReason> conservativeDependencies,
+        bool invalidationTrackingEnabled,
+        ImmutableArray<GenerationInvalidationEvent> invalidationEvents)
     {
         _counters = counters;
         _elapsed = elapsed;
@@ -344,6 +433,8 @@ internal sealed class GenerationStatisticsSnapshot
         OperationTrackingEnabled = operationTrackingEnabled;
         OperationMeasurements = operationMeasurements;
         ConservativeDependencies = conservativeDependencies;
+        InvalidationTrackingEnabled = invalidationTrackingEnabled;
+        InvalidationEvents = invalidationEvents;
     }
 
     public long ReadSourceTextCount => _counters[(int)GenerationStatisticCounter.ReadSourceText];
@@ -376,6 +467,8 @@ internal sealed class GenerationStatisticsSnapshot
     public bool OperationTrackingEnabled { get; }
     public ImmutableArray<GenerationOperationStatistics> OperationMeasurements { get; }
     public ImmutableArray<ConservativeDependencyReason> ConservativeDependencies { get; }
+    public bool InvalidationTrackingEnabled { get; }
+    public ImmutableArray<GenerationInvalidationEvent> InvalidationEvents { get; }
     public TimeSpan ParseElapsed => GetElapsed(GenerationStatisticStage.Parse);
     public TimeSpan CompilationElapsed => GetElapsed(GenerationStatisticStage.Compilation);
     public TimeSpan CatalogElapsed => GetElapsed(GenerationStatisticStage.Catalog);

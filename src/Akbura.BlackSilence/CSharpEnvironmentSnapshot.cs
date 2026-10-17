@@ -18,7 +18,7 @@ namespace Akbura.BlackSilence;
 /// All other C# text, references, options and namespace introductions remain inputs.
 /// Recompute this snapshot when document dependency names change, not just when C# changes.
 /// </summary>
-internal sealed class CSharpEnvironmentSnapshot
+internal sealed partial class CSharpEnvironmentSnapshot
 {
     private readonly ImmutableArray<MetadataReference> _references;
     private readonly ImmutableArray<ParseOptions> _parseOptions;
@@ -69,12 +69,22 @@ internal sealed class CSharpEnvironmentSnapshot
 
         cancellationToken.ThrowIfCancellationRequested();
 
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEnvironmentConstruction);
+#endif
+
         var referencedNames = new HashSet<string>(StringComparer.Ordinal);
         var namespaces = new HashSet<string>(StringComparer.Ordinal);
         var candidates = new Dictionary<SyntaxTree, InertTypeCandidate>();
         var parseOptions = new HashSet<ParseOptions>();
         var retainedTrees = ImmutableArray.CreateBuilder<SyntaxTree>();
+#if STATS
+        using var referencesMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEnvironmentReferences);
+#endif
         var references = compilation.References.ToImmutableArray();
+#if STATS
+        referencesMeasurement.Dispose();
+#endif
         var canIgnoreTrees = compilation.ScriptCompilationInfo == null;
 
         // AKCSS carriers and component namespaces can introduce names which never
@@ -110,11 +120,20 @@ internal sealed class CSharpEnvironmentSnapshot
             }
         }
 
+#if STATS
+        using var enumerationMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEnvironmentTreeEnumeration);
+#endif
         foreach (var tree in compilation.SyntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
             parseOptions.Add(tree.Options);
+#if STATS
+            using var rootMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEnvironmentGetRoot);
+#endif
             var root = tree.GetRoot(cancellationToken);
+#if STATS
+            rootMeasurement.Dispose();
+#endif
             AddNamespaces(root, namespaces, cancellationToken);
 
             if (canIgnoreTrees && TryGetInertType(tree, root, out var candidate))
@@ -126,6 +145,9 @@ internal sealed class CSharpEnvironmentSnapshot
                 AddIdentifiers(root, referencedNames, cancellationToken);
             }
         }
+#if STATS
+        enumerationMeasurement.Dispose();
+#endif
 
         foreach (var namespaceName in namespaces)
         {
@@ -151,6 +173,10 @@ internal sealed class CSharpEnvironmentSnapshot
 
         var ignoredCount = 0;
 
+#if STATS
+        using var retainedMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEnvironmentRetainedTrees);
+#endif
+
         foreach (var tree in compilation.SyntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -166,17 +192,34 @@ internal sealed class CSharpEnvironmentSnapshot
             retainedTrees.Add(tree);
         }
 
-        return new CSharpEnvironmentSnapshot(
+#if STATS
+        retainedMeasurement.Dispose();
+#endif
+        var snapshot = new CSharpEnvironmentSnapshot(
             compilation,
             retainedTrees.ToImmutable(),
             references,
             parseOptions.ToImmutableArray(),
             namespaces.OrderBy(static name => name, StringComparer.Ordinal).ToImmutableArray(),
             ignoredCount);
+#if STATS
+        if (GenerationStatistics.IsInvalidationTrackingEnabled)
+        {
+            BlackSilenceInvalidationTrace.Record("CSharpEnvironment", string.Empty, "Constructed", [],
+                ("Compilation", BlackSilenceInvalidationTrace.Id(compilation)), ("Trees", compilation.SyntaxTrees.Length),
+                ("RetainedTrees", snapshot.RetainedSyntaxTrees.Length), ("IgnoredTrees", ignoredCount),
+                ("References", references.Length), ("InertCandidates", candidates.Count), ("Namespaces", namespaces.Count));
+        }
+#endif
+        return snapshot;
     }
 
     internal bool HasSameEnvironment(CSharpEnvironmentSnapshot other)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEnvironmentComparison);
+        using var optionsMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEnvironmentOptionsComparison);
+#endif
         if (!string.Equals(Compilation.AssemblyName, other.Compilation.AssemblyName, StringComparison.Ordinal) ||
             !Compilation.Options.Equals(other.Compilation.Options) ||
             !ReferenceEquals(Compilation.ScriptCompilationInfo, other.Compilation.ScriptCompilationInfo) ||
@@ -188,6 +231,10 @@ internal sealed class CSharpEnvironmentSnapshot
             return false;
         }
 
+#if STATS
+        optionsMeasurement.Dispose();
+        using var referencesMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEnvironmentReferenceComparison);
+#endif
         for (var i = 0; i < _references.Length; i++)
         {
             if (!ReferenceEquals(_references[i], other._references[i]))
@@ -196,6 +243,10 @@ internal sealed class CSharpEnvironmentSnapshot
             }
         }
 
+#if STATS
+        referencesMeasurement.Dispose();
+        using var parseMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEnvironmentParseOptionsComparison);
+#endif
         foreach (var parseOptions in _parseOptions)
         {
             if (!other._parseOptions.Contains(parseOptions))
@@ -204,6 +255,10 @@ internal sealed class CSharpEnvironmentSnapshot
             }
         }
 
+#if STATS
+        parseMeasurement.Dispose();
+        using var namespacesMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEnvironmentNamespaceComparison);
+#endif
         for (var i = 0; i < _namespaces.Length; i++)
         {
             if (!string.Equals(_namespaces[i], other._namespaces[i], StringComparison.Ordinal))
@@ -212,6 +267,10 @@ internal sealed class CSharpEnvironmentSnapshot
             }
         }
 
+#if STATS
+        namespacesMeasurement.Dispose();
+        using var treesMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEnvironmentTreeComparison);
+#endif
         for (var i = 0; i < RetainedSyntaxTrees.Length; i++)
         {
             var left = RetainedSyntaxTrees[i];
@@ -231,6 +290,9 @@ internal sealed class CSharpEnvironmentSnapshot
 
     private static bool TryGetInertType(SyntaxTree tree, SyntaxNode root, out InertTypeCandidate candidate)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEnvironmentInertCandidates);
+#endif
         candidate = default;
 
         if (tree.Options.Kind != SourceCodeKind.Regular ||
@@ -305,6 +367,9 @@ internal sealed class CSharpEnvironmentSnapshot
         string metadataName,
         CancellationToken cancellationToken)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEnvironmentReferenceCollisions);
+#endif
         foreach (var reference in references)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -351,6 +416,9 @@ internal sealed class CSharpEnvironmentSnapshot
         HashSet<string> namespaces,
         CancellationToken cancellationToken)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEnvironmentNamespaces);
+#endif
         foreach (var declaration in root.DescendantNodes().OfType<BaseNamespaceDeclarationSyntax>())
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -388,6 +456,9 @@ internal sealed class CSharpEnvironmentSnapshot
         HashSet<string> identifiers,
         CancellationToken cancellationToken)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEnvironmentIdentifiers);
+#endif
         foreach (var token in root.DescendantTokens(descendIntoTrivia: true))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -404,6 +475,9 @@ internal sealed class CSharpEnvironmentSnapshot
         HashSet<string> identifiers,
         CancellationToken cancellationToken)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEnvironmentIdentifiers);
+#endif
         foreach (var token in SyntaxFactory.ParseTokens(text))
         {
             cancellationToken.ThrowIfCancellationRequested();

@@ -23,6 +23,13 @@ internal sealed partial class BlackSilenceDocumentBatch
         }
         catch (OperationCanceledException)
         {
+#if STATS
+            if (GenerationStatistics.IsInvalidationTrackingEnabled)
+            {
+                BlackSilenceInvalidationTrace.Record("DocumentBatch", string.Empty, "Canceled", [],
+                    ("State", BlackSilenceInvalidationTrace.Id(request.State)), ("Version", request.Version));
+            }
+#endif
             throw;
         }
         catch (Exception exception)

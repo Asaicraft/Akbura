@@ -82,6 +82,7 @@ internal sealed class AkburaProjectIndex
     {
 #if STATS
         using var indexMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.Catalog);
+        using var descriptorsMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.ProjectDescriptors);
 #endif
         cancellationToken.ThrowIfCancellationRequested();
         documents = documents.IsDefault ? [] : documents;
@@ -139,6 +140,7 @@ internal sealed class AkburaProjectIndex
         var componentSyntaxTrees = componentTrees.ToImmutable();
         var akcssSyntaxTrees = akcssTrees.ToImmutable();
 #if STATS
+        descriptorsMeasurement.Dispose();
         using var compilationMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.Compilation);
 #endif
         var compilation = new AkburaCompilation(

@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using Akbura.Language.CodeGeneration;
 using BoxedMemberNames = System.Runtime.CompilerServices.StrongBox<Akbura.Collections.ImmutableSegmentedHashSet<string>>;
 
 namespace Akbura.Language;
@@ -33,6 +34,9 @@ internal sealed partial class SyntaxAndDeclarationManager
 
     private State CreateState()
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.DeclarationStateConstruction);
+#endif
         return CreateState(
             _syntaxTrees,
             _akcssSyntaxTrees,

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Akbura.Language.CodeGeneration;
 
 namespace Akbura.BlackSilence;
 
@@ -9,7 +10,14 @@ internal sealed class CSharpEnvironmentSnapshotComparer : IEqualityComparer<CSha
 
     public bool Equals(CSharpEnvironmentSnapshot? x, CSharpEnvironmentSnapshot? y)
     {
-        return ReferenceEquals(x, y) || (x != null && y != null && x.HasSameEnvironment(y));
+        var equal = ReferenceEquals(x, y) || (x != null && y != null && x.HasSameEnvironment(y));
+#if STATS
+        if (GenerationStatistics.IsInvalidationTrackingEnabled && x != null && y != null)
+        {
+            x.TraceComparison(y, equal);
+        }
+#endif
+        return equal;
     }
 
     public int GetHashCode(CSharpEnvironmentSnapshot obj)

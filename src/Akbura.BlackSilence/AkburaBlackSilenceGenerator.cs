@@ -61,7 +61,7 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
             .WithTrackingName(SyntaxTreesTrackingName);
 
         var documents = syntaxTrees
-            .Select(static (tree, cancellationToken) => DocumentSyntaxVersion.Create(tree, cancellationToken))
+            .Select(static (tree, cancellationToken) => CreateDocumentVersion(tree, cancellationToken))
             .WithComparer(DocumentSyntaxVersionComparer.Instance)
             .WithTrackingName("BlackSilence.Documents");
 
@@ -202,6 +202,18 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
         return failures.ToImmutable();
     }
 
+    private static DocumentSyntaxVersion CreateDocumentVersion(AkburaSyntaxTree tree, CancellationToken cancellationToken)
+    {
+        var version = DocumentSyntaxVersion.Create(tree, cancellationToken);
+#if STATS
+        if (GenerationStatistics.IsInvalidationTrackingEnabled)
+        {
+            BlackSilenceInvalidationTrace.DocumentVersion(version);
+        }
+#endif
+        return version;
+    }
+
     private static AkburaSourceText? ReadSourceText(
         AdditionalText file,
         CancellationToken cancellationToken)
@@ -215,6 +227,15 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
         {
             return null;
         }
+
+#if STATS
+        if (GenerationStatistics.IsInvalidationTrackingEnabled)
+        {
+            using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.InvalidationTrace);
+            BlackSilenceInvalidationTrace.Record("SourceRead", file.Path, "Read", [],
+                ("Source", BlackSilenceInvalidationTrace.Fingerprint(sourceText.ToString())));
+        }
+#endif
 
         var extension = Path.GetExtension(file.Path);
         var kind = extension.Equals(".akcss", StringComparison.OrdinalIgnoreCase)
@@ -270,8 +291,18 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
 
     private static void AddGeneratedSource(SourceProductionContext context, GeneratedSource source)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.SourcePublication);
+#endif
         context.CancellationToken.ThrowIfCancellationRequested();
         context.AddSource(source.HintName, source.SourceText);
+#if STATS
+        GenerationStatistics.Increment(GenerationStatisticCounter.SourcePublished);
+        if (GenerationStatistics.IsInvalidationTrackingEnabled)
+        {
+            BlackSilenceInvalidationTrace.Record("SourcePublication", source.HintName, "Added", []);
+        }
+#endif
     }
 
     private static AkburaSyntaxTree ParseSyntaxTree(

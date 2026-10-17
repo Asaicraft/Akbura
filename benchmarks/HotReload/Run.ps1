@@ -1,10 +1,13 @@
 param(
-    [ValidateSet('runtime', 'generator', 'graph', 'build', 'watch')]
+    [ValidateSet('runtime', 'generator', 'graph', 'build', 'watch', 'invalidation')]
     [string[]]$Suite = @('runtime', 'generator', 'graph', 'build', 'watch'),
     [string]$OutputDirectory,
     [string]$PurityRoot,
     [switch]$SkipPurity,
-    [switch]$Prepare
+    [switch]$Prepare,
+    [string[]]$InvalidationScenario = @(),
+    [ValidateSet('off', 'stats', 'trace')][string[]]$InvalidationProfiling = @('trace'),
+    [ValidateSet('NeedHelp.akbura', 'Sidebar.akbura')][string[]]$InvalidationPurityFile = @('Sidebar.akbura')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -30,7 +33,14 @@ function Invoke-Dotnet([string[]]$Arguments, [string]$LogPath) {
         $ErrorActionPreference = $previousPreference
     }
     if ($LASTEXITCODE -ne 0) {
-        Get-Content -LiteralPath $LogPath -Tail 30 | Write-Host
+        Get-Content -LiteralPath $LogPath -Tail 30 | ForEach-Object {
+            if ($_.Length -gt 500) {
+                Write-Host ($_.Substring(0, 500) + ' ... [full structured row retained in the log]')
+            }
+            else {
+                Write-Host $_
+            }
+        }
         throw "dotnet exited with $LASTEXITCODE; see $LogPath"
     }
 }
@@ -65,12 +75,17 @@ Push-Location $repository
 try {
     if ($Prepare) {
         Invoke-Dotnet @('build', 'src/Akbura.Diagnostics/Akbura.Diagnostics.csproj', '--nologo', '-v:minimal') (Join-Path $OutputDirectory 'prepare-runtime.log')
-        Invoke-Dotnet @('build', $toolProject, '--nologo', '-v:minimal') (Join-Path $OutputDirectory 'prepare-tool.log')
+        $toolArguments = @('build', $toolProject, '--nologo', '-v:minimal')
+        if ('invalidation' -in $Suite) {
+            Invoke-Dotnet @('build', 'src/Akbura.BlackSilence/Akbura.BlackSilence.csproj', '-c', 'DebugStats', '--nologo', '-v:minimal') (Join-Path $OutputDirectory 'prepare-invalidation.log')
+            $toolArguments += '-p:BlackSilenceConfiguration=DebugStats'
+        }
+        Invoke-Dotnet $toolArguments (Join-Path $OutputDirectory 'prepare-tool.log')
     }
     if (-not (Test-Path -LiteralPath $tool)) {
         throw 'Run with -Prepare to build the runtime and benchmark executable first.'
     }
-    $usePurity = -not $SkipPurity -and @($Suite | Where-Object { $_ -in @('generator', 'graph', 'watch') }).Count -gt 0
+    $usePurity = -not $SkipPurity -and @($Suite | Where-Object { $_ -in @('generator', 'graph', 'watch', 'invalidation') }).Count -gt 0
     if ($usePurity) {
         if (-not $PurityRoot) {
             $PurityRoot = Join-Path $PSScriptRoot 'Akbura-PurityUI-Tutorial'
@@ -171,6 +186,56 @@ try {
             }
             foreach ($file in @('NeedHelp.akbura', 'Sidebar.akbura')) {
                 Invoke-Dotnet @($tool, 'graph', $purityInputs, $file) (Join-Path $OutputDirectory "graph-purity-$file.jsonl")
+            }
+        }
+    }
+    if ('invalidation' -in $Suite) {
+        if (-not $galleryInputs) {
+            Invoke-Dotnet @('build', $gallery, '--nologo', '-v:minimal') (Join-Path $OutputDirectory 'invalidation-gallery-prepare.log')
+            $galleryInputs = Export-Inputs $gallery 'gallery'
+        }
+        $workloads = @(@{ Name = 'gallery'; Inputs = $galleryInputs; File = 'Counter.akbura' })
+        if ($usePurity) {
+            $purityInputs = Export-Inputs (Join-Path $PurityRoot 'PurityUIDashborad/PurityUIDashborad.csproj') 'purity'
+            foreach ($file in $InvalidationPurityFile) {
+                $workloads += @{ Name = "purity-$file"; Inputs = $purityInputs; File = $file }
+            }
+        }
+        $scenarios = if ($InvalidationScenario.Count -gt 0) { $InvalidationScenario } else {
+            @('unchanged', 'fresh-driver', 'akbura', 'akbura-whitespace', 'original-add-tree', 'unrelated-body', 'csharp-trivia', 'csharp-whitespace', 'inert-tree',
+                'referenced-body', 'referenced-signature', 'overload', 'const', 'attribute', 'global-using', 'reference-compatible',
+                'reference-incompatible', 'unresolved', 'nullable', 'preprocessor', 'language', 'compilation-options',
+                'add-tree', 'remove-tree', 'repeat', 'revert', 'multi-tree')
+        }
+        $changedPaths = @(& git diff --name-only HEAD) + @(& git ls-files --others --exclude-standard)
+        $sourceHashes = foreach ($relativePath in $changedPaths | Sort-Object -Unique) {
+            $path = Join-Path $repository $relativePath
+            if ((Test-Path -LiteralPath $path -PathType Leaf) -and [IO.Path]::GetExtension($path) -in @('.cs', '.csproj', '.ps1', '.slnx')) {
+                @{ Path = $relativePath; Sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash }
+            }
+        }
+        $os = Get-CimInstance Win32_OperatingSystem
+        $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
+        $environment = @{
+            RepositoryRevision = (& git rev-parse HEAD)
+            StartedUtc = [DateTime]::UtcNow.ToString('o')
+            Sdk = (& dotnet --version)
+            OS = $os.Caption; OSVersion = $os.Version; Cpu = $cpu.Name
+            LogicalProcessors = $cpu.NumberOfLogicalProcessors
+            PhysicalMemoryKiB = $os.TotalVisibleMemorySize; AvailableMemoryKiB = $os.FreePhysicalMemory
+            SourceHashes = @($sourceHashes)
+            AnalyzerHashes = @(foreach ($name in @('Akbura.BlackSilence', 'Akbura.Generator')) {
+                @{ Name = $name; Sha256 = (Get-FileHash -LiteralPath (Join-Path (Split-Path $tool) "$name.dll") -Algorithm SHA256).Hash }
+            })
+        }
+        [IO.File]::WriteAllText((Join-Path $OutputDirectory 'invalidation-environment.json'),
+            ($environment | ConvertTo-Json -Depth 10) + "`r`n", [Text.UTF8Encoding]::new($false))
+        foreach ($workload in $workloads) {
+            foreach ($scenario in $scenarios) {
+                foreach ($profiling in $InvalidationProfiling) {
+                    Invoke-Dotnet @($tool, 'invalidation', $workload.Inputs, $workload.File, $scenario, $profiling) (
+                        Join-Path $OutputDirectory "invalidation-$($workload.Name)-$scenario-$profiling.jsonl")
+                }
             }
         }
     }

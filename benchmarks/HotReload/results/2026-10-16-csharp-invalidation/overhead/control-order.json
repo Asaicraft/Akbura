@@ -1,0 +1,101 @@
+[
+  {
+    "FinishedUtc": "2026-10-17T02:23:46.4356258Z",
+    "Scenario": "akbura",
+    "File": "NeedHelp.akbura",
+    "Inputs": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CSharpInvalidationInvestigation\\matrix\\purity-inputs.json",
+    "StartedUtc": "2026-10-17T02:23:07.1108607Z",
+    "Tool": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\benchmarks\\HotReload\\bin\\Debug\\net10.0\\HotReloadBenchmarks.dll",
+    "Mode": "trace"
+  },
+  {
+    "FinishedUtc": "2026-10-17T02:24:08.8939445Z",
+    "Scenario": "akbura-whitespace",
+    "File": "NeedHelp.akbura",
+    "Inputs": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CSharpInvalidationInvestigation\\matrix\\purity-inputs.json",
+    "StartedUtc": "2026-10-17T02:23:46.4428494Z",
+    "Tool": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\benchmarks\\HotReload\\bin\\Debug\\net10.0\\HotReloadBenchmarks.dll",
+    "Mode": "trace"
+  },
+  {
+    "FinishedUtc": "2026-10-17T02:25:01.2895405Z",
+    "Scenario": "unrelated-body",
+    "File": "NeedHelp.akbura",
+    "Inputs": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CSharpInvalidationInvestigation\\matrix\\purity-inputs.json",
+    "StartedUtc": "2026-10-17T02:24:08.8950559Z",
+    "Tool": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\benchmarks\\HotReload\\bin\\Debug\\net10.0\\HotReloadBenchmarks.dll",
+    "Mode": "trace"
+  },
+  {
+    "FinishedUtc": "2026-10-17T02:28:05.3333973Z",
+    "Scenario": "unrelated-body",
+    "File": "Counter.akbura",
+    "Inputs": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CSharpInvalidationInvestigation\\matrix\\gallery-inputs.json",
+    "StartedUtc": "2026-10-17T02:25:01.3367017Z",
+    "Tool": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CSharpInvalidationInvestigation\\production-tool\\HotReloadBenchmarks.dll",
+    "Mode": "off"
+  },
+  {
+    "FinishedUtc": "2026-10-17T02:30:40.0437161Z",
+    "Scenario": "unrelated-body",
+    "File": "Counter.akbura",
+    "Inputs": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CSharpInvalidationInvestigation\\matrix\\gallery-inputs.json",
+    "StartedUtc": "2026-10-17T02:28:05.3350969Z",
+    "Tool": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\benchmarks\\HotReload\\bin\\Debug\\net10.0\\HotReloadBenchmarks.dll",
+    "Mode": "off"
+  },
+  {
+    "FinishedUtc": "2026-10-17T02:33:03.4942586Z",
+    "Scenario": "unrelated-body",
+    "File": "Counter.akbura",
+    "Inputs": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CSharpInvalidationInvestigation\\matrix\\gallery-inputs.json",
+    "StartedUtc": "2026-10-17T02:30:40.0448407Z",
+    "Tool": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\benchmarks\\HotReload\\bin\\Debug\\net10.0\\HotReloadBenchmarks.dll",
+    "Mode": "stats"
+  },
+  {
+    "FinishedUtc": "2026-10-17T02:35:27.2649240Z",
+    "Scenario": "unrelated-body",
+    "File": "Counter.akbura",
+    "Inputs": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CSharpInvalidationInvestigation\\matrix\\gallery-inputs.json",
+    "StartedUtc": "2026-10-17T02:33:03.4950279Z",
+    "Tool": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\benchmarks\\HotReload\\bin\\Debug\\net10.0\\HotReloadBenchmarks.dll",
+    "Mode": "trace"
+  },
+  {
+    "FinishedUtc": "2026-10-17T02:36:15.4687544Z",
+    "Scenario": "unrelated-body",
+    "File": "Sidebar.akbura",
+    "Inputs": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CSharpInvalidationInvestigation\\matrix\\purity-inputs.json",
+    "StartedUtc": "2026-10-17T02:35:27.2657997Z",
+    "Tool": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CSharpInvalidationInvestigation\\production-tool\\HotReloadBenchmarks.dll",
+    "Mode": "off"
+  },
+  {
+    "FinishedUtc": "2026-10-17T02:36:58.2948971Z",
+    "Scenario": "unrelated-body",
+    "File": "Sidebar.akbura",
+    "Inputs": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CSharpInvalidationInvestigation\\matrix\\purity-inputs.json",
+    "StartedUtc": "2026-10-17T02:36:15.4704560Z",
+    "Tool": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\benchmarks\\HotReload\\bin\\Debug\\net10.0\\HotReloadBenchmarks.dll",
+    "Mode": "off"
+  },
+  {
+    "FinishedUtc": "2026-10-17T02:37:41.6879105Z",
+    "Scenario": "unrelated-body",
+    "File": "Sidebar.akbura",
+    "Inputs": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CSharpInvalidationInvestigation\\matrix\\purity-inputs.json",
+    "StartedUtc": "2026-10-17T02:36:58.2956841Z",
+    "Tool": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\benchmarks\\HotReload\\bin\\Debug\\net10.0\\HotReloadBenchmarks.dll",
+    "Mode": "stats"
+  },
+  {
+    "FinishedUtc": "2026-10-17T02:38:26.5620744Z",
+    "Scenario": "unrelated-body",
+    "File": "Sidebar.akbura",
+    "Inputs": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CSharpInvalidationInvestigation\\matrix\\purity-inputs.json",
+    "StartedUtc": "2026-10-17T02:37:41.6886335Z",
+    "Tool": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\benchmarks\\HotReload\\bin\\Debug\\net10.0\\HotReloadBenchmarks.dll",
+    "Mode": "trace"
+  }
+]

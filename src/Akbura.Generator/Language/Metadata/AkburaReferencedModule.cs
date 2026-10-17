@@ -1,3 +1,4 @@
+using Akbura.Language.CodeGeneration;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
@@ -263,6 +264,9 @@ internal sealed class AkburaReferencedModule
 
     public static ImmutableArray<AkburaReferencedModule> Load(CSharpCompilation compilation)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.ReferenceModulesLoading);
+#endif
         if (compilation == null)
         {
             throw new ArgumentNullException(nameof(compilation));

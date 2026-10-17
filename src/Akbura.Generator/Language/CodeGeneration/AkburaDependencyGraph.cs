@@ -35,6 +35,9 @@ internal sealed class AkburaDependencyGraph
         AkburaProjectIndex index,
         CancellationToken cancellationToken = default)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.DependencyGraph);
+#endif
         if (index == null)
         {
             throw new ArgumentNullException(nameof(index));

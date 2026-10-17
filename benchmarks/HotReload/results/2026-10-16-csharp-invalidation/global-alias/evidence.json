@@ -1,0 +1,61 @@
+{
+  "Diagnostics": [
+    "CS1537|Error|0|False|The using alias 'InvestigationAlias' appeared previously in this namespace|SourceFile|[47..65)|Akbura.BlackSilence\\Akbura.BlackSilence.AkburaBlackSilenceGenerator\\Akbura.Component.Counter.akbura.ad1ca61b.g.cs: (2,6)-(2,24)|False|Akbura.BlackSilence\\Akbura.BlackSilence.AkburaBlackSilenceGenerator\\Akbura.Component.Counter.akbura.ad1ca61b.g.cs: (2,6)-(2,24)|False|",
+    "CS8019|Hidden|1|False|Unnecessary using directive.|SourceFile|[0..60)|C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CSharpInvalidationInvestigation\\global-alias-proof\\fixture\\Alias.cs: (0,0)-(0,60)|False|C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CSharpInvalidationInvestigation\\global-alias-proof\\fixture\\Alias.cs: (0,0)-(0,60)|False|",
+    "CS8019|Hidden|1|False|Unnecessary using directive.|SourceFile|[41..94)|Akbura.BlackSilence\\Akbura.BlackSilence.AkburaBlackSilenceGenerator\\Akbura.Component.Counter.akbura.ad1ca61b.g.cs: (2,0)-(2,53)|False|Akbura.BlackSilence\\Akbura.BlackSilence.AkburaBlackSilenceGenerator\\Akbura.Component.Counter.akbura.ad1ca61b.g.cs: (2,0)-(2,53)|False|",
+    "CS8019|Hidden|1|False|Unnecessary using directive.|SourceFile|[96..120)|Akbura.BlackSilence\\Akbura.BlackSilence.AkburaBlackSilenceGenerator\\Akbura.Component.Counter.akbura.ad1ca61b.g.cs: (3,0)-(3,24)|False|Akbura.BlackSilence\\Akbura.BlackSilence.AkburaBlackSilenceGenerator\\Akbura.Component.Counter.akbura.ad1ca61b.g.cs: (3,0)-(3,24)|False|"
+  ],
+  "Alias": "global using InvestigationAlias = System.Text.StringBuilder;",
+  "Status": "Known compiler limitation; not a successful latency sample",
+  "Provenance": {
+    "Kind": "invalidation-provenance",
+    "Project": "Demo",
+    "File": "Counter.akbura",
+    "Profiling": "off",
+    "BinaryFlavor": "production",
+    "RepositoryRevision": "7e3967f82c3da21c8755a0323ad66e36617b7418",
+    "Sdk": "5.9.0-1.26423.113+e34a38d2ae1fc26406a317517196e55c68ff83ab",
+    "CSharpTrees": 2,
+    "AdditionalFiles": 1,
+    "BlackSilence": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CSharpInvalidationInvestigation\\production-tool\\Akbura.BlackSilence.dll",
+    "Generator": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CSharpInvalidationInvestigation\\production-tool\\Akbura.Generator.dll",
+    "BlackSilenceSha256": "ADA4B0C99FB52AF4DBBE94617810B31CDBF9D375FC4DE4535C24D47E05F05E06",
+    "GeneratorSha256": "5D96650E10701DF69B5F9FE06B31199C8B78EF0C62F1277A0275D928529A056D",
+    "InputsSha256": "5E24870D7622B1AD1E282EAF143FCC760A87098957871ECA1DAF83E91E25539B"
+  },
+  "FreshDriverParityChecks": [
+    {
+      "Kind": "invalidation-parity",
+      "Project": "Demo",
+      "File": "Counter.akbura",
+      "Scenario": "fresh-driver",
+      "Profiling": "off",
+      "BinaryFlavor": "production",
+      "Index": 9,
+      "EqualSources": true,
+      "EqualDiagnostics": true,
+      "DiagnosticCount": 4,
+      "SourceDigests": {
+        "Akbura.Component.Counter.akbura.ad1ca61b.g.cs": "C0C2FC3CC845D6574FD5352FC5C6EE05BCB8AEDEF219F4D553653546E006C542",
+        "Akbura.HotReloadService.g.cs": "4CCE31A100E755DA0345C438BD8BA403509E5269E36D06D9620A6D500B347605"
+      }
+    },
+    {
+      "Kind": "invalidation-parity",
+      "Project": "Demo",
+      "File": "Counter.akbura",
+      "Scenario": "fresh-driver",
+      "Profiling": "off",
+      "BinaryFlavor": "production",
+      "Index": 10,
+      "EqualSources": true,
+      "EqualDiagnostics": true,
+      "DiagnosticCount": 4,
+      "SourceDigests": {
+        "Akbura.Component.Counter.akbura.ad1ca61b.g.cs": "C0C2FC3CC845D6574FD5352FC5C6EE05BCB8AEDEF219F4D553653546E006C542",
+        "Akbura.HotReloadService.g.cs": "4CCE31A100E755DA0345C438BD8BA403509E5269E36D06D9620A6D500B347605"
+      }
+    }
+  ],
+  "Input": "One unchanged WatchFixture Counter component and its code-behind, plus the global-alias C# tree; evaluated Gallery reference set. No source files in the repository or tutorial were edited."
+}

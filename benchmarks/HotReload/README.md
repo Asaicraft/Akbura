@@ -1,6 +1,6 @@
 # Hot Reload timing benchmark
 
-This harness measures elapsed time, not memory. It separates three different paths:
+This harness primarily measures elapsed time. The opt-in C# invalidation suite also records allocation and lifetime observations. It separates three different paths:
 
 - `dotnet watch`: immediately before writing an edit to observing its value on the live UI thread. The headless host polls every 10 ms. The same process and target control must survive; the fixture also checks component state and user input.
 - BlackSilence: `RunGeneratorsAndUpdateCompilation` over real evaluated project inputs. Generated-text changes and incremental step reasons are logged. These runs do not include MSBuild or Roslyn Edit and Continue.
@@ -44,6 +44,23 @@ powershell -NoProfile -ExecutionPolicy Bypass -File benchmarks/HotReload/Summari
 
 `WatchFixture.csproj` can also be run directly. The runner puts the absolute repository root into its isolated copy so custom output directories resolve the same runtime and build tasks.
 
+## C# invalidation investigation
+
+`-Suite invalidation -Prepare` builds local `DebugStats` analyzers and runs the C# edit matrix over FeatureGallery and a prepared Purity snapshot. It preserves the older suites and their `csharp` scenario. It records actual statistics, structured cache-availability/invalidation observations, public Roslyn tracked steps, full diagnostic/source parity, caller/process allocations and independently timed driver wall time. See the [investigation](../../For%20Contributors/csharp-invalidation-investigation.md) for boundaries and correctness limitations.
+
+```powershell
+pwsh -NoProfile -File benchmarks/HotReload/Run.ps1 -Suite invalidation -Prepare -OutputDirectory bin/CSharpInvalidationInvestigation/matrix
+pwsh -NoProfile -File benchmarks/HotReload/Summarize-Invalidation.ps1 -InputDirectory bin/CSharpInvalidationInvestigation/matrix -ResultDirectory benchmarks/HotReload/results/local-invalidation
+```
+
+Use `-InvalidationScenario unrelated-body,akbura,unchanged` for a subset, `-InvalidationProfiling off,stats,trace` for profiler-overhead modes, `-InvalidationPurityFile NeedHelp.akbura,Sidebar.akbura` to select Purity targets, or `-SkipPurity` for Gallery only. `off` means no session in the same stats-enabled binary, not a non-STATS production build. Timing runs must not overlap builds/tests. Do not overwrite the historical results directory.
+
+Pass array options by invoking the script inside PowerShell 7, for example `& ./benchmarks/HotReload/Run.ps1 -Suite invalidation -Prepare -InvalidationScenario @('unrelated-body', 'unchanged') -InvalidationProfiling @('off', 'stats', 'trace')`. Do not forward comma-separated array values through the native `pwsh -File` argument boundary.
+
+The separate summarizer exports compressed raw JSONL, samples, stage timings/allocations, tracked-step transitions, causes, provenance and medians/range/nearest-rank p95. It validates two warm-ups/eight measured samples and two final fresh-driver parity checks per group. Its README update replaces only its own marked block, preserving manual notes. Stage timings/allocations are inclusive and must not be summed.
+
+`Verify-SdkRoslyn.ps1 -Prepare` runs the instrumentation/statistics checks in an isolated copy of the existing test output with the active SDK's Roslyn assemblies. It leaves the original test output and repository package versions unchanged and records assembly hashes, versions, host-resolution evidence and TRX results. This complements the ordinary package-based unit-test host; run it after benchmarks, not concurrently with timing samples. The verification and invalidation-report scripts require PowerShell 7.2 or later.
+
 ## Partially generated reports
 
 `Summarize.ps1` writes the CSV artifacts and then calls `Update-Report.ps1` to create or update `README.md` in the results directory. Watch timings and send boundaries, generator/CLR/build tables, graph decisions, observation/parity counts, and available tutorial provenance are generated from recorded artifacts. Missing suites are shown as unmeasured, not as zero-cost results. Variable graph counts are displayed as ranges.
@@ -72,3 +89,4 @@ This finite matrix does not claim to enumerate every program, unsupported edit, 
 Checked-in runs:
 
 - [2026-10-16 results](results/2026-10-16/README.md)
+- [C# invalidation investigation and profiling controls](results/2026-10-16-csharp-invalidation/README.md)

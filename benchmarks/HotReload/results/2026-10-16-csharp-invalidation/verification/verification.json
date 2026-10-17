@@ -1,0 +1,55 @@
+{
+  "Style": {
+    "BraceViolations": 0,
+    "CSharpFiles": 25,
+    "OneLineXmlSummaryViolations": 0
+  },
+  "SdkHost": {
+    "Executed": 17,
+    "Passed": 17,
+    "Assemblies": [
+      {
+        "Name": "Microsoft.CodeAnalysis",
+        "AssemblyVersion": "5.9.0.0",
+        "InformationalVersion": "5.9.0-1.26423.113+e34a38d2ae1fc26406a317517196e55c68ff83ab",
+        "Sha256": "03B3AB9D73D477D259FBC0AE167DD8CAF4775C3C8688F1FDC5E0D3603255C3F4"
+      },
+      {
+        "Name": "Microsoft.CodeAnalysis.CSharp",
+        "AssemblyVersion": "5.9.0.0",
+        "InformationalVersion": "5.9.0-1.26423.113+e34a38d2ae1fc26406a317517196e55c68ff83ab",
+        "Sha256": "12B0428203FAAE6555858D2FF856CEF7450D2764CF00C57E7516587A04885870"
+      }
+    ],
+    "Sdk": "10.0.401",
+    "TestAssemblySha256": "F1795A85DEF3D00D6452224FAB24CE620C1543CCD6B381947FE0FBB04BA88A06",
+    "Mode": "Isolated copy of the existing tests; SDK Roslyn replaces only the two host assemblies. Repository package references and original test output remain unchanged.",
+    "RuntimeVersionAssertion": "InvalidationTrace_UnchangedCompilationSkipsCallbacks asserts the SDK assembly version inside the executing test host.",
+    "Failed": 0
+  },
+  "PackageHost": {
+    "Roslyn": "4.11.0-3.24376.4+5e3a11e2e7f952da93f9d35bd63a2fa181c0608b",
+    "Failed": 0,
+    "Executed": 230,
+    "Skipped": 0,
+    "Passed": 230
+  },
+  "CompletedUtc": "2026-10-17T02:46:46.6651260Z",
+  "ReportChecks": {
+    "Existing": 17,
+    "Invalidation": 12,
+    "Failed": 0
+  },
+  "ReleaseAnalyzerBuild": {
+    "ExitCode": 0,
+    "Errors": 0,
+    "Warnings": 0
+  },
+  "FullHostResolutionSha256": "749069E1F8AF067DF6DE8BF782365E41D6821022FFCA8460F6BFAD87EA7993A2",
+  "BenchmarkBuild": {
+    "ExitCode": 0,
+    "Errors": 0,
+    "Warnings": 0
+  },
+  "Scope": "Selected compiler/instrumentation regressions only; not a new full-repository audit."
+}

@@ -1,5 +1,6 @@
 #if STATS
 using Akbura.BlackSilence;
+using Akbura.Language;
 using Akbura.Language.CodeGeneration;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -74,9 +75,7 @@ public sealed class BlackSilenceGenerationStatisticsTests
         var component = new TestAdditionalText(
             Path.Combine(directory, "StatisticsView.akbura"),
             "using Avalonia.Controls;\r\n<Border />");
-        var styles = new TestAdditionalText(
-            Path.Combine(directory, "Styles.akcss"),
-            "@using Avalonia.Controls;\r\n.button { Width: 10; }");
+        var styles = CreateNonCollidingStyles(component, "@using Avalonia.Controls;\r\n.button { Width: 10; }");
         var compilation = CSharpCompilation.Create(
             "BlackSilenceStatistics",
             references: SymbolTests.CreateAvaloniaReferences(),
@@ -104,6 +103,53 @@ public sealed class BlackSilenceGenerationStatisticsTests
         Assert.Equal(0, statistics.AkcssGeneratedCount);
         Assert.Equal(0, statistics.GeneratedSourceTextCreatedCount);
         Assert.Equal(TimeSpan.Zero, statistics.DocumentBatchElapsed);
+    }
+
+    [Fact]
+    public void WhitespaceFixture_AvoidsItsOwnDirectMappedCacheCollision()
+    {
+        // Collection isolation cannot prevent two files in the same fixture from
+        // mapping to the same slot. Exercise an actual colliding key pair.
+        for (var index = 0; index < 10_000; index++)
+        {
+            var directory = Path.Combine(Path.GetTempPath(), "BlackSilenceStatistics", "Collision" + index);
+            var component = new TestAdditionalText(Path.Combine(directory, "StatisticsView.akbura"), "<Border />");
+            var originalStyles = new TestAdditionalText(Path.Combine(directory, "Styles.akcss"), string.Empty);
+            if (CacheSlot(component, SyntaxTreeKind.Component) != CacheSlot(originalStyles, SyntaxTreeKind.Akcss))
+            {
+                continue;
+            }
+
+            var selected = CreateNonCollidingStyles(component, string.Empty);
+            Assert.NotEqual(CacheSlot(component, SyntaxTreeKind.Component), CacheSlot(selected, SyntaxTreeKind.Akcss));
+            return;
+        }
+
+        Assert.Fail("The deterministic fixture search did not exercise a cache-slot collision.");
+    }
+
+    private static TestAdditionalText CreateNonCollidingStyles(TestAdditionalText component, string text)
+    {
+        var componentSlot = CacheSlot(component, SyntaxTreeKind.Component);
+        for (var index = 0; index < 1024; index++)
+        {
+            var candidate = new TestAdditionalText(Path.Combine(Path.GetDirectoryName(component.Path)!, "Styles" + index + ".akcss"), text);
+            if (CacheSlot(candidate, SyntaxTreeKind.Akcss) != componentSlot)
+            {
+                return candidate;
+            }
+        }
+
+        throw new InvalidOperationException("Could not select independent parse-cache slots for the statistics fixture.");
+    }
+
+    private static int CacheSlot(TestAdditionalText file, SyntaxTreeKind kind)
+    {
+        var logicalName = kind == SyntaxTreeKind.Akcss
+            ? AkcssGeneratedModuleNames.GetMetadataName(string.Empty, Path.GetFileName(file.Path))
+            : string.Empty;
+        IncrementalParseCache.TryGet(kind, file.Path, logicalName, file.GetText(), out var hash);
+        return hash & IncrementalParseCache.RegularCacheMask;
     }
 
     [Fact]

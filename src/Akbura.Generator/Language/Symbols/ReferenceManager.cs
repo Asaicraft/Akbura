@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Threading;
+using Akbura.Language.CodeGeneration;
 
 namespace Akbura.Language;
 
@@ -53,6 +54,9 @@ internal sealed partial class AkburaCompilation
             CSharpCompilation? previousCompilation,
             ReferenceManager? previousManager)
         {
+#if STATS
+            using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.ReferenceManagerInitialization);
+#endif
             if (compilation == null)
             {
                 throw new ArgumentNullException(nameof(compilation));

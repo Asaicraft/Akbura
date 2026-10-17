@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;
+using Akbura.Language.CodeGeneration;
 
 namespace Akbura.BlackSilence;
 
@@ -26,6 +27,22 @@ internal sealed class GeneratedSourceComparer : IEqualityComparer<GeneratedSourc
     }
 
     public bool Equals(GeneratedSource left, GeneratedSource right)
+    {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.GeneratedOutputComparison);
+#endif
+        var equal = HaveSameContent(left, right);
+#if STATS
+        if (GenerationStatistics.IsInvalidationTrackingEnabled)
+        {
+            BlackSilenceInvalidationTrace.Record("OutputComparison", right.HintName, equal ? "Equal" : "Different", [],
+                ("SourceTextIdentityEqual", ReferenceEquals(left.SourceText, right.SourceText)));
+        }
+#endif
+        return equal;
+    }
+
+    private static bool HaveSameContent(GeneratedSource left, GeneratedSource right)
     {
         if (!StringComparer.Ordinal.Equals(left.HintName, right.HintName))
         {

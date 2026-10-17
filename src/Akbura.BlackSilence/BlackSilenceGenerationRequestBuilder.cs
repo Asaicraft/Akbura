@@ -21,6 +21,9 @@ internal static class BlackSilenceGenerationRequestBuilder
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.GenerationRequests);
+#endif
         var previous = state.TryGetSnapshot(options);
         var version = state.GetNextVersion();
         var orderedDocuments = OrderDocuments(documents, cancellationToken);
@@ -91,7 +94,7 @@ internal static class BlackSilenceGenerationRequestBuilder
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        return new BlackSilenceGenerationRequest(
+        var request = new BlackSilenceGenerationRequest(
             state,
             version,
             options,
@@ -104,6 +107,13 @@ internal static class BlackSilenceGenerationRequestBuilder
             previous,
             diagnostics.ToImmutableArrayUnsafe(),
             computeDiagnostics);
+#if STATS
+        if (GenerationStatistics.IsInvalidationTrackingEnabled)
+        {
+            BlackSilenceInvalidationTrace.Requests(request);
+        }
+#endif
+        return request;
 
         void FillAkcssRequests(ImmutableArray<AkcssDocumentDescriptor> descriptors, AkcssGenerationRequest[] requests)
         {

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using Akbura.Language.CodeGeneration;
 
 namespace Akbura.Language;
 
@@ -29,6 +30,9 @@ internal sealed partial class SyntaxAndDeclarationManager
         State? state,
         DeclarationTable? previousDeclarationTable = null)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.SyntaxDeclarationManager);
+#endif
         _syntaxTrees = syntaxTrees.IsDefault
             ? ImmutableArray<AkburaSyntaxTree>.Empty
             : syntaxTrees;

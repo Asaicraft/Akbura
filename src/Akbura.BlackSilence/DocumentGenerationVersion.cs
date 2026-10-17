@@ -1,6 +1,7 @@
 using Akbura.Language.CodeGeneration;
 using System;
 using System.Collections.Immutable;
+using System.Linq;
 
 namespace Akbura.BlackSilence;
 
@@ -30,8 +31,43 @@ internal sealed class DocumentGenerationVersion : IEquatable<DocumentGenerationV
 
     public DocumentSyntaxVersion Document { get; }
 
+#if STATS
+    internal ImmutableArray<string> DescribeChanges(DocumentGenerationVersion other)
+    {
+        var reasons = ImmutableArray.CreateBuilder<string>();
+        if (_schemaVersion != other._schemaVersion)
+        {
+            reasons.Add("GeneratorSchemaChanged");
+        }
+        if (!ReferenceEquals(_environment, other._environment))
+        {
+            reasons.Add("DeclarationEnvironmentChanged");
+        }
+        if (_options != other._options)
+        {
+            reasons.Add("ProjectOptionsChanged");
+        }
+        if (!Document.HasSameGenerationShape(other.Document))
+        {
+            reasons.Add("GenerationShapeChanged");
+        }
+        if (_dependencies.Length != other._dependencies.Length || !_dependencies.SequenceEqual(other._dependencies))
+        {
+            reasons.Add("DependencyVersionsChanged");
+        }
+        return reasons.ToImmutable();
+    }
+
+    internal string DescribeDependencies() => BlackSilenceInvalidationTrace.Fingerprint(string.Join("\0",
+        _dependencies.Select(static dependency => dependency.Identity + ":" + dependency.IncludesBody + ":" +
+            (dependency.IncludesBody ? dependency.Document.GenerationShape : string.Join("\0", dependency.Document.SurfaceShape)))));
+#endif
+
     public bool Equals(DocumentGenerationVersion? other)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.GenerationVersionComparison);
+#endif
         if (ReferenceEquals(this, other))
         {
             return true;

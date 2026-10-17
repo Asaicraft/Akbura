@@ -14,7 +14,7 @@ using System.Reflection.Metadata;
 using System.Text;
 using System.Text.Json;
 
-internal static class Program
+internal static partial class Program
 {
     private const int Warmup = 2;
     private const int Samples = 8;
@@ -48,6 +48,9 @@ internal static class Program
             case "graph":
                 MeasureGenerator(args[1], args[2], "scalar", graphOnly: true);
                 break;
+            case "invalidation":
+                MeasureInvalidation(args[1], args[2], args.ElementAtOrDefault(3), args.ElementAtOrDefault(4) ?? "trace");
+                break;
             case "watch":
                 MeasureWatch(args[1], args[2], args[3]).GetAwaiter().GetResult();
                 break;
@@ -65,7 +68,7 @@ internal static class Program
                 }
                 break;
             default:
-                throw new ArgumentException("runtime [filter] | generator <MSBuild-items.json> <file> <scenario> | graph <MSBuild-items.json> <file> | watch <project> <file> <component> | binlog <path> | style <files...>");
+                throw new ArgumentException("runtime [filter] | generator <MSBuild-items.json> <file> <scenario> | graph <MSBuild-items.json> <file> | invalidation <MSBuild-items.json> <file> [scenario] [off|stats|trace] | watch <project> <file> <component> | binlog <path> | style <files...>");
         }
         return 0;
     }

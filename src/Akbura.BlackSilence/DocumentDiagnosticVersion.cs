@@ -1,6 +1,7 @@
 using Akbura.Language.CodeGeneration;
 using System;
 using System.Collections.Immutable;
+using System.Linq;
 
 namespace Akbura.BlackSilence;
 
@@ -33,8 +34,43 @@ internal sealed class DocumentDiagnosticVersion : IEquatable<DocumentDiagnosticV
 
     public DocumentSyntaxVersion Document { get; }
 
+#if STATS
+    internal ImmutableArray<string> DescribeChanges(DocumentDiagnosticVersion other)
+    {
+        var reasons = ImmutableArray.CreateBuilder<string>();
+        if (_schemaVersion != other._schemaVersion)
+        {
+            reasons.Add("DiagnosticSchemaChanged");
+        }
+        if (!ReferenceEquals(_environment, other._environment))
+        {
+            reasons.Add("DeclarationEnvironmentChanged");
+        }
+        if (!ReferenceEquals(_csharpEnvironment, other._csharpEnvironment))
+        {
+            reasons.Add("CSharpEnvironmentChanged");
+        }
+        if (_options != other._options)
+        {
+            reasons.Add("ProjectOptionsChanged");
+        }
+        if (!(ReferenceEquals(Document, other.Document) || Document.HasSameGenerationShape(other.Document)))
+        {
+            reasons.Add("GenerationShapeChanged");
+        }
+        if (_dependencies.Length != other._dependencies.Length || !_dependencies.SequenceEqual(other._dependencies))
+        {
+            reasons.Add("DependencyVersionsChanged");
+        }
+        return reasons.ToImmutable();
+    }
+#endif
+
     public bool Equals(DocumentDiagnosticVersion? other)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.DiagnosticVersionComparison);
+#endif
         if (ReferenceEquals(this, other))
         {
             return true;

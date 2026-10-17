@@ -44,8 +44,11 @@
     <File Path="benchmarks/HotReload/README.md" />
     <File Path="benchmarks/HotReload/Run.ps1" />
     <File Path="benchmarks/HotReload/Summarize.ps1" />
+    <File Path="benchmarks/HotReload/Summarize-Invalidation.ps1" />
     <File Path="benchmarks/HotReload/Test-Report.ps1" />
+    <File Path="benchmarks/HotReload/Test-InvalidationReport.ps1" />
     <File Path="benchmarks/HotReload/Update-Report.ps1" />
+    <File Path="benchmarks/HotReload/Verify-SdkRoslyn.ps1" />
     <Project Path="benchmarks/HotReload/HotReloadBenchmarks.csproj">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="Release|*" Project="Debug" />
@@ -83,6 +86,7 @@
   </Folder>
   <Folder Name="/For Contributors/">
     <File Path="For Contributors/adding-features-without-new-syntax.md" />
+    <File Path="For Contributors/csharp-invalidation-investigation.md" />
     <File Path="For Contributors/hot-reload.md" />
     <File Path="For Contributors/Make Your Own Syntax.md" />
     <File Path="For Contributors/README.md" />

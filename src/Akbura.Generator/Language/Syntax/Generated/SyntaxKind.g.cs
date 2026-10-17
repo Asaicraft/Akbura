@@ -171,6 +171,7 @@ namespace Akbura.Language.Syntax
 		MarkupLiteralAttributeValueSyntax = 535,
 		MarkupDynamicAttributeValueSyntax = 536,
 		MarkupExtensionAttributeValueSyntax = 537,
+		MarkupExpressionBindingSyntax = 590,
 		MarkupExtensionSyntax = 538,
 		MarkupExtensionTypeSyntax = 539,
 		MarkupExtensionArgumentSyntax = 540,

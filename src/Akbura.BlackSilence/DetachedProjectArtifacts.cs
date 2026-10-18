@@ -28,10 +28,10 @@ internal sealed record DetachedProjectArtifacts(
     DetachedCSharpInputs CSharpInputs,
     ImmutableArray<DetachedDocumentInput> Documents,
     ImmutableDictionary<string, DetachedGeneratedArtifact> Entries,
-    ImmutableDictionary<string, ImmutableArray<AkburaDiagnosticRecord>> Diagnostics,
+    ImmutableDictionary<string, DetachedDiagnosticArtifact> Diagnostics,
     bool DiagnosticsComputed)
 {
-    internal const int CurrentSchema = 1;
+    internal const int CurrentSchema = 2;
 
     internal static DetachedProjectArtifacts Create(BlackSilenceGenerationRequest request,
         ImmutableDictionary<string, GeneratedDocumentEntry> generatedEntries, ImmutableDictionary<string, DiagnosticDocumentEntry> diagnosticEntries)
@@ -42,17 +42,20 @@ internal sealed record DetachedProjectArtifacts(
         foreach (var pair in generatedEntries)
         {
             var source = pair.Value.Source;
+            var dependencies = pair.Value.Version.Dependencies;
             // These characters were already selected by current generation. This
             // memo avoids detachment copies; it never decides semantic reuse.
             if (previous?.DetachedArtifacts != null && previous.Entries.TryGetValue(pair.Key, out var previousEntry) &&
                 ReferenceEquals(previousEntry.Source.SourceText, source.SourceText) &&
-                previous.DetachedArtifacts.Entries.TryGetValue(pair.Key, out var previousArtifact) && previousArtifact.HintName == source.HintName)
+                previous.DetachedArtifacts.Entries.TryGetValue(pair.Key, out var previousArtifact) && previousArtifact.HintName == source.HintName &&
+                DetachedDependencyInput.Matches(previousArtifact.Dependencies, dependencies))
             {
                 entries.Add(pair.Key, previousArtifact);
                 continue;
             }
             if (latest != null && latest.Entries.TryGetValue(pair.Key, out var currentArtifact) &&
-                ReferenceEquals(currentArtifact.Source, source.SourceText) && currentArtifact.HintName == source.HintName)
+                ReferenceEquals(currentArtifact.Source, source.SourceText) && currentArtifact.HintName == source.HintName &&
+                DetachedDependencyInput.Matches(currentArtifact.Dependencies, dependencies))
             {
                 entries.Add(pair.Key, currentArtifact);
                 continue;
@@ -60,22 +63,36 @@ internal sealed record DetachedProjectArtifacts(
             // Never accept arbitrary SourceText implementations into the cache.
             // From(string) owns characters, not the writer, reader or compilation.
             entries.Add(pair.Key, new DetachedGeneratedArtifact(source.HintName,
-                SourceText.From(source.SourceText.ToString(), Encoding.UTF8, source.SourceText.ChecksumAlgorithm)));
+                SourceText.From(source.SourceText.ToString(), Encoding.UTF8, source.SourceText.ChecksumAlgorithm), DetachedDependencyInput.Create(dependencies)));
 #if STATS
             GenerationStatistics.Increment(GenerationStatisticCounter.DetachedSourceTextCreated);
 #endif
         }
-        var diagnostics = ImmutableDictionary.CreateBuilder<string, ImmutableArray<AkburaDiagnosticRecord>>(StringComparer.Ordinal);
+        var diagnostics = ImmutableDictionary.CreateBuilder<string, DetachedDiagnosticArtifact>(StringComparer.Ordinal);
         foreach (var pair in diagnosticEntries)
         {
-            diagnostics.Add(pair.Key, pair.Value.Diagnostics);
+            diagnostics.Add(pair.Key, new DetachedDiagnosticArtifact(pair.Value.Diagnostics, DetachedDependencyInput.Create(pair.Value.Version.Dependencies)));
         }
         return new DetachedProjectArtifacts(request.Version, CurrentSchema, request.Options, request.ArtifactInputs!,
             request.DetachedDocuments, entries.ToImmutable(), diagnostics.ToImmutable(), request.ComputeDiagnostics);
     }
 }
 
-internal sealed record DetachedGeneratedArtifact(string HintName, SourceText Source);
+internal sealed record DetachedGeneratedArtifact(string HintName, SourceText Source, ImmutableArray<DetachedDependencyInput> Dependencies);
+internal sealed record DetachedDiagnosticArtifact(ImmutableArray<AkburaDiagnosticRecord> Records, ImmutableArray<DetachedDependencyInput> Dependencies);
+
+internal sealed record DetachedDependencyInput(string Identity, bool IncludesBody, ImmutableArray<string> Shape)
+{
+    internal static ImmutableArray<DetachedDependencyInput> Create(ImmutableArray<DependencyGenerationVersion> dependencies) =>
+        dependencies.Select(static dependency => new DetachedDependencyInput(dependency.Identity, dependency.IncludesBody,
+            dependency.IncludesBody ? [dependency.Document.GenerationShape] : dependency.Document.SurfaceShape)).ToImmutableArray();
+
+    internal static bool Matches(ImmutableArray<DetachedDependencyInput> inputs, ImmutableArray<DependencyGenerationVersion> dependencies) =>
+        inputs.Length == dependencies.Length && !inputs.Where((input, index) =>
+            input.Identity != dependencies[index].Identity || input.IncludesBody != dependencies[index].IncludesBody ||
+            (input.IncludesBody ? input.Shape.Length != 1 || input.Shape[0] != dependencies[index].Document.GenerationShape :
+                !input.Shape.SequenceEqual(dependencies[index].Document.SurfaceShape, StringComparer.Ordinal))).Any();
+}
 
 internal sealed record DetachedDocumentInput(
     string Path,
@@ -83,7 +100,9 @@ internal sealed record DetachedDocumentInput(
     int Kind,
     string Shape,
     bool Supported,
-    ImmutableArray<string> LookupNames)
+    ImmutableArray<string> LookupNames,
+    ImmutableArray<string> SurfaceShape,
+    bool HasGlobalUsings)
 {
     internal static ImmutableArray<DetachedDocumentInput> Create(BlackSilenceGenerationRequest request)
     {
@@ -107,12 +126,16 @@ internal sealed record DetachedDocumentInput(
                 .SelectMany(static name => Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseTokens(name)
                     .Where(static token => token.RawKind == (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind.IdentifierToken)
                     .Select(static token => token.ValueText).Prepend(name))
-                .Distinct(StringComparer.Ordinal).ToImmutableArray())).ToImmutableArray();
+                .Distinct(StringComparer.Ordinal).ToImmutableArray(), document.SurfaceShape, document.HasGlobalUsings)).ToImmutableArray();
     }
 
     internal bool Matches(DetachedDocumentInput other) => Path == other.Path && LogicalName == other.LogicalName &&
         Kind == other.Kind && Shape == other.Shape && Supported == other.Supported &&
         LookupNames.SequenceEqual(other.LookupNames, StringComparer.Ordinal);
+
+    internal bool HasSameDeclarations(DetachedDocumentInput other) => Path == other.Path && LogicalName == other.LogicalName &&
+        Kind == other.Kind && HasGlobalUsings == other.HasGlobalUsings && (Shape == other.Shape || Supported && other.Supported) &&
+        SurfaceShape.SequenceEqual(other.SurfaceShape, StringComparer.Ordinal);
 
     internal bool Excludes(ImmutableArray<string> names) => Supported &&
         !LookupNames.Any(lookup => names.Any(name => lookup.IndexOf(name, StringComparison.Ordinal) >= 0));

@@ -5,6 +5,7 @@ param(
     [string]$PurityRoot,
     [switch]$SkipPurity,
     [switch]$Prepare,
+    [switch]$FreshCompiler,
     [string[]]$InvalidationScenario = @(),
     [ValidateSet('off', 'stats', 'trace')][string[]]$InvalidationProfiling = @('trace'),
     [ValidateSet('NeedHelp.akbura', 'Sidebar.akbura')][string[]]$InvalidationPurityFile = @('Sidebar.akbura'),
@@ -25,6 +26,9 @@ $fixture = Join-Path $OutputDirectory 'fixture'
 $gallery = Join-Path $repository 'src/Akbura.FeatureGallery/Akbura.FeatureGallery/Akbura.FeatureGallery.csproj'
 
 function Invoke-Dotnet([string[]]$Arguments, [string]$LogPath) {
+    if ($FreshCompiler -and $Arguments[0] -eq 'build') {
+        $Arguments += @('-p:UseSharedCompilation=false', '-nr:false')
+    }
     Write-Host ('dotnet ' + ($Arguments -join ' '))
     $previousPreference = $ErrorActionPreference
     try {

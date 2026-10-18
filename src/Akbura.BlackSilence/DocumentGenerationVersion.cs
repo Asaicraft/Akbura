@@ -30,6 +30,7 @@ internal sealed class DocumentGenerationVersion : IEquatable<DocumentGenerationV
     }
 
     public DocumentSyntaxVersion Document { get; }
+    internal ImmutableArray<DependencyGenerationVersion> Dependencies => _dependencies;
 
 #if STATS
     internal ImmutableArray<string> DescribeChanges(DocumentGenerationVersion other)

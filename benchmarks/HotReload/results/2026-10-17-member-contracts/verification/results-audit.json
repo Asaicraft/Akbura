@@ -1,0 +1,55 @@
+{
+  "PrimaryGroups": 44,
+  "MainLifetimeAndForkFreshParityChecks": 270,
+  "PrimaryFreshParityChecks": 484,
+  "MainLifetimeSamples": 206,
+  "CompilerBaselineErrors": {
+    "Akbura.FeatureGallery": [
+      {
+        "Id": "CS0103",
+        "Message": "The name 'InitializeComponent' does not exist in the current context"
+      },
+      {
+        "Id": "CS0103",
+        "Message": "The name 'InitializeComponent' does not exist in the current context"
+      }
+    ],
+    "PurityUIDashborad": [
+      {
+        "Id": "CS0103",
+        "Message": "The name 'InitializeComponent' does not exist in the current context"
+      }
+    ]
+  },
+  "MainConcurrentPairs": 32,
+  "WatchEdits": 9,
+  "WatchLogSha256": "024AAA70EAEB273FF79DBCD36CAC3D9385215099ABE69CA3043F16A9EAAFBE31",
+  "Tests": [
+    {
+      "File": "debugstats.trx",
+      "Passed": 325,
+      "Failed": 0,
+      "Skipped": 0
+    },
+    {
+      "File": "sdk-invalidation.trx",
+      "Passed": 112,
+      "Failed": 0,
+      "Skipped": 0
+    },
+    {
+      "File": "release.trx",
+      "Passed": 82,
+      "Failed": 0,
+      "Skipped": 0
+    },
+    {
+      "File": "guard.trx",
+      "Passed": 8,
+      "Failed": 0,
+      "Skipped": 0
+    }
+  ],
+  "VerifiedUtc": "2026-10-18T02:23:12.8323159Z",
+  "WatchApplicationPid": "18476"
+}

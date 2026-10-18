@@ -227,7 +227,17 @@ public sealed partial class BlackSilenceIncrementalGenerationTests
         }
         current = ArtifactRun(project, driver, compilation);
         Assert.All(current.Request.Components, component => Assert.Null(component.Previous));
-        Assert.All(current.Request.ExternalAkcss, module => Assert.Null(module.Previous));
+        if (change == "mapping")
+        {
+            // The component's source map changed, not the imported module or its
+            // dependency versions. Only that component must rebind; the detached
+            // module remains independently eligible under the narrower contract.
+            Assert.All(current.Request.ExternalAkcss, module => Assert.NotNull(module.Previous));
+        }
+        else
+        {
+            Assert.All(current.Request.ExternalAkcss, module => Assert.Null(module.Previous));
+        }
         AssertArtifactsEqualToFresh(project, current, compilation, files);
         if (change == "add/remove")
         {

@@ -43,12 +43,15 @@
     <File Path="benchmarks/HotReload/PurityHost/PurityHost.csproj" />
     <File Path="benchmarks/HotReload/README.md" />
     <File Path="benchmarks/HotReload/Run.ps1" />
+    <File Path="benchmarks/HotReload/Start-ContractBenchmarks.ps1" />
     <File Path="benchmarks/HotReload/Summarize.ps1" />
     <File Path="benchmarks/HotReload/Summarize-Invalidation.ps1" />
     <File Path="benchmarks/HotReload/Test-Report.ps1" />
     <File Path="benchmarks/HotReload/Test-InvalidationReport.ps1" />
+    <File Path="benchmarks/HotReload/Test-ContractRunner.ps1" />
     <File Path="benchmarks/HotReload/Update-Report.ps1" />
     <File Path="benchmarks/HotReload/Verify-SdkRoslyn.ps1" />
+    <File Path="benchmarks/HotReload/Verify-MemberWatch.ps1" />
     <Project Path="benchmarks/HotReload/HotReloadBenchmarks.csproj">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="Release|*" Project="Debug" />
@@ -66,6 +69,11 @@
     <File Path="benchmarks/HotReload/Akbura-PurityUI-Tutorial/PurityUIDashborad.slnx" />
     <File Path="benchmarks/HotReload/Akbura-PurityUI-Tutorial/README.md" />
     <File Path="benchmarks/HotReload/Akbura-PurityUI-Tutorial/THIRD-PARTY-NOTICES.md" />
+  </Folder>
+  <Folder Name="/benchmarks/HotReload/MemberWatchFixture/">
+    <File Path="benchmarks/HotReload/MemberWatchFixture/Counter.akbura" />
+    <File Path="benchmarks/HotReload/MemberWatchFixture/MemberViewModel.cs" />
+    <File Path="benchmarks/HotReload/MemberWatchFixture/Program.cs" />
   </Folder>
   <Folder Name="/draft-concepts/">
     <File Path="draft-concepts/Dependecy Injection.md" />

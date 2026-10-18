@@ -1,3 +1,4 @@
+using Akbura.Language.CodeGeneration;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -9,8 +10,8 @@ using System.Threading;
 namespace Akbura.BlackSilence;
 
 /// <summary>
-/// Exact scalar inputs, not a signature hash. Only the explicitly isolated leaf
-/// declaration subset may differ. All other tree contents remain exact inputs.
+/// Exact scalar inputs, not a signature hash. Only explicitly validated isolated
+/// leaves or member implementation regions may differ; all other inputs stay exact.
 /// </summary>
 internal sealed record DetachedCSharpInputs(
     string AssemblyName,
@@ -45,8 +46,12 @@ internal sealed record DetachedCSharpInputs(
             references.ToImmutable(), trees.ToImmutable(), supported);
     }
 
-    internal ArtifactValidation Validate(DetachedCSharpInputs other)
+    internal ArtifactValidation Validate(DetachedCSharpInputs other, CancellationToken cancellationToken = default)
     {
+#if STATS
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.DeclarationContractValidation);
+#endif
+        cancellationToken.ThrowIfCancellationRequested();
         if (!Supported || !other.Supported)
         {
             return new(ArtifactReuseDecision.UnsupportedDependency, "UnsupportedCompilerInput", [], []);
@@ -58,8 +63,10 @@ internal sealed record DetachedCSharpInputs(
         }
         var names = ImmutableArray.CreateBuilder<string>();
         var paths = ImmutableArray.CreateBuilder<string>();
+        var memberTypes = ImmutableArray.CreateBuilder<string>();
         for (var index = 0; index < Trees.Length; index++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var old = Trees[index];
             var current = other.Trees[index];
             if (old.Path != current.Path || old.ParseIdentity != current.ParseIdentity || old.EncodingIdentity != current.EncodingIdentity)
@@ -68,6 +75,23 @@ internal sealed record DetachedCSharpInputs(
             }
             if (old.Source == current.Source)
             {
+                continue;
+            }
+            if (old.IsolatedType.Length == 0 && current.IsolatedType.Length == 0 && old.Contract != null && current.Contract != null &&
+                old.Contract.Matches(current.Contract))
+            {
+                foreach (var member in current.Contract.Members.Where((member, position) => member.Body != old.Contract.Members[position].Body))
+                {
+                    // Ambiguous/partial type declarations in a different tree must
+                    // not turn an ordinary-class proof into partial-type reuse.
+                    if (Trees.Sum(tree => tree.DeclaredTypes.Count(name => name == member.TypeName)) != 1 ||
+                        other.Trees.Sum(tree => tree.DeclaredTypes.Count(name => name == member.TypeName)) != 1)
+                    {
+                        return new(ArtifactReuseDecision.UnsupportedDependency, "AmbiguousOrPartialContainingType", [], []);
+                    }
+                    memberTypes.Add(member.TypeName);
+                }
+                paths.Add(current.Path);
                 continue;
             }
             if (old.IsolatedType.Length == 0 || old.IsolatedType != current.IsolatedType ||
@@ -85,7 +109,8 @@ internal sealed record DetachedCSharpInputs(
             names.Add(current.IsolatedType);
             paths.Add(current.Path);
         }
-        return new(ArtifactReuseDecision.ValidatedEquivalent, "IsolatedLeafInputsEquivalent", names.ToImmutable(), paths.ToImmutable());
+        return new(ArtifactReuseDecision.ValidatedEquivalent, memberTypes.Count == 0 ? "IsolatedLeafInputsEquivalent" : "MemberDeclarationContractsEquivalent",
+            names.ToImmutable(), paths.ToImmutable(), memberTypes.Distinct(StringComparer.Ordinal).ToImmutableArray());
     }
 }
 
@@ -93,7 +118,8 @@ internal readonly record struct ArtifactValidation(
     ArtifactReuseDecision Decision,
     string Reason,
     ImmutableArray<string> ChangedTypes,
-    ImmutableArray<string> ChangedPaths);
+    ImmutableArray<string> ChangedPaths,
+    ImmutableArray<string> MemberTypes = default);
 
 internal sealed record DetachedCSharpTree(
     string Path,
@@ -102,7 +128,9 @@ internal sealed record DetachedCSharpTree(
     long EncodingIdentity,
     string IsolatedType,
     ImmutableArray<string> DeclarationTokens,
-    ImmutableArray<string> Identifiers)
+    ImmutableArray<string> Identifiers,
+    DetachedCSharpDeclarationContract? Contract,
+    ImmutableArray<string> DeclaredTypes)
 {
     internal static DetachedCSharpTree Create(SyntaxTree tree, SyntaxNode root, ArtifactIdentitySession identities, CancellationToken cancellationToken)
     {
@@ -117,8 +145,11 @@ internal sealed record DetachedCSharpTree(
         }
         var identifiers = root.DescendantTokens().Where(static token => token.IsKind(SyntaxKind.IdentifierToken))
             .Select(static token => token.ValueText).Distinct(StringComparer.Ordinal).ToImmutableArray();
-        return new DetachedCSharpTree(tree.FilePath, tree.GetText(cancellationToken).ToString(),
-            identities.GetIdentity(tree.Options), identities.GetIdentity(tree.Encoding), name, declaration, identifiers);
+        var source = tree.GetText(cancellationToken).ToString();
+        var declaredTypes = root.DescendantNodes().OfType<BaseTypeDeclarationSyntax>().Select(static type => type.Identifier.ValueText).ToImmutableArray();
+        return new DetachedCSharpTree(tree.FilePath, source,
+            identities.GetIdentity(tree.Options), identities.GetIdentity(tree.Encoding), name, declaration, identifiers,
+            name.Length == 0 ? DetachedCSharpDeclarationContract.Create(root, source, cancellationToken) : null, declaredTypes);
     }
 
     private static bool TryGetLeaf(SyntaxNode root, out ClassDeclarationSyntax? type, out MethodDeclarationSyntax? method)

@@ -184,6 +184,12 @@ public sealed partial class BlackSilenceIncrementalGenerationTests
                 Assert.Equal(SourceText.From(string.Empty).GetType(), type);
                 continue;
             }
+            if (value is WeakReference<object>)
+            {
+                // The stable owner's identity window intentionally uses weak
+                // runtime handles; their targets are not strong graph edges.
+                continue;
+            }
             if (type.IsPrimitive || type.IsEnum || value is string or decimal)
             {
                 continue;

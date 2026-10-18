@@ -1,0 +1,12 @@
+{
+  "RefreshPolicy": "The application increments a separate tick state every 10 ms; no arbitrary-service runtime refresh graph is claimed.",
+  "Updates": 9,
+  "Kind": "member-watch-result",
+  "StageBoundaries": "Native detection logs and post-delta metadata callbacks are observed. Exact EnC generator processing and delta submission are unavailable, not inferred from generator-only timings.",
+  "Optimization": "enabled",
+  "CompletedUtc": "2026-10-17T21:57:38.6135125Z",
+  "OriginalProcessAndControlPreserved": true,
+  "ToolSha256": "F4B65C42EE344CB168A392407BCFA6C2D5CE0BE45C9271A20D0ACE94A8127C97",
+  "StateAndInputPreserved": true,
+  "MemberImplementationAndDisplayedValueVerified": true
+}

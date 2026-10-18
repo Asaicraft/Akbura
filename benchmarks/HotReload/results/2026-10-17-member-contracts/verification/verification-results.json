@@ -1,0 +1,28 @@
+{
+  "DebugStats": {
+    "Failed": 0,
+    "Skipped": 0,
+    "Passed": 325
+  },
+  "Sdk": {
+    "Failed": 0,
+    "Skipped": 0,
+    "Passed": 112
+  },
+  "Guard": {
+    "Failed": 0,
+    "Skipped": 0,
+    "Passed": 8
+  },
+  "Reports": {
+    "Controller": 12,
+    "Existing": 17,
+    "Invalidation": 23
+  },
+  "Release": {
+    "Failed": 0,
+    "Skipped": 0,
+    "Passed": 82
+  },
+  "Prepared": true
+}

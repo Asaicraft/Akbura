@@ -142,6 +142,55 @@ $fork = Import-Csv -LiteralPath (Join-Path $result 'artifact-concurrent.csv') | 
 Check ($fork.ProbeCompilationCreated -eq '0' -and $fork.BranchCompletionMs -eq '10/11') 'Concurrent counters or timing arrays were lost.'
 $forkStage = Import-Csv -LiteralPath (Join-Path $result 'artifact-concurrent-stages.csv') | Select-Object -First 1
 Check ($forkStage.Stage -eq 'SemanticBinding' -and $forkStage.Count -eq '0') 'Concurrent inclusive stages were lost.'
+$repeatedForks = foreach ($index in 0..2) {
+    $copy = $memory[2].Clone()
+    $copy.Index = $index
+    $copy.GeneratorMs = 10 + $index * 10
+    $copy.ProcessAllocatedBytes = 100 + $index * 10
+    $copy
+}
+$memory = @($memory[0], $memory[1]) + @($repeatedForks) + @($memory[-1])
+$memory[-1].ConcurrentSamples = 3
+$memory[-1].FreshParityChecks = 8
+Save-MemoryFixture
+& $summarizer -InputDirectory $raw -ResultDirectory $result
+$concurrentSummary = Import-Csv -LiteralPath (Join-Path $result 'artifact-concurrent-summary.csv') | Select-Object -First 1
+Check ($concurrentSummary.Count -eq '3' -and $concurrentSummary.MedianMs -eq '20' -and
+    $concurrentSummary.MinMs -eq '10' -and $concurrentSummary.MaxMs -eq '30') 'Repeated concurrency median/range/count is incorrect.'
+$completeMemory = $memory
+$memory = @($memory | Where-Object { $_.Kind -ne 'artifact-concurrent' -or $_.Index -ne 1 })
+Save-MemoryFixture
+$failed = $false
+try {
+    & $summarizer -InputDirectory $raw -ResultDirectory $result
+}
+catch {
+    $failed = $true
+}
+Check $failed 'Missing intermediate concurrent sample must fail.'
+$memory = $completeMemory
+$memory[3].Index = 0
+Save-MemoryFixture
+$failed = $false
+try {
+    & $summarizer -InputDirectory $raw -ResultDirectory $result
+}
+catch {
+    $failed = $true
+}
+Check $failed 'Duplicate concurrent sample index must fail.'
+$memory[3].Index = 1
+$memory[-1].FreshParityChecks = 2
+Save-MemoryFixture
+$failed = $false
+try {
+    & $summarizer -InputDirectory $raw -ResultDirectory $result
+}
+catch {
+    $failed = $true
+}
+Check $failed 'Concurrent branches without fresh comparisons must fail.'
+$memory[-1].FreshParityChecks = 8
 $memory[-1].Objects.CSharpCompilation.Alive = 1
 Save-MemoryFixture
 $failed = $false

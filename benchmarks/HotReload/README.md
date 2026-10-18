@@ -85,6 +85,30 @@ The unit tests independently cover 100/500 revisions, canceled attempts, stale/c
 & ./benchmarks/HotReload/Verify-SdkRoslyn.ps1 -Prepare -TestFilter 'FullyQualifiedName~InvalidationTrace_|FullyQualifiedName~BlackSilenceGenerationStatisticsTests|FullyQualifiedName~DetachedArtifacts_' -ExpectedTestCount 61
 ```
 
+## Real C# member contracts and autonomous runs
+
+The real-member scenarios insert a multi-member `UserViewModel`, a separate service, fields/properties and several methods into the real evaluated Gallery/Purity inputs. Markup directly calls the instance through its current ViewModel/service. `real-method`, `real-referenced-method`, `real-service`, `real-property`, `real-multiple`, `real-mixed`, `real-signature` and `real-overload` distinguish accepted bodies, simultaneous markup changes and mandatory fallback. This is not another isolated static-leaf fixture.
+
+The [recorded real-member results](results/2026-10-17-member-contracts/README.md) include paired timings/counters, repeated concurrent forks, isolated-owner GC observations, 100/500-revision test evidence and a real C# `dotnet watch` transcript. Generator-only savings and live application latency are reported separately.
+
+Prepare once, then start the detached controller from PowerShell 7:
+
+```powershell
+& ./benchmarks/HotReload/Run.ps1 -Suite artifacts -Prepare -FreshCompiler -ArtifactOptimization @() -OutputDirectory bin/MemberContracts/inputs
+& ./benchmarks/HotReload/Start-ContractBenchmarks.ps1 -InputDirectory bin/MemberContracts/inputs -OutputDirectory bin/MemberContracts/run
+Get-Content -LiteralPath ./bin/MemberContracts/run/journal.log -Tail 20 -Wait
+```
+
+The launcher returns immediately. The worker survives closing the chat, freezes its tool closure, hashes evaluated sources/references, writes raw stdout with immediate flush, saves stderr separately and updates `status.json` atomically. The journal includes checked revisions and a 15-second process/CPU heartbeat, not only scenario boundaries. Other CLI build/test activity pauses startup; activity detected during a group invalidates that partial group. Do not build, test or edit measured project inputs while it runs. Closing the log viewer with Ctrl+C does not stop the worker. The computer must remain awake.
+
+Use the same `-OutputDirectory ... -Resume` to continue after a failure. Complete groups are checked before reuse, partial logs are preserved under `interrupted/`, and changed frozen inputs require a new run rather than silently mixing implementations. A second controller cannot acquire the run lock. Default reports go to the run's `report/`; `-ResultDirectory` selects a separate portable archive. `status.json` reports `Complete` or `Failed` with the current job and failure text. Send that directory back for analysis; there is no reason to keep a chat polling for hours.
+
+Before the main matrix, a separate Gallery preflight checks a referenced real-member edit, three concurrent fork pairs, fresh-generation parity and owner-only collection. Its logs stay under `preflight/` and are excluded from reported timing groups. Scenario names are restricted to the supported matrix, and output cannot be placed inside the tool directory being frozen.
+
+The default queue pairs 11 scenarios in two projects/two modes (44 primary groups), then four real-member lifetime groups: Gallery 100 revisions per mode, Purity one revision per mode, each followed by eight repeated two-branch concurrent observations. `-RetentionRevisions` and `-ConcurrentSamples` adjust those counts; concurrency requires at least three observations. Summary exports include declaration construction/validation stages and `artifact-concurrent-summary.csv` medians/ranges/counts. Inclusive stages must not be summed. Inputs must stay unchanged between preparation and resumed groups.
+
+After generator measurements, the worker runs `Verify-MemberWatch.ps1` in an ignored disposable fixture with the local analyzers. It edits `MemberViewModel.GetName()` nine times under real `dotnet watch` and checks the original process/control, updated method result/displayed value, user input and unrelated state. A 10 ms application tick drives ordinary rendering; this does not extend runtime Hot Reload type selection to arbitrary services. Raw native detection logs and post-delta metadata callbacks are timestamped. Exact EnC generator-processing and delta-submission intervals are unavailable and remain null, not inferred from generator-only timings. `-FreshCompiler` only affects preparation builds, not measured generator-driver calls.
+
 ## Partially generated reports
 
 `Summarize.ps1` writes the CSV artifacts and then calls `Update-Report.ps1` to create or update `README.md` in the results directory. Watch timings and send boundaries, generator/CLR/build tables, graph decisions, observation/parity counts, and available tutorial provenance are generated from recorded artifacts. Missing suites are shown as unmeasured, not as zero-cost results. Variable graph counts are displayed as ranges.

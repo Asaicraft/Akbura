@@ -20,15 +20,16 @@ internal static partial class Program
         GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
     }
 
-    private static void MeasureArtifactRetention(string itemsPath, string fileName, int revisions, bool reuse)
+    private static void MeasureArtifactRetention(string itemsPath, string fileName, int revisions, bool reuse,
+        bool realMembers = false, int concurrentSamples = 1)
     {
         Assert.True(revisions >= 1);
         Write(new { Kind = "artifact-memory-provenance", RepositoryRevision = GitRevision(),
             ToolSha256 = FileDigest(typeof(Program).Assembly.Location),
             BlackSilenceSha256 = FileDigest(typeof(AkburaBlackSilenceGenerator).Assembly.Location),
             GeneratorSha256 = FileDigest(typeof(GenerationStatistics).Assembly.Location),
-            InputsSha256 = FileDigest(itemsPath), Revisions = revisions, Optimization = reuse ? "enabled" : "disabled" });
-        var result = RunArtifactRetention(itemsPath, fileName, revisions, reuse);
+            InputsSha256 = FileDigest(itemsPath), Revisions = revisions, Optimization = reuse ? "enabled" : "disabled", RealMembers = realMembers, ConcurrentSamples = concurrentSamples });
+        var result = RunArtifactRetention(itemsPath, fileName, revisions, reuse, realMembers, concurrentSamples);
         for (var attempt = 0; attempt < 6; attempt++)
         {
             ForceArtifactGc();
@@ -47,12 +48,13 @@ internal static partial class Program
             Objects = counts, PostGcHeapBytes = GC.GetTotalMemory(false), WorkingSetBytes = Environment.WorkingSet,
             Entries = result.Owner.Latest?.Entries.Count ?? 0, IdentitySlots = result.Owner.Read()?.Identities.Length ?? 0,
             RootPolicy = "Only the newest detached store and weak observations remain; all drivers and compilations released.",
-            FreshParityChecks = revisions + 3, ConcurrentBranches = 2 });
+            FreshParityChecks = revisions + 1 + concurrentSamples * 2, ConcurrentBranches = concurrentSamples * 2, ConcurrentSamples = concurrentSamples });
         GC.KeepAlive(result.Owner);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static ArtifactRetentionResult RunArtifactRetention(string itemsPath, string fileName, int revisions, bool reuse)
+    private static ArtifactRetentionResult RunArtifactRetention(string itemsPath, string fileName, int revisions, bool reuse,
+        bool realMembers, int concurrentSamples)
     {
         using var input = JsonDocument.Parse(File.ReadAllText(itemsPath));
         var properties = input.RootElement.GetProperty("Properties");
@@ -68,8 +70,14 @@ internal static partial class Program
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Debug));
         var files = Paths("AdditionalFiles").Select(path => new Input(path, File.ReadAllText(path))).ToArray();
         var selected = files.Single(file => Path.GetFileName(file.Path) == fileName);
+        if (realMembers)
+        {
+            selected = new Input(selected.Path, BindingSource(selected.GetText().ToString(), fileName, "real-referenced-method"));
+            files = files.Select(file => file.Path == selected.Path ? selected : file).ToArray();
+        }
         SyntaxTree Leaf(int value) => CSharpSyntaxTree.ParseText(SourceText.From(
-            "internal static class RetentionLeaf { public static int Value() => " + value + "; }", Encoding.UTF8), parse, "RetentionLeaf.cs");
+            realMembers ? RealMemberSource("real-referenced-method", value) :
+                "internal static class RetentionLeaf { public static int Value() => " + value + "; }", Encoding.UTF8), parse, "RetentionLeaf.cs");
         var leaf = Leaf(0);
         compilation = compilation.AddSyntaxTrees(leaf);
         var driver = Driver(files, directory, rootNamespace, parse: parse, reuse: reuse);
@@ -115,53 +123,61 @@ internal static partial class Program
         var fork = driver;
         var parentCompilation = compilation;
         var parentLeaf = leaf;
-        using var concurrentMeasurement = GenerationStatistics.BeginMeasurement(GC.GetAllocatedBytesForCurrentThread);
-        var concurrentAllocated = GC.GetTotalAllocatedBytes(precise: true);
-        var concurrentCollections = Enumerable.Range(0, 3).Select(GC.CollectionCount).ToArray();
-        var startedForks = System.Diagnostics.Stopwatch.GetTimestamp();
-        var branches = Task.WhenAll(Enumerable.Range(1, 2).Select(branch => Task.Run(() =>
+        for (var concurrentIndex = 0; concurrentIndex < concurrentSamples; concurrentIndex++)
         {
-            var current = parentCompilation.ReplaceSyntaxTree(parentLeaf, Leaf(revisions + branch));
-            var changed = new Input(selected.Path, Edit(selected.GetText().ToString(), fileName, revisions + branch));
-            var changedFiles = files.Select(file => file.Path == selected.Path ? changed : file).ToArray();
-            var preparedDriver = fork.ReplaceAdditionalText(selected, changed);
-            var branchStarted = System.Diagnostics.Stopwatch.GetTimestamp();
-            var currentDriver = preparedDriver.RunGeneratorsAndUpdateCompilation(current, out var output, out var diagnostics);
-            var driverMs = Elapsed(branchStarted);
-            var generated = currentDriver.GetRunResult().Results.Single().GeneratedSources
-                .ToDictionary(source => source.HintName, source => source.SourceText.ToString());
-            var generationMs = Elapsed(startedForks);
-            return (GenerationMs: generationMs, DriverMs: driverMs, Driver: currentDriver, Compilation: current, Files: changedFiles,
-                Generated: generated, Diagnostics: diagnostics, Output: output);
-        }))).GetAwaiter().GetResult();
-        var concurrentMs = Elapsed(startedForks);
-        concurrentAllocated = GC.GetTotalAllocatedBytes(precise: true) - concurrentAllocated;
-        concurrentMeasurement.Dispose();
-        var concurrentStats = concurrentMeasurement.GetSnapshot();
-        var generationCollections = Enumerable.Range(0, 3).Select(generation => GC.CollectionCount(generation) - concurrentCollections[generation]).ToArray();
-        ForceArtifactGc();
-        var concurrentHeap = GC.GetTotalMemory(false);
-        var concurrentWorkingSet = Environment.WorkingSet;
-        foreach (var branch in branches)
-        {
-            // Both measured generations have completed before either fresh oracle
-            // starts, so one branch's verification cannot inflate the other's time.
-            VerifyFreshArtifacts(branch.Files, directory, rootNamespace, parse, branch.Compilation, branch.Generated,
-                DiagnosticKeys(branch.Diagnostics.Concat(branch.Output.GetDiagnostics())), false);
-            ValidateArtifactDiagnosticStamps(branch.Diagnostics, ArtifactRequest(branch.Driver).Version);
-            CaptureArtifactObjects(branch.Driver, weak);
+            using var concurrentMeasurement = GenerationStatistics.BeginMeasurement(GC.GetAllocatedBytesForCurrentThread);
+            var concurrentAllocated = GC.GetTotalAllocatedBytes(precise: true);
+            var concurrentCollections = Enumerable.Range(0, 3).Select(GC.CollectionCount).ToArray();
+            var startedForks = System.Diagnostics.Stopwatch.GetTimestamp();
+            var branches = Task.WhenAll(Enumerable.Range(1, 2).Select(branch => Task.Run(() =>
+            {
+                var revision = revisions + concurrentIndex * 2 + branch;
+                var current = parentCompilation.ReplaceSyntaxTree(parentLeaf, Leaf(revision));
+                var changedText = realMembers ? selected.GetText().ToString().Replace("ContractFixture.Current.Vm.GetName()",
+                    "ContractFixture.Current.Vm.GetName() + \" " + revision + "\"", StringComparison.Ordinal) :
+                    Edit(selected.GetText().ToString(), fileName, revision);
+                var changed = new Input(selected.Path, changedText);
+                var changedFiles = files.Select(file => file.Path == selected.Path ? changed : file).ToArray();
+                var preparedDriver = fork.ReplaceAdditionalText(selected, changed);
+                var branchStarted = System.Diagnostics.Stopwatch.GetTimestamp();
+                var currentDriver = preparedDriver.RunGeneratorsAndUpdateCompilation(current, out var output, out var diagnostics);
+                var driverMs = Elapsed(branchStarted);
+                var generated = currentDriver.GetRunResult().Results.Single().GeneratedSources
+                    .ToDictionary(source => source.HintName, source => source.SourceText.ToString());
+                var generationMs = Elapsed(startedForks);
+                return (GenerationMs: generationMs, DriverMs: driverMs, Driver: currentDriver, Compilation: current, Files: changedFiles,
+                    Generated: generated, Diagnostics: diagnostics, Output: output);
+            }))).GetAwaiter().GetResult();
+            var concurrentMs = Elapsed(startedForks);
+            concurrentAllocated = GC.GetTotalAllocatedBytes(precise: true) - concurrentAllocated;
+            concurrentMeasurement.Dispose();
+            var concurrentStats = concurrentMeasurement.GetSnapshot();
+            var generationCollections = Enumerable.Range(0, 3).Select(generation => GC.CollectionCount(generation) - concurrentCollections[generation]).ToArray();
+            ForceArtifactGc();
+            var concurrentHeap = GC.GetTotalMemory(false);
+            var concurrentWorkingSet = Environment.WorkingSet;
+            foreach (var branch in branches)
+            {
+                // Both measured generations have completed before either fresh oracle
+                // starts, so one branch's verification cannot inflate the other's time.
+                VerifyFreshArtifacts(branch.Files, directory, rootNamespace, parse, branch.Compilation, branch.Generated,
+                    DiagnosticKeys(branch.Diagnostics.Concat(branch.Output.GetDiagnostics())), false);
+                ValidateArtifactDiagnosticStamps(branch.Diagnostics, ArtifactRequest(branch.Driver).Version);
+                CaptureArtifactObjects(branch.Driver, weak);
+            }
+            Write(new { Kind = "artifact-concurrent", Project = rootNamespace, Optimization = reuse ? "enabled" : "disabled",
+                Index = concurrentIndex,
+                GeneratorMs = concurrentMs, ProcessAllocatedBytes = concurrentAllocated, Collections = generationCollections,
+                PostGcHeapBytes = concurrentHeap, WorkingSetBytes = concurrentWorkingSet,
+                Counters = Enum.GetValues<GenerationStatisticCounter>().Where(counter => counter != GenerationStatisticCounter.Count)
+                    .ToDictionary(counter => counter.ToString(), concurrentStats.GetCounterCount),
+                Stages = Enum.GetValues<GenerationStatisticStage>().Where(stage => stage != GenerationStatisticStage.Count)
+                    .Select(stage => new { Stage = stage.ToString(), Count = concurrentStats.GetStageInvocationCount(stage),
+                        InclusiveMs = concurrentStats.GetStageElapsed(stage).TotalMilliseconds }).ToArray(),
+                BranchCompletionMs = branches.Select(branch => branch.GenerationMs).ToArray(), IncludesFreshOracle = false,
+                BranchGeneratorMs = branches.Select(branch => branch.DriverMs).ToArray(),
+                EndToEndWithOraclesMs = Elapsed(startedForks) });
         }
-        Write(new { Kind = "artifact-concurrent", Project = rootNamespace, Optimization = reuse ? "enabled" : "disabled",
-            GeneratorMs = concurrentMs, ProcessAllocatedBytes = concurrentAllocated, Collections = generationCollections,
-            PostGcHeapBytes = concurrentHeap, WorkingSetBytes = concurrentWorkingSet,
-            Counters = Enum.GetValues<GenerationStatisticCounter>().Where(counter => counter != GenerationStatisticCounter.Count)
-                .ToDictionary(counter => counter.ToString(), concurrentStats.GetCounterCount),
-            Stages = Enum.GetValues<GenerationStatisticStage>().Where(stage => stage != GenerationStatisticStage.Count)
-                .Select(stage => new { Stage = stage.ToString(), Count = concurrentStats.GetStageInvocationCount(stage),
-                    InclusiveMs = concurrentStats.GetStageElapsed(stage).TotalMilliseconds }).ToArray(),
-            BranchCompletionMs = branches.Select(branch => branch.GenerationMs).ToArray(), IncludesFreshOracle = false,
-            BranchGeneratorMs = branches.Select(branch => branch.DriverMs).ToArray(),
-            EndToEndWithOraclesMs = Elapsed(startedForks) });
         return new ArtifactRetentionResult(rootNamespace, ArtifactRequest(driver).State.Artifacts, weak);
     }
 

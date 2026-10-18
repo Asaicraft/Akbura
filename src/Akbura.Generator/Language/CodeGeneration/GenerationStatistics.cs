@@ -115,6 +115,11 @@ internal enum GenerationStatisticStage : byte
     SourcePublication,
     ArtifactValidation,
     ArtifactCapture,
+    DeclarationContractConstruction,
+    DeclarationContractValidation,
+    ArtifactSelection,
+    ArtifactPublicationPreparation,
+    ArtifactPublication,
     Count,
 }
 

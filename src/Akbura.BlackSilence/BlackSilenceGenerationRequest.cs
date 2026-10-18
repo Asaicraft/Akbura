@@ -82,9 +82,13 @@ internal sealed class BlackSilenceGenerationRequest
         }
         var candidate = publication?.Artifacts;
         HasArtifactCandidate = candidate != null;
-        ArtifactValidation = DetachedArtifactReuse.Validate(this, candidate);
+        ArtifactValidation = DetachedArtifactReuse.Validate(this, candidate, cancellationToken);
         if (PreviousSnapshot == null)
         {
+#if STATS
+            using var selectionMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.ArtifactSelection);
+#endif
+            cancellationToken.ThrowIfCancellationRequested();
             Components = DetachedArtifactReuse.Components(this, candidate);
             ExternalAkcss = DetachedArtifactReuse.Akcss(this, ExternalAkcss, candidate);
             InlineAkcss = DetachedArtifactReuse.Akcss(this, InlineAkcss, candidate);

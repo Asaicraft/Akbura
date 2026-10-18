@@ -218,6 +218,13 @@ internal sealed partial class BlackSilenceDocumentBatch
         cancellationToken.ThrowIfCancellationRequested();
         if (artifacts != null)
         {
+#if STATS
+            using (GenerationStatistics.Measure(GenerationStatisticStage.ArtifactPublicationPreparation))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            using var publicationMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.ArtifactPublication);
+#endif
             request.State.Artifacts.Publish(artifacts, request.State, snapshot, cancellationToken);
         }
         else

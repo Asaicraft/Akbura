@@ -207,6 +207,9 @@ $summaries = foreach ($group in $samples | Group-Object Project, File, Scenario,
         MedianEmissionCount = Median @($groupStages | Where-Object Stage -eq 'CSharpEmission' | ForEach-Object Count)
         MedianArtifactValidationMs = Median @($groupStages | Where-Object Stage -eq 'ArtifactValidation' | ForEach-Object InclusiveMs)
         MedianArtifactCaptureMs = Median @($groupStages | Where-Object Stage -eq 'ArtifactCapture' | ForEach-Object InclusiveMs)
+        MedianDeclarationContractConstructionMs = Median @($groupStages | Where-Object Stage -eq 'DeclarationContractConstruction' | ForEach-Object InclusiveMs)
+        MedianDeclarationContractConstructionCount = Median @($groupStages | Where-Object Stage -eq 'DeclarationContractConstruction' | ForEach-Object Count)
+        MedianDeclarationContractValidationMs = Median @($groupStages | Where-Object Stage -eq 'DeclarationContractValidation' | ForEach-Object InclusiveMs)
     }
 }
 Save-Csv $samples 'invalidation-samples.csv'
@@ -275,6 +278,15 @@ if ($memoryFiles.Count -gt 0) {
                 $memorySamples.Add($row)
             }
             $memoryResults.Add($final[0])
+            $forks = @($rows | Where-Object Kind -eq 'artifact-concurrent')
+            if ($final[0].PSObject.Properties['ConcurrentSamples']) {
+                $expected = [int]$final[0].ConcurrentSamples
+                if ($forks.Count -ne $expected -or @($forks.Index | Sort-Object -Unique).Count -ne $expected -or
+                    @($forks | Where-Object { $_.Index -lt 0 -or $_.Index -ge $expected }).Count -gt 0 -or
+                    $final[0].FreshParityChecks -ne $final[0].Revisions + 1 + 2 * $expected) {
+                    throw "Incomplete repeated concurrency or fresh-oracle proof: $($file.Name)"
+                }
+            }
             foreach ($row in $rows | Where-Object Kind -eq 'artifact-concurrent') {
                 $row.BranchCompletionMs = @($row.BranchCompletionMs | ForEach-Object { [Convert]::ToString($_, $culture) }) -join '/'
                 $row.BranchGeneratorMs = @($row.BranchGeneratorMs | ForEach-Object { [Convert]::ToString($_, $culture) }) -join '/'
@@ -284,7 +296,7 @@ if ($memoryFiles.Count -gt 0) {
                 }
                 foreach ($stage in $row.Stages) {
                     $concurrentStages.Add([PSCustomObject]@{ Project = $row.Project; Optimization = $row.Optimization
-                        Stage = $stage.Stage; Count = $stage.Count; InclusiveMs = $stage.InclusiveMs })
+                        Index = $row.Index; Stage = $stage.Stage; Count = $stage.Count; InclusiveMs = $stage.InclusiveMs })
                 }
                 $row.PSObject.Properties.Remove('Counters')
                 $row.PSObject.Properties.Remove('Stages')
@@ -300,6 +312,23 @@ if ($memoryFiles.Count -gt 0) {
     Save-Csv $memorySamples 'artifact-memory-samples.csv'
     Save-Csv $concurrent 'artifact-concurrent.csv'
     Save-Csv $concurrentStages 'artifact-concurrent-stages.csv'
+    $concurrentSummary = foreach ($group in $concurrent | Group-Object Project, Optimization | Sort-Object Name) {
+        $first = $group.Group[0]
+        $values = @($group.Group.GeneratorMs | Where-Object { $null -ne $_ } | Sort-Object)
+        [PSCustomObject]@{
+            Project = $first.Project; Optimization = $first.Optimization; Count = $group.Count
+            MedianMs = Median $values
+            MinMs = $(if ($values.Count) { $values[0] } else { $null })
+            MaxMs = $(if ($values.Count) { $values[-1] } else { $null })
+            P95Ms = $(if ($values.Count) { $values[[int][Math]::Ceiling(0.95 * $values.Count) - 1] } else { $null })
+            MedianProcessAllocatedBytes = Median $group.Group.ProcessAllocatedBytes
+            MedianPostGcHeapBytes = Median $group.Group.PostGcHeapBytes
+            MedianSemanticModels = Median $group.Group.SemanticModelCreated
+            MedianArtifactHits = Median $group.Group.CrossCompilationArtifactHit
+            MedianArtifactFallbacks = Median $group.Group.ArtifactValidationFallback
+        }
+    }
+    Save-Csv $concurrentSummary 'artifact-concurrent-summary.csv'
     [IO.File]::WriteAllText((Join-Path $ResultDirectory 'artifact-memory-results.json'),
         (ConvertTo-Json -InputObject @($memoryResults) -Depth 12) + "`r`n", [Text.UTF8Encoding]::new($false))
 }

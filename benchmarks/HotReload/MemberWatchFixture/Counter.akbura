@@ -1,0 +1,13 @@
+using Avalonia.Controls;
+namespace Demo;
+
+state int count = 7;
+state int tick = 0;
+
+<Border Width="100">
+    <StackPanel>
+        <TextBlock Text={global::Demo.MemberViewModel.Current.GetName() + (tick < 0 ? "" : "")} />
+        <TextBox Text="User input" />
+        <TextBlock Text={count.ToString()} />
+    </StackPanel>
+</Border>

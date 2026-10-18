@@ -59,6 +59,12 @@ internal static partial class Program
                 Assert.Contains(args[4], new[] { "enabled", "disabled" });
                 MeasureArtifactRetention(args[1], args[2], int.Parse(args[3]), args[4] == "enabled");
                 break;
+            case "member-memory":
+                Assert.Contains(args[4], new[] { "enabled", "disabled" });
+                var concurrentSamples = int.Parse(args.ElementAtOrDefault(5) ?? "8");
+                Assert.InRange(concurrentSamples, 3, 100);
+                MeasureArtifactRetention(args[1], args[2], int.Parse(args[3]), args[4] == "enabled", realMembers: true, concurrentSamples);
+                break;
             case "watch":
                 MeasureWatch(args[1], args[2], args[3]).GetAwaiter().GetResult();
                 break;
@@ -76,7 +82,7 @@ internal static partial class Program
                 }
                 break;
             default:
-                throw new ArgumentException("runtime [filter] | generator <MSBuild-items.json> <file> <scenario> | graph <MSBuild-items.json> <file> | invalidation <MSBuild-items.json> <file> [scenario] [off|stats|trace] | artifacts <MSBuild-items.json> <file> <scenario> <off|stats|trace> <enabled|disabled> | artifact-memory <MSBuild-items.json> <file> <revisions> <enabled|disabled> | watch <project> <file> <component> | binlog <path> | style <files...>");
+                throw new ArgumentException("runtime [filter] | generator <MSBuild-items.json> <file> <scenario> | graph <MSBuild-items.json> <file> | invalidation <MSBuild-items.json> <file> [scenario] [off|stats|trace] | artifacts <MSBuild-items.json> <file> <scenario> <off|stats|trace> <enabled|disabled> | artifact-memory <MSBuild-items.json> <file> <revisions> <enabled|disabled> | member-memory <MSBuild-items.json> <file> <revisions> <enabled|disabled> [concurrent-samples] | watch <project> <file> <component> | binlog <path> | style <files...>");
         }
         return 0;
     }
@@ -345,6 +351,7 @@ internal static partial class Program
             "Sidebar.akbura" => source.Replace("Text=\"Dashboard\"", "Text=\"Dashboard " + (index + 1) + "\"", StringComparison.Ordinal),
             "NeedHelp.akbura" => source.Replace("StrokeThickness=\"1\"", "StrokeThickness=\"" + (index + 1) + "\"", StringComparison.Ordinal),
             "Counter.akbura" => source.Replace("Akbura Counter", "Akbura Counter " + index, StringComparison.Ordinal),
+            "MemberViewModel.cs" => source.Replace("return _prefix + \" 0\";", "return _prefix + \" " + index + "\";", StringComparison.Ordinal),
             _ => throw new ArgumentException("No scalar edit configured for " + fileName),
         };
         Assert.NotEqual(source, edited);
@@ -373,6 +380,10 @@ internal static partial class Program
         long started = 0;
         var expected = 0;
         var processId = "";
+        var applicationRestarted = false;
+        double? detectionLogMs = null;
+        double? clearCacheMs = null;
+        double? applicationCallbackMs = null;
         using var process = new Process { StartInfo = info };
         void Output(string? line)
         {
@@ -383,10 +394,24 @@ internal static partial class Program
             lock (gate)
             {
                 Write(new { Kind = "watch-log", Scenario = component, Ms = started == 0 ? 0 : Elapsed(started), Text = line });
+                if (started != 0 && (line.Contains("File changed:", StringComparison.OrdinalIgnoreCase) ||
+                    line.Contains("File change: Update", StringComparison.OrdinalIgnoreCase)))
+                {
+                    detectionLogMs ??= Elapsed(started);
+                }
+                if (started != 0 && line.StartsWith("MEMBER_METADATA_CLEAR ", StringComparison.Ordinal))
+                {
+                    clearCacheMs ??= Elapsed(started);
+                }
+                if (started != 0 && line.StartsWith("MEMBER_METADATA_APPLIED ", StringComparison.Ordinal))
+                {
+                    applicationCallbackMs ??= Elapsed(started);
+                }
                 if (line.StartsWith("PROBE_READY pid=", StringComparison.Ordinal))
                 {
                     if (processId.Length != 0)
                     {
+                        applicationRestarted = true;
                         pending?.TrySetException(new InvalidOperationException("The application restarted."));
                     }
                     processId = line["PROBE_READY pid=".Length..];
@@ -427,14 +452,28 @@ internal static partial class Program
                 Task<double> completed;
                 lock (gate)
                 {
+                    Assert.False(applicationRestarted, "The original application process must survive every edit.");
                     expected = index + 1;
+                    detectionLogMs = null;
+                    clearCacheMs = null;
+                    applicationCallbackMs = null;
                     pending = new TaskCompletionSource<double>(TaskCreationOptions.RunContinuationsAsynchronously);
                     completed = pending.Task;
                     started = Stopwatch.GetTimestamp();
                     File.WriteAllText(sourcePath, Edit(original, Path.GetFileName(sourcePath), index), new UTF8Encoding(false));
                 }
                 var elapsed = await completed.WaitAsync(TimeSpan.FromMinutes(2));
-                Write(new { Kind = "watch", Scenario = component, Index = index, Warmup = index == 1, TotalMs = elapsed });
+                if (Path.GetFileName(sourcePath) == "MemberViewModel.cs")
+                {
+                    // Keep behavior latency at the observation instant; allow an
+                    // independently scheduled post-delta callback to be logged too.
+                    await Task.Delay(50);
+                }
+                Assert.False(applicationRestarted, "The application restarted during an edit.");
+                Write(new { Kind = "watch", Scenario = component, Index = index, Warmup = index == 1, TotalMs = elapsed,
+                    ApplicationPid = processId,
+                    SourceDetectionLogMs = detectionLogMs, PostDeltaClearCacheCallbackMs = clearCacheMs,
+                    PostDeltaApplicationCallbackMs = applicationCallbackMs, GeneratorProcessingMs = (double?)null, DeltaSubmissionMs = (double?)null });
             }
         }
         finally

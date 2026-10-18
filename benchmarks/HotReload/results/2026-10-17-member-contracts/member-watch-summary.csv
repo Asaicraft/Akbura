@@ -1,0 +1,5 @@
+"Metric","Count","MedianMs","MinMs","MaxMs","P95Ms"
+"TotalMs","8","477.52885000000003","452.1217","514.8797","514.8797"
+"SourceDetectionLogMs","8","1.2269999999999999","1.038","1.5012","1.5012"
+"PostDeltaClearCacheCallbackMs","8","460.1856","440.5365","507.1669","507.1669"
+"PostDeltaApplicationCallbackMs","8","460.20325","440.5555","507.1823","507.1823"

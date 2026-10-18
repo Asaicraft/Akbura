@@ -10,6 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="WatchFixture/**/*.cs" />
+    <Compile Remove="MemberWatchFixture/**/*.cs" />
     <PackageReference Include="Avalonia.Headless" />
     <PackageReference Include="xunit" />
     <Using Include="Xunit" />

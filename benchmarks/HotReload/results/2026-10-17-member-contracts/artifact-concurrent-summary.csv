@@ -1,0 +1,5 @@
+"Project","Optimization","Count","MedianMs","MinMs","MaxMs","P95Ms","MedianProcessAllocatedBytes","MedianPostGcHeapBytes","MedianSemanticModels","MedianArtifactHits","MedianArtifactFallbacks"
+"Akbura.FeatureGallery","disabled","8","14829.2649","12412.4544","15497.7589","15497.7589","6396319228","959719292","62","0","0"
+"Akbura.FeatureGallery","enabled","8","1023.2171000000001","895.2519","1091.7022","1091.7022","1371434872","427015880","6","64","2"
+"PurityUIDashborad","disabled","8","2915.86445","2817.6995","3589.3825","3589.3825","1937818028","410685108","30","0","0"
+"PurityUIDashborad","enabled","8","1535.36175","1493.2291","2125.7586","2125.7586","1501501288","229212080","12","28","2"

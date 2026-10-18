@@ -2,12 +2,13 @@ using Akbura.Diagnostics;
 using Akbura.Language.CodeGeneration;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 
 namespace Akbura.BlackSilence;
 
 internal static class DetachedArtifactReuse
 {
-    internal static ArtifactValidation Validate(BlackSilenceGenerationRequest request, DetachedProjectArtifacts? candidate)
+    internal static ArtifactValidation Validate(BlackSilenceGenerationRequest request, DetachedProjectArtifacts? candidate, CancellationToken cancellationToken = default)
     {
         if (candidate == null)
         {
@@ -18,11 +19,11 @@ internal static class DetachedArtifactReuse
             return new(ArtifactReuseDecision.RequiresRebinding, "ArtifactSchemaChanged", [], []);
         }
         if (candidate.Options != request.Options || candidate.Documents.Length != request.DetachedDocuments.Length ||
-            candidate.Documents.Where((document, index) => !document.Matches(request.DetachedDocuments[index])).Any())
+            candidate.Documents.Where((document, index) => !document.HasSameDeclarations(request.DetachedDocuments[index])).Any())
         {
             return new(ArtifactReuseDecision.RequiresRebinding, "DocumentInputsOrProjectOptionsChanged", [], []);
         }
-        var validation = candidate.CSharpInputs.Validate(request.ArtifactInputs!);
+        var validation = candidate.CSharpInputs.Validate(request.ArtifactInputs!, cancellationToken);
         if (validation.Decision == ArtifactReuseDecision.ValidatedEquivalent)
         {
             var implicitNames = request.Index.ComponentDescriptors.Select(static descriptor => descriptor.ComponentMetadataName)
@@ -30,7 +31,8 @@ internal static class DetachedArtifactReuse
                 .Concat(request.Index.InlineAkcssDescriptors.Select(static descriptor => descriptor.GeneratedTypeName))
                 .SelectMany(static lookup => Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseTokens(lookup)
                     .Select(static token => token.ValueText).Prepend(lookup));
-            if (implicitNames.Any(lookup => validation.ChangedTypes.Any(name => lookup.IndexOf(name, System.StringComparison.Ordinal) >= 0)))
+            var changedTypes = validation.ChangedTypes.Concat(validation.MemberTypes.IsDefault ? [] : validation.MemberTypes);
+            if (implicitNames.Any(lookup => changedTypes.Any(name => lookup.IndexOf(name, System.StringComparison.Ordinal) >= 0)))
             {
                 return new(ArtifactReuseDecision.UnsupportedDependency, "GeneratedDeclarationLookupCollision", [], []);
             }
@@ -54,10 +56,14 @@ internal static class DetachedArtifactReuse
     private static GeneratedDocumentEntry? Source(BlackSilenceGenerationRequest request, DetachedProjectArtifacts? candidate,
         string identity, DocumentGenerationVersion version)
     {
-        var decision = Decision(request, version.Document.FilePath);
+        var decision = Decision(request, candidate, version.Document.FilePath);
         if (candidate == null || !candidate.Entries.TryGetValue(identity, out var artifact))
         {
             decision = ArtifactReuseDecision.MissingArtifact;
+        }
+        else if (decision == ArtifactReuseDecision.ValidatedEquivalent && !DetachedDependencyInput.Matches(artifact.Dependencies, version.Dependencies))
+        {
+            decision = ArtifactReuseDecision.RequiresRebinding;
         }
         else if (decision == ArtifactReuseDecision.ValidatedEquivalent)
         {
@@ -73,9 +79,9 @@ internal static class DetachedArtifactReuse
     {
         return request.Diagnostics.Select(diagnostic =>
         {
-            var decision = Decision(request, diagnostic.Document.FilePath);
+            var decision = Decision(request, candidate, diagnostic.Document.FilePath);
             DiagnosticDocumentEntry? previous = null;
-            if (candidate == null || !candidate.DiagnosticsComputed || !candidate.Diagnostics.TryGetValue(diagnostic.Document.FilePath, out var records))
+            if (candidate == null || !candidate.DiagnosticsComputed || !candidate.Diagnostics.TryGetValue(diagnostic.Document.FilePath, out var artifact))
             {
                 decision = ArtifactReuseDecision.MissingArtifact;
             }
@@ -83,7 +89,8 @@ internal static class DetachedArtifactReuse
             {
                 // Diagnostics have their own mapping dependencies, independently
                 // of generated-source eligibility. Never restore stale locations.
-                if (records.Any(record => request.ArtifactValidation.ChangedPaths.Contains(record.FilePath) ||
+                if (!DetachedDependencyInput.Matches(artifact.Dependencies, diagnostic.Version.Dependencies) ||
+                    artifact.Records.Any(record => request.ArtifactValidation.ChangedPaths.Contains(record.FilePath) ||
                     record.AdditionalLocations.Any(location => request.ArtifactValidation.ChangedPaths.Contains(location.FilePath))))
                 {
                     decision = ArtifactReuseDecision.RequiresRebinding;
@@ -91,7 +98,7 @@ internal static class DetachedArtifactReuse
                 else
                 {
                     previous = new DiagnosticDocumentEntry(diagnostic.Version,
-                        records.Select(record => record with { DocumentVersion = request.Version }).ToImmutableArray());
+                        artifact.Records.Select(record => record with { DocumentVersion = request.Version }).ToImmutableArray());
                 }
             }
             Observe(request, diagnostic.Document.FilePath, diagnostic.Document.FilePath, decision, diagnostic: true);
@@ -99,13 +106,18 @@ internal static class DetachedArtifactReuse
         }).ToImmutableArray();
     }
 
-    private static ArtifactReuseDecision Decision(BlackSilenceGenerationRequest request, string path)
+    private static ArtifactReuseDecision Decision(BlackSilenceGenerationRequest request, DetachedProjectArtifacts? candidate, string path)
     {
         if (request.ArtifactValidation.Decision != ArtifactReuseDecision.ValidatedEquivalent)
         {
             return request.ArtifactValidation.Decision;
         }
         var document = request.DetachedDocuments.Single(document => document.Path == path);
+        var previous = candidate?.Documents.SingleOrDefault(document => document.Path == path);
+        if (previous == null || !document.Matches(previous))
+        {
+            return ArtifactReuseDecision.RequiresRebinding;
+        }
         return document.Excludes(request.ArtifactValidation.ChangedTypes)
             ? ArtifactReuseDecision.ValidatedEquivalent : ArtifactReuseDecision.UnsupportedDependency;
     }
@@ -128,7 +140,7 @@ internal static class DetachedArtifactReuse
                 ? decision switch
                 {
                     ArtifactReuseDecision.UnsupportedDependency => "DocumentOrGlobalLookupNotProven",
-                    ArtifactReuseDecision.RequiresRebinding => "DiagnosticMappingChanged",
+                    ArtifactReuseDecision.RequiresRebinding => diagnostic ? "DiagnosticInputsOrMappingChanged" : "DocumentInputsOrDependenciesChanged",
                     ArtifactReuseDecision.MissingArtifact => diagnostic ? "DetachedDiagnosticsUnavailable" : "DetachedSourceUnavailable",
                     _ => request.ArtifactValidation.Reason,
                 }

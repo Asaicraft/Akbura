@@ -21,6 +21,7 @@ internal static partial class Program
         "csharp-trivia", "csharp-whitespace", "inert-tree", "referenced-body", "referenced-signature", "overload", "const", "attribute",
         "global-using", "reference-compatible", "reference-incompatible", "unresolved", "nullable",
         "preprocessor", "language", "compilation-options", "add-tree", "remove-tree", "repeat", "revert", "multi-tree",
+        "real-method", "real-referenced-method", "real-service", "real-property", "real-multiple", "real-mixed", "real-signature", "real-overload",
     ];
 
     private static void MeasureInvalidation(string itemsPath, string fileName, string? selectedScenario, string profiling,
@@ -65,7 +66,7 @@ internal static partial class Program
         void RunScenario(string scenario)
         {
             var useExpression = scenario is "referenced-body" or "referenced-signature" or "overload" or "const" or "attribute" or
-                "reference-compatible" or "reference-incompatible" or "unresolved";
+                "reference-compatible" or "reference-incompatible" or "unresolved" || scenario.StartsWith("real-", StringComparison.Ordinal);
             var support = Support(0);
             var unrelated = SupportTree("internal static class BenchmarkUnrelated { public static int Value() => 0; }", "BenchmarkUnrelated.cs");
             var original = useExpression ? new Input(selected.Path, BindingSource(selected.GetText().ToString(), fileName, scenario)) : selected;
@@ -131,6 +132,23 @@ internal static partial class Program
                         case "attribute":
                         case "unresolved":
                             compilation = compilation.ReplaceSyntaxTree(support, Support(index));
+                            break;
+                        case "real-method":
+                        case "real-referenced-method":
+                        case "real-service":
+                        case "real-property":
+                        case "real-multiple":
+                        case "real-mixed":
+                        case "real-signature":
+                        case "real-overload":
+                            compilation = compilation.ReplaceSyntaxTree(support, Support(index));
+                            if (scenario == "real-mixed")
+                            {
+                                var mixed = new Input(original.Path, original.GetText().ToString().Replace(
+                                    "ContractFixture.Current.Vm.GetName()", "ContractFixture.Current.Vm.GetName() + \" " + index + "\"", StringComparison.Ordinal));
+                                driver = driver.ReplaceAdditionalText(previousInput, mixed);
+                                previousInput = mixed;
+                            }
                             break;
                         case "global-using":
                             compilation = compilation.ReplaceSyntaxTree(support, SupportTree("global using " +
@@ -323,6 +341,10 @@ internal static partial class Program
 
             SyntaxTree Support(int index)
             {
+                if (scenario.StartsWith("real-", StringComparison.Ordinal))
+                {
+                    return SupportTree(RealMemberSource(scenario, index), "ContractViewModels.cs");
+                }
                 var type = scenario == "referenced-signature" && index % 2 == 1 ? "string" : "int";
                 var expression = type == "string" ? "\"" + index + "\"" :
                     (scenario is "referenced-body" or "referenced-signature" or "multi-tree" ? index : 0).ToString(CultureInfo.InvariantCulture);
@@ -353,6 +375,7 @@ internal static partial class Program
     {
         var original = fileName switch { "Counter.akbura" => "Text=\"Akbura Counter\"", "Sidebar.akbura" => "Text=\"Dashboard\"", "NeedHelp.akbura" => "Text={Title}", _ => throw new ArgumentException(fileName) };
         var expression = scenario.StartsWith("reference-", StringComparison.Ordinal) ? "global::InvestigationLibrary.ExternalSupport.Read().ToString()" :
+            scenario.StartsWith("real-", StringComparison.Ordinal) ? RealMemberExpression(scenario) :
             scenario == "const" ? "global::InvestigationFixture.Support.Number.ToString()" : "global::InvestigationFixture.Support.Read().ToString()";
         Assert.Contains(original, source);
         return source.Replace(original, "Text={" + expression + "}", StringComparison.Ordinal);

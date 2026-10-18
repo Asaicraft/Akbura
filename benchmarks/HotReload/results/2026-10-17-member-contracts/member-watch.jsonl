@@ -1,0 +1,250 @@
+{"Kind":"environment","Utc":"2026-10-17T21:57:17.5155169Z","Runtime":"10.0.12","CpuCount":12,"OS":"Microsoft Windows NT 10.0.26200.0","Roslyn":"5.9.0.0","ClrHotReload":false,"Warmup":2,"Samples":8}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : Working directory: \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\u0027"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : Watching with Hot Reload."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : Hot reload enabled. For a list of supported edits, see https://aka.ms/dotnet/hot-reload."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : Press Ctrl\u002BR to restart."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : Building C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\WatchFixture.csproj ..."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : Launched \u0027C:\\Program Files\\dotnet\\dotnet.exe\u0027 with arguments \u0027build C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\WatchFixture.csproj --property:NuGetInteractive=false -restore:false\u0027: process id 17644"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"  Avalonia Accelerate Community requires telemetry. To opt out, please upgrade to a paid tier. Learn more: https://avaloniaui.net/accelerate/"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"  WatchFixture -\u003E C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\bin\\Debug\\net10.0\\WatchFixture.dll"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":""}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"Build succeeded."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"    0 Warning(s)"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"    0 Error(s)"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":""}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"Time Elapsed 00:00:01.06"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : Process id 17644 ran for 1321ms and exited with exit code 0."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : Project graph loaded in 0,4s."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : Loading projects ..."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : Design-time build completed in 0,3s."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : Loaded 1 project(s) in 0,3s."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : Watching 7 file(s) for changes"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : Exclusion glob: \u0027bin\\Debug\\/**;obj\\Debug\\/**;bin\\/**;obj\\/**;bin\\Debug\\net10.0\\publish\\/**;**/*.user;**/*.*proj;**/*.sln;**/*.slnx;**/*.vssscc;**/.DS_Store\u0027 under project \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\u0027"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : Solution after project update: v1"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : Hot reload session started."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : Application kind: Default."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : launchSettings does not allow launching browsers."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : [WatchFixture (net10.0)] Waiting for application to connect to pipe \u0027d14253be7a9f455b98213b6bf7f29078\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : [WatchFixture (net10.0)] Launched \u0027C:\\Program Files\\dotnet\\dotnet.exe\u0027 with arguments \u0027run --no-build -e DOTNET_WATCH=1 -e DOTNET_WATCH_ITERATION=1 -e DOTNET_MODIFIABLE_ASSEMBLIES=debug -e \u0022DOTNET_STARTUP_HOOKS=C:\\Program Files\\dotnet\\sdk\\10.0.401\\DotnetTools\\dotnet-watch\\10.0.401\\tools\\net10.0\\any\\hotreload\\net10.0\\Microsoft.Extensions.DotNetDeltaApplier.dll\u0022 -e DOTNET_WATCH_HOTRELOAD_NAMEDPIPE_NAME=d14253be7a9f455b98213b6bf7f29078 --project C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\WatchFixture.csproj --no-restore\u0027: process id 23468"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : [WatchFixture (net10.0)] Capabilities: \u0027Baseline AddMethodToExistingType AddStaticFieldToExistingType AddInstanceFieldToExistingType NewTypeDefinition ChangeCustomAttributes UpdateParameters GenericUpdateMethod GenericAddMethodToExistingType GenericAddFieldToExistingType AddFieldRva AddExplicitInterfaceImplementation\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"dotnet watch : Waiting for changes"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"PROBE_READY pid=18476"}
+{"Kind":"watch-startup","Scenario":"MemberFixture","Ms":5263.479}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":0,"Text":"PROBE_VALUE 1 pid=18476 same_control=True state_preserved=True input_preserved=True member_result=True utc=2026-10-17T21:57:22.8678036Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":5.4087,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":6.4696,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":47.9853,"Text":"dotnet watch : File updated: .\\MemberViewModel.cs"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":65.1239,"Text":"dotnet watch : Updating document text of \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":81.724,"Text":"dotnet watch : Solution after document update: v2"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":1873.5906,"Text":"dotnet watch : Hot reload capabilities: AddExplicitInterfaceImplementation AddFieldRva AddInstanceFieldToExistingType AddMethodToExistingType AddStaticFieldToExistingType Baseline ChangeCustomAttributes GenericAddFieldToExistingType GenericAddMethodToExistingType GenericUpdateMethod NewTypeDefinition UpdateParameters."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":2202.8224,"Text":"dotnet watch : [WatchFixture (net10.0)] Sending update batch #0"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":2216.8458,"Text":"PROBE_VALUE 2 pid=18476 same_control=True state_preserved=True input_preserved=True member_result=True utc=2026-10-17T21:57:26.0445970Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":2231.0738,"Text":"MEMBER_METADATA_CLEAR pid=18476 utc=2026-10-17T21:57:26.0587769Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":2231.5943,"Text":"MEMBER_METADATA_APPLIED pid=18476 utc=2026-10-17T21:57:26.0593992Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":2241.3696,"Text":"dotnet watch : [WatchFixture (net10.0)] Writing capabilities: Baseline AddMethodToExistingType AddStaticFieldToExistingType AddInstanceFieldToExistingType NewTypeDefinition ChangeCustomAttributes UpdateParameters GenericUpdateMethod GenericAddMethodToExistingType GenericAddFieldToExistingType AddFieldRva"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":2241.8818,"Text":"dotnet watch : [WatchFixture (net10.0)] Applying updates to module cf0fbf40-b6f3-41b4-878f-705326ab81ac."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":2242.1589,"Text":"dotnet watch : [WatchFixture (net10.0)] Invoking metadata update handlers."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":2242.3916,"Text":"dotnet watch : [WatchFixture (net10.0)] System.Reflection.Metadata.RuntimeTypeMetadataUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":2242.6555,"Text":"dotnet watch : [WatchFixture (net10.0)] System.ComponentModel.ReflectionCachesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":2242.9164,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":2243.1945,"Text":"dotnet watch : [WatchFixture (net10.0)] MemberMetadataObserver.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":2243.4876,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_97854A59A7C35739.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":2243.6796,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":2243.8715,"Text":"dotnet watch : [WatchFixture (net10.0)] MemberMetadataObserver.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":2244.0753,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_97854A59A7C35739.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":2244.2214,"Text":"dotnet watch : [WatchFixture (net10.0)] Updates applied."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":2244.7881,"Text":"dotnet watch : [WatchFixture (net10.0)] Update batch #0 completed."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":2246.8956,"Text":"dotnet watch : C# and Razor changes applied in 2163ms."}
+{"Kind":"watch","Scenario":"MemberFixture","Index":1,"Warmup":true,"TotalMs":2216.8842,"ApplicationPid":"18476","SourceDetectionLogMs":null,"PostDeltaClearCacheCallbackMs":2231.2328,"PostDeltaApplicationCallbackMs":2231.6228,"GeneratorProcessingMs":null,"DeltaSubmissionMs":null}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":1.0733,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":1.4025,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":32.2647,"Text":"dotnet watch : File updated: .\\MemberViewModel.cs"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":33.2474,"Text":"dotnet watch : Updating document text of \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":34.0315,"Text":"dotnet watch : Solution after document update: v3"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":486.4382,"Text":"dotnet watch : Hot reload capabilities: AddExplicitInterfaceImplementation AddFieldRva AddInstanceFieldToExistingType AddMethodToExistingType AddStaticFieldToExistingType Baseline ChangeCustomAttributes GenericAddFieldToExistingType GenericAddMethodToExistingType GenericUpdateMethod NewTypeDefinition UpdateParameters."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":505.1848,"Text":"dotnet watch : [WatchFixture (net10.0)] Sending update batch #1"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":507.1356,"Text":"MEMBER_METADATA_CLEAR pid=18476 utc=2026-10-17T21:57:27.6260397Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":507.1792,"Text":"MEMBER_METADATA_APPLIED pid=18476 utc=2026-10-17T21:57:27.6260781Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":507.9663,"Text":"dotnet watch : [WatchFixture (net10.0)] Applying updates to module cf0fbf40-b6f3-41b4-878f-705326ab81ac."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":508.2305,"Text":"dotnet watch : [WatchFixture (net10.0)] Invoking metadata update handlers."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":508.2958,"Text":"PROBE_VALUE 3 pid=18476 same_control=True state_preserved=True input_preserved=True member_result=True utc=2026-10-17T21:57:27.6272768Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":508.4422,"Text":"dotnet watch : [WatchFixture (net10.0)] System.Reflection.Metadata.RuntimeTypeMetadataUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":508.5756,"Text":"dotnet watch : [WatchFixture (net10.0)] System.ComponentModel.ReflectionCachesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":508.7359,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":508.9468,"Text":"dotnet watch : [WatchFixture (net10.0)] MemberMetadataObserver.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":509.079,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_97854A59A7C35739.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":509.2228,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":509.4211,"Text":"dotnet watch : [WatchFixture (net10.0)] MemberMetadataObserver.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":509.6331,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_97854A59A7C35739.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":509.7984,"Text":"dotnet watch : [WatchFixture (net10.0)] Updates applied."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":509.9155,"Text":"dotnet watch : [WatchFixture (net10.0)] Update batch #1 completed."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":510.0509,"Text":"dotnet watch : C# and Razor changes applied in 475ms."}
+{"Kind":"watch","Scenario":"MemberFixture","Index":2,"Warmup":false,"TotalMs":508.3134,"ApplicationPid":"18476","SourceDetectionLogMs":null,"PostDeltaClearCacheCallbackMs":507.1669,"PostDeltaApplicationCallbackMs":507.1823,"GeneratorProcessingMs":null,"DeltaSubmissionMs":null}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":1.2024,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":1.5594,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":47.37,"Text":"dotnet watch : File updated: .\\MemberViewModel.cs"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":48.2879,"Text":"dotnet watch : Updating document text of \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":48.8312,"Text":"dotnet watch : Solution after document update: v4"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":493.1698,"Text":"dotnet watch : Hot reload capabilities: AddExplicitInterfaceImplementation AddFieldRva AddInstanceFieldToExistingType AddMethodToExistingType AddStaticFieldToExistingType Baseline ChangeCustomAttributes GenericAddFieldToExistingType GenericAddMethodToExistingType GenericUpdateMethod NewTypeDefinition UpdateParameters."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":504.794,"Text":"dotnet watch : [WatchFixture (net10.0)] Sending update batch #2"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":506.3714,"Text":"MEMBER_METADATA_CLEAR pid=18476 utc=2026-10-17T21:57:29.1958940Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":506.4073,"Text":"MEMBER_METADATA_APPLIED pid=18476 utc=2026-10-17T21:57:29.1959310Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":507.0702,"Text":"dotnet watch : [WatchFixture (net10.0)] Applying updates to module cf0fbf40-b6f3-41b4-878f-705326ab81ac."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":507.3715,"Text":"dotnet watch : [WatchFixture (net10.0)] Invoking metadata update handlers."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":507.5357,"Text":"dotnet watch : [WatchFixture (net10.0)] System.Reflection.Metadata.RuntimeTypeMetadataUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":507.6807,"Text":"dotnet watch : [WatchFixture (net10.0)] System.ComponentModel.ReflectionCachesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":507.8627,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":507.993,"Text":"dotnet watch : [WatchFixture (net10.0)] MemberMetadataObserver.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":508.1326,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_97854A59A7C35739.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":508.2598,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":508.3966,"Text":"dotnet watch : [WatchFixture (net10.0)] MemberMetadataObserver.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":508.5459,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_97854A59A7C35739.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":508.6776,"Text":"dotnet watch : [WatchFixture (net10.0)] Updates applied."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":508.7683,"Text":"dotnet watch : [WatchFixture (net10.0)] Update batch #2 completed."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":508.8331,"Text":"dotnet watch : C# and Razor changes applied in 459ms."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":514.8655,"Text":"PROBE_VALUE 4 pid=18476 same_control=True state_preserved=True input_preserved=True member_result=True utc=2026-10-17T21:57:29.2045000Z"}
+{"Kind":"watch","Scenario":"MemberFixture","Index":3,"Warmup":false,"TotalMs":514.8797,"ApplicationPid":"18476","SourceDetectionLogMs":null,"PostDeltaClearCacheCallbackMs":506.3906,"PostDeltaApplicationCallbackMs":506.4118,"GeneratorProcessingMs":null,"DeltaSubmissionMs":null}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":1.0939,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":1.4509,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":32.1812,"Text":"dotnet watch : File updated: .\\MemberViewModel.cs"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":33.0709,"Text":"dotnet watch : Updating document text of \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":33.4546,"Text":"dotnet watch : Solution after document update: v5"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":452.619,"Text":"dotnet watch : Hot reload capabilities: AddExplicitInterfaceImplementation AddFieldRva AddInstanceFieldToExistingType AddMethodToExistingType AddStaticFieldToExistingType Baseline ChangeCustomAttributes GenericAddFieldToExistingType GenericAddMethodToExistingType GenericUpdateMethod NewTypeDefinition UpdateParameters."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":458.4894,"Text":"dotnet watch : [WatchFixture (net10.0)] Sending update batch #3"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":459.7491,"Text":"MEMBER_METADATA_CLEAR pid=18476 utc=2026-10-17T21:57:30.7397016Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":459.7854,"Text":"MEMBER_METADATA_APPLIED pid=18476 utc=2026-10-17T21:57:30.7397348Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":460.0134,"Text":"dotnet watch : [WatchFixture (net10.0)] Applying updates to module cf0fbf40-b6f3-41b4-878f-705326ab81ac."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":460.1956,"Text":"dotnet watch : [WatchFixture (net10.0)] Invoking metadata update handlers."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":460.355,"Text":"dotnet watch : [WatchFixture (net10.0)] System.Reflection.Metadata.RuntimeTypeMetadataUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":460.5803,"Text":"dotnet watch : [WatchFixture (net10.0)] System.ComponentModel.ReflectionCachesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":460.8255,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":460.9652,"Text":"dotnet watch : [WatchFixture (net10.0)] MemberMetadataObserver.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":461.1493,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_97854A59A7C35739.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":461.3204,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":461.459,"Text":"dotnet watch : [WatchFixture (net10.0)] MemberMetadataObserver.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":461.6056,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_97854A59A7C35739.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":461.7421,"Text":"dotnet watch : [WatchFixture (net10.0)] Updates applied."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":461.8358,"Text":"dotnet watch : [WatchFixture (net10.0)] Update batch #3 completed."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":461.9093,"Text":"dotnet watch : C# and Razor changes applied in 428ms."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":466.2112,"Text":"PROBE_VALUE 5 pid=18476 same_control=True state_preserved=True input_preserved=True member_result=True utc=2026-10-17T21:57:30.7462111Z"}
+{"Kind":"watch","Scenario":"MemberFixture","Index":4,"Warmup":false,"TotalMs":466.2387,"ApplicationPid":"18476","SourceDetectionLogMs":null,"PostDeltaClearCacheCallbackMs":459.7728,"PostDeltaApplicationCallbackMs":459.7886,"GeneratorProcessingMs":null,"DeltaSubmissionMs":null}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":1.038,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":1.3354,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":31.1006,"Text":"dotnet watch : File updated: .\\MemberViewModel.cs"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":31.7958,"Text":"dotnet watch : Updating document text of \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":32.0931,"Text":"dotnet watch : Solution after document update: v6"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":469.38,"Text":"dotnet watch : Hot reload capabilities: AddExplicitInterfaceImplementation AddFieldRva AddInstanceFieldToExistingType AddMethodToExistingType AddStaticFieldToExistingType Baseline ChangeCustomAttributes GenericAddFieldToExistingType GenericAddMethodToExistingType GenericUpdateMethod NewTypeDefinition UpdateParameters."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":474.7823,"Text":"dotnet watch : [WatchFixture (net10.0)] Sending update batch #4"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":475.7242,"Text":"MEMBER_METADATA_CLEAR pid=18476 utc=2026-10-17T21:57:32.2930666Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":475.7791,"Text":"MEMBER_METADATA_APPLIED pid=18476 utc=2026-10-17T21:57:32.2931022Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":476.0495,"Text":"dotnet watch : [WatchFixture (net10.0)] Applying updates to module cf0fbf40-b6f3-41b4-878f-705326ab81ac."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":476.2775,"Text":"dotnet watch : [WatchFixture (net10.0)] Invoking metadata update handlers."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":476.5187,"Text":"dotnet watch : [WatchFixture (net10.0)] System.Reflection.Metadata.RuntimeTypeMetadataUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":476.7666,"Text":"dotnet watch : [WatchFixture (net10.0)] System.ComponentModel.ReflectionCachesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":477.0038,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":477.235,"Text":"dotnet watch : [WatchFixture (net10.0)] MemberMetadataObserver.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":477.3969,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_97854A59A7C35739.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":477.5657,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":477.7677,"Text":"dotnet watch : [WatchFixture (net10.0)] MemberMetadataObserver.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":477.9141,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_97854A59A7C35739.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":478.1183,"Text":"dotnet watch : [WatchFixture (net10.0)] Updates applied."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":478.2259,"Text":"dotnet watch : [WatchFixture (net10.0)] Update batch #4 completed."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":478.2862,"Text":"dotnet watch : C# and Razor changes applied in 446ms."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":500.0069,"Text":"PROBE_VALUE 6 pid=18476 same_control=True state_preserved=True input_preserved=True member_result=True utc=2026-10-17T21:57:32.3173330Z"}
+{"Kind":"watch","Scenario":"MemberFixture","Index":5,"Warmup":false,"TotalMs":500.03,"ApplicationPid":"18476","SourceDetectionLogMs":null,"PostDeltaClearCacheCallbackMs":475.7383,"PostDeltaApplicationCallbackMs":475.7824,"GeneratorProcessingMs":null,"DeltaSubmissionMs":null}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":1.3749,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":1.7999,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":30.1402,"Text":"dotnet watch : File updated: .\\MemberViewModel.cs"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":31.0781,"Text":"dotnet watch : Updating document text of \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":31.4642,"Text":"dotnet watch : Solution after document update: v7"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":449.9838,"Text":"dotnet watch : Hot reload capabilities: AddExplicitInterfaceImplementation AddFieldRva AddInstanceFieldToExistingType AddMethodToExistingType AddStaticFieldToExistingType Baseline ChangeCustomAttributes GenericAddFieldToExistingType GenericAddMethodToExistingType GenericUpdateMethod NewTypeDefinition UpdateParameters."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":455.378,"Text":"dotnet watch : [WatchFixture (net10.0)] Sending update batch #5"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":456.2927,"Text":"MEMBER_METADATA_CLEAR pid=18476 utc=2026-10-17T21:57:33.8381691Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":456.3537,"Text":"MEMBER_METADATA_APPLIED pid=18476 utc=2026-10-17T21:57:33.8382011Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":456.5579,"Text":"dotnet watch : [WatchFixture (net10.0)] Applying updates to module cf0fbf40-b6f3-41b4-878f-705326ab81ac."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":456.7743,"Text":"dotnet watch : [WatchFixture (net10.0)] Invoking metadata update handlers."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":456.9666,"Text":"dotnet watch : [WatchFixture (net10.0)] System.Reflection.Metadata.RuntimeTypeMetadataUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":457.1627,"Text":"dotnet watch : [WatchFixture (net10.0)] System.ComponentModel.ReflectionCachesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":457.3763,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":457.5679,"Text":"dotnet watch : [WatchFixture (net10.0)] MemberMetadataObserver.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":457.7167,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_97854A59A7C35739.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":457.8697,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":457.9968,"Text":"dotnet watch : [WatchFixture (net10.0)] MemberMetadataObserver.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":458.1443,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_97854A59A7C35739.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":458.2971,"Text":"dotnet watch : [WatchFixture (net10.0)] Updates applied."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":458.3845,"Text":"dotnet watch : [WatchFixture (net10.0)] Update batch #5 completed."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":458.4864,"Text":"dotnet watch : C# and Razor changes applied in 426ms."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":469.2067,"Text":"PROBE_VALUE 7 pid=18476 same_control=True state_preserved=True input_preserved=True member_result=True utc=2026-10-17T21:57:33.8510862Z"}
+{"Kind":"watch","Scenario":"MemberFixture","Index":6,"Warmup":false,"TotalMs":469.2223,"ApplicationPid":"18476","SourceDetectionLogMs":null,"PostDeltaClearCacheCallbackMs":456.3396,"PostDeltaApplicationCallbackMs":456.3622,"GeneratorProcessingMs":null,"DeltaSubmissionMs":null}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":1.5012,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":1.8232,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":30.2174,"Text":"dotnet watch : File updated: .\\MemberViewModel.cs"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":31.2586,"Text":"dotnet watch : Updating document text of \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":31.6006,"Text":"dotnet watch : Solution after document update: v8"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":434.3088,"Text":"dotnet watch : Hot reload capabilities: AddExplicitInterfaceImplementation AddFieldRva AddInstanceFieldToExistingType AddMethodToExistingType AddStaticFieldToExistingType Baseline ChangeCustomAttributes GenericAddFieldToExistingType GenericAddMethodToExistingType GenericUpdateMethod NewTypeDefinition UpdateParameters."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":439.5568,"Text":"dotnet watch : [WatchFixture (net10.0)] Sending update batch #6"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":440.5009,"Text":"MEMBER_METADATA_CLEAR pid=18476 utc=2026-10-17T21:57:35.3640511Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":440.5521,"Text":"MEMBER_METADATA_APPLIED pid=18476 utc=2026-10-17T21:57:35.3640828Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":440.846,"Text":"dotnet watch : [WatchFixture (net10.0)] Applying updates to module cf0fbf40-b6f3-41b4-878f-705326ab81ac."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":441.0952,"Text":"dotnet watch : [WatchFixture (net10.0)] Invoking metadata update handlers."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":441.2764,"Text":"dotnet watch : [WatchFixture (net10.0)] System.Reflection.Metadata.RuntimeTypeMetadataUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":441.4249,"Text":"dotnet watch : [WatchFixture (net10.0)] System.ComponentModel.ReflectionCachesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":441.6033,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":441.8022,"Text":"dotnet watch : [WatchFixture (net10.0)] MemberMetadataObserver.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":441.9462,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_97854A59A7C35739.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":442.1121,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":442.2854,"Text":"dotnet watch : [WatchFixture (net10.0)] MemberMetadataObserver.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":442.437,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_97854A59A7C35739.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":442.6279,"Text":"dotnet watch : [WatchFixture (net10.0)] Updates applied."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":442.6989,"Text":"dotnet watch : [WatchFixture (net10.0)] Update batch #6 completed."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":442.7599,"Text":"dotnet watch : C# and Razor changes applied in 411ms."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":452.0883,"Text":"PROBE_VALUE 8 pid=18476 same_control=True state_preserved=True input_preserved=True member_result=True utc=2026-10-17T21:57:35.3756715Z"}
+{"Kind":"watch","Scenario":"MemberFixture","Index":7,"Warmup":false,"TotalMs":452.1217,"ApplicationPid":"18476","SourceDetectionLogMs":null,"PostDeltaClearCacheCallbackMs":440.5365,"PostDeltaApplicationCallbackMs":440.5555,"GeneratorProcessingMs":null,"DeltaSubmissionMs":null}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":1.4234,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":1.7698,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":30.8373,"Text":"dotnet watch : File updated: .\\MemberViewModel.cs"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":31.722,"Text":"dotnet watch : Updating document text of \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":32.1232,"Text":"dotnet watch : Solution after document update: v9"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":454.9505,"Text":"dotnet watch : Hot reload capabilities: AddExplicitInterfaceImplementation AddFieldRva AddInstanceFieldToExistingType AddMethodToExistingType AddStaticFieldToExistingType Baseline ChangeCustomAttributes GenericAddFieldToExistingType GenericAddMethodToExistingType GenericUpdateMethod NewTypeDefinition UpdateParameters."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":459.577,"Text":"dotnet watch : [WatchFixture (net10.0)] Sending update batch #7"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":460.5614,"Text":"MEMBER_METADATA_CLEAR pid=18476 utc=2026-10-17T21:57:36.9070375Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":460.6144,"Text":"MEMBER_METADATA_APPLIED pid=18476 utc=2026-10-17T21:57:36.9070672Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":460.9201,"Text":"dotnet watch : [WatchFixture (net10.0)] Applying updates to module cf0fbf40-b6f3-41b4-878f-705326ab81ac."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":461.1741,"Text":"dotnet watch : [WatchFixture (net10.0)] Invoking metadata update handlers."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":461.4261,"Text":"dotnet watch : [WatchFixture (net10.0)] System.Reflection.Metadata.RuntimeTypeMetadataUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":461.6353,"Text":"dotnet watch : [WatchFixture (net10.0)] System.ComponentModel.ReflectionCachesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":461.8515,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":462.0566,"Text":"dotnet watch : [WatchFixture (net10.0)] MemberMetadataObserver.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":462.22,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_97854A59A7C35739.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":462.3989,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":462.5912,"Text":"dotnet watch : [WatchFixture (net10.0)] MemberMetadataObserver.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":462.7191,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_97854A59A7C35739.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":462.8538,"Text":"dotnet watch : [WatchFixture (net10.0)] Updates applied."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":462.9475,"Text":"dotnet watch : [WatchFixture (net10.0)] Update batch #7 completed."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":463.0085,"Text":"dotnet watch : C# and Razor changes applied in 430ms."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":484.6695,"Text":"PROBE_VALUE 9 pid=18476 same_control=True state_preserved=True input_preserved=True member_result=True utc=2026-10-17T21:57:36.9311572Z"}
+{"Kind":"watch","Scenario":"MemberFixture","Index":8,"Warmup":false,"TotalMs":484.696,"ApplicationPid":"18476","SourceDetectionLogMs":null,"PostDeltaClearCacheCallbackMs":460.5984,"PostDeltaApplicationCallbackMs":460.6179,"GeneratorProcessingMs":null,"DeltaSubmissionMs":null}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":1.2516,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":1.7051,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":15.6648,"Text":"dotnet watch : File updated: .\\MemberViewModel.cs"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":16.5348,"Text":"dotnet watch : Updating document text of \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticContracts\\final\\measurements\\watch-2bae588e80934a97a91cf2ffe96f88f9\\fixture\\MemberViewModel.cs\u0027."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":16.8415,"Text":"dotnet watch : Solution after document update: v10"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":439.0378,"Text":"dotnet watch : Hot reload capabilities: AddExplicitInterfaceImplementation AddFieldRva AddInstanceFieldToExistingType AddMethodToExistingType AddStaticFieldToExistingType Baseline ChangeCustomAttributes GenericAddFieldToExistingType GenericAddMethodToExistingType GenericUpdateMethod NewTypeDefinition UpdateParameters."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":444.0952,"Text":"dotnet watch : [WatchFixture (net10.0)] Sending update batch #8"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":445.0739,"Text":"MEMBER_METADATA_CLEAR pid=18476 utc=2026-10-17T21:57:38.4486963Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":445.1316,"Text":"MEMBER_METADATA_APPLIED pid=18476 utc=2026-10-17T21:57:38.4487289Z"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":445.3652,"Text":"dotnet watch : [WatchFixture (net10.0)] Applying updates to module cf0fbf40-b6f3-41b4-878f-705326ab81ac."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":445.6911,"Text":"dotnet watch : [WatchFixture (net10.0)] Invoking metadata update handlers."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":445.8967,"Text":"dotnet watch : [WatchFixture (net10.0)] System.Reflection.Metadata.RuntimeTypeMetadataUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":446.0703,"Text":"dotnet watch : [WatchFixture (net10.0)] System.ComponentModel.ReflectionCachesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":446.3303,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":446.5011,"Text":"dotnet watch : [WatchFixture (net10.0)] MemberMetadataObserver.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":446.6493,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_97854A59A7C35739.ClearCache"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":446.7997,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":446.9544,"Text":"dotnet watch : [WatchFixture (net10.0)] MemberMetadataObserver.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":447.0851,"Text":"dotnet watch : [WatchFixture (net10.0)] Akbura.Generated.HotReloadService_97854A59A7C35739.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":447.2216,"Text":"dotnet watch : [WatchFixture (net10.0)] Updates applied."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":447.3031,"Text":"dotnet watch : [WatchFixture (net10.0)] Update batch #8 completed."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":447.3677,"Text":"dotnet watch : C# and Razor changes applied in 430ms."}
+{"Kind":"watch-log","Scenario":"MemberFixture","Ms":470.3464,"Text":"PROBE_VALUE 10 pid=18476 same_control=True state_preserved=True input_preserved=True member_result=True utc=2026-10-17T21:57:38.4738955Z"}
+{"Kind":"watch","Scenario":"MemberFixture","Index":9,"Warmup":false,"TotalMs":470.3617,"ApplicationPid":"18476","SourceDetectionLogMs":null,"PostDeltaClearCacheCallbackMs":445.0853,"PostDeltaApplicationCallbackMs":445.1338,"GeneratorProcessingMs":null,"DeltaSubmissionMs":null}

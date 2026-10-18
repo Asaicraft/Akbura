@@ -2957,7 +2957,25 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
     private static bool IsIncompleteMarkupStartTag(MarkupStartTagSyntax startTag)
     {
-        return startTag.ContainsDiagnostics || startTag.CloseToken.IsMissing;
+        return startTag.CloseToken.IsMissing || HasStructuralDiagnostics(startTag.Green);
+
+        static bool HasStructuralDiagnostics(Syntax.Green.GreenNode node)
+        {
+            if (!node.ContainsDiagnostics) return false;
+            if (node is Syntax.Green.GreenMarkupExpressionBindingSyntax binding &&
+                !binding.CloseBrace.IsMissing)
+            {
+                // An invalid/empty embedded expression does not make an
+                // otherwise complete tag name or attribute target incomplete.
+                return binding.DollarToken.ContainsDiagnostics || binding.OpenBrace.ContainsDiagnostics ||
+                    binding.XIdentifier.ContainsDiagnostics || binding.DotToken.ContainsDiagnostics ||
+                    binding.BindKeyword.ContainsDiagnostics || binding.CloseBrace.ContainsDiagnostics;
+            }
+            if (!node.GetDiagnostics().IsEmpty) return true;
+            for (var i = 0; i < node.SlotCount; i++)
+                if (node.GetSlot(i) is { } child && HasStructuralDiagnostics(child)) return true;
+            return false;
+        }
     }
 
     private bool TryResolveMarkupPropertyElement(

@@ -25,7 +25,8 @@ internal sealed class MarkupPropertySetterOperation : IMarkupPropertySetterOpera
         object? convertedValue,
         bool assignsCollectionSource,
         bool hasErrors,
-        ICSharpOperation? valueOperationTree = null)
+        ICSharpOperation? valueOperationTree = null,
+        ExpressionBindingPlan? expressionBindingPlan = null)
     {
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
         ContainingComponent = containingComponent;
@@ -44,6 +45,7 @@ internal sealed class MarkupPropertySetterOperation : IMarkupPropertySetterOpera
         AssignsCollectionSource = assignsCollectionSource;
         HasErrors = hasErrors;
         ValueOperationTree = valueOperationTree;
+        ExpressionBindingPlan = expressionBindingPlan;
         AdoptCSharpOperationTree(ValueOperationTree);
         Children = ValueOperationTree == null
             ? ImmutableArray<IOperation>.Empty
@@ -87,6 +89,8 @@ internal sealed class MarkupPropertySetterOperation : IMarkupPropertySetterOpera
     public AkburaConversion ValueConversion { get; }
 
     public ICSharpOperation? ValueOperationTree { get; }
+
+    public ExpressionBindingPlan? ExpressionBindingPlan { get; }
 
     public MarkupAttributeBindingKind BindingKind { get; }
 

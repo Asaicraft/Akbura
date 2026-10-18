@@ -20,4 +20,6 @@ internal interface IMarkupPropertySetterOperation : IPropertySetterOperation, IM
     object? ConvertedValue { get; }
 
     bool AssignsCollectionSource { get; }
+
+    ExpressionBindingPlan? ExpressionBindingPlan { get; }
 }

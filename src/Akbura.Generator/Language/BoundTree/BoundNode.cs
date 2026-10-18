@@ -87,9 +87,12 @@ internal abstract class BoundNode
 
     private bool ComputeHasErrorsFromDiagnosticsAndChildren()
     {
-        if (Diagnostics.Length != 0)
+        foreach (var diagnostic in Diagnostics)
         {
-            return true;
+            if (diagnostic.Severity == AkburaDiagnosticSeverity.Error)
+            {
+                return true;
+            }
         }
 
         for (var i = 0; i < Children.Length; i++)

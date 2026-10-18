@@ -7,4 +7,5 @@ internal enum MarkupAttributeValueKind
     DynamicExpression,
     MarkupExtension,
     Error,
+    ExpressionBinding,
 }

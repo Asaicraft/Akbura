@@ -297,8 +297,11 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
             node.ValueSyntax,
             node.LiteralValue,
             node.ConvertedValue,
-            node.AssignsCollectionSource);
+            node.AssignsCollectionSource,
+            VisitExpressionBindingPlan(node.ExpressionBindingPlan));
     }
+
+    protected virtual ExpressionBindingPlan? VisitExpressionBindingPlan(ExpressionBindingPlan? plan) => plan;
 
     public override BoundNode? VisitMarkupCommandBinding(BoundMarkupCommandBinding node)
     {

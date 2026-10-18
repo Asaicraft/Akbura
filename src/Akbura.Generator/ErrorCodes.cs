@@ -51,6 +51,9 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_MarkupNameDuplicate = nameof(AKBURA_SEMANTIC_MarkupNameDuplicate);
     public const string AKBURA_SEMANTIC_MarkupNameInsideTemplateContent = nameof(AKBURA_SEMANTIC_MarkupNameInsideTemplateContent);
     public const string AKBURA_SEMANTIC_MarkupAttributeValueCannotConvert = nameof(AKBURA_SEMANTIC_MarkupAttributeValueCannotConvert);
+    public const string AKBURA_SEMANTIC_ExpressionBindingUnsupportedTarget = nameof(AKBURA_SEMANTIC_ExpressionBindingUnsupportedTarget);
+    public const string AKBURA_SEMANTIC_ExpressionBindingUnsupportedExpression = nameof(AKBURA_SEMANTIC_ExpressionBindingUnsupportedExpression);
+    public const string AKBURA_SEMANTIC_ExpressionBindingHiddenDependencies = nameof(AKBURA_SEMANTIC_ExpressionBindingHiddenDependencies);
     public const string AKBURA_SEMANTIC_MarkupAttributeBindingNotAllowed = nameof(AKBURA_SEMANTIC_MarkupAttributeBindingNotAllowed);
     public const string AKBURA_SEMANTIC_MarkupPropertyAccessNotSupported = nameof(AKBURA_SEMANTIC_MarkupPropertyAccessNotSupported);
     public const string AKBURA_SEMANTIC_MarkupDuplicatePropertySetter = nameof(AKBURA_SEMANTIC_MarkupDuplicatePropertySetter);

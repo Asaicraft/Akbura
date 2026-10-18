@@ -585,7 +585,7 @@ internal sealed partial class CSharpProbeBinder
         }
     }
 
-    private static bool TryGetAvaloniaPropertyField(
+    internal static bool TryGetAvaloniaPropertyField(
         IPropertySymbol property,
         out IFieldSymbol field)
     {

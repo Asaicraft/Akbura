@@ -789,6 +789,13 @@ internal sealed partial class MarkupBinder : Binder
 
     private BoundNode BindMarkupPropertyOrEvent(MarkupAttributeSyntax markupAttribute)
     {
+        if (AkburaSemanticModel.GetMarkupAttributeValue(markupAttribute) is MarkupExpressionBindingSyntax)
+        {
+            // Even an invalid target must explicitly diagnose this distinct
+            // value kind, not silently route it through event/directive binding.
+            return BindMarkupPropertySetter(markupAttribute);
+        }
+
         if (AkburaSemanticModel.IsMarkupForeachKeyDirective(markupAttribute))
         {
             return BindMarkupForeachKey((MarkupAttachedPropertyAttributeSyntax)markupAttribute);
@@ -882,6 +889,11 @@ internal sealed partial class MarkupBinder : Binder
 
     private BoundNode BindMarkupPropertySetter(MarkupAttributeSyntax markupAttribute)
     {
+        if (AkburaSemanticModel.GetMarkupAttributeValue(markupAttribute) is MarkupExpressionBindingSyntax binding)
+        {
+            return BindMarkupExpressionBinding(markupAttribute, binding);
+        }
+
         var propertyInfo = SemanticModel.GetSymbolInfo(markupAttribute);
         var property = propertyInfo.Symbol as IPropertySymbol;
         var containingComponent = SemanticModel.GetContainingMarkupComponentSymbol(markupAttribute);

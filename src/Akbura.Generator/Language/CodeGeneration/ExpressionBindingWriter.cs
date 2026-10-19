@@ -13,7 +13,7 @@ using IInjectSymbol = Akbura.Language.Symbols.IInjectSymbol;
 
 namespace Akbura.Language.CodeGeneration;
 
-internal readonly ref struct ExpressionBindingWriter(CodeWriter writer, ComponentGenerationSourceMap sourceMap)
+internal readonly ref struct ExpressionBindingWriter(CodeWriter writer, ComponentGenerationSourceMap sourceMap, string ownerTypeName)
 {
     public void Write(in ComponentPlan component, in ComponentPropertyWritePlan property,
         in ComponentElementPlan element, in MarkupExtensionWriteContext context)
@@ -25,8 +25,39 @@ internal readonly ref struct ExpressionBindingWriter(CodeWriter writer, Componen
         ref readonly var scope = ref component.Scopes.ItemRef(element.ScopeId);
         var lifetimeRoot = element.ScopeId == 0 ? "this" :
             component.Elements.ItemRef(component.ScopeRootElementIds[scope.Roots.Start]).Identifier;
-        writer.Write(structural ? "__akburaRenderState.ReconcileExpressionBinding<" : "this.__AkburaBindExpression<");
         var types = new CSharpValueWriter(writer);
+        var rewriter = new TrackingRewriter(plan, value.ExpressionStateAccessors, value.ExpressionNamedReceivers);
+        var expressionValue = rewriter.NewIdentifier("__expressionValue");
+        var isolateCallbacks = value.ExpressionInitialization == ExpressionBindingInitializationKind.InitialOnly &&
+            element.RuntimeStorageRootScopeId > 0;
+        var evaluatorFactory = string.Empty;
+        var writerFactory = string.Empty;
+        if (isolateCallbacks)
+        {
+            // A C# display class is shared by neighboring lambdas, even if this
+            // binding never reads the item/local captured by another binding.
+            // Static factories form a capture boundary with explicit stable inputs.
+            var suffix = property.Syntax.Span.Start.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            evaluatorFactory = rewriter.NewIdentifier("__akburaExpressionEvaluator" + suffix);
+            writerFactory = rewriter.NewIdentifier("__akburaExpressionWriter" + suffix);
+            var owner = rewriter.NewIdentifier("__akburaExpressionOwner");
+            var store = rewriter.NewIdentifier("__akburaExpressionStore");
+            var target = rewriter.NewIdentifier("__akburaExpressionTarget");
+            rewriter.SetStableScope(owner, store);
+            writer.Write("static global::System.Func<global::Akbura.ComponentTree.ExpressionBindingContext, ");
+            types.WriteTypeNameWithNullableAnnotation(plan.TargetType);
+            writer.Write("> ").Write(evaluatorFactory).Write("(").Write(ownerTypeName).Write(" ").Write(owner)
+                .Write(", global::Akbura.HotReload.AkburaRenderState ").Write(store).Write(") => ")
+                .Write(rewriter.TrackerName).Write(" => ").Write(rewriter.Visit(plan.Expression.Syntax)!.NormalizeWhitespace().ToFullString()).WriteLine(";");
+            writer.Write("static global::System.Action<");
+            types.WriteTypeNameWithNullableAnnotation(plan.TargetType);
+            writer.Write("> ").Write(writerFactory).Write("(");
+            types.WriteTypeName(element.Type);
+            writer.Write(" ").Write(target).Write(") => ");
+            WriteValueCallback(property, target, expressionValue);
+            writer.WriteLine(";");
+        }
+        writer.Write(structural ? "__akburaRenderState.ReconcileExpressionBinding<" : "this.__AkburaBindExpression<");
         types.WriteTypeNameWithNullableAnnotation(plan.TargetType);
         writer.Write(">(");
         if (structural) writer.WriteIntegerLiteral(element.RuntimeStorageId);
@@ -37,17 +68,19 @@ internal readonly ref struct ExpressionBindingWriter(CodeWriter writer, Componen
             writer.WriteStringLiteral(ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(property.Syntax));
         else
             writer.Write(lifetimeRoot);
-        var rewriter = new TrackingRewriter(plan, value.ExpressionStateAccessors);
-        writer.Write(", ").Write(rewriter.TrackerName).Write(" => ");
-        var expression = rewriter.Visit(plan.Expression.Syntax)!;
-        writer.Write(expression.NormalizeWhitespace().ToFullString());
-        var expressionValue = rewriter.NewIdentifier("__expressionValue");
-        writer.Write(", ").Write(expressionValue).Write(" => { ");
+        writer.Write(", ");
+        if (isolateCallbacks)
+        {
+            writer.Write(evaluatorFactory).Write("(this, __akburaRenderState), ")
+                .Write(writerFactory).Write("(").Write(element.Identifier).Write(")");
+        }
+        else
+        {
+            writer.Write(rewriter.TrackerName).Write(" => ")
+                .Write(rewriter.Visit(plan.Expression.Syntax)!.NormalizeWhitespace().ToFullString()).Write(", ");
+            WriteValueCallback(property, element.Identifier, expressionValue);
+        }
         var assignment = new PropertyWriter(writer);
-        var end = assignment.WriteStart(property.Destination, element.Identifier);
-        writer.Write(expressionValue);
-        assignment.WriteEnd(end);
-        writer.Write(" }");
         if (structural)
         {
             if (property.Destination.HasAvaloniaPropertyTarget)
@@ -58,12 +91,14 @@ internal readonly ref struct ExpressionBindingWriter(CodeWriter writer, Componen
             else if (property.Destination.Kind is PropertyWriteKind.ClrProperty or PropertyWriteKind.DirectMember or PropertyWriteKind.ComponentParameter)
             {
                 var expressionBaseline = rewriter.NewIdentifier("__expressionBaseline");
-                writer.Write(", null, null, () => { var ").Write(expressionBaseline).Write(" = ((");
+                var baselineTarget = rewriter.NewIdentifier("__expressionBaselineTarget");
+                writer.Write(", null, null, () => { var ").Write(baselineTarget).Write(" = ((");
                 types.WriteTypeName(property.Destination.ReceiverType);
-                writer.Write(")").Write(element.Identifier).Write(").");
+                writer.Write(")").Write(element.Identifier).Write("); var ").Write(expressionBaseline)
+                    .Write(" = ").Write(baselineTarget).Write(".");
                 types.WriteIdentifier(property.Destination.ClrProperty?.Name ?? property.Destination.MemberName!);
                 writer.Write("; return () => { ");
-                var restoreEnd = assignment.WriteStart(property.Destination, element.Identifier);
+                var restoreEnd = assignment.WriteStart(property.Destination, baselineTarget);
                 writer.Write(expressionBaseline);
                 assignment.WriteEnd(restoreEnd);
                 writer.Write(" }; }");
@@ -73,8 +108,29 @@ internal readonly ref struct ExpressionBindingWriter(CodeWriter writer, Componen
                 .Write(" => this.__AkburaRegisterLocalRenderScope(").Write(lifetimeRoot)
                 .Write(", ").Write(lifetimeName).Write(".Resume, ")
                 .Write(lifetimeName).Write(".Suspend, __akburaRenderState)");
+            if (value.ExpressionInitialization == ExpressionBindingInitializationKind.InitialOnly)
+            {
+                foreach (var region in component.ForeachRegions)
+                foreach (var root in region.Roots)
+                {
+                    if (root.ScopeId != element.RuntimeStorageRootScopeId) continue;
+                    // Name-scope bookkeeping can prepare a revision on ordinary
+                    // foreach frames. Only a real source change needs new callbacks.
+                    writer.Write(", preserveUnchanged: !__foreachFrame").WriteIntegerLiteral(region.Id).Write(".IsSourceRevision");
+                }
+            }
         }
         writer.WriteLine(");");
+    }
+
+    private void WriteValueCallback(in ComponentPropertyWritePlan property, string target, string value)
+    {
+        writer.Write(value).Write(" => { ");
+        var assignment = new PropertyWriter(writer);
+        var end = assignment.WriteStart(property.Destination, target);
+        writer.Write(value);
+        assignment.WriteEnd(end);
+        writer.Write(" }");
     }
 
     private sealed class TrackingRewriter : CSharpSyntaxRewriter
@@ -85,13 +141,17 @@ internal readonly ref struct ExpressionBindingWriter(CodeWriter writer, Componen
         private readonly Stack<IdentifierNameSyntax> _receivers = new();
         private readonly HashSet<string> _identifiers;
         private readonly IReadOnlyDictionary<string, string> _stateNames;
+        private readonly IReadOnlyDictionary<TextSpan, string> _namedReceivers;
+        private string? _ownerName, _storeName;
         private readonly Dictionary<ISymbol, int> _memberIdentities = new(SymbolEqualityComparer.Default);
         private int _temporary;
         public string TrackerName { get; }
 
-        public TrackingRewriter(ExpressionBindingPlan plan, IReadOnlyDictionary<string, string> stateNames)
+        public TrackingRewriter(ExpressionBindingPlan plan, IReadOnlyDictionary<string, string> stateNames,
+            IReadOnlyDictionary<TextSpan, string> namedReceivers)
         {
             _stateNames = stateNames;
+            _namedReceivers = namedReceivers;
             _identifiers = new HashSet<string>(plan.Expression.Syntax!.DescendantTokens()
                 .Where(token => token.IsKind(SyntaxKind.IdentifierToken)).Select(token => token.ValueText));
             TrackerName = FreshName("__akburaExpressionTracker");
@@ -106,6 +166,16 @@ internal readonly ref struct ExpressionBindingWriter(CodeWriter writer, Componen
         }
 
         public string NewIdentifier(string prefix) => FreshName(prefix);
+
+        public void SetStableScope(string owner, string store)
+        {
+            _ownerName = owner;
+            _storeName = store;
+        }
+
+        private ExpressionSyntax Owner => _ownerName == null ? ThisExpression() : IdentifierName(_ownerName);
+
+        public override SyntaxNode? VisitThisExpression(ThisExpressionSyntax node) => Owner.WithTriviaFrom(node);
 
         private void Add(ExpressionBindingEvaluation evaluation)
         {
@@ -133,6 +203,15 @@ internal readonly ref struct ExpressionBindingWriter(CodeWriter writer, Componen
         public override SyntaxNode? Visit(SyntaxNode? node)
         {
             if (node == null) return null;
+            if (node is IdentifierNameSyntax && _namedReceivers.TryGetValue(node.Span, out var namedReceiver))
+            {
+                var receiverSyntax = ParseExpression(namedReceiver);
+                if (_storeName != null)
+                    receiverSyntax = receiverSyntax.ReplaceNodes(receiverSyntax.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>()
+                        .Where(name => name.Identifier.ValueText is "__akburaRenderState" or "__akburaForeachRenderState"),
+                        (_, _) => IdentifierName(_storeName));
+                return receiverSyntax.WithTriviaFrom(node);
+            }
             if (node is ExpressionSyntax && _projectedLoopSyntax.TryGetValue(node.Span, out var projected))
                 return projected.WithTriviaFrom(node);
             var updated = base.Visit(node);
@@ -141,15 +220,19 @@ internal readonly ref struct ExpressionBindingWriter(CodeWriter writer, Componen
             var dependency = evaluation.Dependency;
             if (dependency == null) return updated;
             if (dependency.SourceSymbol is IStateSymbol state)
-                return Call("State", IdentifierName(_stateNames[state.Name]), dependency.Id).WithTriviaFrom(node);
+                return Call("State", _ownerName == null ? IdentifierName(_stateNames[state.Name]) :
+                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, Owner, IdentifierName(_stateNames[state.Name])), dependency.Id).WithTriviaFrom(node);
             if (dependency.SourceSymbol is IParamSymbol or IInjectSymbol)
             {
                 var source = dependency.SourceSymbol;
-                var receiver = Call("Avalonia", ThisExpression(), dependency.Id,
+                var receiver = Call("Avalonia", Owner, dependency.Id,
                     MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
                         IdentifierName(source.Name + "Property"), IdentifierName("AvaloniaProperty")));
                 return MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, receiver, EscapedIdentifier(source.Name)).WithTriviaFrom(node);
             }
+            if (_ownerName != null && evaluation.Operation is IFieldReferenceOperation { Instance: IInstanceReferenceOperation } &&
+                expression is IdentifierNameSyntax field)
+                return MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, Owner, field.WithoutTrivia()).WithTriviaFrom(node);
             if (evaluation.Operation is IPropertyReferenceOperation property)
             {
                 if (dependency.Observation == ExpressionBindingObservation.None)
@@ -170,7 +253,7 @@ internal readonly ref struct ExpressionBindingWriter(CodeWriter writer, Componen
                 {
                     MemberAccessExpressionSyntax member => member.WithExpression(Trace(member.Expression)).WithTriviaFrom(node),
                     ElementAccessExpressionSyntax indexer => indexer.WithExpression(Trace(indexer.Expression)).WithTriviaFrom(node),
-                    IdentifierNameSyntax name => MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, Trace(ThisExpression()), name.WithoutTrivia()).WithTriviaFrom(node),
+                    IdentifierNameSyntax name => MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, Trace(Owner), name.WithoutTrivia()).WithTriviaFrom(node),
                     _ => updated,
                 };
             }

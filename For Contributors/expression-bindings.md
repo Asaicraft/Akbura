@@ -142,8 +142,44 @@ the target write, but still reconcile dependency observations.
 ## Lifetime and generation modes
 
 The first active evaluation assigns the destination. Relevant notifications
-subsequently update it without requesting a full-component render. Ordinary
-component renders refresh generated callbacks and reuse unchanged observers.
+subsequently update it without requesting a full-component render.
+
+Generation classifies initialization as `InitialOnly` or `RequiresRenderRefresh`
+using the semantic evaluation tree and resolved declaration identities. State,
+parameters, injected services, constants, readonly receivers and observable
+paths can initialize once. Mutable unobserved fields/properties, render locals,
+iteration/template item captures, unobservable array indexing, arbitrary calls
+and unproven named-control lifetimes retain render-time callback refresh.
+Absence of local variables alone is not proof of stability.
+
+`InitialOnly` registration runs in `FirstUpdate` for direct components. In
+structural/single-pass generation it runs during owning-node initialization
+and actual source revisions, not on ordinary update frames. An existing
+binding still reconciles on a real revision; this optimization does not skip
+Hot Reload ownership or rollback. `RequiresRenderRefresh` keeps the previous
+update behavior and reuses unchanged observers while refreshing captures.
+
+Foreach may prepare a bookkeeping revision for its native name scope on an
+ordinary frame. Stable expression slots preserve their applied resource during
+that revision; the existing reconciliation method refreshes them for actual
+template/source revisions. The observation engine itself is unchanged.
+Stable callbacks in retained local stores are emitted through static local
+factories with explicit component/store/target inputs. This prevents C# from
+sharing a display class with adjacent render-local callbacks and retaining an
+obsolete keyed item that the stable expression never reads.
+
+Named receivers are resolved by projected symbol origins, not text matching.
+Self references and ordinary component-owned peers can be proven stable;
+other cross-scope references fall back conservatively. All owning nodes are
+created before their initial assignments, so a same-element read such as
+`text.Width` can subscribe before a later Width assignment and receive its
+notification. The property is not read from an uninitialized name field.
+
+Expression-binding probes include preceding C# declarations when resolving
+captures and their initializer inputs. A render local that shadows a state is
+therefore a real local, not a duplicate projected state. Ordinary expression
+probe behavior is unchanged. CLR rollback captures the actual target object,
+rather than looking it up after the pending node store has been rolled back.
 
 Direct bindings have per-target slots in their component owner. Structural
 bindings use `AkburaRenderState` owned operation slots, capture target baselines,

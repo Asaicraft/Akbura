@@ -366,7 +366,11 @@ internal readonly ref partial struct ComponentScopeWriter
                 {
                     Debug.Assert((uint)action.Index < (uint)plan.PropertyWrites.Length);
                     ref readonly var property = ref plan.PropertyWrites.ItemRef(action.Index);
-                    if (_generationMode.UsesStructuralRuntime() &&
+                    if (property.ValueKind == ComponentPropertyValueKind.ExpressionBinding)
+                    {
+                        new ExpressionBindingWriter(_writer, _sourceMap, _ownerTypeName).Write(plan, property, element, propertyContext);
+                    }
+                    else if (_generationMode.UsesStructuralRuntime() &&
                         element.UsesRuntimeStorage &&
                         property.ValueKind == ComponentPropertyValueKind.Constant)
                     {
@@ -523,6 +527,10 @@ internal readonly ref partial struct ComponentScopeWriter
                     property,
                     targetExpression,
                     propertyContext);
+            }
+            else if (property.ValueKind == ComponentPropertyValueKind.ExpressionBinding)
+            {
+                new ExpressionBindingWriter(_writer, _sourceMap, _ownerTypeName).Write(plan, property, element, propertyContext);
             }
             else
             {

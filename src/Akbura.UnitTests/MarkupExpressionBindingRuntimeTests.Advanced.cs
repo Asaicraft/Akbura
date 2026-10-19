@@ -581,6 +581,7 @@ public sealed partial class MarkupExpressionBindingRuntimeTests
             vm.ThrowOnRemove = throwOnRemove;
             var failure = Record.Exception(() => { component.InitializeForTest(); });
             Assert.NotNull(failure);
+            _output.WriteLine(failure.ToString());
             Assert.Contains("Target rejected the initial value.", failure.ToString());
             if (throwOnRemove)
             {

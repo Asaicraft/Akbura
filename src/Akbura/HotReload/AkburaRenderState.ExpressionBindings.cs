@@ -8,7 +8,7 @@ public sealed partial class AkburaRenderState
     public void ReconcileExpressionBinding<T>(int localId, string slot, string identity,
         Func<ExpressionBindingContext, T> evaluate, Action<T> write,
         AvaloniaObject? target = null, AvaloniaProperty? property = null, Func<Action>? captureBaseline = null,
-        Func<ExpressionBinding<T>, IDisposable>? ownLifetime = null)
+        Func<ExpressionBinding<T>, IDisposable>? ownLifetime = null, bool preserveUnchanged = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(slot);
         ArgumentException.ThrowIfNullOrWhiteSpace(identity);
@@ -58,7 +58,11 @@ public sealed partial class AkburaRenderState
         {
             ValidateLocalId(localId, pending.Nodes.Length);
             var node = pending.Nodes[localId];
-            node.RegisterOwnedOperationForReplacement(slot, identity);
+            if (preserveUnchanged)
+            {
+                if (!node.RegisterOwnedOperation(slot, identity)) return;
+            }
+            else node.RegisterOwnedOperationForReplacement(slot, identity);
             var key = CreateSlotKey(pending, localId, slot);
             ReleasePreviousProperty(pending, key);
             var applied = FindAppliedOperation(key)?.Resource;

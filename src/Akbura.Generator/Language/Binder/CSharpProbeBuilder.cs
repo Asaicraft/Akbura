@@ -304,14 +304,24 @@ internal sealed partial class CSharpProbeBuilder
         var excludedNames = GetParameterNames(containingMethod);
         completionScopeNode = WrapMarkupConditionalScopes(scope,
             CSharpSyntaxFactory.ReturnStatement(completionScopeNode as CSharp.ExpressionSyntax ?? probeExpression));
+        // Include real preceding declarations, both to resolve their inputs and
+        // to avoid projecting a duplicate local that shadows the actual capture.
+        var isExpressionBinding = scope is MarkupExpressionBindingSyntax ||
+            scope.Parent is MarkupExpressionBindingSyntax ||
+            scope is MarkupAttributeSyntax attribute &&
+                AkburaSemanticModel.GetMarkupAttributeValue(attribute) is MarkupExpressionBindingSyntax;
+        var analyzedScope = isExpressionBinding
+            ? CSharpProbeBinder.CreateProbeBlock(ImmutableArray<CSharp.StatementSyntax>.Empty,
+                precedingLocals, (CSharp.StatementSyntax)completionScopeNode)
+            : completionScopeNode;
         var probeScope = includeAllVisibleSymbols
             ? _binder.CreateCompletionProbeScope(
                 scope,
-                completionScopeNode,
+                analyzedScope,
                 excludedNames)
             : _binder.CreateProbeScope(
                 scope,
-                completionScopeNode,
+                analyzedScope,
                 excludedNames);
         var returnStatement = CSharpSyntaxFactory.ReturnStatement(
             probeExpression).WithAdditionalAnnotations(new SyntaxAnnotation(ReturnProbeAnnotationKind));

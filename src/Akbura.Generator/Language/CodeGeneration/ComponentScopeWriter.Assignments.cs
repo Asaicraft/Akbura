@@ -121,7 +121,13 @@ internal readonly ref partial struct ComponentScopeWriter
                     continue;
                 }
 
-                if (property.ValueKind == ComponentPropertyValueKind.Constant)
+                if (property.ValueKind == ComponentPropertyValueKind.ExpressionBinding)
+                {
+                    // This path runs for actual structural initialization/source
+                    // revisions, not for ordinary steady-state Update frames.
+                    new ExpressionBindingWriter(_writer, _sourceMap, _ownerTypeName).Write(plan, property, element, propertyContext);
+                }
+                else if (property.ValueKind == ComponentPropertyValueKind.Constant)
                 {
                     WriteStructuralPropertyOperation(plan, element, property, element.Identifier, propertyContext);
                 }
@@ -331,7 +337,7 @@ internal readonly ref partial struct ComponentScopeWriter
                     if (write)
                     {
                         if (property.ValueKind == ComponentPropertyValueKind.ExpressionBinding)
-                            new ExpressionBindingWriter(_writer, _sourceMap).Write(plan, property, element, propertyContext);
+                            new ExpressionBindingWriter(_writer, _sourceMap, _ownerTypeName).Write(plan, property, element, propertyContext);
                         else
                             propertyWriter.Write(plan, property, element.Identifier, propertyContext);
                         wroteAny = true;

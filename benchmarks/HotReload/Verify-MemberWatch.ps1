@@ -2,7 +2,8 @@
 param(
     [string]$OutputDirectory = (Join-Path $PSScriptRoot ('../../bin/MemberWatch/' + [Guid]::NewGuid().ToString('N'))),
     [string]$ToolDirectory = (Join-Path $PSScriptRoot 'bin/Debug/net10.0'),
-    [ValidateSet('enabled', 'disabled')][string]$Optimization = 'enabled'
+    [ValidateSet('enabled', 'disabled')][string]$Optimization = 'enabled',
+    [switch]$DeclarationChanges
 )
 
 $ErrorActionPreference = 'Stop'
@@ -48,14 +49,16 @@ function Invoke-Logged([string[]]$arguments, [string]$name) {
 Invoke-Logged @('restore', $project, '--nologo', '-v:minimal') 'restore.log'
 Invoke-Logged @('build', $project, '--no-restore', '-p:UseSharedCompilation=false', '-nr:false', '--nologo', '-v:minimal') 'build.log'
 $tool = Join-Path $ToolDirectory 'HotReloadBenchmarks.dll'
-Invoke-Logged @($tool, 'watch', $project, (Join-Path $fixture 'MemberViewModel.cs'), 'MemberFixture') 'watch.jsonl'
+$component = if ($DeclarationChanges) { 'MemberDeclarations' } else { 'MemberFixture' }
+Invoke-Logged @($tool, 'watch', $project, (Join-Path $fixture 'MemberViewModel.cs'), $component) 'watch.jsonl'
 $observations = @([IO.File]::ReadLines((Join-Path $OutputDirectory 'watch.jsonl')) | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object Kind -eq 'watch')
 if ($observations.Count -ne 9 -or @($observations | Where-Object { $_.TotalMs -le 0 }).Count -gt 0) {
     throw 'Expected one first edit and eight measured live member updates.'
 }
 $result = @{ Kind = 'member-watch-result'; CompletedUtc = [DateTime]::UtcNow.ToString('o'); Optimization = $Optimization
     Updates = 9; OriginalProcessAndControlPreserved = $true; MemberImplementationAndDisplayedValueVerified = $true
-    StateAndInputPreserved = $true; ToolSha256 = (Get-FileHash -LiteralPath $tool).Hash
+    StateAndInputPreserved = $true; ToolSha256 = (Get-FileHash -LiteralPath $tool).Hash; DeclarationChanges = [bool]$DeclarationChanges
+    EditKind = $(if ($DeclarationChanges) { 'Add one private ordinary method per revision and redirect the existing GetName body; do not remove previous methods.' } else { 'Ordinary method implementation edits.' })
     RefreshPolicy = 'The application increments a separate tick state every 10 ms; no arbitrary-service runtime refresh graph is claimed.'
     StageBoundaries = 'Native detection logs and post-delta metadata callbacks are observed. Exact EnC generator processing and delta submission are unavailable, not inferred from generator-only timings.' }
 [IO.File]::WriteAllText((Join-Path $OutputDirectory 'result.json'), ($result | ConvertTo-Json) + "`r`n", [Text.UTF8Encoding]::new($false))

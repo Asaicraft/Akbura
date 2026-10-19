@@ -1,0 +1,226 @@
+[
+  {
+    "Kind": "artifact-memory-result",
+    "Project": "Akbura.FeatureGallery",
+    "Revisions": 100,
+    "Optimization": "disabled",
+    "Objects": {
+      "CSharpCompilation": {
+        "Observed": 117,
+        "Alive": 0
+      },
+      "AkburaCompilation": {
+        "Observed": 117,
+        "Alive": 0
+      },
+      "ProjectIndex": {
+        "Observed": 117,
+        "Alive": 0
+      },
+      "ProjectState": {
+        "Observed": 117,
+        "Alive": 0
+      },
+      "ProjectSnapshot": {
+        "Observed": 117,
+        "Alive": 0
+      },
+      "DetachedSnapshot": {
+        "Observed": 117,
+        "Alive": 0
+      },
+      "AkburaSemanticModel": {
+        "Observed": 3531,
+        "Alive": 0
+      },
+      "ProbeContext": {
+        "Observed": 3531,
+        "Alive": 0
+      },
+      "SemanticDependencyCollector": {
+        "Observed": 3531,
+        "Alive": 0
+      },
+      "ProbeCompilation": {
+        "Observed": 3531,
+        "Alive": 0
+      }
+    },
+    "PostGcHeapBytes": 33713632,
+    "WorkingSetBytes": 1705324544,
+    "Entries": 0,
+    "IdentitySlots": 0,
+    "RootPolicy": "Only the newest detached store and weak observations remain; all drivers and compilations released.",
+    "FreshParityChecks": 117,
+    "ConcurrentBranches": 16,
+    "ConcurrentSamples": 8
+  },
+  {
+    "Kind": "artifact-memory-result",
+    "Project": "Akbura.FeatureGallery",
+    "Revisions": 100,
+    "Optimization": "enabled",
+    "Objects": {
+      "CSharpCompilation": {
+        "Observed": 117,
+        "Alive": 0
+      },
+      "AkburaCompilation": {
+        "Observed": 117,
+        "Alive": 0
+      },
+      "ProjectIndex": {
+        "Observed": 117,
+        "Alive": 0
+      },
+      "ProjectState": {
+        "Observed": 117,
+        "Alive": 0
+      },
+      "ProjectSnapshot": {
+        "Observed": 117,
+        "Alive": 0
+      },
+      "DetachedSnapshot": {
+        "Observed": 117,
+        "Alive": 1
+      },
+      "AkburaSemanticModel": {
+        "Observed": 3351,
+        "Alive": 0
+      },
+      "ProbeContext": {
+        "Observed": 3351,
+        "Alive": 0
+      },
+      "SemanticDependencyCollector": {
+        "Observed": 3351,
+        "Alive": 0
+      },
+      "ProbeCompilation": {
+        "Observed": 3351,
+        "Alive": 0
+      }
+    },
+    "PostGcHeapBytes": 56632712,
+    "WorkingSetBytes": 1919844352,
+    "Entries": 35,
+    "IdentitySlots": 193,
+    "RootPolicy": "Only the newest detached store and weak observations remain; all drivers and compilations released.",
+    "FreshParityChecks": 117,
+    "ConcurrentBranches": 16,
+    "ConcurrentSamples": 8
+  },
+  {
+    "Kind": "artifact-memory-result",
+    "Project": "PurityUIDashborad",
+    "Revisions": 1,
+    "Optimization": "disabled",
+    "Objects": {
+      "CSharpCompilation": {
+        "Observed": 18,
+        "Alive": 0
+      },
+      "AkburaCompilation": {
+        "Observed": 18,
+        "Alive": 0
+      },
+      "ProjectIndex": {
+        "Observed": 18,
+        "Alive": 0
+      },
+      "ProjectState": {
+        "Observed": 18,
+        "Alive": 0
+      },
+      "ProjectSnapshot": {
+        "Observed": 18,
+        "Alive": 0
+      },
+      "DetachedSnapshot": {
+        "Observed": 18,
+        "Alive": 0
+      },
+      "AkburaSemanticModel": {
+        "Observed": 273,
+        "Alive": 0
+      },
+      "ProbeContext": {
+        "Observed": 273,
+        "Alive": 0
+      },
+      "SemanticDependencyCollector": {
+        "Observed": 273,
+        "Alive": 0
+      },
+      "ProbeCompilation": {
+        "Observed": 273,
+        "Alive": 0
+      }
+    },
+    "PostGcHeapBytes": 27573832,
+    "WorkingSetBytes": 778555392,
+    "Entries": 0,
+    "IdentitySlots": 0,
+    "RootPolicy": "Only the newest detached store and weak observations remain; all drivers and compilations released.",
+    "FreshParityChecks": 18,
+    "ConcurrentBranches": 16,
+    "ConcurrentSamples": 8
+  },
+  {
+    "Kind": "artifact-memory-result",
+    "Project": "PurityUIDashborad",
+    "Revisions": 1,
+    "Optimization": "enabled",
+    "Objects": {
+      "CSharpCompilation": {
+        "Observed": 18,
+        "Alive": 0
+      },
+      "AkburaCompilation": {
+        "Observed": 18,
+        "Alive": 0
+      },
+      "ProjectIndex": {
+        "Observed": 18,
+        "Alive": 0
+      },
+      "ProjectState": {
+        "Observed": 18,
+        "Alive": 0
+      },
+      "ProjectSnapshot": {
+        "Observed": 18,
+        "Alive": 0
+      },
+      "DetachedSnapshot": {
+        "Observed": 18,
+        "Alive": 1
+      },
+      "AkburaSemanticModel": {
+        "Observed": 220,
+        "Alive": 0
+      },
+      "ProbeContext": {
+        "Observed": 220,
+        "Alive": 0
+      },
+      "SemanticDependencyCollector": {
+        "Observed": 220,
+        "Alive": 0
+      },
+      "ProbeCompilation": {
+        "Observed": 220,
+        "Alive": 0
+      }
+    },
+    "PostGcHeapBytes": 32204352,
+    "WorkingSetBytes": 756584448,
+    "Entries": 17,
+    "IdentitySlots": 194,
+    "RootPolicy": "Only the newest detached store and weak observations remain; all drivers and compilations released.",
+    "FreshParityChecks": 18,
+    "ConcurrentBranches": 16,
+    "ConcurrentSamples": 8
+  }
+]

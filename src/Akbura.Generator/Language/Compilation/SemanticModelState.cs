@@ -1,4 +1,5 @@
 using Akbura.Language.Symbols;
+using Akbura.Language.CodeGeneration;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -28,6 +29,7 @@ internal sealed class SemanticModelState
         DeclarationSymbolInfos = builder.DeclarationSymbolInfos.ToImmutable();
         Diagnostics = builder.Diagnostics.ToImmutable();
         AggregatedDiagnostics = builder.AggregatedDiagnostics.ToImmutable();
+        SemanticDependencies = builder.SemanticDependencies;
     }
 
     public AkburaSyntaxTree SourceTree { get; }
@@ -36,6 +38,7 @@ internal sealed class SemanticModelState
     public string ProjectDirectory { get; }
     public int CachedResultCount => SymbolInfos.Count + DeclarationSymbolInfos.Count +
         Diagnostics.Count + AggregatedDiagnostics.Count;
+    internal DetachedCSharpDependencySet? SemanticDependencies { get; }
 
     internal ImmutableDictionary<AkburaSyntax, AkburaSymbolInfo> SymbolInfos { get; }
     internal ImmutableDictionary<AkburaSyntax, AkburaSymbolInfo> DeclarationSymbolInfos { get; }
@@ -74,6 +77,7 @@ internal sealed class SemanticModelState
         public CSharpCompilation CSharpCompilation { get; }
         public string RootNamespace { get; }
         public string ProjectDirectory { get; }
+        internal DetachedCSharpDependencySet? SemanticDependencies { get; set; }
         public ImmutableDictionary<AkburaSyntax, AkburaSymbolInfo>.Builder SymbolInfos { get; } =
             ImmutableDictionary.CreateBuilder<AkburaSyntax, AkburaSymbolInfo>();
         public ImmutableDictionary<AkburaSyntax, AkburaSymbolInfo>.Builder DeclarationSymbolInfos { get; } =

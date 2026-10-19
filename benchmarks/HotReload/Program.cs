@@ -60,10 +60,12 @@ internal static partial class Program
                 MeasureArtifactRetention(args[1], args[2], int.Parse(args[3]), args[4] == "enabled");
                 break;
             case "member-memory":
+            case "semantic-memory":
                 Assert.Contains(args[4], new[] { "enabled", "disabled" });
                 var concurrentSamples = int.Parse(args.ElementAtOrDefault(5) ?? "8");
                 Assert.InRange(concurrentSamples, 3, 100);
-                MeasureArtifactRetention(args[1], args[2], int.Parse(args[3]), args[4] == "enabled", realMembers: true, concurrentSamples);
+                MeasureArtifactRetention(args[1], args[2], int.Parse(args[3]), args[4] == "enabled", realMembers: true, concurrentSamples,
+                    semanticDependencies: args[0] == "semantic-memory");
                 break;
             case "watch":
                 MeasureWatch(args[1], args[2], args[3]).GetAwaiter().GetResult();
@@ -344,18 +346,28 @@ internal static partial class Program
         return counts;
     }
 
-    private static string Edit(string source, string fileName, int index)
+    private static string Edit(string source, string fileName, int index, bool declarationChanges = false)
     {
         var edited = fileName switch
         {
             "Sidebar.akbura" => source.Replace("Text=\"Dashboard\"", "Text=\"Dashboard " + (index + 1) + "\"", StringComparison.Ordinal),
             "NeedHelp.akbura" => source.Replace("StrokeThickness=\"1\"", "StrokeThickness=\"" + (index + 1) + "\"", StringComparison.Ordinal),
             "Counter.akbura" => source.Replace("Akbura Counter", "Akbura Counter " + index, StringComparison.Ordinal),
-            "MemberViewModel.cs" => source.Replace("return _prefix + \" 0\";", "return _prefix + \" " + index + "\";", StringComparison.Ordinal),
+            "MemberViewModel.cs" => declarationChanges ? EditMemberDeclarations(source, index) :
+                source.Replace("return _prefix + \" 0\";", "return _prefix + \" " + index + "\";", StringComparison.Ordinal),
             _ => throw new ArgumentException("No scalar edit configured for " + fileName),
         };
         Assert.NotEqual(source, edited);
         return edited;
+    }
+
+    private static string EditMemberDeclarations(string source, int index)
+    {
+        var methods = string.Join("\r\n", Enumerable.Range(1, index).Select(value =>
+            "    private string Label" + value + "() => _prefix + \" " + value + "\";"));
+        var end = source.LastIndexOf('}');
+        return source.Substring(0, end).Replace("return _prefix + \" 0\";", "return Label" + index + "();", StringComparison.Ordinal) +
+            methods + "\r\n" + source.Substring(end);
     }
 
     private static async Task MeasureWatch(string projectPath, string sourcePath, string component)
@@ -460,7 +472,7 @@ internal static partial class Program
                     pending = new TaskCompletionSource<double>(TaskCreationOptions.RunContinuationsAsynchronously);
                     completed = pending.Task;
                     started = Stopwatch.GetTimestamp();
-                    File.WriteAllText(sourcePath, Edit(original, Path.GetFileName(sourcePath), index), new UTF8Encoding(false));
+                    File.WriteAllText(sourcePath, Edit(original, Path.GetFileName(sourcePath), index, component == "MemberDeclarations"), new UTF8Encoding(false));
                 }
                 var elapsed = await completed.WaitAsync(TimeSpan.FromMinutes(2));
                 if (Path.GetFileName(sourcePath) == "MemberViewModel.cs")

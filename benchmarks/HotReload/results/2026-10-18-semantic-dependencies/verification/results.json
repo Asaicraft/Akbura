@@ -1,0 +1,12 @@
+{
+  "Fingerprint": "990CAA3D19E3D76A15C90AE6CBB830D9DCE6222F53F3CC44D53B234F52042136",
+  "CompletedUtc": "2026-10-19T01:20:41.1331123Z",
+  "Scope": "Relevant generator/ownership suites, not every repository test project.",
+  "ExpectedSdkTests": 167,
+  "BenchmarksRequested": true,
+  "DebugStats": {
+    "Passed": 380,
+    "Executed": 380
+  },
+  "Revision": "320605884d4cc59f53da2e67c499661a45f69c5c"
+}

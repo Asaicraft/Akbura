@@ -905,6 +905,7 @@ internal sealed partial class MarkupBinder : Binder
                 out _,
                 out _);
         var targetType = GetExpectedValueType(property);
+        SemanticModel.BindingSession.SemanticDependencies.RecordTargetType(targetType);
         if (property?.Command == null && !assignmentContract.AssignBinding &&
             assignmentContract.ContextualValueType is { } contextualType &&
             !Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(contextualType, assignmentContract.DeclaredType))

@@ -18,7 +18,8 @@ internal sealed record DetachedCSharpInputs(
     long OptionsIdentity,
     ImmutableArray<long> References,
     ImmutableArray<DetachedCSharpTree> Trees,
-    bool Supported)
+    bool Supported,
+    string AssemblyIdentity = "")
 {
     internal static DetachedCSharpInputs Create(CSharpCompilation compilation, ArtifactIdentitySession identities, CancellationToken cancellationToken)
     {
@@ -43,7 +44,7 @@ internal sealed record DetachedCSharpInputs(
             trees.Add(DetachedCSharpTree.Create(tree, root, identities, cancellationToken));
         }
         return new DetachedCSharpInputs(compilation.AssemblyName ?? string.Empty, identities.GetIdentity(options),
-            references.ToImmutable(), trees.ToImmutable(), supported);
+            references.ToImmutable(), trees.ToImmutable(), supported, compilation.Assembly.Identity.ToString());
     }
 
     internal ArtifactValidation Validate(DetachedCSharpInputs other, CancellationToken cancellationToken = default)
@@ -56,7 +57,7 @@ internal sealed record DetachedCSharpInputs(
         {
             return new(ArtifactReuseDecision.UnsupportedDependency, "UnsupportedCompilerInput", [], []);
         }
-        if (AssemblyName != other.AssemblyName || OptionsIdentity != other.OptionsIdentity ||
+        if (AssemblyName != other.AssemblyName || AssemblyIdentity != other.AssemblyIdentity || OptionsIdentity != other.OptionsIdentity ||
             !References.SequenceEqual(other.References) || Trees.Length != other.Trees.Length)
         {
             return new(ArtifactReuseDecision.RequiresRebinding, "CompilerOptionsReferencesOrTreeSetChanged", [], []);
@@ -64,6 +65,10 @@ internal sealed record DetachedCSharpInputs(
         var names = ImmutableArray.CreateBuilder<string>();
         var paths = ImmutableArray.CreateBuilder<string>();
         var memberTypes = ImmutableArray.CreateBuilder<string>();
+        var declarationChanges = ImmutableArray.CreateBuilder<DetachedCSharpDeclarationChange>();
+#if STATS
+        using var changeMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpChangeSetConstruction);
+#endif
         for (var index = 0; index < Trees.Length; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -97,6 +102,11 @@ internal sealed record DetachedCSharpInputs(
             if (old.IsolatedType.Length == 0 || old.IsolatedType != current.IsolatedType ||
                 !old.DeclarationTokens.SequenceEqual(current.DeclarationTokens, StringComparer.Ordinal))
             {
+                if (old.Contract != null && current.Contract != null && old.Contract.TryGetDeclarationChanges(current.Contract, declarationChanges, cancellationToken))
+                {
+                    paths.Add(current.Path);
+                    continue;
+                }
                 return new(ArtifactReuseDecision.UnsupportedDependency, "ChangedDeclarationOutsideSupportedSubset", [], []);
             }
             // Include negative/candidate lookup space: no other source tree may
@@ -109,6 +119,30 @@ internal sealed record DetachedCSharpInputs(
             names.Add(current.IsolatedType);
             paths.Add(current.Path);
         }
+        if (declarationChanges.Count != 0)
+        {
+            foreach (var change in declarationChanges)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (Trees.Sum(tree => tree.QualifiedTypes.Count(name => name == change.MetadataName)) != 1 ||
+                    other.Trees.Sum(tree => tree.QualifiedTypes.Count(name => name == change.MetadataName)) != 1)
+                {
+                    return new(ArtifactReuseDecision.UnsupportedDependency, "AmbiguousOrPartialContainingType", [], []);
+                }
+            }
+#if STATS
+            foreach (var change in declarationChanges)
+            {
+                GenerationStatistics.Increment(GenerationStatisticCounter.CSharpDeclarationsChanged);
+                for (var member = 0; member < change.ChangedMembers; member++)
+                {
+                    GenerationStatistics.Increment(GenerationStatisticCounter.CSharpMemberDeclarationsChanged);
+                }
+            }
+#endif
+            return new(ArtifactReuseDecision.ValidateDocumentDependencies, "ClosedClassMemberDeclarationsChanged", names.ToImmutable(), paths.ToImmutable(),
+                memberTypes.Distinct(StringComparer.Ordinal).ToImmutableArray(), new DetachedCSharpChangeSet(AssemblyIdentity, declarationChanges.ToImmutable()));
+        }
         return new(ArtifactReuseDecision.ValidatedEquivalent, memberTypes.Count == 0 ? "IsolatedLeafInputsEquivalent" : "MemberDeclarationContractsEquivalent",
             names.ToImmutable(), paths.ToImmutable(), memberTypes.Distinct(StringComparer.Ordinal).ToImmutableArray());
     }
@@ -119,7 +153,8 @@ internal readonly record struct ArtifactValidation(
     string Reason,
     ImmutableArray<string> ChangedTypes,
     ImmutableArray<string> ChangedPaths,
-    ImmutableArray<string> MemberTypes = default);
+    ImmutableArray<string> MemberTypes = default,
+    DetachedCSharpChangeSet? ChangeSet = null);
 
 internal sealed record DetachedCSharpTree(
     string Path,
@@ -130,7 +165,8 @@ internal sealed record DetachedCSharpTree(
     ImmutableArray<string> DeclarationTokens,
     ImmutableArray<string> Identifiers,
     DetachedCSharpDeclarationContract? Contract,
-    ImmutableArray<string> DeclaredTypes)
+    ImmutableArray<string> DeclaredTypes,
+    ImmutableArray<string> QualifiedTypes)
 {
     internal static DetachedCSharpTree Create(SyntaxTree tree, SyntaxNode root, ArtifactIdentitySession identities, CancellationToken cancellationToken)
     {
@@ -147,9 +183,17 @@ internal sealed record DetachedCSharpTree(
             .Select(static token => token.ValueText).Distinct(StringComparer.Ordinal).ToImmutableArray();
         var source = tree.GetText(cancellationToken).ToString();
         var declaredTypes = root.DescendantNodes().OfType<BaseTypeDeclarationSyntax>().Select(static type => type.Identifier.ValueText).ToImmutableArray();
+        var qualifiedTypes = root.DescendantNodes().OfType<BaseTypeDeclarationSyntax>().Where(static type =>
+                type.Parent is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax)
+            .Select(static type => string.Join(".", type.Ancestors().OfType<BaseNamespaceDeclarationSyntax>().Reverse()
+                .Select(static space => string.Join(".", space.Name.DescendantTokens()
+                    .Where(static token => token.IsKind(SyntaxKind.IdentifierToken)).Select(static token => token.ValueText)))
+                .Append(type.Identifier.ValueText)) +
+                (type is TypeDeclarationSyntax { TypeParameterList.Parameters.Count: > 0 } generic ? "`" + generic.TypeParameterList!.Parameters.Count : string.Empty))
+            .ToImmutableArray();
         return new DetachedCSharpTree(tree.FilePath, source,
             identities.GetIdentity(tree.Options), identities.GetIdentity(tree.Encoding), name, declaration, identifiers,
-            name.Length == 0 ? DetachedCSharpDeclarationContract.Create(root, source, cancellationToken) : null, declaredTypes);
+            name.Length == 0 ? DetachedCSharpDeclarationContract.Create(root, source, cancellationToken) : null, declaredTypes, qualifiedTypes);
     }
 
     private static bool TryGetLeaf(SyntaxNode root, out ClassDeclarationSyntax? type, out MethodDeclarationSyntax? method)

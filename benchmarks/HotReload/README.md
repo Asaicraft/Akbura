@@ -109,6 +109,24 @@ The default queue pairs 11 scenarios in two projects/two modes (44 primary group
 
 After generator measurements, the worker runs `Verify-MemberWatch.ps1` in an ignored disposable fixture with the local analyzers. It edits `MemberViewModel.GetName()` nine times under real `dotnet watch` and checks the original process/control, updated method result/displayed value, user input and unrelated state. A 10 ms application tick drives ordinary rendering; this does not extend runtime Hot Reload type selection to arbitrary services. Raw native detection logs and post-delta metadata callbacks are timestamped. Exact EnC generator-processing and delta-submission intervals are unavailable and remain null, not inferred from generator-only timings. `-FreshCompiler` only affects preparation builds, not measured generator-driver calls.
 
+## Semantic dependency verification
+
+`Verify-SemanticDependencies.ps1` runs the relevant DebugStats suite (including mixed 100/500-revision GC tests), the isolated SDK Roslyn suite, Release compatibility checks and report/controller regression checks. It then uses the existing detached controller for paired real-project declaration scenarios, lifetime/concurrent checks, live method-addition edits and a profiling-off control. It writes live console output, flushed per-step logs, 15-second heartbeats, `status.json`, TRXs and successful-step markers. Run it in a separate terminal; there is no need to keep a chat polling while it works.
+
+```powershell
+pwsh -NoProfile -File benchmarks/HotReload/Verify-SemanticDependencies.ps1 `
+  -InputDirectory bin/SemanticContracts/final/prepared `
+  -OutputDirectory bin/SemanticDependencies/final-validated `
+  -ResultDirectory benchmarks/HotReload/results/2026-10-18-semantic-dependencies
+Get-Content bin/SemanticDependencies/final-validated/journal.log -Wait
+```
+
+Prepare evaluated inputs with `Run.ps1 -Suite artifacts -Prepare -ArtifactOptimization @()` first on a new checkout. The example input path is an existing local prepared copy, not a tracked prerequisite. `-Resume` skips successful verification steps only when the implementation source fingerprint is unchanged and reattaches/resumes the frozen benchmark controller. Failed attempts and their stderr remain in separate directories. The controller rejects overlapping CLI builds/tests and changed evaluated inputs. A successful script exit supplies evidence, not automatic engineering sign-off.
+
+The `semantic-*` matrix includes property/signature changes, overload addition/removal, unresolved-to-valid lookup, multiple consumers, an unrelated type, a mixed markup/declaration edit and a global fallback. It retains all evaluated Gallery/Purity files and adds two explicitly identified independent consumers; the multiple-consumer case adds a third dependent consumer. This is a controlled scenario inside the real project, not a claim that complex existing UI fits the initial selective subset. Raw rows disclose these additions. Original submodule/external sources are never edited. Existing body-only and ordinary markup controls remain included.
+
+`Start-ContractBenchmarks.ps1 -SemanticDependencies` selects mixed declaration lifetime/fork scenarios and private-method additions for live watch. `-Profiling off` uses the same binary with measurement sessions disabled; missing counters are unmeasured, not zero binding work. `Verify-MemberWatch.ps1 -DeclarationChanges` adds one ordinary private method per revision and redirects the existing method to it, preserving earlier additions to avoid a method-deletion rude edit. Host EnC rejection must remain a separate failed/unsupported runtime observation, never a successful generator timing.
+
 ## Partially generated reports
 
 `Summarize.ps1` writes the CSV artifacts and then calls `Update-Report.ps1` to create or update `README.md` in the results directory. Watch timings and send boundaries, generator/CLR/build tables, graph decisions, observation/parity counts, and available tutorial provenance are generated from recorded artifacts. Missing suites are shown as unmeasured, not as zero-cost results. Variable graph counts are displayed as ranges.

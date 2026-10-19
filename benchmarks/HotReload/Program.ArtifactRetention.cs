@@ -21,15 +21,16 @@ internal static partial class Program
     }
 
     private static void MeasureArtifactRetention(string itemsPath, string fileName, int revisions, bool reuse,
-        bool realMembers = false, int concurrentSamples = 1)
+        bool realMembers = false, int concurrentSamples = 1, bool semanticDependencies = false)
     {
         Assert.True(revisions >= 1);
         Write(new { Kind = "artifact-memory-provenance", RepositoryRevision = GitRevision(),
             ToolSha256 = FileDigest(typeof(Program).Assembly.Location),
             BlackSilenceSha256 = FileDigest(typeof(AkburaBlackSilenceGenerator).Assembly.Location),
             GeneratorSha256 = FileDigest(typeof(GenerationStatistics).Assembly.Location),
-            InputsSha256 = FileDigest(itemsPath), Revisions = revisions, Optimization = reuse ? "enabled" : "disabled", RealMembers = realMembers, ConcurrentSamples = concurrentSamples });
-        var result = RunArtifactRetention(itemsPath, fileName, revisions, reuse, realMembers, concurrentSamples);
+            InputsSha256 = FileDigest(itemsPath), Revisions = revisions, Optimization = reuse ? "enabled" : "disabled", RealMembers = realMembers,
+            SemanticDependencies = semanticDependencies, ConcurrentSamples = concurrentSamples });
+        var result = RunArtifactRetention(itemsPath, fileName, revisions, reuse, realMembers, concurrentSamples, semanticDependencies);
         for (var attempt = 0; attempt < 6; attempt++)
         {
             ForceArtifactGc();
@@ -54,7 +55,7 @@ internal static partial class Program
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static ArtifactRetentionResult RunArtifactRetention(string itemsPath, string fileName, int revisions, bool reuse,
-        bool realMembers, int concurrentSamples)
+        bool realMembers, int concurrentSamples, bool semanticDependencies)
     {
         using var input = JsonDocument.Parse(File.ReadAllText(itemsPath));
         var properties = input.RootElement.GetProperty("Properties");
@@ -72,11 +73,20 @@ internal static partial class Program
         var selected = files.Single(file => Path.GetFileName(file.Path) == fileName);
         if (realMembers)
         {
-            selected = new Input(selected.Path, BindingSource(selected.GetText().ToString(), fileName, "real-referenced-method"));
+            selected = new Input(selected.Path, BindingSource(selected.GetText().ToString(), fileName, semanticDependencies ? "semantic-signature" : "real-referenced-method"));
             files = files.Select(file => file.Path == selected.Path ? selected : file).ToArray();
         }
+        if (semanticDependencies)
+        {
+            files = SemanticFiles(files, directory, "semantic-signature");
+        }
+        var originalSelected = selected;
         SyntaxTree Leaf(int value) => CSharpSyntaxTree.ParseText(SourceText.From(
-            realMembers ? RealMemberSource("real-referenced-method", value) :
+            semanticDependencies ? SemanticMemberSource((value % 7) switch
+            {
+                1 => "semantic-signature", 2 => "semantic-add-overload", 3 => "semantic-remove-overload",
+                4 => "semantic-unrelated", 5 => "semantic-global", _ => "semantic-mixed",
+            }, value) : realMembers ? RealMemberSource("real-referenced-method", value) :
                 "internal static class RetentionLeaf { public static int Value() => " + value + "; }", Encoding.UTF8), parse, "RetentionLeaf.cs");
         var leaf = Leaf(0);
         compilation = compilation.AddSyntaxTrees(leaf);
@@ -89,6 +99,14 @@ internal static partial class Program
                 var next = Leaf(index);
                 compilation = compilation.ReplaceSyntaxTree(leaf, next);
                 leaf = next;
+                if (semanticDependencies && index % 11 == 0)
+                {
+                    var replacement = new Input(selected.Path, originalSelected.GetText().ToString().Replace("ProfileService.GetName().ToString()",
+                        "ProfileService.GetName().ToString() + \" " + index + "\"", StringComparison.Ordinal));
+                    driver = driver.ReplaceAdditionalText(selected, replacement);
+                    files = files.Select(file => file.Path == selected.Path ? replacement : file).ToArray();
+                    selected = replacement;
+                }
             }
             using var measurement = GenerationStatistics.BeginMeasurement(GC.GetAllocatedBytesForCurrentThread);
             var allocated = GC.GetTotalAllocatedBytes(precise: true);
@@ -115,7 +133,9 @@ internal static partial class Program
                 ActiveCompilationOwners = weak.Where(item => item.Kind == "ProjectState" && item.Reference.IsAlive)
                     .Select(item => item.Reference.Target).Distinct(ReferenceEqualityComparer.Instance).Count(),
                 SemanticModels = stats.GetCounterCount(GenerationStatisticCounter.SemanticModelCreated),
-                ArtifactHits = stats.GetCounterCount(GenerationStatisticCounter.CrossCompilationArtifactHit) });
+                ArtifactHits = stats.GetCounterCount(GenerationStatisticCounter.CrossCompilationArtifactHit),
+                DependencyFacts = request.State.Artifacts.Latest?.Entries.Values.Sum(artifact => artifact.SemanticDependencies is { } facts
+                    ? facts.SourceTypes.Length + facts.Symbols.Length + facts.Lookups.Length + facts.Conversions.Length : 0) ?? 0 });
         }
 
         // Fork the real large driver. Each branch is independently checked against a
@@ -133,7 +153,9 @@ internal static partial class Program
             {
                 var revision = revisions + concurrentIndex * 2 + branch;
                 var current = parentCompilation.ReplaceSyntaxTree(parentLeaf, Leaf(revision));
-                var changedText = realMembers ? selected.GetText().ToString().Replace("ContractFixture.Current.Vm.GetName()",
+                var changedText = realMembers ? selected.GetText().ToString().Replace(
+                    semanticDependencies ? "SemanticFixture.ProfileService.GetName().ToString()" : "ContractFixture.Current.Vm.GetName()",
+                    semanticDependencies ? "SemanticFixture.ProfileService.GetName().ToString() + \" " + revision + "\"" :
                     "ContractFixture.Current.Vm.GetName() + \" " + revision + "\"", StringComparison.Ordinal) :
                     Edit(selected.GetText().ToString(), fileName, revision);
                 var changed = new Input(selected.Path, changedText);
@@ -197,6 +219,7 @@ internal static partial class Program
                 var model = request.Index.Compilation.GetSemanticModel(document.SyntaxTree);
                 weak.Add(("AkburaSemanticModel", new WeakReference(model)));
                 weak.Add(("ProbeContext", new WeakReference(model.BindingSession.ProbeContext)));
+                weak.Add(("SemanticDependencyCollector", new WeakReference(model.BindingSession.SemanticDependencies)));
                 weak.Add(("ProbeCompilation", new WeakReference(request.Index.Compilation.CSharpProbeCompilation)));
             }
         }

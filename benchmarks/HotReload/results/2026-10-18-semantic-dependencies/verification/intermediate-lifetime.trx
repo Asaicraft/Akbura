@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="8701f858-7698-4612-bf6f-c3b4941859a2" name="Asanov@DESKTOP-90N0PL6 2026-10-18 09:39:12" runUser="DESKTOP-90N0PL6\Asanov" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-10-18T09:39:13.0075121+06:00" queuing="2026-10-18T09:39:13.0075125+06:00" start="2026-10-18T09:28:10.5483101+06:00" finish="2026-10-18T09:41:21.6487011+06:00" />
+  <TestSettings name="default" id="5eb5659e-d9ed-4a79-a3f6-b6a4c50a5289">
+    <Deployment runDeploymentRoot="Asanov_DESKTOP-90N0PL6_2026-10-18_09_39_12" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="0e6e6e78-dfe9-41ef-a508-a487d995e240" testId="882308db-da54-0a7e-bc36-ffbe19a149b8" testName="Akbura.UnitTests.BlackSilenceIncrementalGenerationTests.SemanticDependencies_MixedRevisionsKeepOnlyCurrentFactsAndReleaseEveryCompilerOwner(revisions: 500)" computerName="DESKTOP-90N0PL6" duration="00:11:01.2667530" startTime="2026-10-18T09:28:11.6865670+06:00" endTime="2026-10-18T09:39:12.9614158+06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0e6e6e78-dfe9-41ef-a508-a487d995e240" />
+    <UnitTestResult executionId="8eaaa7a2-3afb-44e1-a273-cc4d5a07cf84" testId="387b163f-2943-07f9-4699-7f508976cbde" testName="Akbura.UnitTests.BlackSilenceIncrementalGenerationTests.SemanticDependencies_MixedRevisionsKeepOnlyCurrentFactsAndReleaseEveryCompilerOwner(revisions: 100)" computerName="DESKTOP-90N0PL6" duration="00:02:08.5798073" startTime="2026-10-18T09:39:12.9863375+06:00" endTime="2026-10-18T09:41:21.5416441+06:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8eaaa7a2-3afb-44e1-a273-cc4d5a07cf84" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Akbura.UnitTests.BlackSilenceIncrementalGenerationTests.SemanticDependencies_MixedRevisionsKeepOnlyCurrentFactsAndReleaseEveryCompilerOwner(revisions: 500)" storage="c:\users\asanov\.codex\worktrees\c671\akbura\src\akbura.unittests\bin\debugstats\net10.0\akbura.unittests.dll" id="882308db-da54-0a7e-bc36-ffbe19a149b8">
+      <Execution id="0e6e6e78-dfe9-41ef-a508-a487d995e240" />
+      <TestMethod codeBase="C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.UnitTests\bin\DebugStats\net10.0\Akbura.UnitTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Akbura.UnitTests.BlackSilenceIncrementalGenerationTests" name="SemanticDependencies_MixedRevisionsKeepOnlyCurrentFactsAndReleaseEveryCompilerOwner" />
+    </UnitTest>
+    <UnitTest name="Akbura.UnitTests.BlackSilenceIncrementalGenerationTests.SemanticDependencies_MixedRevisionsKeepOnlyCurrentFactsAndReleaseEveryCompilerOwner(revisions: 100)" storage="c:\users\asanov\.codex\worktrees\c671\akbura\src\akbura.unittests\bin\debugstats\net10.0\akbura.unittests.dll" id="387b163f-2943-07f9-4699-7f508976cbde">
+      <Execution id="8eaaa7a2-3afb-44e1-a273-cc4d5a07cf84" />
+      <TestMethod codeBase="C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.UnitTests\bin\DebugStats\net10.0\Akbura.UnitTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Akbura.UnitTests.BlackSilenceIncrementalGenerationTests" name="SemanticDependencies_MixedRevisionsKeepOnlyCurrentFactsAndReleaseEveryCompilerOwner" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="882308db-da54-0a7e-bc36-ffbe19a149b8" executionId="0e6e6e78-dfe9-41ef-a508-a487d995e240" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="387b163f-2943-07f9-4699-7f508976cbde" executionId="8eaaa7a2-3afb-44e1-a273-cc4d5a07cf84" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="2" executed="2" passed="2" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.5+1b188a7b0a (64-bit .NET 10.0.12)&#xD;
+[xUnit.net 00:00:00.19]   Discovering: Akbura.UnitTests&#xD;
+[xUnit.net 00:00:00.65]   Discovered:  Akbura.UnitTests&#xD;
+[xUnit.net 00:00:00.69]   Starting:    Akbura.UnitTests&#xD;
+[xUnit.net 00:13:10.57]   Finished:    Akbura.UnitTests&#xD;
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

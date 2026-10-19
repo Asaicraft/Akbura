@@ -6,6 +6,17 @@ namespace Akbura.BlackSilence;
 
 internal sealed class BlackSilenceGenerationRequest
 {
+#if STATS
+    private readonly System.Collections.Generic.Dictionary<string, ArtifactReuseDecision> _semanticDependencyDecisions = new(StringComparer.Ordinal);
+
+    internal void ObserveSemanticDocument(string path, ArtifactReuseDecision decision)
+    {
+        if (!_semanticDependencyDecisions.TryGetValue(path, out var previous) || previous == ArtifactReuseDecision.ValidatedEquivalent)
+        {
+            _semanticDependencyDecisions[path] = decision;
+        }
+    }
+#endif
     private readonly WeakReference<BlackSilenceProjectSnapshot>? _previousSnapshot;
     public BlackSilenceGenerationRequest(
         BlackSilenceProjectState state,
@@ -61,6 +72,7 @@ internal sealed class BlackSilenceGenerationRequest
         {
             return;
         }
+        Index.Compilation.CollectCSharpSemanticDependencies = true;
 #if STATS
         using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.ArtifactValidation);
 #endif
@@ -89,10 +101,20 @@ internal sealed class BlackSilenceGenerationRequest
             using var selectionMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.ArtifactSelection);
 #endif
             cancellationToken.ThrowIfCancellationRequested();
-            Components = DetachedArtifactReuse.Components(this, candidate);
-            ExternalAkcss = DetachedArtifactReuse.Akcss(this, ExternalAkcss, candidate);
-            InlineAkcss = DetachedArtifactReuse.Akcss(this, InlineAkcss, candidate);
-            Diagnostics = DetachedArtifactReuse.Diagnostics(this, candidate);
+            Components = DetachedArtifactReuse.Components(this, candidate, cancellationToken);
+            ExternalAkcss = DetachedArtifactReuse.Akcss(this, ExternalAkcss, candidate, cancellationToken);
+            InlineAkcss = DetachedArtifactReuse.Akcss(this, InlineAkcss, candidate, cancellationToken);
+            Diagnostics = DetachedArtifactReuse.Diagnostics(this, candidate, cancellationToken);
+#if STATS
+            foreach (var decision in _semanticDependencyDecisions.Values)
+            {
+                GenerationStatistics.Increment(GenerationStatisticCounter.SemanticDependencyDocumentsExamined);
+                GenerationStatistics.Increment(decision == ArtifactReuseDecision.ValidatedEquivalent
+                    ? GenerationStatisticCounter.SemanticDependencyDocumentsIndependent
+                    : decision == ArtifactReuseDecision.IncompleteSemanticDependencies ? GenerationStatisticCounter.SemanticDependencyDocumentsIncomplete
+                    : GenerationStatisticCounter.SemanticDependencyDocumentsAffected);
+            }
+#endif
         }
         cancellationToken.ThrowIfCancellationRequested();
     }

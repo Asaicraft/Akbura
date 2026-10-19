@@ -15,6 +15,10 @@ internal enum ArtifactReuseDecision : byte
     RequiresRebinding,
     UnsupportedDependency,
     MissingArtifact,
+    ValidateDocumentDependencies,
+    AffectedByChangedSymbol,
+    AffectedByLookupCandidateChange,
+    IncompleteSemanticDependencies,
 }
 
 /// <summary>
@@ -31,7 +35,7 @@ internal sealed record DetachedProjectArtifacts(
     ImmutableDictionary<string, DetachedDiagnosticArtifact> Diagnostics,
     bool DiagnosticsComputed)
 {
-    internal const int CurrentSchema = 2;
+    internal const int CurrentSchema = 3;
 
     internal static DetachedProjectArtifacts Create(BlackSilenceGenerationRequest request,
         ImmutableDictionary<string, GeneratedDocumentEntry> generatedEntries, ImmutableDictionary<string, DiagnosticDocumentEntry> diagnosticEntries)
@@ -50,20 +54,23 @@ internal sealed record DetachedProjectArtifacts(
                 previous.DetachedArtifacts.Entries.TryGetValue(pair.Key, out var previousArtifact) && previousArtifact.HintName == source.HintName &&
                 DetachedDependencyInput.Matches(previousArtifact.Dependencies, dependencies))
             {
-                entries.Add(pair.Key, previousArtifact);
+                entries.Add(pair.Key, ReferenceEquals(previousArtifact.SemanticDependencies, pair.Value.SemanticDependencies) ? previousArtifact :
+                    previousArtifact with { SemanticDependencies = pair.Value.SemanticDependencies, DocumentPath = pair.Value.Version.Document.FilePath });
                 continue;
             }
             if (latest != null && latest.Entries.TryGetValue(pair.Key, out var currentArtifact) &&
                 ReferenceEquals(currentArtifact.Source, source.SourceText) && currentArtifact.HintName == source.HintName &&
                 DetachedDependencyInput.Matches(currentArtifact.Dependencies, dependencies))
             {
-                entries.Add(pair.Key, currentArtifact);
+                entries.Add(pair.Key, ReferenceEquals(currentArtifact.SemanticDependencies, pair.Value.SemanticDependencies) ? currentArtifact :
+                    currentArtifact with { SemanticDependencies = pair.Value.SemanticDependencies, DocumentPath = pair.Value.Version.Document.FilePath });
                 continue;
             }
             // Never accept arbitrary SourceText implementations into the cache.
             // From(string) owns characters, not the writer, reader or compilation.
             entries.Add(pair.Key, new DetachedGeneratedArtifact(source.HintName,
-                SourceText.From(source.SourceText.ToString(), Encoding.UTF8, source.SourceText.ChecksumAlgorithm), DetachedDependencyInput.Create(dependencies)));
+                SourceText.From(source.SourceText.ToString(), Encoding.UTF8, source.SourceText.ChecksumAlgorithm), DetachedDependencyInput.Create(dependencies),
+                pair.Value.SemanticDependencies, pair.Value.Version.Document.FilePath));
 #if STATS
             GenerationStatistics.Increment(GenerationStatisticCounter.DetachedSourceTextCreated);
 #endif
@@ -71,15 +78,18 @@ internal sealed record DetachedProjectArtifacts(
         var diagnostics = ImmutableDictionary.CreateBuilder<string, DetachedDiagnosticArtifact>(StringComparer.Ordinal);
         foreach (var pair in diagnosticEntries)
         {
-            diagnostics.Add(pair.Key, new DetachedDiagnosticArtifact(pair.Value.Diagnostics, DetachedDependencyInput.Create(pair.Value.Version.Dependencies)));
+            diagnostics.Add(pair.Key, new DetachedDiagnosticArtifact(pair.Value.Diagnostics, DetachedDependencyInput.Create(pair.Value.Version.Dependencies),
+                pair.Value.SemanticDependencies));
         }
         return new DetachedProjectArtifacts(request.Version, CurrentSchema, request.Options, request.ArtifactInputs!,
             request.DetachedDocuments, entries.ToImmutable(), diagnostics.ToImmutable(), request.ComputeDiagnostics);
     }
 }
 
-internal sealed record DetachedGeneratedArtifact(string HintName, SourceText Source, ImmutableArray<DetachedDependencyInput> Dependencies);
-internal sealed record DetachedDiagnosticArtifact(ImmutableArray<AkburaDiagnosticRecord> Records, ImmutableArray<DetachedDependencyInput> Dependencies);
+internal sealed record DetachedGeneratedArtifact(string HintName, SourceText Source, ImmutableArray<DetachedDependencyInput> Dependencies,
+    DetachedCSharpDependencySet? SemanticDependencies = null, string DocumentPath = "");
+internal sealed record DetachedDiagnosticArtifact(ImmutableArray<AkburaDiagnosticRecord> Records, ImmutableArray<DetachedDependencyInput> Dependencies,
+    DetachedCSharpDependencySet? SemanticDependencies = null);
 
 internal sealed record DetachedDependencyInput(string Identity, bool IncludesBody, ImmutableArray<string> Shape)
 {

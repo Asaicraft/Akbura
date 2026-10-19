@@ -1,5 +1,6 @@
 using Akbura.BlackSilence;
 using Akbura.Language;
+using Akbura.Language.Binder;
 using Akbura.Language.CodeGeneration;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -133,6 +134,7 @@ public sealed partial class BlackSilenceIncrementalGenerationTests
             var probes = run.Request.Index.Compilation.CSharpProbeCompilation;
             weak.Add(("AkburaSemanticModel", new WeakReference(model)));
             weak.Add(("ProbeContext", new WeakReference(model.BindingSession.ProbeContext)));
+            weak.Add(("SemanticDependencyCollector", new WeakReference(model.BindingSession.SemanticDependencies)));
             weak.Add(("ProbeCompilation", new WeakReference(probes)));
             weak.Add(("RoslynSemanticModel", new WeakReference(probes.GetSemanticModel(probes.SyntaxTrees.Last()))));
         }
@@ -176,7 +178,7 @@ public sealed partial class BlackSilenceIncrementalGenerationTests
             }
             var type = value.GetType();
             Assert.False(value is Compilation or SemanticModel or SyntaxTree or SyntaxNode or Microsoft.CodeAnalysis.ISymbol or
-                IOperation or AkburaCompilation or AkburaSemanticModel or AkburaProjectIndex or SemanticModelState or
+                IOperation or CSharpBindingResult or DocumentSemanticDependencyCollector or AkburaCompilation or AkburaSemanticModel or AkburaProjectIndex or SemanticModelState or
                 AkburaSyntaxTree or ComponentPlan or DocumentSyntaxVersion or DocumentGenerationVersion or DocumentDiagnosticVersion or BlackSilenceProjectSnapshot or Delegate,
                 "Compilation-bound object in detached graph: " + type.FullName);
             if (value is SourceText)

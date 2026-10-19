@@ -1,0 +1,14 @@
+{
+  "ToolSha256": "3C878B170E1970FBC8EE84FB20C0FC4D74E1D4CC46757C6F7AFFB7E2B8D6C34B",
+  "RefreshPolicy": "The application increments a separate tick state every 10 ms; no arbitrary-service runtime refresh graph is claimed.",
+  "Kind": "member-watch-result",
+  "CompletedUtc": "2026-10-19T00:58:18.7645572Z",
+  "OriginalProcessAndControlPreserved": true,
+  "Updates": 9,
+  "StateAndInputPreserved": true,
+  "EditKind": "Add one private ordinary method per revision and redirect the existing GetName body; do not remove previous methods.",
+  "MemberImplementationAndDisplayedValueVerified": true,
+  "Optimization": "enabled",
+  "StageBoundaries": "Native detection logs and post-delta metadata callbacks are observed. Exact EnC generator processing and delta submission are unavailable, not inferred from generator-only timings.",
+  "DeclarationChanges": true
+}

@@ -71,6 +71,9 @@ internal sealed partial class CSharpProbeBinder : Binder
             ? null
             : declaredType;
 
+        SemanticModel.BindingSession.SemanticDependencies.Record(probeType, typeSymbol, symbolInfo.Symbol, null,
+            symbolInfo.CandidateSymbols, symbolInfo.CandidateReason, null, semanticModel);
+
         return new CSharpBindingResult(
             typeSymbol,
             symbolInfo.Symbol,
@@ -190,6 +193,7 @@ internal sealed partial class CSharpProbeBinder : Binder
         CSharp.StatementSyntax statement,
         bool isBindingPath = false)
     {
+        SemanticModel.BindingSession.SemanticDependencies.MarkIncomplete("StatementOrComponentMethodScope");
 #if STATS
         using var probeMeasurement = MeasureProbe(ProbeCategory.Statement, syntax);
         using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeBinding);
@@ -743,6 +747,9 @@ internal sealed partial class CSharpProbeBinder : Binder
         {
             typeSymbol = null;
         }
+
+        SemanticModel.BindingSession.SemanticDependencies.Record(expression, typeSymbol, symbolInfo.Symbol, receiverType,
+            symbolInfo.CandidateSymbols, symbolInfo.CandidateReason, operation, semanticModel);
 
         return new CSharpBindingResult(
             typeSymbol,

@@ -15,12 +15,14 @@ namespace Akbura.BlackSilence;
 /// a public-signature hash or a blanket removal of executable syntax. Unknown
 /// members remain in the exact segments, so changing them forces rebinding.
 /// </summary>
-internal sealed record DetachedCSharpDeclarationContract(
+internal sealed partial record DetachedCSharpDeclarationContract(
     int Schema,
     ImmutableArray<string> Segments,
-    ImmutableArray<DetachedMemberContract> Members)
+    ImmutableArray<DetachedMemberContract> Members,
+    ImmutableArray<DetachedCSharpTypeContract> Types = default,
+    ImmutableArray<string> TypeSegments = default)
 {
-    private const int CurrentSchema = 1;
+    private const int CurrentSchema = 2;
 
     internal static DetachedCSharpDeclarationContract? Create(SyntaxNode root, string source, CancellationToken cancellationToken)
     {
@@ -86,7 +88,8 @@ internal sealed record DetachedCSharpDeclarationContract(
                 }
             }
         }
-        if (regions.Count == 0)
+        var (types, typeSegments) = CaptureTypes(unit, source, cancellationToken);
+        if (regions.Count == 0 && types.IsEmpty)
         {
             return null;
         }
@@ -102,7 +105,7 @@ internal sealed record DetachedCSharpDeclarationContract(
             position = span.End;
         }
         segments.Add(source.Substring(position));
-        return new DetachedCSharpDeclarationContract(CurrentSchema, segments.ToImmutable(), members.ToImmutable());
+        return new DetachedCSharpDeclarationContract(CurrentSchema, segments.ToImmutable(), members.ToImmutable(), types, typeSegments);
     }
 
     internal bool Matches(DetachedCSharpDeclarationContract other) => Schema == CurrentSchema && Schema == other.Schema &&

@@ -263,7 +263,8 @@ internal sealed partial class BlackSilenceDocumentBatch
                     component.Identity,
                     component.Version,
                     ComponentDocumentWriter.GetHintName(input.Component, input.SourcePath),
-                    text);
+                    text,
+                    request.Options.CrossCompilationReuse ? input.SemanticModel.BindingSession.SemanticDependencies.Detach(cancellationToken) : null);
             }
             else
             {
@@ -279,7 +280,8 @@ internal sealed partial class BlackSilenceDocumentBatch
                     module.Identity,
                     module.Version,
                     AkcssDocumentWriter.GetHintName(input),
-                    text);
+                    text,
+                    request.Options.CrossCompilationReuse ? input.SemanticModel.BindingSession.SemanticDependencies.Detach(cancellationToken) : null);
             }
         }
     }

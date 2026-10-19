@@ -132,7 +132,9 @@ internal sealed partial class BlackSilenceDocumentBatch
                 diagnostics = detached.ToImmutableArrayUnsafe();
             }
 
-            entries.Add(document.FilePath, new DiagnosticDocumentEntry(diagnosticRequest.Version, diagnostics));
+            entries.Add(document.FilePath, new DiagnosticDocumentEntry(diagnosticRequest.Version, diagnostics,
+                request.Options.CrossCompilationReuse ? model?.BindingSession.SemanticDependencies.Detach(cancellationToken) ??
+                    new DetachedCSharpDependencySet(DetachedCSharpDependencySet.CurrentSchema, true, true, [], [], [], [], []) : null));
 #if STATS
             GenerationStatistics.Increment(GenerationStatisticCounter.DiagnosticDocumentEvaluated);
 #endif

@@ -36,6 +36,7 @@ internal sealed class AkburaConversions
         }
 
         var conversion = _binder.Compilation.CSharpCompilation.ClassifyConversion(sourceType, targetType);
+        _binder.SemanticModel.BindingSession.SemanticDependencies.RecordConversion(sourceType, targetType, conversion.MethodSymbol, conversion.ToString());
         var kind = conversion.IsIdentity
             ? AkburaConversionKind.Identity
             : conversion.IsImplicit
@@ -56,6 +57,7 @@ internal sealed class AkburaConversions
         ITypeSymbol? targetType,
         CSharpConversion conversion)
     {
+        _binder.SemanticModel.BindingSession.SemanticDependencies.RecordConversion(sourceType, targetType, conversion.MethodSymbol, conversion.ToString());
         if (targetType == null)
         {
             return AkburaConversion.None(sourceType, targetType);

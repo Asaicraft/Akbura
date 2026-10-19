@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace Akbura.BlackSilence;
 
-internal static class DetachedArtifactReuse
+internal static partial class DetachedArtifactReuse
 {
     internal static ArtifactValidation Validate(BlackSilenceGenerationRequest request, DetachedProjectArtifacts? candidate, CancellationToken cancellationToken = default)
     {
@@ -24,14 +24,15 @@ internal static class DetachedArtifactReuse
             return new(ArtifactReuseDecision.RequiresRebinding, "DocumentInputsOrProjectOptionsChanged", [], []);
         }
         var validation = candidate.CSharpInputs.Validate(request.ArtifactInputs!, cancellationToken);
-        if (validation.Decision == ArtifactReuseDecision.ValidatedEquivalent)
+        if (validation.Decision is ArtifactReuseDecision.ValidatedEquivalent or ArtifactReuseDecision.ValidateDocumentDependencies)
         {
             var implicitNames = request.Index.ComponentDescriptors.Select(static descriptor => descriptor.ComponentMetadataName)
                 .Concat(request.Index.ExternalAkcssDescriptors.Select(static descriptor => descriptor.GeneratedTypeName))
                 .Concat(request.Index.InlineAkcssDescriptors.Select(static descriptor => descriptor.GeneratedTypeName))
                 .SelectMany(static lookup => Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseTokens(lookup)
                     .Select(static token => token.ValueText).Prepend(lookup));
-            var changedTypes = validation.ChangedTypes.Concat(validation.MemberTypes.IsDefault ? [] : validation.MemberTypes);
+            var changedTypes = validation.ChangedTypes.Concat(validation.MemberTypes.IsDefault ? [] : validation.MemberTypes)
+                .Concat(validation.ChangeSet?.Changes.SelectMany(static change => new[] { change.MetadataName, change.MetadataName.Split('.').Last() }) ?? []);
             if (implicitNames.Any(lookup => changedTypes.Any(name => lookup.IndexOf(name, System.StringComparison.Ordinal) >= 0)))
             {
                 return new(ArtifactReuseDecision.UnsupportedDependency, "GeneratedDeclarationLookupCollision", [], []);
@@ -40,22 +41,23 @@ internal static class DetachedArtifactReuse
         return validation;
     }
 
-    internal static ImmutableArray<ComponentGenerationRequest> Components(BlackSilenceGenerationRequest request, DetachedProjectArtifacts? candidate)
+    internal static ImmutableArray<ComponentGenerationRequest> Components(BlackSilenceGenerationRequest request, DetachedProjectArtifacts? candidate, CancellationToken cancellationToken)
     {
         return request.Components.Select(component => new ComponentGenerationRequest(component.Descriptor, component.Version,
-            component.AkcssModuleTypeNames, Source(request, candidate, component.Identity, component.Version))).ToImmutableArray();
+            component.AkcssModuleTypeNames, Source(request, candidate, component.Identity, component.Version, cancellationToken))).ToImmutableArray();
     }
 
     internal static ImmutableArray<AkcssGenerationRequest> Akcss(BlackSilenceGenerationRequest request,
-        ImmutableArray<AkcssGenerationRequest> modules, DetachedProjectArtifacts? candidate)
+        ImmutableArray<AkcssGenerationRequest> modules, DetachedProjectArtifacts? candidate, CancellationToken cancellationToken)
     {
         return modules.Select(module => new AkcssGenerationRequest(module.Descriptor, module.Version,
-            Source(request, candidate, module.Identity, module.Version))).ToImmutableArray();
+            Source(request, candidate, module.Identity, module.Version, cancellationToken))).ToImmutableArray();
     }
 
     private static GeneratedDocumentEntry? Source(BlackSilenceGenerationRequest request, DetachedProjectArtifacts? candidate,
-        string identity, DocumentGenerationVersion version)
+        string identity, DocumentGenerationVersion version, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var decision = Decision(request, candidate, version.Document.FilePath);
         if (candidate == null || !candidate.Entries.TryGetValue(identity, out var artifact))
         {
@@ -67,18 +69,26 @@ internal static class DetachedArtifactReuse
         }
         else if (decision == ArtifactReuseDecision.ValidatedEquivalent)
         {
-            Observe(request, version.Document.FilePath, identity, decision, diagnostic: false);
-            // Wrap the detached characters with the CURRENT compilation's version.
-            return new GeneratedDocumentEntry(identity, version, artifact.HintName, artifact.Source);
+            decision = ValidateSemanticDependencies(request, candidate, version.Document.FilePath, artifact.SemanticDependencies, version.Dependencies, diagnostic: false, cancellationToken);
+            if (decision == ArtifactReuseDecision.ValidatedEquivalent)
+            {
+#if STATS
+                using var selectiveMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.SelectiveArtifactReuse);
+#endif
+                Observe(request, version.Document.FilePath, identity, decision, diagnostic: false);
+                // Wrap the detached characters with the CURRENT compilation's version.
+                return new GeneratedDocumentEntry(identity, version, artifact.HintName, artifact.Source, artifact.SemanticDependencies);
+            }
         }
         Observe(request, version.Document.FilePath, identity, decision, diagnostic: false);
         return null;
     }
 
-    internal static ImmutableArray<DocumentDiagnosticRequest> Diagnostics(BlackSilenceGenerationRequest request, DetachedProjectArtifacts? candidate)
+    internal static ImmutableArray<DocumentDiagnosticRequest> Diagnostics(BlackSilenceGenerationRequest request, DetachedProjectArtifacts? candidate, CancellationToken cancellationToken)
     {
         return request.Diagnostics.Select(diagnostic =>
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var decision = Decision(request, candidate, diagnostic.Document.FilePath);
             DiagnosticDocumentEntry? previous = null;
             if (candidate == null || !candidate.DiagnosticsComputed || !candidate.Diagnostics.TryGetValue(diagnostic.Document.FilePath, out var artifact))
@@ -87,18 +97,23 @@ internal static class DetachedArtifactReuse
             }
             else if (decision == ArtifactReuseDecision.ValidatedEquivalent)
             {
+                decision = ValidateSemanticDependencies(request, candidate, diagnostic.Document.FilePath, artifact.SemanticDependencies,
+                    diagnostic.Version.Dependencies, diagnostic: true, cancellationToken);
                 // Diagnostics have their own mapping dependencies, independently
                 // of generated-source eligibility. Never restore stale locations.
-                if (!DetachedDependencyInput.Matches(artifact.Dependencies, diagnostic.Version.Dependencies) ||
+                if (decision == ArtifactReuseDecision.ValidatedEquivalent && (!DetachedDependencyInput.Matches(artifact.Dependencies, diagnostic.Version.Dependencies) ||
                     artifact.Records.Any(record => request.ArtifactValidation.ChangedPaths.Contains(record.FilePath) ||
-                    record.AdditionalLocations.Any(location => request.ArtifactValidation.ChangedPaths.Contains(location.FilePath))))
+                    record.AdditionalLocations.Any(location => request.ArtifactValidation.ChangedPaths.Contains(location.FilePath)))))
                 {
                     decision = ArtifactReuseDecision.RequiresRebinding;
                 }
-                else
+                else if (decision == ArtifactReuseDecision.ValidatedEquivalent)
                 {
+#if STATS
+                    using var selectiveMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.SelectiveDiagnosticReuse);
+#endif
                     previous = new DiagnosticDocumentEntry(diagnostic.Version,
-                        artifact.Records.Select(record => record with { DocumentVersion = request.Version }).ToImmutableArray());
+                        artifact.Records.Select(record => record with { DocumentVersion = request.Version }).ToImmutableArray(), artifact.SemanticDependencies);
                 }
             }
             Observe(request, diagnostic.Document.FilePath, diagnostic.Document.FilePath, decision, diagnostic: true);
@@ -108,7 +123,7 @@ internal static class DetachedArtifactReuse
 
     private static ArtifactReuseDecision Decision(BlackSilenceGenerationRequest request, DetachedProjectArtifacts? candidate, string path)
     {
-        if (request.ArtifactValidation.Decision != ArtifactReuseDecision.ValidatedEquivalent)
+        if (request.ArtifactValidation.Decision is not (ArtifactReuseDecision.ValidatedEquivalent or ArtifactReuseDecision.ValidateDocumentDependencies))
         {
             return request.ArtifactValidation.Decision;
         }
@@ -136,12 +151,15 @@ internal static class DetachedArtifactReuse
         }
         if (GenerationStatistics.IsInvalidationTrackingEnabled)
         {
-            var reason = request.ArtifactValidation.Decision == ArtifactReuseDecision.ValidatedEquivalent
+            var reason = request.ArtifactValidation.Decision is ArtifactReuseDecision.ValidatedEquivalent or ArtifactReuseDecision.ValidateDocumentDependencies
                 ? decision switch
                 {
                     ArtifactReuseDecision.UnsupportedDependency => "DocumentOrGlobalLookupNotProven",
                     ArtifactReuseDecision.RequiresRebinding => diagnostic ? "DiagnosticInputsOrMappingChanged" : "DocumentInputsOrDependenciesChanged",
                     ArtifactReuseDecision.MissingArtifact => diagnostic ? "DetachedDiagnosticsUnavailable" : "DetachedSourceUnavailable",
+                    ArtifactReuseDecision.AffectedByChangedSymbol => "AffectedByChangedTypeContract",
+                    ArtifactReuseDecision.AffectedByLookupCandidateChange => "AffectedByLookupCandidateChange",
+                    ArtifactReuseDecision.IncompleteSemanticDependencies => "IncompleteSemanticDependencies",
                     _ => request.ArtifactValidation.Reason,
                 }
                 : request.ArtifactValidation.Reason;

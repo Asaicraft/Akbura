@@ -119,6 +119,7 @@ internal sealed partial class AkburaCompilation
 #endif
     }
     public CSharpCompilation CSharpCompilation { get; }
+    internal bool CollectCSharpSemanticDependencies { get; set; }
 
     internal CSharpCompilation CSharpProbeCompilation
     {

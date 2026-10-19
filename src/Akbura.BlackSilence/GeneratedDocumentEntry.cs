@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis.Text;
+using Akbura.Language.CodeGeneration;
 
 namespace Akbura.BlackSilence;
 
@@ -11,14 +12,17 @@ internal sealed class GeneratedDocumentEntry
         string identity,
         DocumentGenerationVersion version,
         string hintName,
-        SourceText sourceText)
+        SourceText sourceText,
+        DetachedCSharpDependencySet? semanticDependencies = null)
     {
         Identity = identity;
         Version = version;
         Source = new GeneratedSource(hintName, sourceText);
+        SemanticDependencies = semanticDependencies;
     }
 
     public string Identity { get; }
     public DocumentGenerationVersion Version { get; }
     public GeneratedSource Source { get; }
+    internal DetachedCSharpDependencySet? SemanticDependencies { get; }
 }

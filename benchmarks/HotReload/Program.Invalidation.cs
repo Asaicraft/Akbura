@@ -22,6 +22,8 @@ internal static partial class Program
         "global-using", "reference-compatible", "reference-incompatible", "unresolved", "nullable",
         "preprocessor", "language", "compilation-options", "add-tree", "remove-tree", "repeat", "revert", "multi-tree",
         "real-method", "real-referenced-method", "real-service", "real-property", "real-multiple", "real-mixed", "real-signature", "real-overload",
+        "semantic-property", "semantic-signature", "semantic-add-overload", "semantic-remove-overload", "semantic-negative",
+        "semantic-multiple", "semantic-unrelated", "semantic-mixed", "semantic-global",
     ];
 
     private static void MeasureInvalidation(string itemsPath, string fileName, string? selectedScenario, string profiling,
@@ -66,11 +68,17 @@ internal static partial class Program
         void RunScenario(string scenario)
         {
             var useExpression = scenario is "referenced-body" or "referenced-signature" or "overload" or "const" or "attribute" or
-                "reference-compatible" or "reference-incompatible" or "unresolved" || scenario.StartsWith("real-", StringComparison.Ordinal);
+                "reference-compatible" or "reference-incompatible" or "unresolved" || scenario.StartsWith("real-", StringComparison.Ordinal) || scenario.StartsWith("semantic-", StringComparison.Ordinal);
             var support = Support(0);
             var unrelated = SupportTree("internal static class BenchmarkUnrelated { public static int Value() => 0; }", "BenchmarkUnrelated.cs");
             var original = useExpression ? new Input(selected.Path, BindingSource(selected.GetText().ToString(), fileName, scenario)) : selected;
             var files = sourceFiles.Select(file => file.Path == selected.Path ? original : file).ToArray();
+            if (scenario.StartsWith("semantic-", StringComparison.Ordinal))
+            {
+                files = SemanticFiles(files, directory, scenario);
+                Write(new { Kind = "semantic-fixture", Project = rootNamespace, Scenario = scenario, OriginalDocuments = sourceFiles.Length,
+                    ControlledIndependentConsumers = 2, ExtraProfileConsumer = scenario == "semantic-multiple", TotalDocuments = files.Length });
+            }
             var initialCompilation = baseline.AddSyntaxTrees(support, unrelated);
             var reference0 = scenario.StartsWith("reference-", StringComparison.Ordinal) ? Library(0) : null;
             if (reference0 != null)
@@ -141,11 +149,21 @@ internal static partial class Program
                         case "real-mixed":
                         case "real-signature":
                         case "real-overload":
+                        case "semantic-property":
+                        case "semantic-signature":
+                        case "semantic-add-overload":
+                        case "semantic-remove-overload":
+                        case "semantic-negative":
+                        case "semantic-multiple":
+                        case "semantic-unrelated":
+                        case "semantic-mixed":
+                        case "semantic-global":
                             compilation = compilation.ReplaceSyntaxTree(support, Support(index));
-                            if (scenario == "real-mixed")
+                            if (scenario is "real-mixed" or "semantic-mixed")
                             {
                                 var mixed = new Input(original.Path, original.GetText().ToString().Replace(
-                                    "ContractFixture.Current.Vm.GetName()", "ContractFixture.Current.Vm.GetName() + \" " + index + "\"", StringComparison.Ordinal));
+                                    scenario == "real-mixed" ? "ContractFixture.Current.Vm.GetName()" : "SemanticFixture.ProfileService.GetName().ToString()",
+                                    scenario == "real-mixed" ? "ContractFixture.Current.Vm.GetName() + \" " + index + "\"" : "SemanticFixture.ProfileService.GetName().ToString() + \" " + index + "\"", StringComparison.Ordinal));
                                 driver = driver.ReplaceAdditionalText(previousInput, mixed);
                                 previousInput = mixed;
                             }
@@ -219,7 +237,16 @@ internal static partial class Program
                 Assert.Null(result.Exception);
                 ValidateArtifactDiagnosticStamps(diagnostics, ArtifactRequest(driver).Version);
                 Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "AKBURA_GENERATOR_FAILURE");
-                var expectedIncompleteInput = scenario == "unresolved" && index % 2 == 0;
+                if (reuse && index > 0 && scenario.StartsWith("semantic-", StringComparison.Ordinal) && scenario != "semantic-global")
+                {
+                    var request = ArtifactRequest(driver);
+                    foreach (var independent in new[] { "SemanticOrders.akbura", "SemanticSettings.akbura" })
+                    {
+                        Assert.NotNull(request.Components.Single(component => component.Version.Document.FilePath.EndsWith(independent, StringComparison.Ordinal)).Previous);
+                        Assert.NotNull(request.Diagnostics.Single(diagnostic => diagnostic.Document.FilePath.EndsWith(independent, StringComparison.Ordinal)).Previous);
+                    }
+                }
+                var expectedIncompleteInput = scenario is "unresolved" or "semantic-negative" && index % 2 == 0;
                 if (!expectedIncompleteInput)
                 {
                     Clean(diagnostics);
@@ -303,7 +330,7 @@ internal static partial class Program
                     var diagnosticKeys = DiagnosticKeys(diagnostics.Concat(output.GetDiagnostics()));
                     var compilerErrors = DiagnosticKeys(output.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
                     baselineCompilerErrors ??= compilerErrors;
-                    if (scenario != "unresolved")
+                    if (scenario is not ("unresolved" or "semantic-negative"))
                     {
                         Assert.Equal(baselineCompilerErrors, compilerErrors);
                     }
@@ -341,7 +368,7 @@ internal static partial class Program
 
             SyntaxTree Support(int index)
             {
-                if (scenario.StartsWith("real-", StringComparison.Ordinal))
+                if (scenario.StartsWith("real-", StringComparison.Ordinal) || scenario.StartsWith("semantic-", StringComparison.Ordinal))
                 {
                     return SupportTree(RealMemberSource(scenario, index), "ContractViewModels.cs");
                 }
@@ -375,7 +402,7 @@ internal static partial class Program
     {
         var original = fileName switch { "Counter.akbura" => "Text=\"Akbura Counter\"", "Sidebar.akbura" => "Text=\"Dashboard\"", "NeedHelp.akbura" => "Text={Title}", _ => throw new ArgumentException(fileName) };
         var expression = scenario.StartsWith("reference-", StringComparison.Ordinal) ? "global::InvestigationLibrary.ExternalSupport.Read().ToString()" :
-            scenario.StartsWith("real-", StringComparison.Ordinal) ? RealMemberExpression(scenario) :
+            scenario.StartsWith("real-", StringComparison.Ordinal) || scenario.StartsWith("semantic-", StringComparison.Ordinal) ? RealMemberExpression(scenario) :
             scenario == "const" ? "global::InvestigationFixture.Support.Number.ToString()" : "global::InvestigationFixture.Support.Read().ToString()";
         Assert.Contains(original, source);
         return source.Replace(original, "Text={" + expression + "}", StringComparison.Ordinal);

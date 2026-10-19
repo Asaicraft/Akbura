@@ -55,6 +55,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         if (reusableState?.IsCompatibleWith(compilation, syntaxTree) == true)
         {
+            _bindingSession.SemanticDependencies.Import(reusableState.SemanticDependencies);
             _bindingCache.ImportReusableResults(reusableState);
             _declarationSymbols.ImportReusableResults(reusableState);
         }
@@ -86,6 +87,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             SyntaxTree, Compilation.CSharpCompilation, Compilation.RootNamespace, Compilation.ProjectDirectory);
         _bindingCache.CopyReusableResultsTo(builder);
         _declarationSymbols.CopyReusableResultsTo(builder);
+        builder.SemanticDependencies = Compilation.CollectCSharpSemanticDependencies ? _bindingSession.SemanticDependencies.Detach() : null;
         return builder.ToState();
     }
 
@@ -2915,6 +2917,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         var binding = BindCSharpType(csharpType);
         if (TryGetMarkupComponentType(binding, out var namedType))
         {
+            BindingSession.SemanticDependencies.RecordMarkupType(namedType);
             var contentModel = CreateMarkupContentModel(namedType, markupElement);
             var symbol = new MarkupComponentSymbol(
                 componentNameText,
@@ -3233,6 +3236,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         string componentNameText,
         IAkburaComponentSymbol componentSymbol)
     {
+        BindingSession.SemanticDependencies.RecordComponentType(componentSymbol.ComponentType);
         var declaredParameterContent = CreateAkburaParameterContentModel(componentSymbol.Parameters);
         var contentModel = declaredParameterContent.IsDictionary
             ? declaredParameterContent

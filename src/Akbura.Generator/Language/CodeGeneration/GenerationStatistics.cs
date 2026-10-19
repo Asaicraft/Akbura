@@ -48,6 +48,15 @@ internal enum GenerationStatisticCounter : byte
     ArtifactValidationFallback,
     DetachedDiagnosticsReused,
     DetachedSourceTextCreated,
+    CSharpDeclarationsChanged,
+    CSharpMemberDeclarationsChanged,
+    SemanticDependencyDocumentsExamined,
+    SemanticDependencyDocumentsIndependent,
+    SemanticDependencyDocumentsAffected,
+    SemanticDependencyDocumentsIncomplete,
+    SemanticDependencyValidationFailures,
+    DetachedSemanticDependencyEntries,
+    SemanticBindingOperationsObserved,
     Count,
 }
 
@@ -120,6 +129,15 @@ internal enum GenerationStatisticStage : byte
     ArtifactSelection,
     ArtifactPublicationPreparation,
     ArtifactPublication,
+    CSharpChangeSetConstruction,
+    SemanticDependencyCapture,
+    DependencySetDetachment,
+    DocumentDependencyValidation,
+    NegativeLookupValidation,
+    CandidateSetValidation,
+    DependencyGraphPropagation,
+    SelectiveArtifactReuse,
+    SelectiveDiagnosticReuse,
     Count,
 }
 

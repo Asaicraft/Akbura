@@ -10,6 +10,8 @@ param(
     [switch]$SkipPurity,
     [switch]$SkipLifetime,
     [switch]$SkipWatch,
+    [switch]$SemanticDependencies,
+    [ValidateSet('stats', 'off')][string]$Profiling = 'stats',
     [ValidateRange(1, 10000)][int]$RetentionRevisions = 100,
     [ValidateRange(3, 100)][int]$ConcurrentSamples = 8
 )
@@ -19,7 +21,9 @@ $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 
 function Assert-Scenarios([string[]]$names) {
     $supported = @('akbura', 'real-method', 'real-referenced-method', 'real-service', 'real-property', 'real-multiple',
-        'real-mixed', 'real-signature', 'real-overload', 'unrelated-body', 'referenced-signature')
+        'real-mixed', 'real-signature', 'real-overload', 'unrelated-body', 'referenced-signature',
+        'semantic-property', 'semantic-signature', 'semantic-add-overload', 'semantic-remove-overload', 'semantic-negative',
+        'semantic-multiple', 'semantic-unrelated', 'semantic-mixed', 'semantic-global')
     if (-not $names.Count -or @($names | Sort-Object -Unique).Count -ne $names.Count) {
         throw 'Select at least one scenario, without duplicates.'
     }
@@ -100,7 +104,8 @@ if (-not $Worker) {
         $configuration = @{ RepositoryRevision = (& git -C $repository rev-parse HEAD); StartedUtc = [DateTime]::UtcNow.ToString('o')
             ResultDirectory = $ResultDirectory; ToolHashes = @($hashes); InputHashes = @($inputHashes)
             RetentionRevisions = $RetentionRevisions; ConcurrentSamples = $ConcurrentSamples; Scenarios = $Scenario
-            SkipPurity = [bool]$SkipPurity; SkipLifetime = [bool]$SkipLifetime; SkipWatch = [bool]$SkipWatch }
+            SkipPurity = [bool]$SkipPurity; SkipLifetime = [bool]$SkipLifetime; SkipWatch = [bool]$SkipWatch
+            SemanticDependencies = [bool]$SemanticDependencies; Profiling = $Profiling }
         [IO.File]::WriteAllText($configurationPath, ($configuration | ConvertTo-Json -Depth 5) + "`r`n", [Text.UTF8Encoding]::new($false))
     }
     $previousStatusPath = Join-Path $OutputDirectory 'status.json'
@@ -196,7 +201,8 @@ function Complete([string]$path, $job) {
             $samples = @($rows | Where-Object Kind -eq 'invalidation')
             $checks = @($rows | Where-Object Kind -eq 'invalidation-parity')
             $heaps = @($rows | Where-Object Kind -eq 'artifact-heap')
-            return $provenance[0].VerifyEveryUpdate -and $provenance[0].Profiling -eq 'stats' -and
+            $expectedProfiling = if ($configuration.Profiling) { $configuration.Profiling } else { 'stats' }
+            return $provenance[0].VerifyEveryUpdate -and $provenance[0].Profiling -eq $expectedProfiling -and
                 $samples.Count -eq 11 -and $checks.Count -eq 11 -and
                 @($checks | Where-Object { -not $_.EqualSources -or -not $_.EqualDiagnostics }).Count -eq 0 -and
                 @($checks.Index | Sort-Object -Unique).Count -eq 11 -and
@@ -219,7 +225,8 @@ function Complete([string]$path, $job) {
         }
         $samples = @($rows | Where-Object Kind -eq 'artifact-memory-sample')
         $concurrent = @($rows | Where-Object Kind -eq 'artifact-concurrent')
-        return $provenance[0].RealMembers -and $provenance[0].Revisions -eq $job.Revisions -and
+        return [bool]$provenance[0].SemanticDependencies -eq [bool]$configuration.SemanticDependencies -and
+            $provenance[0].RealMembers -and $provenance[0].Revisions -eq $job.Revisions -and
             $provenance[0].ConcurrentSamples -eq $job.ConcurrentSamples -and $final.Count -eq 1 -and
             $final[0].Revisions -eq $job.Revisions -and $final[0].ConcurrentSamples -eq $job.ConcurrentSamples -and
             $final[0].FreshParityChecks -eq $job.Revisions + 1 + $job.ConcurrentSamples * 2 -and
@@ -269,7 +276,8 @@ function Run($job, [string]$path) {
     $arguments = @((Join-Path $OutputDirectory 'tool/HotReloadBenchmarks.dll'), $job.Command,
         (Join-Path $OutputDirectory ($job.Workload + '-inputs.json')), $job.File)
     if ($job.Command -eq 'artifacts') {
-        $arguments += @($job.Scenario, 'stats', $job.Mode)
+        $profile = if ($configuration.Profiling) { $configuration.Profiling } else { 'stats' }
+        $arguments += @($job.Scenario, $profile, $job.Mode)
     }
     else {
         $arguments += @("$($job.Revisions)", $job.Mode, "$($job.ConcurrentSamples)")
@@ -351,7 +359,8 @@ try {
     $preflightDirectory = Join-Path $OutputDirectory 'preflight'
     $null = New-Item -ItemType Directory -Path $preflightDirectory -Force
     $preflightPath = Join-Path $preflightDirectory ([Guid]::NewGuid().ToString('N') + '.jsonl')
-    $preflight = @{ Workload = 'gallery'; File = 'Counter.akbura'; Command = 'member-memory'; Mode = 'enabled'
+    $memoryCommand = $(if ($configuration.SemanticDependencies) { 'semantic-memory' } else { 'member-memory' })
+    $preflight = @{ Workload = 'gallery'; File = 'Counter.akbura'; Command = $memoryCommand; Mode = 'enabled'
         Revisions = 1; ConcurrentSamples = 3 }
     Status 'Running'
     Log "START $current"
@@ -369,7 +378,7 @@ try {
             }
         }
         foreach ($mode in @('disabled', 'enabled') | Where-Object { -not $configuration.SkipLifetime }) {
-            $jobs.Add(@{ Workload = $workload.Name; File = $workload.File; Command = 'member-memory'; Scenario = 'lifetime'; Mode = $mode
+            $jobs.Add(@{ Workload = $workload.Name; File = $workload.File; Command = $memoryCommand; Scenario = 'lifetime'; Mode = $mode
                 Revisions = $(if ($workload.Name -eq 'gallery') { $configuration.RetentionRevisions } else { 1 }); ConcurrentSamples = $configuration.ConcurrentSamples })
         }
     }
@@ -411,7 +420,7 @@ try {
         Wait-QuietHost
         Status 'VerifyingWatch'
         $watchDirectory = Join-Path $OutputDirectory ('watch-' + [Guid]::NewGuid().ToString('N'))
-        & (Join-Path $PSScriptRoot 'Verify-MemberWatch.ps1') -OutputDirectory $watchDirectory -ToolDirectory (Join-Path $OutputDirectory 'tool')
+        & (Join-Path $PSScriptRoot 'Verify-MemberWatch.ps1') -OutputDirectory $watchDirectory -ToolDirectory (Join-Path $OutputDirectory 'tool') -DeclarationChanges:([bool]$configuration.SemanticDependencies)
         foreach ($name in @('watch.jsonl', 'result.json')) {
             Copy-Item -LiteralPath (Join-Path $watchDirectory $name) -Destination (Join-Path $configuration.ResultDirectory ('member-' + $name)) -Force
         }

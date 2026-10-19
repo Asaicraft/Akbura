@@ -1,0 +1,23 @@
+  Akbura.Generator -> C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.Generator\bin\DebugStats\netstandard2.0\Akbura.Generator.dll
+  Akbura.BlackSilence -> C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.BlackSilence\bin\DebugStats\netstandard2.0\Akbura.BlackSilence.dll
+C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.Furioso\ComponentGenerator.cs(3144,38): warning CS8602: Dereference of a possibly null reference. [C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.Furioso\Akbura.Furioso.csproj]
+  Akbura.Furioso -> C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.Furioso\bin\DebugStats\netstandard2.0\Akbura.Furioso.dll
+  Akbura.Build.Tasks -> C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.Build.Tasks\bin\DebugStats\net10.0\Akbura.Build.Tasks.dll
+  Avalonia Accelerate Community requires telemetry. To opt out, please upgrade to a paid tier. Learn more: https://avaloniaui.net/accelerate/
+  Akbura -> C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura\bin\DebugStats\net10.0\Akbura.dll
+  Avalonia Accelerate Community requires telemetry. To opt out, please upgrade to a paid tier. Learn more: https://avaloniaui.net/accelerate/
+  Akbura.Diagnostics -> C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.Diagnostics\bin\DebugStats\net10.0\Akbura.Diagnostics.dll
+  Avalonia Accelerate Community requires telemetry. To opt out, please upgrade to a paid tier. Learn more: https://avaloniaui.net/accelerate/
+C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.UnitTests\QuotedResourceRegressionTests.cs(147,26): warning xUnit2031: Do not use a Where clause to filter before calling Assert.Single. Use the overload of Assert.Single that accepts a filtering function. (https://xunit.net/xunit.analyzers/rules/xUnit2031) [C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.UnitTests\Akbura.UnitTests.csproj]
+C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.UnitTests\QuotedResourceRegressionTests.cs(204,9): warning xUnit2013: Do not use Assert.Equal() to check for collection size. Use Assert.Single instead. (https://xunit.net/xunit.analyzers/rules/xUnit2013) [C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.UnitTests\Akbura.UnitTests.csproj]
+  Akbura.UnitTests -> C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.UnitTests\bin\DebugStats\net10.0\Akbura.UnitTests.dll
+
+Build succeeded.
+
+C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.Furioso\ComponentGenerator.cs(3144,38): warning CS8602: Dereference of a possibly null reference. [C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.Furioso\Akbura.Furioso.csproj]
+C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.UnitTests\QuotedResourceRegressionTests.cs(147,26): warning xUnit2031: Do not use a Where clause to filter before calling Assert.Single. Use the overload of Assert.Single that accepts a filtering function. (https://xunit.net/xunit.analyzers/rules/xUnit2031) [C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.UnitTests\Akbura.UnitTests.csproj]
+C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.UnitTests\QuotedResourceRegressionTests.cs(204,9): warning xUnit2013: Do not use Assert.Equal() to check for collection size. Use Assert.Single instead. (https://xunit.net/xunit.analyzers/rules/xUnit2013) [C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.UnitTests\Akbura.UnitTests.csproj]
+    3 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:01:33.12

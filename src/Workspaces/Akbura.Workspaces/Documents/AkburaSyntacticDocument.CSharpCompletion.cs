@@ -147,6 +147,14 @@ public sealed partial class AkburaSyntacticDocument
         {
             switch (syntax)
             {
+                case MarkupExpressionBindingSyntax binding
+                    when position > binding.BindKeyword.Span.End:
+                    if (EmbeddedCSharpSyntaxFacts.TryGetExpression(binding.Expression, out _, out var bindingSpan))
+                    {
+                        AddCandidate(AkburaCSharpCompletionContextKind.Expression, binding, bindingSpan, priority: 0);
+                    }
+                    break;
+
                 case MarkupForeachHeaderSyntax header:
                     AddCandidate(AkburaCSharpCompletionContextKind.ForeachHeader, header,
                         header.Token.FullSpan, priority: 0);
@@ -211,6 +219,13 @@ public sealed partial class AkburaSyntacticDocument
 
         bool IsCSharpExpressionContext(CSharpExpressionSyntax expression)
         {
+            if (expression.Parent is MarkupExpressionBindingSyntax)
+            {
+                // The binding owns prefix trivia outside the C# child's physical
+                // span. Use that real owner for stable completion-session tracking.
+                return false;
+            }
+
             if (expression.Parent is MarkupIfStatementSyntax markupIf)
             {
                 return !markupIf.OpenParenToken.IsMissing && position >= markupIf.OpenParenToken.Span.End &&
@@ -347,7 +362,10 @@ public sealed partial class AkburaSyntacticDocument
                         ? AkburaCSharpCompletionLogicalSlot.None
                         : AkburaCSharpCompletionLogicalSlot
                             .DeclarationType,
-                    logicalOwner?.FullSpan ?? default),
+                    logicalOwner?.FullSpan ?? default,
+                    expressionOpenBracePosition: owner is MarkupExpressionBindingSyntax binding
+                        ? binding.OpenBrace.Span.Start
+                        : null),
                 priority);
             if (best == null ||
                 candidate.Priority < best.Value.Priority ||

@@ -2,6 +2,17 @@
 
 Visual Studio Code support for `.akbura` and `.akcss` files.
 
+`${x.bind expression}` has built-in prefix completion after `${`, `${x.` and
+`${x.bi`. Inside the expression, the loaded project supplies C# completion,
+hover, definitions, references, rename, signature help and semantic tokens through
+the shared Workspaces/Roslyn projection. Completion edits target the C# identifier,
+not the `x.bind` prefix or outer brace. Interpolation and delimiter pairing use
+the existing typing controller. Without a project, prefix completion and TextMate
+highlighting remain available; full semantic features need project loading.
+Compiler diagnostics retain their source spans. Partial-observation warnings do
+not imply complete runtime reactivity and have no automatic binding-kind fix.
+
+
 ## Features
 
 - syntax and semantic highlighting;

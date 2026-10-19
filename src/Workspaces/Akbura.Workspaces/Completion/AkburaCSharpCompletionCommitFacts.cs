@@ -1,5 +1,6 @@
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis.Text;
+using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Akbura.Workspaces.Completion;
 
@@ -79,6 +80,23 @@ internal static class AkburaCSharpCompletionCommitFacts
             return false;
         }
 
+        if (context.OwnerKind == SyntaxKind.MarkupExpressionBindingSyntax)
+        {
+            // The C# projection includes separator trivia owned by `bind`.
+            // A recovery edit spanning the whole fragment must not remove it
+            // and turn `x.bind Count` into the different token `x.bindCount`.
+            // Roslyn trivia parsing also preserves comments and multiline input.
+            var trivia = CSharpSyntaxFactory.ParseLeadingTrivia(text.ToString(context.HostSpan));
+            var protectedEnd = Math.Min(context.HostSpan.Start + trivia.FullSpan.Length, context.HostPosition);
+            if (protectedEnd < context.HostSpan.Start || protectedEnd > context.HostSpan.End ||
+                translatedSpan.End < protectedEnd)
+            {
+                return false;
+            }
+
+            translatedSpan = TextSpan.FromBounds(Math.Max(translatedSpan.Start, protectedEnd), translatedSpan.End);
+        }
+
         if (context.HostSpan.Contains(translatedSpan))
         {
             replacementSpan = translatedSpan;
@@ -107,9 +125,9 @@ internal static class AkburaCSharpCompletionCommitFacts
     {
         if (!IsBraceDelimitedExpression(currentText, current) ||
             source.Kind != AkburaCSharpCompletionContextKind.Expression ||
-            source.OwnerKind != SyntaxKind.CSharpExpressionSyntax ||
+            !IsExpressionOwner(source.OwnerKind) ||
             source.HostSpan.Start < 1 || source.HostSpan.End > sourceText.Length ||
-            sourceText[source.HostSpan.Start - 1] != '{' ||
+            !HasExpressionOpener(sourceText, source) ||
             source.HostPosition < source.HostSpan.Start || source.HostPosition > source.HostSpan.End ||
             (source.HostSpan.End < sourceText.Length && sourceText[source.HostSpan.End] == '}') ||
             translatedHostSpan.Start != current.HostSpan.Start ||
@@ -133,9 +151,22 @@ internal static class AkburaCSharpCompletionCommitFacts
     private static bool IsBraceDelimitedExpression(SourceText text, AkburaCSharpCompletionContext context)
     {
         return context.Kind == AkburaCSharpCompletionContextKind.Expression &&
-            context.OwnerKind == SyntaxKind.CSharpExpressionSyntax &&
+            IsExpressionOwner(context.OwnerKind) &&
             context.HostSpan.Start > 0 && context.HostSpan.End < text.Length &&
-            text[context.HostSpan.Start - 1] == '{' && text[context.HostSpan.End] == '}';
+            HasExpressionOpener(text, context) && text[context.HostSpan.End] == '}';
+    }
+
+    private static bool IsExpressionOwner(SyntaxKind kind) =>
+        kind is SyntaxKind.CSharpExpressionSyntax or SyntaxKind.MarkupExpressionBindingSyntax;
+
+    private static bool HasExpressionOpener(SourceText text, AkburaCSharpCompletionContext context)
+    {
+        // The parser records the Akbura opener separately from the C# fragment:
+        // ${x.bind ...} can contain arbitrary trivia between these boundaries.
+        var opener = context.ExpressionOpenBracePosition ?? context.HostSpan.Start - 1;
+        return opener >= 0 && opener < context.HostSpan.Start && opener < text.Length &&
+            text[opener] == '{' &&
+            (!context.ExpressionOpenBracePosition.HasValue || opener > 0 && text[opener - 1] == '$');
     }
 
     private static bool TextOutsideSpanMatches(SourceText sourceText, SourceText currentText, TextSpan sourceSpan, TextSpan currentSpan)

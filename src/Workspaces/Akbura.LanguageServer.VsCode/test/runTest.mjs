@@ -43,6 +43,7 @@ try {
         extensionTestsPath,
         launchArgs: [
             workspacePath,
+            '--disable-extensions',
             '--disable-workspace-trust',
             '--skip-welcome',
             '--skip-release-notes'

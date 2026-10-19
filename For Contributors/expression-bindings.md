@@ -1,5 +1,65 @@
 # Expression bindings
 
+## Editor integration (Stage 5)
+
+Expression bindings reuse the Workspaces embedded-C# pipeline: the syntactic
+document identifies `CSharpExpressionSyntax`, the compiler builds a scoped probe,
+and the shared Roslyn projection maps positions/edits to the original UTF-16
+document. The `x.bind` prefix and outer delimiters stay outside that C# mapping.
+Editor integration does not change runtime evaluation or observation rules.
+
+At `${`, `${x.` and `${x.bi`, completion offers the built-in `x.bind` directive,
+even without a semantic project. It reuses the markup value-prefix session and
+safe name-span commit validation, but is not returned by CLR markup-extension
+lookup. Insertion preserves existing delimiters and requests C# completion.
+Binding/CompiledBinding/resource catalogs are unchanged. C# member completion
+requires a loaded semantic project.
+
+Projections preserve state/parameter/inject types, preceding locals and shadowing,
+foreach/template scopes and named-element origins. Completion and reference probes
+use the destination contract's contextual value type (or declared property type),
+never its `BindingBase` assignment channel. The existing compiler reference
+collector supplies real symbol identities and original spans for interpolation
+and nested expressions. Shared references/rename, definition, hover and semantic
+classification consume those identities; signature help uses the same projection.
+The prefix is a directive, delimiters are punctuation, and C# tokens retain
+syntactic classification when semantic information is unavailable.
+
+Diagnostics are the existing compiler expression, conversion, unsupported-target
+and observation diagnostics, mapped to the Akbura file. No duplicate IDE warning
+or automatic partial-observation fix is introduced. Existing code actions remain
+available for diagnostics supported by the shared service; this stage does not
+add a general Roslyn code-fix provider or a missing-using fix for arbitrary C#
+expressions.
+
+Recovery commits retain the parser's outer-opener position separately from the
+C# span, including trivia and paired-brace recovery. Separator whitespace after
+`bind` is included in the projection even for an empty/multiline expression;
+the real binding node owns its completion session. Original Roslyn expression
+nodes are reused with their omitted boundary trivia, not reparsed by a new
+expression parser. Shared completion selection hides the reserved probe method
+in both LSP and Visual Studio. Snapshot validation and
+text-outside-expression checks remain in effect. C# pairing/interpolation and
+outlining reuse existing document services. Markup formatting leaves lines
+crossing a multiline binding expression intact, including raw-string content.
+
+Visual Studio consumes shared semantics and projected documents; its native
+prefix commit adapter uses the same safe name-span rules. LSP handlers/UTF-16
+protocol models require no binding-specific methods. VS Code consumes those
+handlers and a bounded TextMate fallback with C# content and nested braces.
+The existing absence of a native Visual Studio Rename UI adapter is unchanged:
+rename semantics are exposed through Workspaces and LSP/VS Code.
+
+`eng/Verify-ExpressionBindingEditor.ps1` saves focused/full Debug and Release
+results, compiler syntax/semantic regressions, VS Code build/acceptance, and the
+existing Windows editor/VSIX checks. Runs record commands, hashes, logs and test
+counts. `DONE.txt` means the runner stopped, not that everything passed; inspect
+`summary.csv`. Skipped/aborted/timed-out checks are not successes. Interactive
+native VS verification still requires an experimental host and is not performed
+by this script. Shared tests do not count as native-host verification.
+
+## Compiler and runtime contract
+
 `${x.bind expression}` is a built-in, one-way expression binding, not a CLR
 markup extension. Stages 1–3 implement syntax, parsing and semantics. Stage 4
 adds typed code generation and runtime observation in ReleaseDirect,

@@ -735,7 +735,10 @@ public sealed partial class AkburaSyntacticDocument
             return false;
         }
 
-        var hasParsedExtension = TryFindInnermostMarkupExtension(root, position, out var extension) &&
+        var hasParsedBinding = root.DescendantNodes().OfType<MarkupExpressionBindingSyntax>()
+            .Any(binding => binding.OpenBrace.Span.Start == openBracePosition &&
+                position <= binding.BindKeyword.Span.End);
+        var hasParsedExtension = hasParsedBinding || TryFindInnermostMarkupExtension(root, position, out var extension) &&
             extension.OpenBrace.Span.Start == openBracePosition;
         if (!hasParsedExtension &&
             (IsPositionOwnedByMarkupAttributeValue(root, position) ||
@@ -1312,6 +1315,8 @@ public sealed partial class AkburaSyntacticDocument
                 !dynamic.Expression.CloseBrace.IsMissing,
             MarkupExtensionAttributeValueSyntax extension =>
                 !extension.Extension.CloseBrace.IsMissing,
+            MarkupExpressionBindingSyntax binding =>
+                !binding.CloseBrace.IsMissing,
             _ => false,
         };
     }

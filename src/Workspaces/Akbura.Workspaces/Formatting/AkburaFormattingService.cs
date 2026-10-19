@@ -163,6 +163,16 @@ internal sealed class AkburaFormattingService :
         AkburaFormattingOptions options,
         CancellationToken cancellationToken)
     {
+        var line = document.Text.Lines[lineNumber];
+        if (IsExpressionBindingPosition(line.Start) || IsExpressionBindingPosition(line.End))
+        {
+            // Markup indentation/whitespace trimming must not rewrite multiline
+            // C# fragments, including the contents of raw/interpolated strings.
+            builder.Append(content);
+            builder.Append(lineBreak);
+            return;
+        }
+
         var firstContent = 0;
         while (firstContent < content.Length &&
                content[firstContent] is ' ' or '\t')
@@ -209,6 +219,10 @@ internal sealed class AkburaFormattingService :
         builder.Append(indentation);
         builder.Append(content, firstContent, end - firstContent);
         builder.Append(lineBreak);
+
+        bool IsExpressionBindingPosition(int position) =>
+            document.TryGetCSharpCompletionContext(position, out var context, cancellationToken) &&
+            context.ExpressionOpenBracePosition.HasValue;
     }
 
     private static string CreateIndentation(

@@ -178,7 +178,7 @@ internal sealed class AkburaCompletionCommitManager :
 
             var context = document.GetCompletionContext(position, token);
             if (context.Kind == AkburaCompletionContextKind.MarkupExtensionType &&
-                (completion.Kind != AkburaCompletionKind.MarkupExtension ||
+                (!completion.IsMarkupValuePrefix ||
                  applicableSpan.Start.Position != context.ApplicableSpan.Start))
             {
                 AkburaWorkspaceDiagnostics.Write(
@@ -188,7 +188,7 @@ internal sealed class AkburaCompletionCommitManager :
             }
         }
 
-        if (completion.Kind == AkburaCompletionKind.MarkupExtension)
+        if (completion.IsMarkupValuePrefix)
         {
             // EdgeInclusive must include newly typed name characters, but it
             // can also include a closing brace inserted after the list opened.

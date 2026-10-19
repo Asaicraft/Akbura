@@ -325,7 +325,10 @@ internal abstract partial class AkburaSemanticModel
         var builder = new CSharpProbeBuilder(binder);
         var root = isCondition && syntax is CSharpExpressionSyntax condition
             ? builder.CreateMarkupConditionProbe(condition, expression)
-            : builder.CreateReturnExpressionProbe(syntax, expression, targetType: null);
+            : builder.CreateReturnExpressionProbe(syntax, expression,
+                syntax is CSharpExpressionSyntax expressionSyntax
+                    ? GetExpressionBindingTargetType(expressionSyntax)
+                    : null);
         var semantic = CreateReferenceProbeSemanticModel(root, out var tree);
         var target = isCondition
             ? tree.GetRoot().GetAnnotatedNodes(CSharpProbeBuilder.MarkupConditionAnnotationKind)

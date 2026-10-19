@@ -12,7 +12,8 @@ internal readonly struct AkburaEmbeddedCSharpContext
         TextSpan hostSpan,
         int hostPosition,
         AkburaCSharpCompletionLogicalSlot logicalSlot = default,
-        TextSpan logicalOwnerSpan = default)
+        TextSpan logicalOwnerSpan = default,
+        int? expressionOpenBracePosition = null)
     {
         Kind = kind;
         OwnerKind = ownerKind;
@@ -20,6 +21,7 @@ internal readonly struct AkburaEmbeddedCSharpContext
         HostSpan = hostSpan;
         HostPosition = hostPosition;
         LogicalSlot = logicalSlot;
+        ExpressionOpenBracePosition = expressionOpenBracePosition;
         LogicalOwnerSpan = logicalSlot ==
                 AkburaCSharpCompletionLogicalSlot.None
             ? ownerSpan
@@ -40,6 +42,8 @@ internal readonly struct AkburaEmbeddedCSharpContext
 
     public TextSpan LogicalOwnerSpan { get; }
 
+    public int? ExpressionOpenBracePosition { get; }
+
     public int RelativePosition => HostPosition - HostSpan.Start;
 
     public AkburaCSharpCompletionContext ToCompletionContext()
@@ -51,6 +55,7 @@ internal readonly struct AkburaEmbeddedCSharpContext
             HostSpan,
             HostPosition,
             LogicalSlot,
-            LogicalOwnerSpan);
+            LogicalOwnerSpan,
+            ExpressionOpenBracePosition);
     }
 }

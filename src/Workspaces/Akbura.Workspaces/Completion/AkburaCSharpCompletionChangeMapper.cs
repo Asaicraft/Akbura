@@ -104,7 +104,9 @@ internal static class AkburaCSharpCompletionChangeMapper
 
         var mappedArray = mappedChanges.ToImmutable();
         int? newHostPosition = null;
-        if (completionChange.NewPosition is { } projectedPosition)
+        var newProjectedPosition = completionChange.NewPosition ??
+            GetDefaultProjectedPosition(projection, projectedChanges);
+        if (newProjectedPosition is { } projectedPosition)
         {
             if (!TryTransformSpan(
                     projection.ActiveMapping.ProjectedSpan,
@@ -157,6 +159,39 @@ internal static class AkburaCSharpCompletionChangeMapper
             newHostPosition,
             completionChange.IncludesCommitCharacter);
         return true;
+    }
+
+    private static int? GetDefaultProjectedPosition(
+        AkburaCSharpProjection projection,
+        ImmutableArray<TextChange> changes)
+    {
+        // A null Roslyn NewPosition means the end of the committed edit, not
+        // the old caret (which can be in the middle of an existing identifier).
+        // Account for imports and any other edits preceding the active edit.
+        for (var index = 0; index < changes.Length; index++)
+        {
+            var change = changes[index];
+            if (!Contains(projection.ProjectedSpan, change.Span) ||
+                projection.ProjectedPosition < change.Span.Start ||
+                projection.ProjectedPosition > change.Span.End)
+            {
+                continue;
+            }
+
+            var position = change.Span.Start + (change.NewText?.Length ?? 0);
+            for (var beforeIndex = 0; beforeIndex < changes.Length; beforeIndex++)
+            {
+                var before = changes[beforeIndex];
+                if (beforeIndex != index && before.Span.End <= change.Span.Start)
+                {
+                    position += (before.NewText?.Length ?? 0) - before.Span.Length;
+                }
+            }
+
+            return position;
+        }
+
+        return null;
     }
 
     private static bool TryMapImportChanges(

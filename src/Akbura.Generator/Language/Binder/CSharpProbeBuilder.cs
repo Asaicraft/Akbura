@@ -13,6 +13,7 @@ namespace Akbura.Language.Binder;
 internal sealed partial class CSharpProbeBuilder
 {
     internal const string CompletionAnnotationKind = "AkburaCSharpCompletionTarget";
+    internal const string ExpressionProbeMethodName = "__akbura_probe";
     private const string ReturnProbeAnnotationKind = "AkburaCSharpReturnProbe";
     internal const string StatementProbeAnnotationKind = "AkburaCSharpStatementProbe";
 
@@ -333,7 +334,7 @@ internal sealed partial class CSharpProbeBuilder
                     SymbolDisplayFormat.FullyQualifiedFormat));
         var method = CSharpSyntaxFactory.MethodDeclaration(
                 returnType,
-                "__akbura_probe")
+                ExpressionProbeMethodName)
             .WithBody(CSharpProbeBinder.CreateProbeBlock(
                 probeScope.LocalStatements,
                 precedingLocals,

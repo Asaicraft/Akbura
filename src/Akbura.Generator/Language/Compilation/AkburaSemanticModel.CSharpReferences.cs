@@ -300,6 +300,11 @@ internal partial class AkburaSemanticModel
             return GetCSharpSymbolReferences(dynamicValue.Expression);
         }
 
+        if (value is MarkupExpressionBindingSyntax expressionBinding)
+        {
+            return GetCSharpSymbolReferences(expressionBinding.Expression);
+        }
+
         if (value.Kind == AkburaSyntaxKind.MarkupExtensionAttributeValueSyntax)
         {
             var extensionValue = Unsafe.As<MarkupExtensionAttributeValueSyntax>(value);

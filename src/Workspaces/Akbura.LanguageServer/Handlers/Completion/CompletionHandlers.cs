@@ -321,6 +321,16 @@ internal sealed class CompletionHandler :
         item.AdditionalTextEdits = additional.Count == 0
             ? null
             : additional.ToArray();
+        if (change.TriggerNextCompletion)
+        {
+            // Standard completionItem.command; the VS Code client already uses
+            // this editor command for syntax-aware typing completion handoffs.
+            item.Command = new LspCommand
+            {
+                Title = "Continue completion",
+                Command = "editor.action.triggerSuggest",
+            };
+        }
     }
 
     private static JsonElement CreateResolveData(AkburaOpenDocument document, int position, string resolveKey, string provider, TextSpan sourceSpan)

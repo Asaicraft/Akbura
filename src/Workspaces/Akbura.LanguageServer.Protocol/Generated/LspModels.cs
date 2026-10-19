@@ -590,7 +590,16 @@ public sealed class CompletionItem
 
     public TextEdit[]? AdditionalTextEdits { get; set; }
 
+    public LspCommand? Command { get; set; }
+
     public JsonElement? Data { get; set; }
+}
+
+public sealed class LspCommand
+{
+    public string Title { get; set; } = string.Empty;
+
+    public string Command { get; set; } = string.Empty;
 }
 
 public sealed class AkburaCompletionResolveData

@@ -132,6 +132,9 @@
           },
           "patterns": [
             {
+              "include": "#expressionBinding"
+            },
+            {
               "match": "\\b(?:bind|in|out):(?=[A-Za-z_])",
               "name": "storage.modifier.akbura"
             },
@@ -150,6 +153,33 @@
             }
           ]
         }
+      ]
+    },
+    "expressionBinding": {
+      "name": "meta.expression-binding.akbura",
+      "begin": "(\\$\\{)\\s*(x)\\s*(\\.)\\s*(bind)\\b",
+      "beginCaptures": {
+        "1": { "name": "punctuation.section.embedded.begin.akbura" },
+        "2": { "name": "keyword.control.directive.akbura" },
+        "3": { "name": "keyword.control.directive.akbura" },
+        "4": { "name": "keyword.control.directive.akbura" }
+      },
+      "end": "\\}|(?=\\s*/>)",
+      "endCaptures": {
+        "0": { "name": "punctuation.section.embedded.end.akbura" }
+      },
+      "contentName": "source.cs",
+      "patterns": [
+        { "include": "#expressionBraces" },
+        { "include": "source.cs" }
+      ]
+    },
+    "expressionBraces": {
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [
+        { "include": "#expressionBraces" },
+        { "include": "source.cs" }
       ]
     },
     "akcss": {

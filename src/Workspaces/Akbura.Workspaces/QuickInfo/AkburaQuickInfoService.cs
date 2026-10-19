@@ -36,6 +36,16 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
         var lookup = position == root.FullSpan.End && position > 0
             ? position - 1
             : position;
+        var binding = root.FindToken(lookup).Parent?.AncestorsAndSelf()
+            .OfType<MarkupExpressionBindingSyntax>().FirstOrDefault();
+        if (binding != null && position >= binding.XIdentifier.Span.Start &&
+            position < binding.BindKeyword.Span.End)
+        {
+            return new AkburaQuickInfo(TextSpan.FromBounds(binding.XIdentifier.Span.Start,
+                binding.BindKeyword.Span.End), AkburaQuickInfoKind.Symbol, "x.bind",
+                ["One-way reactive C# expression binding. Only observable dependencies trigger updates."]);
+        }
+
         var declaration = root
             .FindToken(lookup)
             .Parent?
@@ -129,7 +139,7 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
             {
                 InlineExpressionSyntax inline => semanticModel.GetCSharpSymbolReferences(inline),
                 CSharpExpressionSyntax condition when condition.Parent is
-                    MarkupIfStatementSyntax or MarkupElseIfClauseSyntax or MarkupCodeIfStatementSyntax or MarkupForeachKeyClauseSyntax =>
+                    MarkupIfStatementSyntax or MarkupElseIfClauseSyntax or MarkupCodeIfStatementSyntax or MarkupForeachKeyClauseSyntax or MarkupExpressionBindingSyntax =>
                     semanticModel.GetCSharpSymbolReferences(condition),
                 MarkupForeachHeaderSyntax header => semanticModel.GetCSharpSymbolReferences(header),
                 MarkupCodeStatementSyntax code => semanticModel.GetCSharpSymbolReferences(code),
@@ -148,8 +158,10 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
                     continue;
                 }
 
-                var signature = symbolReference.AkburaSymbol?.ToDisplayString() ??
-                    GetCSharpSignature(symbolReference.CSharpDefinition.Symbol);
+                var signature = symbolReference.AkburaSymbol is { Language: SymbolLanguage.CSharp }
+                    ? GetCSharpSignature(symbolReference.CSharpDefinition.Symbol)
+                    : symbolReference.AkburaSymbol?.ToDisplayString() ??
+                        GetCSharpSignature(symbolReference.CSharpDefinition.Symbol);
                 if (signature != null)
                 {
                     var details = GetCSharpReferenceDetails(symbolReference, cancellationToken);
@@ -330,9 +342,13 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
 
     private static string? GetCSharpSignature(Microsoft.CodeAnalysis.ISymbol? symbol)
     {
-        return symbol is ILocalSymbol local
-            ? local.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat) + " " + local.Name
-            : symbol?.ToDisplayString();
+        return symbol switch
+        {
+            ILocalSymbol local => local.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat) + " " + local.Name,
+            Microsoft.CodeAnalysis.IPropertySymbol property =>
+                property.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat) + " " + property.ToDisplayString(),
+            _ => symbol?.ToDisplayString(),
+        };
     }
 
     private static ImmutableArray<string> GetCSharpReferenceDetails(CSharpSymbolReference reference, CancellationToken cancellationToken)

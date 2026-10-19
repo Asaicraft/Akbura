@@ -121,7 +121,7 @@ public sealed class WorkspaceControlEventHookTests
         Assert.Contains("useKeyDown", definition.TargetText.ToString(), StringComparison.Ordinal);
     }
 
-    internal static AkburaWorkspace CreateWorkspace(string? csharpSource = null)
+    internal static AkburaWorkspace CreateWorkspace(string? csharpSource = null, string csharpFilePath = "")
     {
         var paths = ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES"))?
             .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries) ?? [];
@@ -134,7 +134,7 @@ public sealed class WorkspaceControlEventHookTests
         var compilation = CSharpCompilation.Create(
             "WorkspaceControlEventHooks",
             [CSharpSyntaxTree.ParseText(csharpSource ??
-                "namespace Gallery; public abstract partial class EventHooks : global::Akbura.AkburaControl { }")],
+                "namespace Gallery; public abstract partial class EventHooks : global::Akbura.AkburaControl { }", path: csharpFilePath)],
             references: references,
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var project = new ProjectContext(

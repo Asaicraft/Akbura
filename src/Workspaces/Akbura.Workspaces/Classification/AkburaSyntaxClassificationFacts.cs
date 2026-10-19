@@ -26,6 +26,14 @@ internal static class AkburaSyntaxClassificationFacts
             return akcssClassification;
         }
 
+        if (token.Parent is MarkupExpressionBindingSyntax ||
+            token.Parent is SimpleNameSyntax { Parent: MarkupExpressionBindingSyntax })
+        {
+            return token.Kind is SyntaxKind.IdentifierToken or SyntaxKind.DotToken or SyntaxKind.BindToken
+                ? AkburaClassificationKind.Directive
+                : AkburaClassificationKind.Punctuation;
+        }
+
         if (token.Kind == SyntaxKind.CSharpRawToken)
         {
             return AkburaClassificationKind.EmbeddedCSharp;

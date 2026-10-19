@@ -1,5 +1,7 @@
+using Akbura.Language.Binder;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis.Completion;
+using Microsoft.CodeAnalysis.Tags;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 
@@ -38,7 +40,10 @@ internal static class AkburaRoslynCompletionItemSelector
                  index++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                selected.Add(rawItems[index]);
+                if (IsUserVisible(rawItems[index]))
+                {
+                    selected.Add(rawItems[index]);
+                }
             }
 
             return new AkburaRoslynCompletionSelection(
@@ -66,6 +71,10 @@ internal static class AkburaRoslynCompletionItemSelector
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var item = rawItems[index];
+                if (!IsUserVisible(item))
+                {
+                    continue;
+                }
                 var matchKind = GetMatchKind(
                     GetFilterText(item),
                     prefix);
@@ -134,7 +143,10 @@ internal static class AkburaRoslynCompletionItemSelector
         for (var index = 0; index < rawItemCount; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            selected.Add(rawItems[index]);
+            if (IsUserVisible(rawItems[index]))
+            {
+                selected.Add(rawItems[index]);
+            }
         }
 
         return new AkburaRoslynCompletionSelection(
@@ -146,6 +158,10 @@ internal static class AkburaRoslynCompletionItemSelector
             rawItemCount,
             isIncomplete: false);
     }
+
+    private static bool IsUserVisible(CompletionItem item) =>
+        item.DisplayText != CSharpProbeBuilder.ExpressionProbeMethodName ||
+        !item.Tags.Contains(WellKnownTags.Method);
 
     internal static CompletionMatchKind GetMatchKind(
         string candidate,

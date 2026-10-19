@@ -1,0 +1,13 @@
+[
+  {
+    "Kind": "environment",
+    "Utc": "2026-10-19T05:33:57.132385Z",
+    "Runtime": "10.0.12",
+    "CpuCount": 12,
+    "OS": "Microsoft Windows NT 10.0.26200.0",
+    "Roslyn": "5.9.0.0",
+    "ClrHotReload": false,
+    "Warmup": 2,
+    "Samples": 8
+  }
+]

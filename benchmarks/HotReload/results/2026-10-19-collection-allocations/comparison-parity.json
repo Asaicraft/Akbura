@@ -1,0 +1,5 @@
+{
+  "Scope": "Matching initial, warm-up and measured source digests and generator diagnostic values across original and optimized binaries.",
+  "Records": 176,
+  "Equal": true
+}

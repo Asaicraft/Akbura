@@ -4,7 +4,8 @@ param(
     [Parameter(Mandatory = $true)][string]$OutputDirectory,
     [Parameter(Mandatory = $true)][string]$ResultDirectory,
     [switch]$Resume,
-    [switch]$SkipBenchmarks
+    [switch]$SkipBenchmarks,
+    [switch]$CollectionAllocations
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,15 +32,19 @@ $sourceHashes = foreach ($path in $sourcePaths) {
 }
 $fingerprint = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($sourceHashes -join "`n"))))
 $manifestPath = Join-Path $OutputDirectory 'source-manifest.json'
+$verificationMode = if ($CollectionAllocations) { 'CollectionAllocations' } else { 'SemanticDependencies' }
 if (Test-Path -LiteralPath $manifestPath) {
     $previousManifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
     if ($previousManifest.Fingerprint -ne $fingerprint) {
         throw 'Implementation sources changed. Use a new output directory; never resume evidence from different source revisions.'
     }
+    if ($previousManifest.VerificationMode -and $previousManifest.VerificationMode -ne $verificationMode) {
+        throw 'Verification mode changed. Use a new output directory rather than reusing different test selections.'
+    }
 }
 else {
     [IO.File]::WriteAllText($manifestPath, (@{ Fingerprint = $fingerprint; Revision = (& git -C $repository rev-parse HEAD)
-        Files = @($sourceHashes); StartedUtc = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json -Depth 5) + "`r`n", [Text.UTF8Encoding]::new($false))
+        Files = @($sourceHashes); VerificationMode = $verificationMode; StartedUtc = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json -Depth 5) + "`r`n", [Text.UTF8Encoding]::new($false))
 }
 
 function Log([string]$message) {
@@ -214,19 +219,33 @@ try {
     $project = 'src/Akbura.UnitTests/Akbura.UnitTests.csproj'
     $null = Run 'build-debugstats' 'dotnet' @('build', $project, '-c', 'DebugStats', '--no-restore', '-p:UseSharedCompilation=false', '-nr:false', '-v:minimal')
     $filter = 'FullyQualifiedName~BlackSilence|FullyQualifiedName~AkburaProjectIndex|FullyQualifiedName~DocumentSyntaxVersion|FullyQualifiedName~GenerationStatistics'
+    $collectionFilter = '|FullyQualifiedName~CollectionAllocationTests|FullyQualifiedName~PooledBuilderTests|FullyQualifiedName~PooledImmutableListTests'
+    if ($CollectionAllocations) {
+        $filter += $collectionFilter
+    }
     $tests = Run 'debugstats' 'dotnet' @('test', $project, '-c', 'DebugStats', '--no-build', '--no-restore', '--filter', $filter,
         '--logger', 'trx;LogFileName=tests.trx', '--results-directory', '{RESULTS}', '-v:normal', '--', 'xUnit.MaxParallelThreads=2')
     [xml]$trx = Get-Content -LiteralPath (Join-Path $tests 'tests.trx') -Raw
     if ([int]$trx.TestRun.ResultSummary.Counters.executed -le 0 -or [int]$trx.TestRun.ResultSummary.Counters.failed -ne 0) {
         throw 'The relevant DebugStats test set did not execute successfully.'
     }
-    $sdkCount = @($trx.TestRun.Results.UnitTestResult | Where-Object { $_.testName -match 'InvalidationTrace_|BlackSilenceGenerationStatisticsTests|DetachedArtifacts_|MemberContracts_|SemanticDependencies_' }).Count
+    $sdkPattern = 'InvalidationTrace_|BlackSilenceGenerationStatisticsTests|DetachedArtifacts_|MemberContracts_|SemanticDependencies_'
+    if ($CollectionAllocations) {
+        $sdkPattern += '|CollectionAllocationTests|PooledBuilderTests|PooledImmutableListTests'
+    }
+    $sdkCount = @($trx.TestRun.Results.UnitTestResult | Where-Object { $_.testName -match $sdkPattern }).Count
     if ($sdkCount -le 0) {
         throw 'No SDK-host tests matched the verified package-host results.'
     }
     $sdkFilter = 'FullyQualifiedName~InvalidationTrace_|FullyQualifiedName~BlackSilenceGenerationStatisticsTests|FullyQualifiedName~DetachedArtifacts_|FullyQualifiedName~MemberContracts_|FullyQualifiedName~SemanticDependencies_'
+    if ($CollectionAllocations) {
+        $sdkFilter += $collectionFilter
+    }
     $null = Run 'sdk' 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'Verify-SdkRoslyn.ps1'), '-OutputDirectory', '{RESULTS}', '-TestFilter', $sdkFilter, '-ExpectedTestCount', "$sdkCount")
     $releaseFilter = '(FullyQualifiedName~DetachedArtifacts_|FullyQualifiedName~MemberContracts_|FullyQualifiedName~SemanticDependencies_)&FullyQualifiedName!~OnlyNewestStoreAlive&FullyQualifiedName!~MixedLongSession&FullyQualifiedName!~MixedRevisions'
+    if ($CollectionAllocations) {
+        $releaseFilter = $releaseFilter.Replace(')&', $collectionFilter + ')&')
+    }
     $null = Run 'release' 'dotnet' @('test', $project, '-c', 'Release', '--no-restore', '-p:UseSharedCompilation=false', '-nr:false', '--filter', $releaseFilter,
         '--logger', 'trx;LogFileName=tests.trx', '--results-directory', '{RESULTS}', '-v:normal', '--', 'xUnit.MaxParallelThreads=2')
     $null = Run 'build-tool' 'dotnet' @('build', 'benchmarks/HotReload/HotReloadBenchmarks.csproj', '-p:BlackSilenceConfiguration=DebugStats', '--no-restore', '-p:UseSharedCompilation=false', '-nr:false', '-v:minimal')
@@ -241,7 +260,7 @@ try {
     $verification = @{ CompletedUtc = [DateTime]::UtcNow.ToString('o'); Fingerprint = $fingerprint; Revision = (& git -C $repository rev-parse HEAD)
         Scope = 'Relevant generator/ownership suites, not every repository test project.'; BenchmarksRequested = -not [bool]$SkipBenchmarks
         DebugStats = @{ Executed = [int]$trx.TestRun.ResultSummary.Counters.executed; Passed = [int]$trx.TestRun.ResultSummary.Counters.passed }
-        ExpectedSdkTests = $sdkCount }
+        ExpectedSdkTests = $sdkCount; VerificationMode = $verificationMode }
     $null = New-Item -ItemType Directory -Path (Join-Path $ResultDirectory 'verification') -Force
     [IO.File]::WriteAllText((Join-Path $ResultDirectory 'verification/results.json'), ($verification | ConvertTo-Json -Depth 5) + "`r`n", [Text.UTF8Encoding]::new($false))
     Copy-Item -LiteralPath $manifestPath -Destination (Join-Path $ResultDirectory 'verification/source-manifest.json') -Force

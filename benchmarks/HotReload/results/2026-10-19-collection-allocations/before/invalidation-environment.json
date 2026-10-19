@@ -1,0 +1,131 @@
+{
+  "AnalyzerHashes": [
+    {
+      "Name": "Akbura.BlackSilence",
+      "Sha256": "874394E2280F28D9DCC32899FDB993B0AED3E7E5DB7BBAE303DDD55924A80609"
+    },
+    {
+      "Name": "Akbura.Generator",
+      "Sha256": "6F282990D792A6B81598341B8A7F72C6D35818F1B74211EE21577DA7658EDDA8"
+    }
+  ],
+  "OS": "Майкрософт Windows 11 Pro",
+  "StartedUtc": "2026-10-17T18:56:27.2662376Z",
+  "Sdk": "10.0.401",
+  "AvailableMemoryKiB": 5477724,
+  "OSVersion": "10.0.26200",
+  "PhysicalMemoryKiB": 16493344,
+  "Cpu": "11th Gen Intel(R) Core(TM) i5-11400H @ 2.70GHz",
+  "LogicalProcessors": 12,
+  "SourceHashes": [
+    {
+      "Path": "Akbura.slnx",
+      "Sha256": "C93BFB5475F545223A5C6184F4EA50C380B8D44C33F08E92B8B470244C6DDF29"
+    },
+    {
+      "Path": "benchmarks/HotReload/HotReloadBenchmarks.csproj",
+      "Sha256": "EFD7991AE97E11230F2C6B570B6856F37E37CB2A7A64B78A33D988BB9B574448"
+    },
+    {
+      "Path": "benchmarks/HotReload/MemberWatchFixture/MemberViewModel.cs",
+      "Sha256": "D241F0F7FB0C4D338344768409129FC484AA61D7EA2BDBC64A04598881C12AD0"
+    },
+    {
+      "Path": "benchmarks/HotReload/MemberWatchFixture/Program.cs",
+      "Sha256": "141916DE3CE4D25D508884C72C3CD5E7A8C335C806FD83CD497B40429FCC2A93"
+    },
+    {
+      "Path": "benchmarks/HotReload/Program.ArtifactRetention.cs",
+      "Sha256": "54DB528CBE6BA901F8E71853AE02C397CFA0CDC02FA7C67FCF2F3A147420706B"
+    },
+    {
+      "Path": "benchmarks/HotReload/Program.Contracts.cs",
+      "Sha256": "07F9EB4044C924EB1FF78E853EBCBEBC32CBC71DCEE8CE99E1BDFABEAB422679"
+    },
+    {
+      "Path": "benchmarks/HotReload/Program.cs",
+      "Sha256": "4594C0D4208FE567F17D44D2E2AB60BDD461B8E2773BB9CE6959B5AFAB351AD5"
+    },
+    {
+      "Path": "benchmarks/HotReload/Program.Invalidation.cs",
+      "Sha256": "F9EA6B9CC829D128BAED88A67FF7FAB0F2ACCC08676CAAF1E505F2F4BA36F2B9"
+    },
+    {
+      "Path": "benchmarks/HotReload/Run.ps1",
+      "Sha256": "F6FA99F690234B0B034F504CBE588027D144A2F98E4340EECFC1FDEBAA482976"
+    },
+    {
+      "Path": "benchmarks/HotReload/Start-ContractBenchmarks.ps1",
+      "Sha256": "2A873A81F59209FC8BFD0A3E2F0F5A2D46589BD87BB182906BCFC318706CF1ED"
+    },
+    {
+      "Path": "benchmarks/HotReload/Summarize-Invalidation.ps1",
+      "Sha256": "91947E0D320E546A2EE6C7D14AEB74DE711D8F4B0027EA1D2C6B60503231A2FF"
+    },
+    {
+      "Path": "benchmarks/HotReload/Test-ContractRunner.ps1",
+      "Sha256": "C6423FBFD4EF5936514588A0E08C344198D16244CB55E3DC59D1A318E45C146E"
+    },
+    {
+      "Path": "benchmarks/HotReload/Test-InvalidationReport.ps1",
+      "Sha256": "E4771F7E4349F09D7C5418CEE8A150B5F6BADEA0F679C22AB5EABD372CA8AEA7"
+    },
+    {
+      "Path": "benchmarks/HotReload/Verify-MemberWatch.ps1",
+      "Sha256": "35D3A24AF71111F520637CDF46958EF73BD2F85736145B151DEC17B5863837B4"
+    },
+    {
+      "Path": "src/Akbura.BlackSilence/BlackSilenceDocumentBatch.cs",
+      "Sha256": "057016C191D159728385D688902DE8F88488D2574AA3B9E507E9ED2F3A2C44B3"
+    },
+    {
+      "Path": "src/Akbura.BlackSilence/BlackSilenceGenerationRequest.cs",
+      "Sha256": "84716E8FAC800A29F1A5091C1914F007D9F994654F8D880735897A591703CC1E"
+    },
+    {
+      "Path": "src/Akbura.BlackSilence/DetachedArtifactReuse.cs",
+      "Sha256": "DA608EB76E459D17D5B8F71FA33E86DE1AEB775EF47DDF63224F8E49DEE710C5"
+    },
+    {
+      "Path": "src/Akbura.BlackSilence/DetachedCSharpDeclarationContract.cs",
+      "Sha256": "1AB9D1E2C4B444ADE30AF69BB0A10EE94425B4E28E72A8031681D8573C02487F"
+    },
+    {
+      "Path": "src/Akbura.BlackSilence/DetachedCSharpInputs.cs",
+      "Sha256": "B3D2753AC97DEDB3CA1CEB829D34EC4160692DBD3CAEAAFA5DFD55D793C628EA"
+    },
+    {
+      "Path": "src/Akbura.BlackSilence/DetachedProjectArtifacts.cs",
+      "Sha256": "D83F83D9E2E34B0257B175D27171A8A56A1319AF43749787F8362C64EB6ACBD3"
+    },
+    {
+      "Path": "src/Akbura.BlackSilence/DocumentDiagnosticVersion.cs",
+      "Sha256": "52553071177965BFC6704A02561287B6292E0657B22BD4343B6FA10DADF3FEC7"
+    },
+    {
+      "Path": "src/Akbura.BlackSilence/DocumentGenerationVersion.cs",
+      "Sha256": "64F2E0E4A773CA2FD46DA226C23934ECBF030F8FE238BD12D88985C397A7DB33"
+    },
+    {
+      "Path": "src/Akbura.Generator/Language/CodeGeneration/GenerationStatistics.cs",
+      "Sha256": "4CCCEA3C944083B96748D8CFC4D8ABF30E1535E559C1FE917B8D96AA7FDC6A8A"
+    },
+    {
+      "Path": "src/Akbura.UnitTests/BlackSilenceIncrementalGenerationTests.ArtifactLifetime.cs",
+      "Sha256": "E75F990A8AA7E46E9EC84DE55979F496F752689287D1BB85AB8C586AEF65E626"
+    },
+    {
+      "Path": "src/Akbura.UnitTests/BlackSilenceIncrementalGenerationTests.Artifacts.cs",
+      "Sha256": "A31A110E0A2DF8C0814C52AE612314CA1E38AD99DB5B38BCB182FE74A50D5171"
+    },
+    {
+      "Path": "src/Akbura.UnitTests/BlackSilenceIncrementalGenerationTests.MemberContracts.cs",
+      "Sha256": "0E20B24995B2C633FFEF3260C57450FA02C4693ACA85E4D4768C5F758A87B24A"
+    },
+    {
+      "Path": "src/Akbura.UnitTests/BlackSilenceIncrementalGenerationTests.MemberPublication.cs",
+      "Sha256": "BCB2589DE4DDDF624B78384808C538BCDEA64F07B0E89B4302721C41F470CBBD"
+    }
+  ],
+  "RepositoryRevision": "e7aa465ffdda6328e85fbc89c56e88b05145fd0d"
+}

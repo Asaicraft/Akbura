@@ -127,6 +127,17 @@ The `semantic-*` matrix includes property/signature changes, overload addition/r
 
 `Start-ContractBenchmarks.ps1 -SemanticDependencies` selects mixed declaration lifetime/fork scenarios and private-method additions for live watch. `-Profiling off` uses the same binary with measurement sessions disabled; missing counters are unmeasured, not zero binding work. `Verify-MemberWatch.ps1 -DeclarationChanges` adds one ordinary private method per revision and redirects the existing method to it, preserving earlier additions to avoid a method-deletion rude edit. Host EnC rejection must remain a separate failed/unsupported runtime observation, never a successful generator timing.
 
+## Collection allocation verification
+
+`Verify-CollectionAllocations.ps1` runs the collection microbenchmarks, relevant compiler/ownership suites and paired Gallery/Purity workloads in the background. It preserves timestamped logs, fingerprints sources, and automatically waits/retries when unrelated CLI tests contaminate a timing group. It never stops those tests. The existing frozen pre-change baseline at `bin/CollectionAllocations/before` is required; prepare it from the unchanged starting revision before editing production code, using `Start-ContractBenchmarks.ps1` with `semantic-signature` and `akbura`, `-SemanticDependencies -SkipLifetime -SkipWatch`. An optimized binary must not be substituted for that baseline.
+
+```powershell
+pwsh -NoProfile -File benchmarks/HotReload/Verify-CollectionAllocations.ps1
+Get-Content bin/CollectionAllocations/final/journal.log -Tail 20 -Wait
+```
+
+The launcher returns its background PID. `status.json` records the current step and failures; individual step directories retain stdout/stderr. Restarting with the same output directory preserves successful quality steps and resumes completed timing groups only when sources match. `-MicroOnly` limits execution to collection microbenchmarks; `Summarize-Collections.ps1` renders their complete cells, raw samples, allocation counts, timing and retention controls. Evidence completion is not automatic engineering sign-off. The [allocation investigation](results/2026-10-19-collection-allocations/README.md) records selection decisions and pending final checks.
+
 ## Partially generated reports
 
 `Summarize.ps1` writes the CSV artifacts and then calls `Update-Report.ps1` to create or update `README.md` in the results directory. Watch timings and send boundaries, generator/CLR/build tables, graph decisions, observation/parity counts, and available tutorial provenance are generated from recorded artifacts. Missing suites are shown as unmeasured, not as zero-cost results. Variable graph counts are displayed as ranges.

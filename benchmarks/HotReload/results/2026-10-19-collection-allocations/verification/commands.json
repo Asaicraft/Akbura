@@ -1,0 +1,130 @@
+[
+  {
+    "Step": "build-debugstats",
+    "CompletedUtc": "2026-10-19T05:34:18.0682262Z",
+    "Fingerprint": "73EAA82574DFC527FE1675F0B844A0D1383E50659813AA39275FC7DFACF0BFA0",
+    "Command": "dotnet",
+    "Arguments": [
+      "build",
+      "src/Akbura.UnitTests/Akbura.UnitTests.csproj",
+      "-c",
+      "DebugStats",
+      "--no-restore",
+      "-p:UseSharedCompilation=false",
+      "-nr:false",
+      "-v:minimal"
+    ]
+  },
+  {
+    "Step": "debugstats",
+    "CompletedUtc": "2026-10-19T06:04:43.977187Z",
+    "Fingerprint": "73EAA82574DFC527FE1675F0B844A0D1383E50659813AA39275FC7DFACF0BFA0",
+    "Command": "dotnet",
+    "Arguments": [
+      "test",
+      "src/Akbura.UnitTests/Akbura.UnitTests.csproj",
+      "-c",
+      "DebugStats",
+      "--no-build",
+      "--no-restore",
+      "--filter",
+      "FullyQualifiedName~BlackSilence|FullyQualifiedName~AkburaProjectIndex|FullyQualifiedName~DocumentSyntaxVersion|FullyQualifiedName~GenerationStatistics|FullyQualifiedName~CollectionAllocationTests|FullyQualifiedName~PooledBuilderTests|FullyQualifiedName~PooledImmutableListTests",
+      "--logger",
+      "trx;LogFileName=tests.trx",
+      "--results-directory",
+      "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CollectionAllocations\\final\\quality\\debugstats-4662820652534f57ac71d77447ddf42e",
+      "-v:normal",
+      "--",
+      "xUnit.MaxParallelThreads=2"
+    ]
+  },
+  {
+    "Step": "sdk",
+    "CompletedUtc": "2026-10-19T06:30:13.3649031Z",
+    "Fingerprint": "73EAA82574DFC527FE1675F0B844A0D1383E50659813AA39275FC7DFACF0BFA0",
+    "Command": "pwsh",
+    "Arguments": [
+      "-NoProfile",
+      "-File",
+      "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\benchmarks\\HotReload\\Verify-SdkRoslyn.ps1",
+      "-OutputDirectory",
+      "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CollectionAllocations\\final\\quality\\sdk-3d71328fd08a4aef8b1669b22ff70c53",
+      "-TestFilter",
+      "FullyQualifiedName~InvalidationTrace_|FullyQualifiedName~BlackSilenceGenerationStatisticsTests|FullyQualifiedName~DetachedArtifacts_|FullyQualifiedName~MemberContracts_|FullyQualifiedName~SemanticDependencies_|FullyQualifiedName~CollectionAllocationTests|FullyQualifiedName~PooledBuilderTests|FullyQualifiedName~PooledImmutableListTests",
+      "-ExpectedTestCount",
+      "208"
+    ]
+  },
+  {
+    "Step": "release",
+    "CompletedUtc": "2026-10-19T06:35:21.5438021Z",
+    "Fingerprint": "73EAA82574DFC527FE1675F0B844A0D1383E50659813AA39275FC7DFACF0BFA0",
+    "Command": "dotnet",
+    "Arguments": [
+      "test",
+      "src/Akbura.UnitTests/Akbura.UnitTests.csproj",
+      "-c",
+      "Release",
+      "--no-restore",
+      "-p:UseSharedCompilation=false",
+      "-nr:false",
+      "--filter",
+      "(FullyQualifiedName~DetachedArtifacts_|FullyQualifiedName~MemberContracts_|FullyQualifiedName~SemanticDependencies_|FullyQualifiedName~CollectionAllocationTests|FullyQualifiedName~PooledBuilderTests|FullyQualifiedName~PooledImmutableListTests)&FullyQualifiedName!~OnlyNewestStoreAlive&FullyQualifiedName!~MixedLongSession&FullyQualifiedName!~MixedRevisions",
+      "--logger",
+      "trx;LogFileName=tests.trx",
+      "--results-directory",
+      "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CollectionAllocations\\final\\quality\\release-c9a44cf24b114f92b4189c068b7d24ec",
+      "-v:normal",
+      "--",
+      "xUnit.MaxParallelThreads=2"
+    ]
+  },
+  {
+    "Step": "build-tool",
+    "CompletedUtc": "2026-10-19T06:35:24.7615113Z",
+    "Fingerprint": "73EAA82574DFC527FE1675F0B844A0D1383E50659813AA39275FC7DFACF0BFA0",
+    "Command": "dotnet",
+    "Arguments": [
+      "build",
+      "benchmarks/HotReload/HotReloadBenchmarks.csproj",
+      "-p:BlackSilenceConfiguration=DebugStats",
+      "--no-restore",
+      "-p:UseSharedCompilation=false",
+      "-nr:false",
+      "-v:minimal"
+    ]
+  },
+  {
+    "Step": "Test-Report",
+    "CompletedUtc": "2026-10-19T06:35:32.6327592Z",
+    "Fingerprint": "73EAA82574DFC527FE1675F0B844A0D1383E50659813AA39275FC7DFACF0BFA0",
+    "Command": "pwsh",
+    "Arguments": [
+      "-NoProfile",
+      "-File",
+      "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\benchmarks\\HotReload\\Test-Report.ps1"
+    ]
+  },
+  {
+    "Step": "Test-InvalidationReport",
+    "CompletedUtc": "2026-10-19T06:35:37.3997843Z",
+    "Fingerprint": "73EAA82574DFC527FE1675F0B844A0D1383E50659813AA39275FC7DFACF0BFA0",
+    "Command": "pwsh",
+    "Arguments": [
+      "-NoProfile",
+      "-File",
+      "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\benchmarks\\HotReload\\Test-InvalidationReport.ps1"
+    ]
+  },
+  {
+    "Step": "Test-ContractRunner",
+    "CompletedUtc": "2026-10-19T06:35:44.3237877Z",
+    "Fingerprint": "73EAA82574DFC527FE1675F0B844A0D1383E50659813AA39275FC7DFACF0BFA0",
+    "Command": "pwsh",
+    "Arguments": [
+      "-NoProfile",
+      "-File",
+      "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\benchmarks\\HotReload\\Test-ContractRunner.ps1"
+    ]
+  }
+]

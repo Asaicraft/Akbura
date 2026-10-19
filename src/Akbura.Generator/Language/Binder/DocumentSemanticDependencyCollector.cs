@@ -1,5 +1,7 @@
+using Akbura.Collections;
 using Akbura.Language.CodeGeneration;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Operations;
@@ -20,6 +22,14 @@ namespace Akbura.Language.Binder;
 /// </summary>
 internal sealed class DocumentSemanticDependencyCollector
 {
+    private static readonly IComparer<DetachedCSharpTypeIdentity> s_typeComparer = Comparer<DetachedCSharpTypeIdentity>.Create(static (left, right) =>
+    {
+        var assembly = StringComparer.Ordinal.Compare(left.AssemblyIdentity, right.AssemblyIdentity);
+        return assembly != 0 ? assembly : StringComparer.Ordinal.Compare(left.MetadataName, right.MetadataName);
+    });
+    private static readonly IComparer<DetachedCSharpLookupDependency> s_lookupComparer = Comparer<DetachedCSharpLookupDependency>.Create(
+        static (left, right) => StringComparer.Ordinal.Compare(left.Key, right.Key));
+
     private readonly AkburaSemanticModel _model;
     private readonly bool _enabled;
     private readonly object _gate = new();
@@ -237,8 +247,7 @@ internal sealed class DocumentSemanticDependencyCollector
                     _lookups[lookupKey] = new DetachedCSharpLookupDependency(lookupKey, TypeIdentity(receiverType), access.Name.Identifier.ValueText,
                         string.Join("\n", _model.GetCSharpUsingDirectives().Select(static directive => directive.ToFullString())),
                         SymbolIdentity(result.Symbol), (int)result.CandidateReason,
-                        members.Concat(result.CandidateSymbols).Select(SymbolIdentity).Distinct(StringComparer.Ordinal)
-                            .OrderBy(static value => value, StringComparer.Ordinal).ToImmutableArray(), [], result.Symbol == null);
+                        CollectCandidateIdentities(members, result.CandidateSymbols), [], result.Symbol == null);
                 }
             }
             var name = syntax switch
@@ -255,44 +264,51 @@ internal sealed class DocumentSemanticDependencyCollector
                 {
                     _incomplete.Add("UnknownLookupReceiver");
                 }
-                var wholeCandidates = ImmutableArray.CreateBuilder<string>();
-                if (owner is INamedTypeSymbol named)
+                var wholeCandidates = PooledStringHashSet.GetInstance();
+                try
                 {
-                    for (var current = named; current != null; current = current.BaseType)
+                    if (owner is INamedTypeSymbol named)
                     {
-                        RecordType(current);
-                        foreach (var candidate in current.GetMembers(name))
+                        for (var current = named; current != null; current = current.BaseType)
                         {
-                            RecordSymbol(candidate);
-                            wholeCandidates.Add(SymbolIdentity(candidate));
+                            RecordType(current);
+                            foreach (var candidate in current.GetMembers(name))
+                            {
+                                RecordSymbol(candidate);
+                                wholeCandidates.Add(SymbolIdentity(candidate));
+                            }
+                        }
+                        foreach (var @interface in named.AllInterfaces)
+                        {
+                            RecordType(@interface);
+                            foreach (var candidate in @interface.GetMembers(name))
+                            {
+                                RecordSymbol(candidate);
+                                wholeCandidates.Add(SymbolIdentity(candidate));
+                            }
                         }
                     }
-                    foreach (var @interface in named.AllInterfaces)
+                    if (symbol is IMethodSymbol { IsExtensionMethod: true } or IMethodSymbol { Arity: > 0 })
                     {
-                        RecordType(@interface);
-                        foreach (var candidate in @interface.GetMembers(name))
-                        {
-                            RecordSymbol(candidate);
-                            wholeCandidates.Add(SymbolIdentity(candidate));
-                        }
+                        _incomplete.Add("ExtensionOrGenericLookup");
                     }
+                    var arguments = operation is IInvocationOperation invocation
+                        ? invocation.Arguments.Select(static argument => TypeIdentity(argument.Value.Type)).ToImmutableArray() : ImmutableArray<string>.Empty;
+                    if (symbol == null && receiver == null && type == null)
+                    {
+                        _incomplete.Add("UnresolvedLookupUniverse");
+                    }
+                    var scope = string.Join("\n", _model.GetCSharpUsingDirectives().Select(static directive => directive.ToFullString()));
+                    var receiverIdentity = TypeIdentity(owner);
+                    var key = receiverIdentity + "\0" + name + "\0" + syntax?.ToString();
+                    _lookups[key] = new DetachedCSharpLookupDependency(key, receiverIdentity, name, scope, SymbolIdentity(symbol), (int)reason,
+                        wholeCandidates.ToSortedImmutableArray(StringComparer.Ordinal),
+                        arguments, symbol == null);
                 }
-                if (symbol is IMethodSymbol { IsExtensionMethod: true } or IMethodSymbol { Arity: > 0 })
+                finally
                 {
-                    _incomplete.Add("ExtensionOrGenericLookup");
+                    wholeCandidates.Free();
                 }
-                var arguments = operation is IInvocationOperation invocation
-                    ? invocation.Arguments.Select(static argument => TypeIdentity(argument.Value.Type)).ToImmutableArray() : ImmutableArray<string>.Empty;
-                if (symbol == null && receiver == null && type == null)
-                {
-                    _incomplete.Add("UnresolvedLookupUniverse");
-                }
-                var scope = string.Join("\n", _model.GetCSharpUsingDirectives().Select(static directive => directive.ToFullString()));
-                var receiverIdentity = TypeIdentity(owner);
-                var key = receiverIdentity + "\0" + name + "\0" + syntax?.ToString();
-                _lookups[key] = new DetachedCSharpLookupDependency(key, receiverIdentity, name, scope, SymbolIdentity(symbol), (int)reason,
-                    wholeCandidates.Distinct(StringComparer.Ordinal).OrderBy(static value => value, StringComparer.Ordinal).ToImmutableArray(),
-                    arguments, symbol == null);
             }
         }
     }
@@ -448,6 +464,28 @@ internal sealed class DocumentSemanticDependencyCollector
         (symbol.ContainingAssembly?.Identity.ToString() ?? string.Empty) + "|" + (symbol.GetDocumentationCommentId() ?? symbol.ToDisplayString()) +
         "|" + symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
 
+    internal static ImmutableArray<string> CollectCandidateIdentities(ImmutableArray<ISymbol> members, ImmutableArray<ISymbol> candidates)
+    {
+        var identities = PooledStringHashSet.GetInstance();
+        try
+        {
+            foreach (var member in members)
+            {
+                identities.Add(SymbolIdentity(member));
+            }
+            foreach (var candidate in candidates)
+            {
+                identities.Add(SymbolIdentity(candidate));
+            }
+            // Equal ordinal strings are the same scalar fact; stable tie order is irrelevant.
+            return identities.ToSortedImmutableArray(StringComparer.Ordinal);
+        }
+        finally
+        {
+            identities.Free();
+        }
+    }
+
     internal DetachedCSharpDependencySet Detach(CancellationToken cancellationToken = default)
     {
 #if STATS
@@ -460,11 +498,11 @@ internal sealed class DocumentSemanticDependencyCollector
             GenerationStatistics.Increment(GenerationStatisticCounter.DetachedSemanticDependencyEntries);
 #endif
             return !_enabled ? DetachedCSharpDependencySet.Missing : new(DetachedCSharpDependencySet.CurrentSchema, _incomplete.Count == 0, _fixedSurface && _incomplete.Count == 0,
-                _types.OrderBy(static type => type.AssemblyIdentity, StringComparer.Ordinal).ThenBy(static type => type.MetadataName, StringComparer.Ordinal).ToImmutableArray(),
-                _symbols.OrderBy(static value => value, StringComparer.Ordinal).ToImmutableArray(),
-                _lookups.Values.OrderBy(static lookup => lookup.Key, StringComparer.Ordinal).ToImmutableArray(),
-                _conversions.OrderBy(static value => value, StringComparer.Ordinal).ToImmutableArray(),
-                _incomplete.OrderBy(static value => value, StringComparer.Ordinal).ToImmutableArray());
+                _types.ToSortedImmutableArray(s_typeComparer),
+                _symbols.ToSortedImmutableArray(StringComparer.Ordinal),
+                _lookups.Values.ToSortedImmutableArray(s_lookupComparer),
+                _conversions.ToSortedImmutableArray(StringComparer.Ordinal),
+                _incomplete.ToSortedImmutableArray(StringComparer.Ordinal));
         }
     }
 }

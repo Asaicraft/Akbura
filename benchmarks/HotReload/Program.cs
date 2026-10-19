@@ -31,6 +31,9 @@ internal static partial class Program
             ClrHotReload = MetadataUpdater.IsSupported, Warmup, Samples });
         switch (args.FirstOrDefault())
         {
+            case "collections":
+                MeasureCollections();
+                break;
             case "runtime":
                 Assert.True(MetadataUpdater.IsSupported, "Set DOTNET_MODIFIABLE_ASSEMBLIES=debug before starting this process.");
                 AppBuilder.Configure<Application>().UseHeadless(new AvaloniaHeadlessPlatformOptions()).SetupWithoutStarting();
@@ -84,7 +87,7 @@ internal static partial class Program
                 }
                 break;
             default:
-                throw new ArgumentException("runtime [filter] | generator <MSBuild-items.json> <file> <scenario> | graph <MSBuild-items.json> <file> | invalidation <MSBuild-items.json> <file> [scenario] [off|stats|trace] | artifacts <MSBuild-items.json> <file> <scenario> <off|stats|trace> <enabled|disabled> | artifact-memory <MSBuild-items.json> <file> <revisions> <enabled|disabled> | member-memory <MSBuild-items.json> <file> <revisions> <enabled|disabled> [concurrent-samples] | watch <project> <file> <component> | binlog <path> | style <files...>");
+                throw new ArgumentException("collections | runtime [filter] | generator <MSBuild-items.json> <file> <scenario> | graph <MSBuild-items.json> <file> | invalidation <MSBuild-items.json> <file> [scenario] [off|stats|trace] | artifacts <MSBuild-items.json> <file> <scenario> <off|stats|trace> <enabled|disabled> | artifact-memory <MSBuild-items.json> <file> <revisions> <enabled|disabled> | member-memory <MSBuild-items.json> <file> <revisions> <enabled|disabled> [concurrent-samples] | watch <project> <file> <component> | binlog <path> | style <files...>");
         }
         return 0;
     }

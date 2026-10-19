@@ -1,0 +1,8 @@
+VSTest version 18.7.0 (x64)
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+Results File: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CollectionAllocations\final\quality\sdk-3d71328fd08a4aef8b1669b22ff70c53\19da23bfbb444cc7911840e07ccbe92d\sdk-invalidation.trx
+
+Passed!  - Failed:     0, Passed:   208, Skipped:     0, Total:   208, Duration: 25 m 18 s - Akbura.UnitTests.dll (net10.0)
+SDK Roslyn checks passed; isolated host and resolution evidence: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\CollectionAllocations\final\quality\sdk-3d71328fd08a4aef8b1669b22ff70c53\19da23bfbb444cc7911840e07ccbe92d

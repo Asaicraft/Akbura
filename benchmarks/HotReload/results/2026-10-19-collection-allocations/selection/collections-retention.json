@@ -1,0 +1,68 @@
+[
+  {
+    "Kind": "collection-retention",
+    "Size": 16,
+    "Policy": "previous-clear-only",
+    "Iterations": 8,
+    "AllocatedBytes": 3784,
+    "PostGcHeapBytes": 5191472,
+    "HeapDeltaBytes": -616,
+    "RetainedCapacity": 17,
+    "RetainedElements": 0
+  },
+  {
+    "Kind": "collection-retention",
+    "Size": 16,
+    "Policy": "bounded",
+    "Iterations": 8,
+    "AllocatedBytes": 3792,
+    "PostGcHeapBytes": 5214792,
+    "HeapDeltaBytes": 392,
+    "RetainedCapacity": 17,
+    "RetainedElements": 0
+  },
+  {
+    "Kind": "collection-retention",
+    "Size": 1024,
+    "Policy": "previous-clear-only",
+    "Iterations": 8,
+    "AllocatedBytes": 76176,
+    "PostGcHeapBytes": 5293392,
+    "HeapDeltaBytes": 38688,
+    "RetainedCapacity": 1931,
+    "RetainedElements": 0
+  },
+  {
+    "Kind": "collection-retention",
+    "Size": 1024,
+    "Policy": "bounded",
+    "Iterations": 8,
+    "AllocatedBytes": 98296,
+    "PostGcHeapBytes": 5276776,
+    "HeapDeltaBytes": 22136,
+    "RetainedCapacity": 1103,
+    "RetainedElements": 0
+  },
+  {
+    "Kind": "collection-retention",
+    "Size": 65536,
+    "Policy": "previous-clear-only",
+    "Iterations": 8,
+    "AllocatedBytes": 2911856,
+    "PostGcHeapBytes": 9343920,
+    "HeapDeltaBytes": 1508736,
+    "RetainedCapacity": 75431,
+    "RetainedElements": 0
+  },
+  {
+    "Kind": "collection-retention",
+    "Size": 65536,
+    "Policy": "bounded",
+    "Iterations": 8,
+    "AllocatedBytes": 23279528,
+    "PostGcHeapBytes": 7835120,
+    "HeapDeltaBytes": 0,
+    "RetainedCapacity": 0,
+    "RetainedElements": 0
+  }
+]

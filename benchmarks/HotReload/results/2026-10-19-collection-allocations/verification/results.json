@@ -1,0 +1,13 @@
+{
+  "BenchmarksRequested": false,
+  "CompletedUtc": "2026-10-19T06:35:44.3255962Z",
+  "Scope": "Relevant generator/ownership suites, not every repository test project.",
+  "Revision": "c46e177cfa93ef375ef71667eef83a01346b5540",
+  "VerificationMode": "CollectionAllocations",
+  "DebugStats": {
+    "Executed": 421,
+    "Passed": 421
+  },
+  "ExpectedSdkTests": 208,
+  "Fingerprint": "73EAA82574DFC527FE1675F0B844A0D1383E50659813AA39275FC7DFACF0BFA0"
+}

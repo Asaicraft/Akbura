@@ -113,6 +113,9 @@ public sealed class MarkupExpressionBindingSemanticTests
     [InlineData("<Target ReadOnly=${x.bind Vm.Name} />")]
     [InlineData("<Target Values=${x.bind Vm.Items} />")]
     [InlineData("<Target InitialOnly=${x.bind Vm.Name} />")]
+    [InlineData("<Target WriteOnly=${x.bind Vm.Name} />")]
+    [InlineData("<Target PrivateGetter=${x.bind Vm.Name} />")]
+    [InlineData("<Target SpanValue=${x.bind default} />")]
     public void UnsupportedTargets_HaveExplicitDiagnosticAndNoIncompletePlan(string markup)
     {
         var fixture = AkcssActivatorPlannerTests.CreateFixture(Header + markup, Models);
@@ -124,6 +127,18 @@ public sealed class MarkupExpressionBindingSemanticTests
         Assert.Null(operation.ExpressionBindingPlan);
         Assert.Contains(fixture.SemanticModel.GetSemanticDiagnostics(attribute),
             d => d.Code == "AKBURA_SEMANTIC_ExpressionBindingUnsupportedTarget");
+    }
+
+    [Fact]
+    public void ObservableStructReceiver_ReportsCopyingRiskInsteadOfGeneratingBoxedObservers()
+    {
+        var fixture = Create("Text", "Vm.ObservableValue.Name");
+        var (_, operation, plan) = GetBinding(fixture);
+        Assert.True(operation.HasErrors);
+        Assert.Equal(ExpressionBindingObservability.Unsupported, plan.Observability);
+        Assert.Contains(plan.Diagnostics, diagnostic =>
+            diagnostic.Code == "AKBURA_SEMANTIC_ExpressionBindingUnsupportedExpression" &&
+            diagnostic.Message.Contains("copying or boxing", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -288,17 +303,26 @@ public sealed class MarkupExpressionBindingSemanticTests
             public ObservableCollection<Vm> Items { get; set; } = new();
             public List<Vm> PlainItems { get; set; } = new();
             public Vm[] Array { get; set; } = [];
+            public ObservableValue ObservableValue;
             public int MutableField;
             public static readonly int ReadOnlyField = 1;
             public const int Constant = 1;
             public string Calculate() => Name.ToString();
         }
         public class Plain { public string Name { get; set; } = ""; }
+        public struct ObservableValue : INotifyPropertyChanged
+        {
+            public string Name { get; set; }
+            public event PropertyChangedEventHandler? PropertyChanged;
+        }
         public class Target : Control
         {
             public string InitialOnly { get; init; } = "";
             public string Scalar { get; set; } = "";
             public string ReadOnly => "";
+            public string WriteOnly { set { } }
+            public string PrivateGetter { private get; set; } = "";
+            public Span<int> SpanValue { get => default; set { } }
             public List<Vm> Values { get; set; } = new();
         }
         public class Assignment

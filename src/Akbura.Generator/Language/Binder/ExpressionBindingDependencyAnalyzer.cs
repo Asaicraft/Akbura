@@ -111,6 +111,8 @@ internal sealed class ExpressionBindingDependencyAnalyzer
                 observation = PropertyObservation(property.Property, receiverType, out notification);
                 if (property.Property.IsIndexer && Implements(receiverType, "System.Collections.Specialized.INotifyCollectionChanged"))
                     observation |= ExpressionBindingObservation.CollectionChanged;
+                if (observation != ExpressionBindingObservation.None && receiverType?.IsValueType == true)
+                    Unsupported(operation, "observable value-type receivers would require copying or boxing the receiver");
                 classification = observation != ExpressionBindingObservation.None ? ExpressionBindingValueClassification.Observable :
                     receiverType?.SpecialType == SpecialType.System_String ? ExpressionBindingValueClassification.Stable : ExpressionBindingValueClassification.Unobservable;
                 deduplicate = !property.Property.IsIndexer;

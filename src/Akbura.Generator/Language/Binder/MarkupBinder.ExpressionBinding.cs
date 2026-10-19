@@ -103,6 +103,10 @@ internal sealed partial class MarkupBinder
             AkburaSemanticModel.IsMarkupDictionaryKeyDirective(attribute) ||
             AkburaSemanticModel.IsMarkupWhitespaceDirective(attribute)) return "metadata directives are not supported";
         if (!property.CanWrite) return "the property is read-only";
+        if (property.IsClrProperty && !property.IsAvaloniaProperty && !property.IsAttachedProperty && !property.CanRead)
+            return "CLR targets require an accessible getter to restore their baseline during structural rollback";
+        if (target is INamedTypeSymbol { IsRefLikeType: true })
+            return "ref-like destination values cannot be retained by a reactive binding";
         if (property.ClrPropertyDefinition.Symbol is Microsoft.CodeAnalysis.IPropertySymbol { IsStatic: true } or
             Microsoft.CodeAnalysis.IPropertySymbol { SetMethod.IsInitOnly: true })
             return "static and init-only properties are not reactive instance targets";

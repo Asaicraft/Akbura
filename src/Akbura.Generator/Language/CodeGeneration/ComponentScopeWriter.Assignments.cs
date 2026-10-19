@@ -330,7 +330,10 @@ internal readonly ref partial struct ComponentScopeWriter
                     };
                     if (write)
                     {
-                        propertyWriter.Write(plan, property, element.Identifier, propertyContext);
+                        if (property.ValueKind == ComponentPropertyValueKind.ExpressionBinding)
+                            new ExpressionBindingWriter(_writer, _sourceMap).Write(plan, property, element, propertyContext);
+                        else
+                            propertyWriter.Write(plan, property, element.Identifier, propertyContext);
                         wroteAny = true;
                     }
 

@@ -278,6 +278,7 @@ internal enum ComponentPropertyValueKind : byte
     StaticResource,
     BindingBaseResult,
     RuntimeMarkupExtensionResult,
+    ExpressionBinding,
 }
 
 internal enum ComponentPropertySynchronizationKind : byte
@@ -302,12 +303,16 @@ internal readonly struct ComponentCSharpValuePlan
         CSharpOperationDefinition operation,
         object? convertedValue,
         string? literalValue,
-        ITypeSymbol? targetType)
+        ITypeSymbol? targetType,
+        ExpressionBindingPlan? expressionBinding = null,
+        ImmutableDictionary<string, string>? expressionStateAccessors = null)
     {
         Operation = operation;
         ConvertedValue = convertedValue;
         LiteralValue = literalValue;
         TargetType = targetType;
+        ExpressionBinding = expressionBinding;
+        ExpressionStateAccessors = expressionStateAccessors ?? ImmutableDictionary<string, string>.Empty;
     }
 
     public CSharpOperationDefinition Operation { get; }
@@ -317,6 +322,10 @@ internal readonly struct ComponentCSharpValuePlan
     public string? LiteralValue { get; }
 
     public ITypeSymbol? TargetType { get; }
+
+    public ExpressionBindingPlan? ExpressionBinding { get; }
+
+    public ImmutableDictionary<string, string> ExpressionStateAccessors { get; }
 }
 
 internal readonly struct ComponentPropertyValueReference

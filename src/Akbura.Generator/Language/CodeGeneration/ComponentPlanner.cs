@@ -2160,12 +2160,30 @@ internal static partial class ComponentPlanner
                 : LowerCSharpValue(pending.Operation);
         }
 
+        private ImmutableDictionary<string, string>? _expressionStateAccessors;
+
+        private ImmutableDictionary<string, string> GetExpressionStateAccessors()
+        {
+            if (_expressionStateAccessors != null) return _expressionStateAccessors;
+            var members = ComponentMemberPlanner.Create(_component, _semanticModel);
+            try
+            {
+                var names = ImmutableDictionary.CreateBuilder<string, string>();
+                foreach (var state in members.States)
+                    names.Add(state.Name, "__State_" + state.GeneratedName);
+                return _expressionStateAccessors = names.ToImmutable();
+            }
+            finally { members.ReturnToPool(); }
+        }
+
         private ComponentPropertyValueReference LowerCSharpValue(IMarkupPropertySetterOperation operation)
         {
             var kind = operation.ValueKind switch
             {
                 MarkupAttributeValueKind.Literal => ComponentPropertyValueKind.Constant,
                 MarkupAttributeValueKind.DynamicExpression => ComponentPropertyValueKind.CSharpExpression,
+                MarkupAttributeValueKind.ExpressionBinding when operation.ExpressionBindingPlan is
+                    { Observability: not ExpressionBindingObservability.Unsupported } => ComponentPropertyValueKind.ExpressionBinding,
                 _ => ComponentPropertyValueKind.None,
             };
 
@@ -2179,7 +2197,9 @@ internal static partial class ComponentPlanner
                 operation.ValueOperation,
                 operation.ConvertedValue,
                 operation.LiteralValue,
-                operation.Property?.Type.Symbol as ITypeSymbol));
+                operation.ExpressionBindingPlan?.TargetType ?? operation.Property?.Type.Symbol as ITypeSymbol,
+                operation.ExpressionBindingPlan,
+                kind == ComponentPropertyValueKind.ExpressionBinding ? GetExpressionStateAccessors() : null));
 
             return new ComponentPropertyValueReference(kind, index);
         }

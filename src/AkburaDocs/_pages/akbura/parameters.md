@@ -130,6 +130,14 @@ A public getter alone does not invent change notifications. If the compiler
 cannot observe the property, it reports the existing binding diagnostic instead
 of generating a connection that only appears reactive.
 
+## Expression bindings are one-way assignments
+
+For a calculated one-way property value, use
+[expression bindings](/akbura/expression-bindings). `Text=${x.bind expression}`
+observes supported inputs and assigns a value; it is not a `bind:`/`out:`
+connection and does not write target edits back to the expression. Directional
+component parameters and `state bind/out/in` remain separate contracts.
+
 ## Multiple output receivers
 
 Output readers do not compete with the one setter of a property. These forms are

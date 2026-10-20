@@ -13,6 +13,8 @@
                       LogicalName="Akbura.Documentation.akbura/conditional-markup.md" />
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)..\..\AkburaDocs\_pages\akbura\grid.md"
                       LogicalName="Akbura.Documentation.akbura/grid.md" />
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)..\..\AkburaDocs\_pages\akbura\expression-bindings.md"
+                      LogicalName="Akbura.Documentation.akbura/expression-bindings.md" />
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)..\..\AkburaDocs\_pages\index.md"
                       LogicalName="Akbura.Documentation.index.md" />
   </ItemGroup>

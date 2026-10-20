@@ -10,7 +10,7 @@ using System.Collections.ObjectModel;
 namespace Akbura.UnitTests;
 
 [Collection(AvaloniaHeadlessCollection.Name)]
-public sealed class DocumentationExamplesTests
+public sealed partial class DocumentationExamplesTests
 {
     public static IEnumerable<object[]> Examples() => DocumentationExampleCatalog.PositiveModes();
 
@@ -21,7 +21,7 @@ public sealed class DocumentationExamplesTests
         var example = DocumentationCompiler.Compile(id, structural);
         await AvaloniaHeadlessTestSession.GetSession().Dispatch(() =>
         {
-            using var view = new DocumentationView(example);
+            using var view = CreateDocumentationView(example);
             AssertInitialOutput(id, view);
         }, CancellationToken.None);
     }
@@ -397,6 +397,24 @@ public sealed class DocumentationExamplesTests
 
         switch (id)
         {
+            case "expression-binding.state":
+            case "expression-binding.ordinary-property":
+            case "expression-binding.avalonia-property":
+            case "expression-binding.property":
+            case "expression-binding.nested":
+            case "expression-binding.indexed":
+            case "expression-binding.conditional":
+            case "expression-binding.avalonia-source":
+            case "expression-binding.conversion":
+            case "expression-binding.injected":
+            case "expression-binding.utility-frame":
+            case "expression-binding.utility-avalonia-binding":
+            case "expression-binding.utility-reactive-expression":
+            case "expression-binding.utility-binding-nested-path":
+            case "expression-binding.utility-comparison":
+            case "expression-binding.utility-cascade":
+                AssertExpressionInitialOutput(id, view);
+                break;
             case "foreach.basic":
                 var basic = Assert.IsType<StackPanel>(view.Root);
                 Assert.Equal(8d, basic.Spacing);

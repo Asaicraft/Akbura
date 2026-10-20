@@ -1,6 +1,6 @@
 ---
 title: Editor Completion
-summary: Type-aware completion for x.DataType, binding paths, and Avalonia resource keys.
+summary: Type-aware completion for embedded C# expression bindings, x.DataType, binding paths, and Avalonia resource keys.
 ---
 
 Akbura's Visual Studio and VS Code extensions share the same project-aware
@@ -40,6 +40,24 @@ existing binding semantics for contexts such as `$self`, `$parent`, named
 elements, casts, and template item scopes. Completion replaces only the path
 segment being edited, so completing in the middle of a path does not duplicate
 its prefix or suffix.
+
+## Expression bindings
+
+The editor offers the built-in `x.bind` directive in markup value prefixes,
+including incomplete `${x.` and `${x.bi` input. After the directive, completion
+uses embedded C# with the real component scope and target property type, not an
+Avalonia BindingPath. Nested members, indexers, interpolation, locals and template
+items use the normal scoped C# projection when project semantics are available.
+
+The same services handle `${x.bind condition}:utility` with a Boolean context.
+The prefix and utility remain distinct from the embedded C# span. Shared
+classification, hover, definition, references/rename and diagnostics map back to
+the original `.akbura` text. Syntax-only prefix assistance does not imply that
+semantic member completion works without a loaded project. Ordinary
+`${Binding ...}` keeps its separate binding-path completion.
+
+See [Expression Bindings](/akbura/expression-bindings) for the property and utility
+contracts, examples and observation limitations.
 
 ## Resource keys
 

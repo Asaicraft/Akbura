@@ -8,6 +8,10 @@
         "link": "/akbura/state"
       },
       {
+        "text": "Expression Bindings",
+        "link": "/akbura/expression-bindings"
+      },
+      {
         "text": "Composable Hooks",
         "link": "/akbura/hooks"
       },

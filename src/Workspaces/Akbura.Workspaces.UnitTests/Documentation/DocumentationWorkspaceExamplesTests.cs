@@ -14,6 +14,47 @@ public sealed class DocumentationWorkspaceExamplesTests
             example.Path == DocumentationExampleCatalog.ConditionalPage)
         .Select(example => new object[] { example.Id });
 
+    public static IEnumerable<object[]> ExpressionExamples() => DocumentationExampleCatalog.Positive
+        .Where(example => example.Path == DocumentationExampleCatalog.ExpressionBindingsPage)
+        .Select(example => new object[] { example.Id });
+
+    [Theory]
+    [MemberData(nameof(ExpressionExamples))]
+    public void DocumentedExpressions_KeepEmbeddedCSharpAndMarkupExtensionSpansDistinct(string id)
+    {
+        var source = Source(id);
+        var document = Parse(source);
+        var root = document.SyntaxTree.GetRootSyntax();
+        using var workspace = new AkburaWorkspace();
+        var spans = workspace.LanguageServices.Classification.GetSyntacticClassifications(document,
+            new TextSpan(0, source.Length));
+        var bindings = root.DescendantNodes().OfType<MarkupExpressionBindingSyntax>().ToArray();
+        foreach (var binding in bindings)
+        {
+            Assert.Contains(spans, span => span.Span == binding.BindKeyword.Span && span.Kind == AkburaClassificationKind.Directive);
+            Assert.Equal(binding.Expression.ToFullString(), source.Substring(
+                binding.Expression.FullSpan.Start, binding.Expression.FullSpan.Length));
+            Assert.True(document.TryGetCSharpCompletionContext(binding.Expression.Span.Start + 1, out var csharp));
+            Assert.Equal(SyntaxKind.MarkupExpressionBindingSyntax, csharp.OwnerKind);
+        }
+        var extensions = root.DescendantNodes().OfType<MarkupExtensionSyntax>().ToArray();
+        if (source.Contains("${Binding ", StringComparison.Ordinal))
+        {
+            Assert.NotEmpty(extensions);
+            Assert.All(extensions, extension => Assert.Equal("Binding", extension.Type.Name.ToString().Trim()));
+        }
+        if (source.Contains("${x.bind ", StringComparison.Ordinal)) Assert.NotEmpty(bindings);
+        var conditions = root.DescendantNodes().OfType<TailwindExpressionBindingConditionalPrefixSyntax>().ToArray();
+        var expected = id switch
+        {
+            "expression-binding.utility-reactive-expression" or "expression-binding.utility-comparison" => 1,
+            "expression-binding.utility-cascade" => 2,
+            _ => 0,
+        };
+        Assert.Equal(expected, conditions.Length);
+        Assert.All(conditions, condition => Assert.Contains(condition.Binding, bindings));
+    }
+
     [Theory]
     [MemberData(nameof(Examples))]
     public void DocumentedSource_RoundTripsAndHasSyntacticClassifications(string id)

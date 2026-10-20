@@ -8,6 +8,16 @@ summary: Define reactive AKCSS utility prefixes and control how active candidate
 A utility variant is a markup extension that controls whether a prefixed AKCSS
 utility is currently active.
 
+Markup-extension-backed variants are one category of utility prefix, not the
+only conditional syntax. Ordinary `{condition}:utility` uses the render/AKCSS
+refresh path; `${x.bind expression}:utility` tracks a C# Boolean expression.
+`${Binding Path}:utility` is a markup-extension-backed condition using Avalonia
+source resolution. Both binding forms can follow notifying sources without a
+component render, and all forms use the existing cascade. See
+[the three conditional forms](/akbura/expression-bindings#three-ways-to-conditionally-apply-akcss-utilities).
+`UtilityVariantAttribute` retains the ordering semantics described below; it
+does not turn an ordinary C# condition into an expression binding.
+
 It does not need a dedicated base class or attribute. Standard markup
 extensions can be prefixes too:
 

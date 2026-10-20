@@ -9,6 +9,104 @@ It does not create a `BindingPath`, a CLR markup extension, or a new
 `State<T>` for the expression result. It can observe an existing `state`
 declaration, but its result is written directly to the destination.
 
+## Try it in FeatureGallery
+
+The interactive [Expression bindings page](../src/Akbura.FeatureGallery/Akbura.FeatureGallery/Pages/ExpressionBindingsPage.akbura)
+is available under **Expression bindings** (`/expression-bindings`) in the
+FeatureGallery sidebar. It contains live previews and matching source code in
+the existing **Preview / Code** tabs. Start there to learn the feature before
+tracing its generated implementation below.
+
+### Write a one-way C# expression binding
+
+```akbura
+state string firstName = "Ada";
+state string lastName = "Lovelace";
+state int count = 1;
+
+<StackPanel>
+    <TextBlock Text=${x.bind $"{firstName} {lastName}"}/>
+    <TextBlock Text=${x.bind $"Twice the count: {count * 2}"}/>
+    <Button Content="Increase" Click={count++}/>
+</StackPanel>
+```
+
+`x.bind` evaluates a typed C# expression and writes its result **one way**
+to the destination property. It does not create a `BindingBase`, make the
+destination editable in reverse, or automatically create a separate state.
+These examples use ordinary Akbura state, whose changes may also schedule
+the component's normal render independently of expression binding.
+
+### Compare the three property-value mechanisms
+
+```akbura
+// An ordinary C# expression: evaluated during the normal render/update.
+<TextBlock Text={model.FirstName}/>
+
+// Avalonia Binding: a DataContext-based path by default.
+<TextBlock DataContext={model} Text=${Binding FirstName}/>
+
+// x.bind: a C# expression with tracked observable reads.
+<TextBlock Text=${x.bind model.FirstName}/>
+```
+
+For an `INotifyPropertyChanged` model, changing `FirstName` can update the
+last two controls through their respective observers without a component
+render. The ordinary `{model.FirstName}` expression reads the value again
+on a normal render; it does not subscribe to that model property merely by
+appearing in the markup. `x.bind` is a one-way assignment; Avalonia
+`Binding` follows its own binding-path and mode semantics.
+
+### Observe nested and indexed values
+
+```akbura
+<TextBlock Text=${x.bind model.Profile?.Name ?? "No profile"}/>
+<TextBlock Text=${x.bind model.People[model.SelectedIndex].Name}/>
+<TextBlock Text=${x.bind model.UsePrimaryName ? model.PrimaryName : model.FallbackName}/>
+```
+
+On a supported observable source, the active receiver, selected index and
+executed conditional branch determine the current observations. Replacing a
+profile or choosing another person reconnects the relevant subscriptions.
+These expressions still use ordinary C# evaluation: an out-of-range index
+can throw, and a non-observable collection is not assumed to raise
+collection-change notifications.
+
+### Make an AKCSS utility condition reactive
+
+```akbura
+state double width = 800;
+<TextBlock ${x.bind width > 1000}:hidden/>
+```
+
+`hidden` participates in the existing AKCSS cascade while the Boolean
+expression is true; when it becomes false, AKCSS restores the appropriate
+winning contribution. An ordinary `{width > 1000}:hidden` condition instead
+uses the normal frame-based utility refresh path. The gallery's `width`
+is a simulated state value, **not** the actual top-level window width.
+See [Reactive AKCSS utility conditions](reactive-utility-conditions.md)
+for the full compiler and candidate-lifetime contract.
+
+### Explore the live demos
+
+| Demo | What to try | Source |
+| --- | --- | --- |
+| Basics | Edit two names, increment a counter, and toggle a conditional expression | [ExpressionBindingBasicsDemo.akbura](../src/Akbura.FeatureGallery/Akbura.FeatureGallery/Components/ExpressionBindingBasicsDemo.akbura) |
+| MVVM and nested receivers | Edit `ObservableObject` properties, replace/clear a profile, and switch conditional branches; compare normal C#, Avalonia Binding and `x.bind` | [ExpressionBindingModelDemo.akbura](../src/Akbura.FeatureGallery/Akbura.FeatureGallery/Components/ExpressionBindingModelDemo.akbura) |
+| Indexed observation | Select, rename and replace an item in an `ObservableCollection`; observe only the active item | [ExpressionBindingIndexedDemo.akbura](../src/Akbura.FeatureGallery/Akbura.FeatureGallery/Components/ExpressionBindingIndexedDemo.akbura) |
+| Reactive utilities | Cross a visibility threshold, switch competing background utilities, and compare reactive versus ordinary utility conditions | [ExpressionBindingUtilityDemo.akbura](../src/Akbura.FeatureGallery/Akbura.FeatureGallery/Components/ExpressionBindingUtilityDemo.akbura) |
+
+The model examples use [ExpressionBindingDemoModel.cs](../src/Akbura.FeatureGallery/Akbura.FeatureGallery/Models/ExpressionBindingDemoModel.cs).
+All four demos are mounted by the [ExpressionBindingsPage](../src/Akbura.FeatureGallery/Akbura.FeatureGallery/Pages/ExpressionBindingsPage.akbura).
+To run them, launch the FeatureGallery desktop or other supported host and
+select **Expression bindings** from its navigation drawer.
+
+Keep the supported-observation contract in mind: Akbura cannot infer hidden
+reads inside arbitrary method bodies or notifications from ordinary CLR
+properties that do not report changes. Partial-observation warnings are
+meaningful; unsupported mutating or deferred expressions are diagnosed.
+
+---
 ## 1. Read the generated code
 
 Given an injected view model implementing `INotifyPropertyChanged`:

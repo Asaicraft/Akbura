@@ -191,9 +191,8 @@ internal static partial class Program
                 Index = concurrentIndex,
                 GeneratorMs = concurrentMs, ProcessAllocatedBytes = concurrentAllocated, Collections = generationCollections,
                 PostGcHeapBytes = concurrentHeap, WorkingSetBytes = concurrentWorkingSet,
-                Counters = Enum.GetValues<GenerationStatisticCounter>().Where(counter => counter != GenerationStatisticCounter.Count)
-                    .ToDictionary(counter => counter.ToString(), concurrentStats.GetCounterCount),
-                Stages = Enum.GetValues<GenerationStatisticStage>().Where(stage => stage != GenerationStatisticStage.Count)
+                Counters = ReadCounters(concurrentStats),
+                Stages = StatisticValues<GenerationStatisticStage>()
                     .Select(stage => new { Stage = stage.ToString(), Count = concurrentStats.GetStageInvocationCount(stage),
                         InclusiveMs = concurrentStats.GetStageElapsed(stage).TotalMilliseconds }).ToArray(),
                 BranchCompletionMs = branches.Select(branch => branch.GenerationMs).ToArray(), IncludesFreshOracle = false,

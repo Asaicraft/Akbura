@@ -73,6 +73,9 @@ internal sealed partial class Parser
         _blender = blended.Blender;
         _prevTokenTrailingTrivia = ((GreenSyntaxToken?)node.Green.GetLastTerminal())?.GetTrailingTrivia();
         member = node.Green;
+#if STATS
+        CodeGeneration.GenerationStatistics.Increment(CodeGeneration.GenerationStatisticCounter.ParserReusedSubtree);
+#endif
         return true;
     }
 
@@ -2055,6 +2058,9 @@ internal sealed partial class Parser
         _blender = blended.Blender;
         _prevTokenTrailingTrivia = ((GreenSyntaxToken?)green.GetLastTerminal())?.GetTrailingTrivia();
         node = green;
+#if STATS
+        CodeGeneration.GenerationStatistics.Increment(CodeGeneration.GenerationStatisticCounter.ParserReusedSubtree);
+#endif
         return true;
     }
 

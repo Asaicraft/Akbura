@@ -1,0 +1,50 @@
+{
+  "ReviewedUtc": "2026-10-20T15:50:19.1006180Z",
+  "SourceFingerprint": "9B649A413E6C9F7AB9EC97BB1EB1CD51067747B53DD8689DA749C6176B6E519C",
+  "CurrentSourceFilesVerified": 1111,
+  "PreservedBaselineGroupHashesVerified": 13,
+  "InstrumentedCells": 40,
+  "ProductionCells": 6,
+  "MeasuredEditsPerCell": 8,
+  "MatchingBeforeAfterSourceDiagnosticRecords": 1012,
+  "Suites": [
+    {
+      "Suite": "debugstats",
+      "Passed": 546
+    },
+    {
+      "Suite": "sdk",
+      "Passed": 238
+    },
+    {
+      "Suite": "release",
+      "Passed": 284
+    },
+    {
+      "Suite": "unit-full-release",
+      "Passed": 3543
+    }
+  ],
+  "VerificationBoundary": "TRX outcomes reviewed; unchanged measured compiler/test sources verified. No new full-suite execution during this review.",
+  "Watch": [
+    {
+      "Version": "before",
+      "Updates": 9,
+      "Measured": 8,
+      "MedianMs": 139.3871,
+      "MinMs": 107.5052,
+      "MaxMs": 206.5364
+    },
+    {
+      "Version": "after",
+      "Updates": 9,
+      "Measured": 8,
+      "MedianMs": 131.05525,
+      "MinMs": 109.7167,
+      "MaxMs": 248.0456
+    }
+  ],
+  "WatchBoundary": "Descriptive fixture observations; foreign build activity was not continuously audited by the watch wrapper.",
+  "PerformanceAcceptance": "Not accepted as a general editing-latency improvement; candidate remains uncommitted for review.",
+  "Reason": "27/40 instrumented medians increased; production repeat is mixed (3/6 faster). Reduced probes and allocations do not establish consistent latency gains."
+}

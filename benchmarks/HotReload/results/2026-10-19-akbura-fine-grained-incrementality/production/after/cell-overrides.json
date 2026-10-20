@@ -1,0 +1,8 @@
+{
+  "Reason": "Use real inline Text expressions in template/navigation components; retain all other page/sidebar scenarios unchanged.",
+  "Overrides": [
+    "purity:Sidebar.akbura/localized-binding-sibling=NavButton.akbura"
+  ],
+  "RunSha256": "286EF531D9A465862575E86BD04CB75CF90924834EB72AF6D5854CBC0970CAAE",
+  "CreatedUtc": "2026-10-20T14:28:23.0748997Z"
+}

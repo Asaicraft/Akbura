@@ -21,6 +21,24 @@ function Check([bool]$condition, [string]$message) {
     }
     $script:checks++
 }
+. (Join-Path $PSScriptRoot 'BenchmarkCellOverrides.ps1')
+$selectionComponents = @('gallery:Counter.akbura','gallery:DataTemplatesPage.akbura')
+$selectionScenarios = @('localized-literal','localized-binding-sibling')
+$redirect = 'gallery:DataTemplatesPage.akbura/localized-binding-sibling=DataTemplates.akbura'
+$map = Get-BenchmarkCellOverrides $selectionComponents $selectionScenarios @($redirect)
+Check ($map['gallery:DataTemplatesPage.akbura/localized-binding-sibling'] -ceq 'DataTemplates.akbura') 'Live component routing was not applied.'
+Check ((Get-BenchmarkCellOverrides $selectionComponents $selectionScenarios @()).Count -eq 0) 'Default routing changed existing cells.'
+foreach ($invalid in @(
+    @{ Values = @('not-a-cell') },
+    @{ Values = @('gallery:Unknown.akbura/localized-literal=DataTemplates.akbura') },
+    @{ Values = @($redirect,$redirect) },
+    @{ Values = @('gallery:DataTemplatesPage.akbura/localized-binding-sibling=Counter.akbura') }
+)) {
+    $rejected = $false
+    try { $null = Get-BenchmarkCellOverrides $selectionComponents $selectionScenarios $invalid.Values }
+    catch { $rejected = $true }
+    Check $rejected 'Invalid, duplicate or colliding benchmark cell routing was accepted.'
+}
 $inputPath = Join-Path $OutputDirectory 'gallery-inputs.json'
 [IO.File]::WriteAllText($inputPath, '{}', [Text.UTF8Encoding]::new($false))
 $inputHash = (Get-FileHash -LiteralPath $inputPath).Hash

@@ -1,0 +1,38 @@
+{
+  "Closures": [
+    {
+      "Analyzers": [
+        {
+          "Sha256": "BF7A72CD2D560766DDDACCAD43AA7035AF8EC7A1273C6A88B3AE5848BF13EDF2",
+          "Name": "Akbura.Generator.dll"
+        },
+        {
+          "Sha256": "2B3EC0BD72440EC3EBC9C992E27BCD2DF176D421833FE3A9CBAE5DC854AA4042",
+          "Name": "Akbura.BlackSilence.dll"
+        }
+      ],
+      "Flavor": "instrumented",
+      "ToolDirectory": "bin/FineGrained/original-instrumented-statistics/tool",
+      "OriginalDirectory": "bin/FineGrained/before/tool",
+      "HostSha256": "078F874836DFE9F94F4A2B8B39D9B4B7F421C676B61DCEE44DE8C218B2927680"
+    },
+    {
+      "Analyzers": [
+        {
+          "Sha256": "D4A42227353DFF0A2E333AF8EF3911C4F43F6ECFACA4BA0D861F72ABDB5B2F17",
+          "Name": "Akbura.Generator.dll"
+        },
+        {
+          "Sha256": "31AE51957729B10347DAD894E55CD213904BD06CB7F59D969B6745FCEA4092FC",
+          "Name": "Akbura.BlackSilence.dll"
+        }
+      ],
+      "Flavor": "production",
+      "ToolDirectory": "bin/FineGrained/original-production-statistics/tool",
+      "OriginalDirectory": "bin/FineGrained/original-production/tool",
+      "HostSha256": "078F874836DFE9F94F4A2B8B39D9B4B7F421C676B61DCEE44DE8C218B2927680"
+    }
+  ],
+  "Purpose": "Fix runtime enum sentinel filtering in the common benchmark host. Frozen original analyzer bytes are unchanged; earlier failed closures remain untouched.",
+  "CreatedUtc": "2026-10-20T03:57:43.0967250Z"
+}

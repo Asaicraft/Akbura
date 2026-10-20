@@ -24,10 +24,11 @@ internal static partial class Program
         "real-method", "real-referenced-method", "real-service", "real-property", "real-multiple", "real-mixed", "real-signature", "real-overload",
         "semantic-property", "semantic-signature", "semantic-add-overload", "semantic-remove-overload", "semantic-negative",
         "semantic-multiple", "semantic-unrelated", "semantic-mixed", "semantic-global",
+        .. LocalizedScenarios,
     ];
 
     private static void MeasureInvalidation(string itemsPath, string fileName, string? selectedScenario, string profiling,
-        bool reuse = true, bool verifyEveryUpdate = false)
+        bool reuse = true, bool verifyEveryUpdate = false, int updates = Warmup + Samples)
     {
         var optimization = reuse ? "enabled" : "disabled";
         Assert.Contains(profiling, new[] { "off", "stats", "trace" });
@@ -55,6 +56,7 @@ internal static partial class Program
             Generator = typeof(GenerationStatistics).Assembly.Location,
             BlackSilenceSha256 = FileDigest(typeof(Akbura.BlackSilence.AkburaBlackSilenceGenerator).Assembly.Location),
             GeneratorSha256 = FileDigest(typeof(GenerationStatistics).Assembly.Location),
+            BenchmarkSha256 = FileDigest(typeof(Program).Assembly.Location),
             InputsSha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(itemsPath))) });
 
         foreach (var scenario in InvalidationScenarios.Where(name => selectedScenario == null || name == selectedScenario))
@@ -72,6 +74,13 @@ internal static partial class Program
             var support = Support(0);
             var unrelated = SupportTree("internal static class BenchmarkUnrelated { public static int Value() => 0; }", "BenchmarkUnrelated.cs");
             var original = useExpression ? new Input(selected.Path, BindingSource(selected.GetText().ToString(), fileName, scenario)) : selected;
+            if (scenario.StartsWith("localized-", StringComparison.Ordinal))
+            {
+                original = new Input(selected.Path, LocalizedSource(selected.GetText().ToString(), selected.Path, scenario, 0));
+                Write(new { Kind = "localized-input", File = selected.Path, Scenario = scenario,
+                    OriginalSha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(selected.GetText().ToString()))),
+                    InitialSource = original.GetText().ToString() });
+            }
             var files = sourceFiles.Select(file => file.Path == selected.Path ? original : file).ToArray();
             if (scenario.StartsWith("semantic-", StringComparison.Ordinal))
             {
@@ -96,13 +105,20 @@ internal static partial class Program
             string[] baselineDiagnostics = [];
             string[]? baselineCompilerErrors = null;
             CSharpCompilation? repeatedCompilation = null;
+            Akbura.Language.Syntax.AkburaSyntax? previousRoot = null;
             using var process = Process.GetCurrentProcess();
-            for (var index = 0; index <= Warmup + Samples; index++)
+            for (var index = 0; index <= updates; index++)
             {
                 var compilation = initialCompilation;
                 var currentParse = parse;
                 if (index > 0)
                 {
+                    if (scenario.StartsWith("localized-", StringComparison.Ordinal))
+                    {
+                        var replacement = new Input(selected.Path, LocalizedSource(selected.GetText().ToString(), selected.Path, scenario, index));
+                        driver = driver.ReplaceAdditionalText(previousInput, replacement);
+                        previousInput = replacement;
+                    }
                     switch (scenario)
                     {
                         case "fresh-driver":
@@ -213,7 +229,7 @@ internal static partial class Program
                 }
 
                 using var measurement = profiling == "off" ? null : GenerationStatistics.BeginMeasurement(GC.GetAllocatedBytesForCurrentThread,
-                    trackInvalidation: profiling == "trace");
+                    trackOperations: profiling == "trace", trackInvalidation: profiling == "trace");
                 process.Refresh();
                 var cpu = process.TotalProcessorTime;
                 var collections = new[] { GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2) };
@@ -228,6 +244,9 @@ internal static partial class Program
                 var cpuMs = (process.TotalProcessorTime - cpu).TotalMilliseconds;
                 measurement?.Dispose();
                 var statistics = measurement?.GetSnapshot();
+                var currentRoot = ArtifactRequest(driver).Documents.Single(document => document.FilePath == selected.Path).SyntaxTree.GetRootSyntax();
+                var syntaxReuse = SyntaxReuse(previousRoot, currentRoot);
+                previousRoot = currentRoot;
                 if (index == 0 && profiling != "off")
                 {
                     Assert.True(statistics!.GetStageInvocationCount(GenerationStatisticStage.CSharpEnvironmentConstruction) > 0,
@@ -246,7 +265,7 @@ internal static partial class Program
                         Assert.NotNull(request.Diagnostics.Single(diagnostic => diagnostic.Document.FilePath.EndsWith(independent, StringComparison.Ordinal)).Previous);
                     }
                 }
-                var expectedIncompleteInput = scenario is "unresolved" or "semantic-negative" && index % 2 == 0;
+                var expectedIncompleteInput = scenario is "unresolved" or "semantic-negative" && index % 2 == 0 || scenario == "localized-diagnostic" && index % 2 != 0;
                 if (!expectedIncompleteInput)
                 {
                     Clean(diagnostics);
@@ -304,18 +323,19 @@ internal static partial class Program
                     CurrentThreadAllocatedBytes = threadAllocated, ProcessAllocatedBytes = processAllocated,
                     ManagedHeapBytes = GC.GetTotalMemory(false), WorkingSetBytes = Environment.WorkingSet,
                     Sources = generated.Count, ChangedSources = changed, InputDeltas = inputDeltas,
+                    SyntaxReuse = syntaxReuse,
                     SourceReadDeltas = readDeltas, DocumentVersionDeltas = versionDeltas,
                     DependencyDeltas = dependencyDeltas,
                     ContextDeltas = context == null || previousContext == null ? null :
                         context.Data.Where(pair => pair.Key is "State" or "Index" or "AkburaCompilation" or "CSharpCompilation" or "DeclarationEnvironment" or "Options")
                             .ToDictionary(pair => pair.Key, pair => pair.Value != previousContext.Data[pair.Key]),
                     RemovedInputs = currentInputs.Count == 0 ? [] : previousInputs.Keys.Except(currentInputs.Keys).ToArray(),
-                    Counters = statistics == null ? null : Enum.GetValues<GenerationStatisticCounter>().Where(counter => counter != GenerationStatisticCounter.Count)
-                        .ToDictionary(counter => counter.ToString(), statistics.GetCounterCount),
-                    Stages = statistics == null ? null : Enum.GetValues<GenerationStatisticStage>().Where(stage => stage != GenerationStatisticStage.Count)
+                    Counters = statistics == null ? null : ReadCounters(statistics),
+                    Stages = statistics == null ? null : StatisticValues<GenerationStatisticStage>()
                         .Select(stage => new { Stage = stage.ToString(), Count = statistics.GetStageInvocationCount(stage),
                             InclusiveMs = statistics.GetStageElapsed(stage).TotalMilliseconds, InclusiveCurrentThreadBytes = statistics.GetStageAllocatedBytes(stage) }).ToArray(),
                     InvalidAllocationSamples = statistics?.InvalidAllocationMeasurementCount, Events = events,
+                    Operations = statistics?.OperationMeasurements,
                     Steps = result.TrackedSteps.ToDictionary(pair => pair.Key, pair => pair.Value.SelectMany(step => step.Outputs)
                         .GroupBy(value => value.Reason.ToString()).ToDictionary(group => group.Key, group => group.Count())) });
                 previousSources = generated;
@@ -330,7 +350,7 @@ internal static partial class Program
                     var diagnosticKeys = DiagnosticKeys(diagnostics.Concat(output.GetDiagnostics()));
                     var compilerErrors = DiagnosticKeys(output.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
                     baselineCompilerErrors ??= compilerErrors;
-                    if (scenario is not ("unresolved" or "semantic-negative"))
+                    if (scenario is not ("unresolved" or "semantic-negative") && !scenario.StartsWith("localized-", StringComparison.Ordinal))
                     {
                         Assert.Equal(baselineCompilerErrors, compilerErrors);
                     }

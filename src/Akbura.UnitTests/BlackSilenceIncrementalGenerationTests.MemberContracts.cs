@@ -35,6 +35,49 @@ public sealed partial class BlackSilenceIncrementalGenerationTests
     }
 
     [Theory]
+    [InlineData("public class Empty;", false)]
+    [InlineData("namespace Demo; public class Empty;", false)]
+    [InlineData("namespace Demo { public class Empty; }", false)]
+    [InlineData("public class Empty; public class Model { public int Read() => 1; }", true)]
+    [InlineData("public class Model { public int Read() => 1; } public class Empty;", true)]
+    [InlineData("namespace Demo { public class Empty; public class Model { public int Read() => 1; } }", true)]
+    public void MemberContracts_BodylessClassesRemainInExactSourceSegments(string source, bool hasContract)
+    {
+        var root = CSharpSyntaxTree.ParseText(source, CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview)).GetRoot();
+        Assert.Empty(root.GetDiagnostics());
+        var contract = DetachedCSharpDeclarationContract.Create(root, source, CancellationToken.None);
+        Assert.Equal(hasContract, contract != null);
+        if (contract != null)
+        {
+            Assert.Single(contract.Types);
+            Assert.Contains("public class Empty;", string.Concat(contract.TypeSegments));
+        }
+    }
+
+    [Theory]
+    [InlineData("public class Empty;", "public class Renamed;")]
+    [InlineData("public class Empty;", "public class Empty { public int Read() => 1; }")]
+    [InlineData("public class Empty { public int Read() => 1; }", "public class Empty;")]
+    public void MemberContracts_BodylessDeclarationChangesRebindAndMatchFreshDriver(string before, string after)
+    {
+        var project = new TestProject(publishDiagnostics: true);
+        var file = project.File("Page.akbura", Component("<TextBlock Text={global::Demo.UserViewModel.Current.GetName()} />"));
+        var source = MemberViewModel + "\r\n" + before;
+        var tree = CSharpSyntaxTree.ParseText(source, project.Options.ParseOptions, "ViewModel.cs");
+        var baseline = project.Compilation.AddSyntaxTrees(tree);
+        var current = ArtifactRun(project, CreateDriver(project.Options, file), baseline);
+        foreach (var declaration in new[] { after, before })
+        {
+            var changed = CSharpSyntaxTree.ParseText(MemberViewModel + "\r\n" + declaration, project.Options.ParseOptions, tree.FilePath);
+            var compilation = baseline.ReplaceSyntaxTree(tree, changed);
+            current = ArtifactRun(project, current.Driver, compilation);
+            Assert.Null(current.Request.Components.Single().Previous);
+            Assert.Empty(current.Output.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+            AssertArtifactsEqualToFresh(project, current, compilation, file);
+        }
+    }
+
+    [Theory]
     [MemberData(nameof(SupportedMemberBodies))]
     public void MemberContracts_ReferencedAndIndependentBodiesReuseWithoutBinding(string name, string source, string expression)
     {

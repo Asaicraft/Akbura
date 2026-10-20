@@ -70,6 +70,11 @@ try {
                 PreviousSnapshotUnavailable = @($row.Events | Where-Object { $_.Kind -eq 'ProjectContext' -and $_.Decision -eq 'NoPreviousSnapshot' }).Count
                 EqualOutputComparisons = @($row.Events | Where-Object { $_.Kind -eq 'OutputComparison' -and $_.Decision -eq 'Equal' }).Count
             }
+            if ($row.SyntaxReuse) {
+                foreach ($property in $row.SyntaxReuse.PSObject.Properties) {
+                    $sample['Syntax' + $property.Name] = $property.Value
+                }
+            }
             if ($row.Counters) {
                 foreach ($counter in $row.Counters.PSObject.Properties) {
                     $sample[$counter.Name] = $counter.Value

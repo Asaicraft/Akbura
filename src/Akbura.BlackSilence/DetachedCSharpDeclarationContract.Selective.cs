@@ -21,8 +21,11 @@ internal sealed partial record DetachedCSharpDeclarationContract
             cancellationToken.ThrowIfCancellationRequested();
             if (type.Parent is not (CompilationUnitSyntax or BaseNamespaceDeclarationSyntax) || type.TypeParameterList != null ||
                 type.ParameterList != null || type.ConstraintClauses.Count != 0 || type.AttributeLists.Count != 0 ||
-                type.Modifiers.Any(SyntaxKind.PartialKeyword) || type.Modifiers.Any(SyntaxKind.UnsafeKeyword))
+                type.Modifiers.Any(SyntaxKind.PartialKeyword) || type.Modifiers.Any(SyntaxKind.UnsafeKeyword) ||
+                !type.OpenBraceToken.IsKind(SyntaxKind.OpenBraceToken) || !type.CloseBraceToken.IsKind(SyntaxKind.CloseBraceToken))
             {
+                // Bodyless declarations remain in the exact source segments.
+                // Their default brace tokens have no usable source positions.
                 continue;
             }
             var name = string.Join(".", type.Ancestors().OfType<BaseNamespaceDeclarationSyntax>().Reverse().Select(space =>

@@ -5,7 +5,8 @@ param(
     [Parameter(Mandatory = $true)][string]$ResultDirectory,
     [switch]$Resume,
     [switch]$SkipBenchmarks,
-    [switch]$CollectionAllocations
+    [switch]$CollectionAllocations,
+    [switch]$LocalizedEdits
 )
 
 $ErrorActionPreference = 'Stop'
@@ -32,7 +33,7 @@ $sourceHashes = foreach ($path in $sourcePaths) {
 }
 $fingerprint = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($sourceHashes -join "`n"))))
 $manifestPath = Join-Path $OutputDirectory 'source-manifest.json'
-$verificationMode = if ($CollectionAllocations) { 'CollectionAllocations' } else { 'SemanticDependencies' }
+$verificationMode = if ($LocalizedEdits) { 'LocalizedEdits' } elseif ($CollectionAllocations) { 'CollectionAllocations' } else { 'SemanticDependencies' }
 if (Test-Path -LiteralPath $manifestPath) {
     $previousManifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
     if ($previousManifest.Fingerprint -ne $fingerprint) {
@@ -56,10 +57,16 @@ function Log([string]$message) {
 function Status([string]$phase, [string]$failure = '') {
     $value = @{ Phase = $phase; Current = $script:step; ChildPid = $script:childPid; ControllerPid = $PID
         UpdatedUtc = [DateTime]::UtcNow.ToString('o'); Failure = $failure; SourceFingerprint = $fingerprint }
-    [IO.File]::WriteAllText($statusPath, ($value | ConvertTo-Json) + "`r`n", [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText(($statusPath + '.tmp'), ($value | ConvertTo-Json) + "`r`n", [Text.UTF8Encoding]::new($false))
+    [IO.File]::Move(($statusPath + '.tmp'), $statusPath, $true)
 }
 
 function Wait-Quiet {
+    # Functional verification can overlap another worktree. The timing controller
+    # independently defers and discards contaminated groups; these are not samples.
+    if ($LocalizedEdits -and $SkipBenchmarks) {
+        return
+    }
     while (@(Get-CimInstance Win32_Process -Filter "Name = 'dotnet.exe' OR Name = 'testhost.exe'" | Where-Object {
         $_.CommandLine -match '(?i)(\bdotnet(?:\.exe)?"?\s+(?:test|build|vstest)\b|vstest\.console\.dll|testhost(?:\.exe)?\b)'
     }).Count) {
@@ -223,6 +230,10 @@ try {
     if ($CollectionAllocations) {
         $filter += $collectionFilter
     }
+    $localizedFilter = '|FullyQualifiedName~MarkupExpressionReuseTests|FullyQualifiedName~MarkupIncrementalParserTests|FullyQualifiedName~RealisticIncrementalParserTests|FullyQualifiedName~CSharpProbeOptimizationTests|FullyQualifiedName~SemanticBindingCacheTests|FullyQualifiedName~SemanticArchitecture|FullyQualifiedName~ComponentHotReload|FullyQualifiedName~AkcssHotReload|FullyQualifiedName~ClrHotReloadSmoke'
+    if ($LocalizedEdits) {
+        $filter += $localizedFilter
+    }
     $tests = Run 'debugstats' 'dotnet' @('test', $project, '-c', 'DebugStats', '--no-build', '--no-restore', '--filter', $filter,
         '--logger', 'trx;LogFileName=tests.trx', '--results-directory', '{RESULTS}', '-v:normal', '--', 'xUnit.MaxParallelThreads=2')
     [xml]$trx = Get-Content -LiteralPath (Join-Path $tests 'tests.trx') -Raw
@@ -233,6 +244,9 @@ try {
     if ($CollectionAllocations) {
         $sdkPattern += '|CollectionAllocationTests|PooledBuilderTests|PooledImmutableListTests'
     }
+    if ($LocalizedEdits) {
+        $sdkPattern += '|BlackSilenceIncrementalGenerationTests.Localized|MarkupExpressionReuseTests|CSharpProbeOptimizationTests'
+    }
     $sdkCount = @($trx.TestRun.Results.UnitTestResult | Where-Object { $_.testName -match $sdkPattern }).Count
     if ($sdkCount -le 0) {
         throw 'No SDK-host tests matched the verified package-host results.'
@@ -241,10 +255,16 @@ try {
     if ($CollectionAllocations) {
         $sdkFilter += $collectionFilter
     }
+    if ($LocalizedEdits) {
+        $sdkFilter += '|FullyQualifiedName~BlackSilenceIncrementalGenerationTests.Localized|FullyQualifiedName~MarkupExpressionReuseTests|FullyQualifiedName~CSharpProbeOptimizationTests'
+    }
     $null = Run 'sdk' 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'Verify-SdkRoslyn.ps1'), '-OutputDirectory', '{RESULTS}', '-TestFilter', $sdkFilter, '-ExpectedTestCount', "$sdkCount")
     $releaseFilter = '(FullyQualifiedName~DetachedArtifacts_|FullyQualifiedName~MemberContracts_|FullyQualifiedName~SemanticDependencies_)&FullyQualifiedName!~OnlyNewestStoreAlive&FullyQualifiedName!~MixedLongSession&FullyQualifiedName!~MixedRevisions'
     if ($CollectionAllocations) {
         $releaseFilter = $releaseFilter.Replace(')&', $collectionFilter + ')&')
+    }
+    if ($LocalizedEdits) {
+        $releaseFilter = $releaseFilter.Replace(')&', '|FullyQualifiedName~Localized' + $localizedFilter + ')&')
     }
     $null = Run 'release' 'dotnet' @('test', $project, '-c', 'Release', '--no-restore', '-p:UseSharedCompilation=false', '-nr:false', '--filter', $releaseFilter,
         '--logger', 'trx;LogFileName=tests.trx', '--results-directory', '{RESULTS}', '-v:normal', '--', 'xUnit.MaxParallelThreads=2')

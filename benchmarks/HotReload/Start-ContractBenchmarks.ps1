@@ -3,6 +3,8 @@ param(
     [string]$InputDirectory,
     [string]$OutputDirectory,
     [string]$ResultDirectory,
+    [string]$ToolDirectory = (Join-Path $PSScriptRoot 'bin/Debug/net10.0'),
+    [string]$CellOverrideFile = '',
     [switch]$Resume,
     [switch]$Worker,
     [string[]]$Scenario = @('akbura', 'real-method', 'real-referenced-method', 'real-service', 'real-property', 'real-multiple',
@@ -11,19 +13,25 @@ param(
     [switch]$SkipLifetime,
     [switch]$SkipWatch,
     [switch]$SemanticDependencies,
-    [ValidateSet('stats', 'off')][string]$Profiling = 'stats',
+    [ValidateSet('stats', 'off', 'trace')][string]$Profiling = 'stats',
+    [string[]]$Component = @('gallery:Counter.akbura', 'purity:Sidebar.akbura'),
+    [ValidateSet('enabled', 'disabled')][string[]]$Mode = @('disabled', 'enabled'),
+    [switch]$SkipPreflight,
     [ValidateRange(1, 10000)][int]$RetentionRevisions = 100,
     [ValidateRange(3, 100)][int]$ConcurrentSamples = 8
 )
 
 $ErrorActionPreference = 'Stop'
 $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+. (Join-Path $PSScriptRoot 'BenchmarkCellOverrides.ps1')
 
 function Assert-Scenarios([string[]]$names) {
     $supported = @('akbura', 'real-method', 'real-referenced-method', 'real-service', 'real-property', 'real-multiple',
         'real-mixed', 'real-signature', 'real-overload', 'unrelated-body', 'referenced-signature',
         'semantic-property', 'semantic-signature', 'semantic-add-overload', 'semantic-remove-overload', 'semantic-negative',
-        'semantic-multiple', 'semantic-unrelated', 'semantic-mixed', 'semantic-global')
+        'semantic-multiple', 'semantic-unrelated', 'semantic-mixed', 'semantic-global',
+        'localized-literal', 'localized-property', 'localized-akcss', 'localized-binding-sibling', 'localized-expression',
+        'localized-property-add-remove', 'localized-structure', 'localized-name', 'localized-diagnostic', 'localized-trivia')
     if (-not $names.Count -or @($names | Sort-Object -Unique).Count -ne $names.Count) {
         throw 'Select at least one scenario, without duplicates.'
     }
@@ -38,7 +46,7 @@ if (-not $OutputDirectory) {
     $OutputDirectory = Join-Path $repository ('bin/MemberContractBenchmarks/' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ'))
 }
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
-$toolDirectory = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'bin/Debug/net10.0'))
+$toolDirectory = [IO.Path]::GetFullPath($ToolDirectory)
 if ($OutputDirectory.Equals($toolDirectory, [StringComparison]::OrdinalIgnoreCase) -or
     $OutputDirectory.StartsWith($toolDirectory + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
     throw 'Keep output outside the source tool directory so freezing cannot recursively copy itself.'
@@ -52,6 +60,14 @@ if (-not $Worker) {
     }
     else {
         Assert-Scenarios $Scenario
+        if (-not $Component.Count -or -not $Mode.Count -or @($Component | Sort-Object -Unique).Count -ne $Component.Count) {
+            throw 'Select nonempty, distinct components and at least one optimization mode.'
+        }
+        foreach ($item in $Component) {
+            if ($item -notmatch '^(gallery|purity):[^\\/:]+\.akbura$') {
+                throw "Invalid component selection: $item"
+            }
+        }
         if (-not $InputDirectory) {
             throw 'Prepare evaluated inputs with Run.ps1, then pass -InputDirectory.'
         }
@@ -69,7 +85,7 @@ if (-not $Worker) {
         $null = New-Item -ItemType Directory -Path $OutputDirectory
         # Freeze the complete tool closure. Subsequent working-tree builds must
         # not silently replace the implementation halfway through a timing pair.
-        Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'bin/Debug/net10.0') -Destination (Join-Path $OutputDirectory 'tool') -Recurse
+        Copy-Item -LiteralPath $toolDirectory -Destination (Join-Path $OutputDirectory 'tool') -Recurse
         foreach ($name in @('gallery-inputs.json', 'purity-inputs.json', 'invalidation-environment.json', 'purity-source.json')) {
             if ($SkipPurity -and $name.StartsWith('purity', [StringComparison]::Ordinal)) {
                 continue
@@ -105,7 +121,8 @@ if (-not $Worker) {
             ResultDirectory = $ResultDirectory; ToolHashes = @($hashes); InputHashes = @($inputHashes)
             RetentionRevisions = $RetentionRevisions; ConcurrentSamples = $ConcurrentSamples; Scenarios = $Scenario
             SkipPurity = [bool]$SkipPurity; SkipLifetime = [bool]$SkipLifetime; SkipWatch = [bool]$SkipWatch
-            SemanticDependencies = [bool]$SemanticDependencies; Profiling = $Profiling }
+            SemanticDependencies = [bool]$SemanticDependencies; Profiling = $Profiling
+            Components = $Component; Modes = $Mode; SkipPreflight = [bool]$SkipPreflight }
         [IO.File]::WriteAllText($configurationPath, ($configuration | ConvertTo-Json -Depth 5) + "`r`n", [Text.UTF8Encoding]::new($false))
     }
     $previousStatusPath = Join-Path $OutputDirectory 'status.json'
@@ -123,9 +140,28 @@ if (-not $Worker) {
         }
     }
     $shell = (Get-Process -Id $PID).Path
+    if ($CellOverrideFile) {
+        $routing = Get-Content -LiteralPath $CellOverrideFile -Raw | ConvertFrom-Json
+        $saved = Get-Content -LiteralPath $configurationPath -Raw | ConvertFrom-Json
+        $null = Get-BenchmarkCellOverrides $saved.Components $saved.Scenarios @($routing.Overrides)
+        $selectionPath = Join-Path $OutputDirectory 'cell-overrides.json'
+        $runDigest = (Get-FileHash -LiteralPath $configurationPath).Hash
+        if (Test-Path -LiteralPath $selectionPath) {
+            $existing = Get-Content -LiteralPath $selectionPath -Raw | ConvertFrom-Json
+            if ($existing.RunSha256 -ne $runDigest -or
+                (ConvertTo-Json -InputObject @($existing.Overrides) -Compress) -cne (ConvertTo-Json -InputObject @($routing.Overrides) -Compress)) {
+                throw 'Cell routing changed; preserve this run and use a new output directory.'
+            }
+        }
+        else {
+            [IO.File]::WriteAllText($selectionPath, (@{ RunSha256 = $runDigest; Overrides = @($routing.Overrides)
+                CreatedUtc = [DateTime]::UtcNow.ToString('o'); Reason = $routing.Reason } | ConvertTo-Json -Depth 4) + "`r`n", [Text.UTF8Encoding]::new($false))
+        }
+    }
+    $stamp = [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ')
     $process = Start-Process -FilePath $shell -ArgumentList @('-NoProfile', '-File', ('"' + $PSCommandPath + '"'),
         '-Worker', '-OutputDirectory', ('"' + $OutputDirectory + '"')) -WorkingDirectory $repository -WindowStyle Hidden -PassThru `
-        -RedirectStandardOutput (Join-Path $OutputDirectory 'controller.stdout.log') -RedirectStandardError (Join-Path $OutputDirectory 'controller.stderr.log')
+        -RedirectStandardOutput (Join-Path $OutputDirectory "controller-$stamp.stdout.log") -RedirectStandardError (Join-Path $OutputDirectory "controller-$stamp.stderr.log")
     Write-Output "Background controller PID: $($process.Id)"
     Write-Output "Status: $(Join-Path $OutputDirectory 'status.json')"
     Write-Output "Live log: Get-Content -LiteralPath '$(Join-Path $OutputDirectory 'journal.log')' -Tail 20 -Wait"
@@ -353,28 +389,44 @@ try {
     }
     # Fail early on real-project parity/ownership errors rather than discovering
     # them only after the complete timing matrix. Keep preflight out of reports.
-    $current = 'Preflight real-member parity and owner-only collection'
-    Wait-QuietHost
     Assert-Inputs
-    $preflightDirectory = Join-Path $OutputDirectory 'preflight'
-    $null = New-Item -ItemType Directory -Path $preflightDirectory -Force
-    $preflightPath = Join-Path $preflightDirectory ([Guid]::NewGuid().ToString('N') + '.jsonl')
     $memoryCommand = $(if ($configuration.SemanticDependencies) { 'semantic-memory' } else { 'member-memory' })
-    $preflight = @{ Workload = 'gallery'; File = 'Counter.akbura'; Command = $memoryCommand; Mode = 'enabled'
-        Revisions = 1; ConcurrentSamples = 3 }
-    Status 'Running'
-    Log "START $current"
-    Run $preflight $preflightPath
-    Assert-Inputs
-    if (-not (Complete $preflightPath $preflight)) {
-        throw "Incomplete successful preflight: $preflightPath"
+    if (-not $configuration.SkipPreflight) {
+        $current = 'Preflight real-member parity and owner-only collection'
+        Wait-QuietHost
+        $preflightDirectory = Join-Path $OutputDirectory 'preflight'
+        $null = New-Item -ItemType Directory -Path $preflightDirectory -Force
+        $preflightPath = Join-Path $preflightDirectory ([Guid]::NewGuid().ToString('N') + '.jsonl')
+        $preflight = @{ Workload = 'gallery'; File = 'Counter.akbura'; Command = $memoryCommand; Mode = 'enabled'
+            Revisions = 1; ConcurrentSamples = 3 }
+        Status 'Running'
+        Log "START $current"
+        Run $preflight $preflightPath
+        Assert-Inputs
+        if (-not (Complete $preflightPath $preflight)) {
+            throw "Incomplete successful preflight: $preflightPath"
+        }
+        Log "DONE $current"
     }
-    Log "DONE $current"
-    foreach ($workload in @(@{ Name = 'gallery'; File = 'Counter.akbura' }, @{ Name = 'purity'; File = 'Sidebar.akbura' }) |
+    $current = 'Waiting for clean timing host'
+    $components = if ($configuration.Components) { $configuration.Components } else { @('gallery:Counter.akbura', 'purity:Sidebar.akbura') }
+    $modes = if ($configuration.Modes) { $configuration.Modes } else { @('disabled', 'enabled') }
+    $selectionPath = Join-Path $OutputDirectory 'cell-overrides.json'
+    $overrides = @()
+    if (Test-Path -LiteralPath $selectionPath) {
+        $selection = Get-Content -LiteralPath $selectionPath -Raw | ConvertFrom-Json
+        if ($selection.RunSha256 -ne (Get-FileHash -LiteralPath $configurationPath).Hash) { throw 'Cell routing belongs to another frozen run.' }
+        $overrides = @($selection.Overrides)
+    }
+    $cellMap = Get-BenchmarkCellOverrides $components $configuration.Scenarios $overrides
+    foreach ($workload in @($components | ForEach-Object { $parts = $_.Split(':'); @{ Name = $parts[0]; File = $parts[1] } }) |
         Where-Object { $_.Name -eq 'gallery' -or -not $configuration.SkipPurity }) {
         foreach ($scenario in $configuration.Scenarios) {
-            foreach ($mode in @('disabled', 'enabled')) {
-                $jobs.Add(@{ Workload = $workload.Name; File = $workload.File; Command = 'artifacts'; Scenario = $scenario; Mode = $mode })
+            $cell = $workload.Name + ':' + $workload.File + '/' + $scenario
+            $file = if ($cellMap.ContainsKey($cell)) { $cellMap[$cell] } else { $workload.File }
+            foreach ($mode in $modes) {
+                $jobs.Add(@{ Workload = $workload.Name; File = $file; RequestedFile = $workload.File
+                    Command = 'artifacts'; Scenario = $scenario; Mode = $mode })
             }
         }
         foreach ($mode in @('disabled', 'enabled') | Where-Object { -not $configuration.SkipLifetime }) {
@@ -382,24 +434,45 @@ try {
                 Revisions = $(if ($workload.Name -eq 'gallery') { $configuration.RetentionRevisions } else { 1 }); ConcurrentSamples = $configuration.ConcurrentSamples })
         }
     }
+    Status 'Preparing'
     foreach ($job in $jobs) {
-        Wait-QuietHost
         Assert-Inputs
-        $current = "$($job.Workload) / $($job.Scenario) / $($job.Mode)"
+        $current = "$($job.Workload) / $($job.File) / $($job.Scenario) / $($job.Mode)"
         $currentIndex = -1
         $lastObservation = ''
-        $name = if ($job.Command -eq 'artifacts') { "invalidation-$($job.Workload)-$($job.Scenario)-stats-$($job.Mode).jsonl" }
+        $filePart = if ($configuration.Components -and (@($components | Where-Object { $_.StartsWith($job.Workload + ':') }).Count -gt 1 -or
+            $job.File -notin @('Counter.akbura', 'Sidebar.akbura'))) { '-' + [IO.Path]::GetFileNameWithoutExtension($job.File) } else { '' }
+        $name = if ($job.Command -eq 'artifacts') { "invalidation-$($job.Workload)$filePart-$($job.Scenario)-stats-$($job.Mode).jsonl" }
             else { "artifact-memory-$($job.Workload)-$($job.Mode).jsonl" }
         $path = Join-Path $OutputDirectory $name
+        if ($job.Command -eq 'artifacts' -and $job.RequestedFile -ne $job.File) {
+            $oldPart = if ($configuration.Components -and (@($components | Where-Object { $_.StartsWith($job.Workload + ':') }).Count -gt 1 -or
+                $job.RequestedFile -notin @('Counter.akbura','Sidebar.akbura'))) { '-' + [IO.Path]::GetFileNameWithoutExtension($job.RequestedFile) } else { '' }
+            $oldPath = Join-Path $OutputDirectory "invalidation-$($job.Workload)$oldPart-$($job.Scenario)-stats-$($job.Mode).jsonl"
+            if (Test-Path -LiteralPath $oldPath) {
+                if (Complete $oldPath $job) { throw 'Cannot redirect an already completed benchmark cell.' }
+                $interrupted = Join-Path $OutputDirectory 'interrupted'
+                $null = New-Item -ItemType Directory -Path $interrupted -Force
+                $stamp = [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ')
+                foreach ($superseded in @($oldPath, ($oldPath + '.stderr.log')) | Where-Object { Test-Path -LiteralPath $_ }) {
+                    Move-Item -LiteralPath $superseded -Destination (Join-Path $interrupted ([IO.Path]::GetFileName($superseded) + '.' + $stamp))
+                }
+            }
+        }
         if (Complete $path $job) {
             $completed++
             Log "RESUMED $current"
             continue
         }
+        Wait-QuietHost
         if (Test-Path -LiteralPath $path) {
             $interrupted = Join-Path $OutputDirectory 'interrupted'
             $null = New-Item -ItemType Directory -Path $interrupted -Force
-            Move-Item -LiteralPath $path -Destination (Join-Path $interrupted ($name + '.' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ')))
+            $stamp = [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ')
+            Move-Item -LiteralPath $path -Destination (Join-Path $interrupted ($name + '.' + $stamp))
+            if (Test-Path -LiteralPath ($path + '.stderr.log')) {
+                Move-Item -LiteralPath ($path + '.stderr.log') -Destination (Join-Path $interrupted ($name + '.stderr.log.' + $stamp))
+            }
         }
         Status 'Running'
         Log "START $current"
@@ -415,6 +488,9 @@ try {
     Status 'Summarizing'
     & (Join-Path $PSScriptRoot 'Summarize-Invalidation.ps1') -InputDirectory $OutputDirectory -ResultDirectory $configuration.ResultDirectory
     Copy-Item -LiteralPath $configurationPath -Destination (Join-Path $configuration.ResultDirectory 'run.json') -Force
+    if (Test-Path -LiteralPath $selectionPath) {
+        Copy-Item -LiteralPath $selectionPath -Destination (Join-Path $configuration.ResultDirectory 'cell-overrides.json') -Force
+    }
     if (-not $configuration.SkipWatch) {
         $current = 'Live C# member dotnet watch'
         Wait-QuietHost

@@ -1,0 +1,21 @@
+{
+  "Boundaries": "File write to observed rendered value; exact compiler delta submission and per-update generator time unavailable.",
+  "OriginalProcessAndControlPreserved": true,
+  "Updates": 9,
+  "BinaryHashes": [
+    {
+      "Name": "Akbura.BlackSilence.dll",
+      "Sha256": "4A1F3C6ED09C20AEC59C69F81A063CA4B69F15EF2FC62B080F6BB42A48B0A7E8"
+    },
+    {
+      "Name": "Akbura.Generator.dll",
+      "Sha256": "1264FBC11F330493839BB0AC0ADF9803DBC21B0C8BAE75DAC8B1C4CC4DFE127B"
+    },
+    {
+      "Name": "HotReloadBenchmarks.dll",
+      "Sha256": "078F874836DFE9F94F4A2B8B39D9B4B7F421C676B61DCEE44DE8C218B2927680"
+    }
+  ],
+  "StateAndInputPreserved": true,
+  "Edit": "Existing Text literal, unchanged count binding"
+}

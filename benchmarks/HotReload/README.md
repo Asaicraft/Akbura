@@ -168,3 +168,9 @@ Checked-in runs:
 - [2026-10-16 results](results/2026-10-16/README.md)
 - [C# invalidation investigation and profiling controls](results/2026-10-16-csharp-invalidation/README.md)
 - [Bounded cross-compilation artifact reuse](results/2026-10-17-artifact-reuse/README.md)
+
+## Localized markup edits
+
+`Run.ps1 -Suite localized -Prepare` prepares the existing evaluated projects and starts the resumable ten-category localized edit matrix. It uses small and complex real components in both FeatureGallery and Purity UI. `Start-ContractBenchmarks.ps1` also accepts explicit `-Component gallery:Counter.akbura,purity:Sidebar.akbura`, `-Mode enabled` and a frozen `-ToolDirectory`.
+
+For a complete original/optimized verification run, freeze the unmodified instrumented and Release analyzer closures first, then use `Verify-LocalizedEdits.ps1`. Its UTC `journal.log` and atomic `status.json` provide background progress; source fingerprints and successful-step markers protect resumption. Clean timing groups are separate from functional tests and diagnostic trace runs. `Summarize-LocalizedEdits.ps1` generates measured tables and extracts actual generated-code differences from verification TRX output without replacing the manually written investigation.

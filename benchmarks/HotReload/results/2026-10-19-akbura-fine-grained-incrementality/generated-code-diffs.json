@@ -1,0 +1,44 @@
+[
+  {
+    "Mode": "DebugStructural",
+    "Changes": [
+      {
+        "Before": "            \"D0F1669E12503A18\";",
+        "After": "            \"AB28EDA24CA8E84E\";"
+      },
+      {
+        "Before": "                \"AD002153AB0ED5980DB74DB51D36F3817E34A778001E3A690456C2CCEB93DAE7\",",
+        "After": "                \"7C364477703BB0C25335B03CD877C9CAFE3E1F2F94265AB31DF93A979ECC04BE\","
+      },
+      {
+        "Before": "                    \"6028E00A78D72B695B5110B8F345C47D9F39D3FE17CA3F6AAB84E52663087B6E\",",
+        "After": "                    \"534B9ED6C251DB4FF63694B3BA5F5E5D3AD0E6F54D5FBFE5FF2725BCE91169FF\","
+      },
+      {
+        "Before": "                    global::Avalonia.Thickness.Parse(\"10\"));",
+        "After": "                    global::Avalonia.Thickness.Parse(\"20\"));"
+      },
+      {
+        "Before": "                \"6028E00A78D72B695B5110B8F345C47D9F39D3FE17CA3F6AAB84E52663087B6E\",",
+        "After": "                \"534B9ED6C251DB4FF63694B3BA5F5E5D3AD0E6F54D5FBFE5FF2725BCE91169FF\","
+      },
+      {
+        "Before": "                global::Avalonia.Thickness.Parse(\"10\"));",
+        "After": "                global::Avalonia.Thickness.Parse(\"20\"));"
+      }
+    ]
+  },
+  {
+    "Mode": "ReleaseDirect",
+    "Changes": [
+      {
+        "Before": "            ((global::Avalonia.AvaloniaObject)__element1).SetValue(global::Avalonia.Layout.Layoutable.MarginProperty, global::Avalonia.Thickness.Parse(\"10\"));",
+        "After": "            ((global::Avalonia.AvaloniaObject)__element1).SetValue(global::Avalonia.Layout.Layoutable.MarginProperty, global::Avalonia.Thickness.Parse(\"20\"));"
+      },
+      {
+        "Before": "            ((global::Avalonia.AvaloniaObject)__element1).SetValue(global::Avalonia.Layout.Layoutable.MarginProperty, global::Avalonia.Thickness.Parse(\"10\"));",
+        "After": "            ((global::Avalonia.AvaloniaObject)__element1).SetValue(global::Avalonia.Layout.Layoutable.MarginProperty, global::Avalonia.Thickness.Parse(\"20\"));"
+      }
+    ]
+  }
+]

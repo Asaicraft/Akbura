@@ -1,0 +1,93 @@
+{
+  "FailedRun": {
+    "Executed": 3543,
+    "Failed": 1,
+    "ExpectedAllocatedBytes": 0,
+    "ActualAllocatedBytes": 1016,
+    "Passed": 3542,
+    "Test": "ConditionalRenderStateTests.UnchangedActiveBranch_DoesNotCreateTransactionOrAllocate"
+  },
+  "CompletedUtc": "2026-10-19T16:09:37.3657888Z",
+  "BinaryHashes": [
+    {
+      "Name": "Akbura.UnitTests.dll",
+      "Sha256": "E1F748AD6F1E41F664E7CC8D3053108841B884ABF3D69757216F37E076744352"
+    },
+    {
+      "Name": "Akbura.dll",
+      "Sha256": "E0009D9A4332F0367EE3D4984E7876F67B73E16ACFDB002AA6D8DBBDFD967C2E"
+    },
+    {
+      "Name": "Akbura.Generator.dll",
+      "Sha256": "1264FBC11F330493839BB0AC0ADF9803DBC21B0C8BAE75DAC8B1C4CC4DFE127B"
+    },
+    {
+      "Name": "Akbura.BlackSilence.dll",
+      "Sha256": "4A1F3C6ED09C20AEC59C69F81A063CA4B69F15EF2FC62B080F6BB42A48B0A7E8"
+    }
+  ],
+  "Repeats": [
+    {
+      "Passed": 37,
+      "Executed": 37,
+      "Name": "group-1",
+      "Failed": 0
+    },
+    {
+      "Passed": 37,
+      "Executed": 37,
+      "Name": "group-2",
+      "Failed": 0
+    },
+    {
+      "Passed": 37,
+      "Executed": 37,
+      "Name": "group-3",
+      "Failed": 0
+    },
+    {
+      "Passed": 37,
+      "Executed": 37,
+      "Name": "group-4",
+      "Failed": 0
+    },
+    {
+      "Passed": 37,
+      "Executed": 37,
+      "Name": "group-5",
+      "Failed": 0
+    },
+    {
+      "Passed": 1,
+      "Executed": 1,
+      "Name": "isolated-1",
+      "Failed": 0
+    },
+    {
+      "Passed": 1,
+      "Executed": 1,
+      "Name": "isolated-2",
+      "Failed": 0
+    },
+    {
+      "Passed": 1,
+      "Executed": 1,
+      "Name": "isolated-3",
+      "Failed": 0
+    },
+    {
+      "Passed": 1,
+      "Executed": 1,
+      "Name": "isolated-4",
+      "Failed": 0
+    },
+    {
+      "Passed": 1,
+      "Executed": 1,
+      "Name": "isolated-5",
+      "Failed": 0
+    }
+  ],
+  "SourceFingerprint": "A5E6AEC96F017605EFE35D7C58EE9E862876C7093C11FF4C0AB0A00AA5C06D4A",
+  "Interpretation": "Failure was not reproduced. Cause remains unconfirmed; successful targeted repeats do not replace full-suite verification. No source/binary/threshold/runtime-setting changes."
+}

@@ -1,0 +1,87 @@
+{
+  "CreatedUtc": "2026-10-19T13:14:31.7096689Z",
+  "RepositoryRevision": "ba6b0a1a55a07714ecd97c34946c9caad167c18c",
+  "HarnessSources": [
+    {
+      "Sha256": "D241F0F7FB0C4D338344768409129FC484AA61D7EA2BDBC64A04598881C12AD0",
+      "Path": "benchmarks/HotReload/MemberWatchFixture/MemberViewModel.cs"
+    },
+    {
+      "Sha256": "141916DE3CE4D25D508884C72C3CD5E7A8C335C806FD83CD497B40429FCC2A93",
+      "Path": "benchmarks/HotReload/MemberWatchFixture/Program.cs"
+    },
+    {
+      "Sha256": "1E106AE7372DD8D44A0B6AFDAA539AE1DCD81295EA88509EF8C27241AEC46944",
+      "Path": "benchmarks/HotReload/Program.ArtifactRetention.cs"
+    },
+    {
+      "Sha256": "8DBBAC45DB4F265D7D2BF9FB6E1E131A9FB1E4C872B4BD5365FA5B01B9858795",
+      "Path": "benchmarks/HotReload/Program.Collections.cs"
+    },
+    {
+      "Sha256": "9CB2E683AA760BF5E4682CF194CE97FBD767C263D24E92FF68F716681E5CE2BB",
+      "Path": "benchmarks/HotReload/Program.Contracts.cs"
+    },
+    {
+      "Sha256": "7DFF3D18751DA7EF47FC28EAF0E988A33D2B45EA120ABF01025CCB3BF488D258",
+      "Path": "benchmarks/HotReload/Program.cs"
+    },
+    {
+      "Sha256": "6319CF9C1E33DAD576A00AFA1DCEDEBAC88878034253265E42FEE128B7F21D6B",
+      "Path": "benchmarks/HotReload/Program.Invalidation.cs"
+    },
+    {
+      "Sha256": "6A33A7064F93D732E12DC69934C3A590ED5864ADDB1281BADBC28201ED1F390E",
+      "Path": "benchmarks/HotReload/Program.Localized.cs"
+    },
+    {
+      "Sha256": "786A8205C718AF7BA8624C0B05E82AC3FBCA8F12E2B7B3F91A10CF4679BB921B",
+      "Path": "benchmarks/HotReload/PurityHost/Program.cs"
+    },
+    {
+      "Sha256": "85D8BF0DE635DFE073EF1A4A4CE2D69227FAEF948282D64545A943F00DD2708E",
+      "Path": "benchmarks/HotReload/WatchFixture/Counter.akbura.cs"
+    },
+    {
+      "Sha256": "39D97BDD55AD8780FE6A3C152813FBBA811A21E43B5BC7D0C70AB8755B41E83D",
+      "Path": "benchmarks/HotReload/WatchFixture/Program.cs"
+    }
+  ],
+  "Purpose": "Correct the benchmark harness only; frozen original analyzers are byte-for-byte unchanged. All accepted timing groups will be rerun with the corrected common host.",
+  "Closures": [
+    {
+      "OriginalHostSha256": "7FE2DAADD6E74F1DB1B74184826E11E32EEC5A0D350795F095347B8B3382D530",
+      "OriginalDirectory": "bin/FineGrained/before/tool",
+      "Analyzers": [
+        {
+          "Sha256": "BF7A72CD2D560766DDDACCAD43AA7035AF8EC7A1273C6A88B3AE5848BF13EDF2",
+          "Name": "Akbura.Generator.dll"
+        },
+        {
+          "Sha256": "2B3EC0BD72440EC3EBC9C992E27BCD2DF176D421833FE3A9CBAE5DC854AA4042",
+          "Name": "Akbura.BlackSilence.dll"
+        }
+      ],
+      "Flavor": "instrumented",
+      "CorrectedHostSha256": "695295703A728E06562FA35D4A51E6B4AD2B0092C87AA95DADF0B9FDEA756AFE",
+      "CorrectedDirectory": "bin/FineGrained/original-instrumented-corrected/tool"
+    },
+    {
+      "OriginalHostSha256": "7FE2DAADD6E74F1DB1B74184826E11E32EEC5A0D350795F095347B8B3382D530",
+      "OriginalDirectory": "bin/FineGrained/original-production/tool",
+      "Analyzers": [
+        {
+          "Sha256": "D4A42227353DFF0A2E333AF8EF3911C4F43F6ECFACA4BA0D861F72ABDB5B2F17",
+          "Name": "Akbura.Generator.dll"
+        },
+        {
+          "Sha256": "31AE51957729B10347DAD894E55CD213904BD06CB7F59D969B6745FCEA4092FC",
+          "Name": "Akbura.BlackSilence.dll"
+        }
+      ],
+      "Flavor": "production",
+      "CorrectedHostSha256": "695295703A728E06562FA35D4A51E6B4AD2B0092C87AA95DADF0B9FDEA756AFE",
+      "CorrectedDirectory": "bin/FineGrained/original-production-corrected/tool"
+    }
+  ]
+}

@@ -94,6 +94,14 @@ internal sealed partial class CSharpProbeBinder : Binder
         using var probeMeasurement = MeasureProbe(isBindingPath ? ProbeCategory.BindingPath : ProbeCategory.MarkupExpression);
         using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeBinding);
 #endif
+#if STATS
+        var sourceExpression = GenerationStatistics.IsInvalidationTrackingEnabled
+            ? CSharpProbeBuilder.GetReturnProbeExpression(compilationUnit) : null;
+        if (sourceExpression != null)
+        {
+            RecordExpressionProbe(SemanticModel.SyntaxTree.GetRootSyntax(), sourceExpression, targetType, compilationUnit, "Return");
+        }
+#endif
         var syntaxTree = CreateSyntaxTree(compilationUnit);
         var semanticModel = CreateSemanticModel(syntaxTree);
         var probeExpression = CSharpProbeBuilder.GetReturnProbeExpression(syntaxTree.GetCompilationUnitRoot());
@@ -134,12 +142,31 @@ internal sealed partial class CSharpProbeBinder : Binder
             throw new ArgumentNullException(nameof(expression));
         }
 
-        var syntaxTree = CreateSyntaxTree(
-            new CSharpProbeBuilder(this)
-                .CreateReturnExpressionProbe(
-                    syntax,
-                    expression,
-                    targetType));
+        var projection = new CSharpProbeBuilder(this).CreateReturnExpressionProbe(syntax, expression, targetType);
+#if STATS
+        RecordExpressionProbe(syntax, expression, targetType, projection);
+#endif
+        return BindExpressionCore(syntax, projection, targetType, isBindingPath);
+    }
+
+    internal CSharpBindingResult BindMarkupExpression(AkburaSyntax syntax, CSharp.ExpressionSyntax expression, ITypeSymbol? targetType)
+    {
+#if STATS
+        using var probeMeasurement = MeasureProbe(expression is CSharp.LambdaExpressionSyntax ? ProbeCategory.Lambda : ProbeCategory.BindingPath, syntax);
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeBinding);
+#endif
+        var projection = new CSharpProbeBuilder(this).CreateReturnExpressionProbe(syntax, expression, targetType);
+#if STATS
+        RecordExpressionProbe(syntax, expression, targetType, projection);
+#endif
+        return SemanticModel.BindingSession.ProbeContext.BindMarkupExpression(projection, targetType,
+            () => AkburaSemanticModel.GetCSharpBindingResult(BindExpressionCore(syntax, projection, targetType, isBindingPath: true)));
+    }
+
+    private BoundExpression BindExpressionCore(AkburaSyntax syntax, CSharp.CompilationUnitSyntax projection,
+        ITypeSymbol? targetType, bool isBindingPath)
+    {
+        var syntaxTree = CreateSyntaxTree(projection);
         var semanticModel = CreateSemanticModel(syntaxTree);
         var probeExpression = CSharpProbeBuilder.GetReturnProbeExpression(syntaxTree.GetCompilationUnitRoot());
 

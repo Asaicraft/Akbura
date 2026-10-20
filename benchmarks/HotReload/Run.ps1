@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('runtime', 'generator', 'graph', 'build', 'watch', 'invalidation', 'artifacts', 'retention')]
+    [ValidateSet('runtime', 'generator', 'graph', 'build', 'watch', 'invalidation', 'artifacts', 'retention', 'localized')]
     [string[]]$Suite = @('runtime', 'generator', 'graph', 'build', 'watch'),
     [string]$OutputDirectory,
     [string]$PurityRoot,
@@ -82,7 +82,7 @@ try {
     if ($Prepare) {
         Invoke-Dotnet @('build', 'src/Akbura.Diagnostics/Akbura.Diagnostics.csproj', '--nologo', '-v:minimal') (Join-Path $OutputDirectory 'prepare-runtime.log')
         $toolArguments = @('build', $toolProject, '--nologo', '-v:minimal')
-        if (@($Suite | Where-Object { $_ -in @('invalidation', 'artifacts', 'retention') }).Count -gt 0) {
+        if (@($Suite | Where-Object { $_ -in @('invalidation', 'artifacts', 'retention', 'localized') }).Count -gt 0) {
             Invoke-Dotnet @('build', 'src/Akbura.BlackSilence/Akbura.BlackSilence.csproj', '-c', 'DebugStats', '--nologo', '-v:minimal') (Join-Path $OutputDirectory 'prepare-invalidation.log')
             $toolArguments += '-p:BlackSilenceConfiguration=DebugStats'
         }
@@ -91,7 +91,7 @@ try {
     if (-not (Test-Path -LiteralPath $tool)) {
         throw 'Run with -Prepare to build the runtime and benchmark executable first.'
     }
-    $usePurity = -not $SkipPurity -and @($Suite | Where-Object { $_ -in @('generator', 'graph', 'watch', 'invalidation', 'artifacts', 'retention') }).Count -gt 0
+    $usePurity = -not $SkipPurity -and @($Suite | Where-Object { $_ -in @('generator', 'graph', 'watch', 'invalidation', 'artifacts', 'retention', 'localized') }).Count -gt 0
     if ($usePurity) {
         if (-not $PurityRoot) {
             $PurityRoot = Join-Path $PSScriptRoot 'Akbura-PurityUI-Tutorial'
@@ -195,7 +195,7 @@ try {
             }
         }
     }
-    if (@($Suite | Where-Object { $_ -in @('invalidation', 'artifacts', 'retention') }).Count -gt 0) {
+    if (@($Suite | Where-Object { $_ -in @('invalidation', 'artifacts', 'retention', 'localized') }).Count -gt 0) {
         if (-not $galleryInputs) {
             Invoke-Dotnet @('build', $gallery, '--nologo', '-v:minimal') (Join-Path $OutputDirectory 'invalidation-gallery-prepare.log')
             $galleryInputs = Export-Inputs $gallery 'gallery'
@@ -236,6 +236,17 @@ try {
         }
         [IO.File]::WriteAllText((Join-Path $OutputDirectory 'invalidation-environment.json'),
             ($environment | ConvertTo-Json -Depth 10) + "`r`n", [Text.UTF8Encoding]::new($false))
+        if ('localized' -in $Suite) {
+            $localized = @('localized-literal', 'localized-property', 'localized-akcss', 'localized-binding-sibling', 'localized-expression',
+                'localized-property-add-remove', 'localized-structure', 'localized-name', 'localized-diagnostic', 'localized-trivia')
+            $components = @('gallery:Counter.akbura', 'gallery:DataTemplatesPage.akbura')
+            if ($usePurity) {
+                $components += @('purity:NeedHelp.akbura', 'purity:Sidebar.akbura')
+            }
+            & (Join-Path $PSScriptRoot 'Start-ContractBenchmarks.ps1') -InputDirectory $OutputDirectory `
+                -OutputDirectory (Join-Path $OutputDirectory 'localized') -Scenario $localized -Component $components `
+                -Mode @('enabled') -SkipLifetime -SkipWatch -SkipPreflight -SkipPurity:$SkipPurity
+        }
         foreach ($workload in $workloads) {
             if ('invalidation' -in $Suite -or 'artifacts' -in $Suite) {
                 foreach ($scenario in $scenarios) {

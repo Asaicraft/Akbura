@@ -6,6 +6,9 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Threading;
+#if STATS
+using Akbura.Language.CodeGeneration;
+#endif
 
 namespace Akbura.Language.Binder;
 
@@ -70,6 +73,9 @@ internal sealed class SemanticBindingCache
         {
             if (_symbolInfoCache.TryGetValue(syntax, out var symbolInfo))
             {
+#if STATS
+                GenerationStatistics.Increment(GenerationStatisticCounter.SemanticCacheHit);
+#endif
                 return symbolInfo;
             }
         }
@@ -78,6 +84,9 @@ internal sealed class SemanticBindingCache
             _cacheLock.ExitReadLock();
         }
 
+#if STATS
+        GenerationStatistics.Increment(GenerationStatisticCounter.SemanticCacheMiss);
+#endif
         var created = bind();
         _cacheLock.EnterWriteLock();
         try
@@ -129,6 +138,9 @@ internal sealed class SemanticBindingCache
         {
             if (_operationCache.TryGetValue(syntax, out var operation))
             {
+#if STATS
+                GenerationStatistics.Increment(GenerationStatisticCounter.SemanticCacheHit);
+#endif
                 return operation;
             }
         }
@@ -137,6 +149,9 @@ internal sealed class SemanticBindingCache
             _cacheLock.ExitReadLock();
         }
 
+#if STATS
+        GenerationStatistics.Increment(GenerationStatisticCounter.SemanticCacheMiss);
+#endif
         var created = bind();
         _cacheLock.EnterWriteLock();
         try
@@ -188,6 +203,9 @@ internal sealed class SemanticBindingCache
         {
             if (_boundNodeCache.TryGetValue(syntax, out var boundNode))
             {
+#if STATS
+                GenerationStatistics.Increment(GenerationStatisticCounter.SemanticCacheHit);
+#endif
                 return boundNode;
             }
         }
@@ -196,6 +214,9 @@ internal sealed class SemanticBindingCache
             _cacheLock.ExitReadLock();
         }
 
+#if STATS
+        GenerationStatistics.Increment(GenerationStatisticCounter.SemanticCacheMiss);
+#endif
         var created = bind();
         _cacheLock.EnterWriteLock();
         try
@@ -270,6 +291,9 @@ internal sealed class SemanticBindingCache
         {
             if (_diagnosticsCache.TryGetValue(syntax, out var diagnostics))
             {
+#if STATS
+                GenerationStatistics.Increment(GenerationStatisticCounter.SemanticCacheHit);
+#endif
                 return diagnostics;
             }
         }
@@ -278,6 +302,9 @@ internal sealed class SemanticBindingCache
             _cacheLock.ExitReadLock();
         }
 
+#if STATS
+        GenerationStatistics.Increment(GenerationStatisticCounter.SemanticCacheMiss);
+#endif
         var created = bind();
         _cacheLock.EnterWriteLock();
         try
@@ -306,6 +333,9 @@ internal sealed class SemanticBindingCache
         {
             if (_aggregatedDiagnosticsCache.TryGetValue(syntax, out var diagnostics))
             {
+#if STATS
+                GenerationStatistics.Increment(GenerationStatisticCounter.SemanticCacheHit);
+#endif
                 return diagnostics;
             }
         }
@@ -314,6 +344,9 @@ internal sealed class SemanticBindingCache
             _cacheLock.ExitReadLock();
         }
 
+#if STATS
+        GenerationStatistics.Increment(GenerationStatisticCounter.SemanticCacheMiss);
+#endif
         var created = bind();
         _cacheLock.EnterWriteLock();
         try

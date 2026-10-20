@@ -31,6 +31,9 @@ internal static partial class Program
             ClrHotReload = MetadataUpdater.IsSupported, Warmup, Samples });
         switch (args.FirstOrDefault())
         {
+            case "statistics-check":
+                CheckStatisticsSnapshot();
+                break;
             case "collections":
                 MeasureCollections();
                 break;
@@ -53,6 +56,13 @@ internal static partial class Program
                 break;
             case "invalidation":
                 MeasureInvalidation(args[1], args[2], args.ElementAtOrDefault(3), args.ElementAtOrDefault(4) ?? "trace");
+                break;
+            case "localized-trace":
+                MeasureInvalidation(args[1], args[2], args.ElementAtOrDefault(3) ?? "localized-literal", "trace",
+                    verifyEveryUpdate: true, updates: 1);
+                break;
+            case "localized-check":
+                MeasureInvalidation(args[1], args[2], args[3], args.ElementAtOrDefault(4) ?? "off", verifyEveryUpdate: true, updates: 1);
                 break;
             case "artifacts":
                 Assert.Contains(args[5], new[] { "enabled", "disabled" });

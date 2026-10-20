@@ -1,0 +1,99 @@
+{
+  "CapturedUtc": "2026-10-20T10:31:52.7923285Z",
+  "RunSha256": "7ED024B8D872522519053D0D8E18A2CDC6940CCEEFD7C61F068E3171A5C5D6A7",
+  "Basis": "Completed groups are retained byte-for-byte; only previously failing, unmeasured component selections are redirected.",
+  "HostSha256": "078F874836DFE9F94F4A2B8B39D9B4B7F421C676B61DCEE44DE8C218B2927680",
+  "Groups": [
+    {
+      "Component": "Counter.akbura",
+      "Scenario": "localized-akcss",
+      "Project": "Akbura.FeatureGallery",
+      "Sha256": "3653B9CE5864DD9190A95C684F514C4AA8F1C35883D6DF83356510BBCAE84488",
+      "File": "invalidation-gallery-Counter-localized-akcss-stats-enabled.jsonl"
+    },
+    {
+      "Component": "Counter.akbura",
+      "Scenario": "localized-binding-sibling",
+      "Project": "Akbura.FeatureGallery",
+      "Sha256": "4FFCEE12B5421086619F7CA67CCB23D58A5734697ABEA216882F8203AB805222",
+      "File": "invalidation-gallery-Counter-localized-binding-sibling-stats-enabled.jsonl"
+    },
+    {
+      "Component": "Counter.akbura",
+      "Scenario": "localized-diagnostic",
+      "Project": "Akbura.FeatureGallery",
+      "Sha256": "E98318732E43F3D0B69595D676BE8FCEF031B8BF2EDE952A6CEA8F9657557D1C",
+      "File": "invalidation-gallery-Counter-localized-diagnostic-stats-enabled.jsonl"
+    },
+    {
+      "Component": "Counter.akbura",
+      "Scenario": "localized-expression",
+      "Project": "Akbura.FeatureGallery",
+      "Sha256": "26583F89DF3AB3AC1D9C2A1066577F6F6A279952E619475D08EF33D724688B3B",
+      "File": "invalidation-gallery-Counter-localized-expression-stats-enabled.jsonl"
+    },
+    {
+      "Component": "Counter.akbura",
+      "Scenario": "localized-literal",
+      "Project": "Akbura.FeatureGallery",
+      "Sha256": "2943B7FA4362CFE8BCC94BEB3C0B87B1754F73A3AFC4FCD11C99D327EA0D5A71",
+      "File": "invalidation-gallery-Counter-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Component": "Counter.akbura",
+      "Scenario": "localized-name",
+      "Project": "Akbura.FeatureGallery",
+      "Sha256": "E6BFE5ADBEB240CF72F14EEABEF44A68359D12689A93B1585A49536AE393BF80",
+      "File": "invalidation-gallery-Counter-localized-name-stats-enabled.jsonl"
+    },
+    {
+      "Component": "Counter.akbura",
+      "Scenario": "localized-property-add-remove",
+      "Project": "Akbura.FeatureGallery",
+      "Sha256": "E00F73762459070E3620B7338800187FC87216EF950A74C261AE348B6C150DD7",
+      "File": "invalidation-gallery-Counter-localized-property-add-remove-stats-enabled.jsonl"
+    },
+    {
+      "Component": "Counter.akbura",
+      "Scenario": "localized-property",
+      "Project": "Akbura.FeatureGallery",
+      "Sha256": "E7AC7DA34ADAB160D03880CE0A9172ACC322D6A8AD1C35B35650DBC5D6CC6378",
+      "File": "invalidation-gallery-Counter-localized-property-stats-enabled.jsonl"
+    },
+    {
+      "Component": "Counter.akbura",
+      "Scenario": "localized-structure",
+      "Project": "Akbura.FeatureGallery",
+      "Sha256": "79201A438AD11F1AA6EE553383976338A68AFE63F5383F35474D2812F50AC152",
+      "File": "invalidation-gallery-Counter-localized-structure-stats-enabled.jsonl"
+    },
+    {
+      "Component": "Counter.akbura",
+      "Scenario": "localized-trivia",
+      "Project": "Akbura.FeatureGallery",
+      "Sha256": "B808C08AFDBDFB28E9431E13ECF2A6A7596F636495BF046C3917D6B201F0BE1D",
+      "File": "invalidation-gallery-Counter-localized-trivia-stats-enabled.jsonl"
+    },
+    {
+      "Component": "DataTemplatesPage.akbura",
+      "Scenario": "localized-akcss",
+      "Project": "Akbura.FeatureGallery",
+      "Sha256": "2C29C47CA73058CCFBD313174896AA0004C43696FD64795BC49CCF9F3A7F0644",
+      "File": "invalidation-gallery-DataTemplatesPage-localized-akcss-stats-enabled.jsonl"
+    },
+    {
+      "Component": "DataTemplatesPage.akbura",
+      "Scenario": "localized-literal",
+      "Project": "Akbura.FeatureGallery",
+      "Sha256": "3910CD4817C44104A75AB168707A42ABB653BDDD1D42B86797243E0F4AD233E3",
+      "File": "invalidation-gallery-DataTemplatesPage-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Component": "DataTemplatesPage.akbura",
+      "Scenario": "localized-property",
+      "Project": "Akbura.FeatureGallery",
+      "Sha256": "C0266B6DD25E59DACBD6ADA546FD3923C69CD7434972FD7AC772A5862188792B",
+      "File": "invalidation-gallery-DataTemplatesPage-localized-property-stats-enabled.jsonl"
+    }
+  ]
+}

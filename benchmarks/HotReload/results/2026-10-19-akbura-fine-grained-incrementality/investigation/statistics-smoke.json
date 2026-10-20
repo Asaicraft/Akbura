@@ -1,0 +1,47 @@
+{
+  "TimingAccepted": false,
+  "CompletedUtc": "2026-10-20T04:02:16.9292692Z",
+  "Reason": "Functional checks were run concurrently; only statistics serialization and fresh-driver parity are evidence here.",
+  "Observations": [
+    {
+      "Mode": "original",
+      "Index": 0,
+      "Profiling": "stats",
+      "CounterNames": 50,
+      "HasSentinel": false,
+      "ProbeCompilations": 2891
+    },
+    {
+      "Mode": "original",
+      "Index": 1,
+      "Profiling": "stats",
+      "CounterNames": 50,
+      "HasSentinel": false,
+      "ProbeCompilations": 93
+    },
+    {
+      "Mode": "original",
+      "FreshParityChecks": 2
+    },
+    {
+      "Mode": "optimized",
+      "Index": 0,
+      "Profiling": "stats",
+      "CounterNames": 54,
+      "HasSentinel": false,
+      "ProbeCompilations": 1514
+    },
+    {
+      "Mode": "optimized",
+      "Index": 1,
+      "Profiling": "stats",
+      "CounterNames": 54,
+      "HasSentinel": false,
+      "ProbeCompilations": 93
+    },
+    {
+      "Mode": "optimized",
+      "FreshParityChecks": 2
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "Fingerprint": "A5E6AEC96F017605EFE35D7C58EE9E862876C7093C11FF4C0AB0A00AA5C06D4A",
+  "VerificationMode": "LocalizedEdits",
+  "DebugStats": {
+    "Executed": 546,
+    "Passed": 546
+  },
+  "BenchmarksRequested": false,
+  "Scope": "Relevant generator/ownership suites, not every repository test project.",
+  "ExpectedSdkTests": 238,
+  "CompletedUtc": "2026-10-19T14:28:31.8532150Z",
+  "Revision": "ba6b0a1a55a07714ecd97c34946c9caad167c18c"
+}

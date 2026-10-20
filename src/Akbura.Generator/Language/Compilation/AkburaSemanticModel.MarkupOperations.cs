@@ -4383,14 +4383,12 @@ internal partial class AkburaSemanticModel
     internal CSharpBindingResult BindMarkupAttributeExpression(AkburaSyntax scopeSyntax, CSharp.ExpressionSyntax expressionSyntax, ITypeSymbol? targetType = null)
     {
         var scope = GetMarkupBindingScope(scopeSyntax);
-        var bound = BindingSession
+        return BindingSession
             .GetCSharpProbeBinder(scope, BinderUsage.Markup)
-            .BindExpression(scopeSyntax, expressionSyntax, targetType);
-
-        return GetCSharpBindingResult(bound);
+            .BindMarkupExpression(scopeSyntax, expressionSyntax, targetType);
     }
 
-    private static CSharpBindingResult GetCSharpBindingResult(BoundExpression expression)
+    internal static CSharpBindingResult GetCSharpBindingResult(BoundExpression expression)
     {
         return expression.Kind switch
         {

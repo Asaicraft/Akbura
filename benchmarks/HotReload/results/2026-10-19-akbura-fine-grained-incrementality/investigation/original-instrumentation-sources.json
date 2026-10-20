@@ -1,0 +1,46 @@
+[
+  {
+    "Path": "benchmarks/HotReload/Program.cs",
+    "Hash": "4DD1237ED7814F844EBF82DA435B4F55F9757025E1C3A2C7FB23773FB2BCEF52"
+  },
+  {
+    "Path": "benchmarks/HotReload/Program.Invalidation.cs",
+    "Hash": "6CBA7E4DBBE6D0A783C1EF09461BBEEBC99E4B7B0E63CE84ED0160B9478C33D0"
+  },
+  {
+    "Path": "benchmarks/HotReload/Program.Localized.cs",
+    "Hash": "FF15E506DECEC7A27872D348A6FBE17A1D9F2A0A84D78EE3A160699CEF0298FC"
+  },
+  {
+    "Path": "benchmarks/HotReload/Run.ps1",
+    "Hash": "7A5EFD5521C69FC50375FE3A9A0A232AD19A472D3D74FA52812A9ECA7D5648DF"
+  },
+  {
+    "Path": "benchmarks/HotReload/Start-ContractBenchmarks.ps1",
+    "Hash": "534CD4BCF90BCEEE628A1825C6EC661D7529A0DBA4CE6CF77FB19DCE653D40D1"
+  },
+  {
+    "Path": "benchmarks/HotReload/Summarize-Invalidation.ps1",
+    "Hash": "4DD516DEB5AAF2382C66153FC75D4F7C4B76F4B7B4D3E720A46C441EDF6AE1C9"
+  },
+  {
+    "Path": "src/Akbura.Generator/Language/Binder/CSharpProbeBinder.cs",
+    "Hash": "B94287D0E477863A4DEB319906B53F90837AFA5CED08C50D93B7B9CE1BBA5FDA"
+  },
+  {
+    "Path": "src/Akbura.Generator/Language/Binder/CSharpProbeBinder.Statistics.cs",
+    "Hash": "522812B272343E41B2049FEFCF0A083E2C298D6774D565813CC43E389639EC7E"
+  },
+  {
+    "Path": "src/Akbura.Generator/Language/Binder/SemanticBindingCache.cs",
+    "Hash": "08F4A8F8C3F005314B9EC5BE8211F4883F30EEDDD696E435C01597A8892DBFFB"
+  },
+  {
+    "Path": "src/Akbura.Generator/Language/CodeGeneration/GenerationStatistics.cs",
+    "Hash": "6768C8BA0D6521D5B4475E311798DE0C4649D571FDD62B7BEA4CBFA012D9E8E3"
+  },
+  {
+    "Path": "src/Akbura.Generator/Language/Parser.Incremental.cs",
+    "Hash": "386A91067BD22F4C85B14CB2D5AEAD4CC73C696DEA56F4615D10C8BBA90F47E4"
+  }
+]

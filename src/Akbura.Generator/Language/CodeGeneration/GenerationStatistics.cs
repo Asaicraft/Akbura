@@ -57,6 +57,14 @@ internal enum GenerationStatisticCounter : byte
     SemanticDependencyValidationFailures,
     DetachedSemanticDependencyEntries,
     SemanticBindingOperationsObserved,
+    SemanticCacheHit,
+    SemanticCacheMiss,
+    ParserReusedSubtree,
+    ProbeLiteralRequest,
+    MarkupExpressionRequest,
+    MarkupExpressionCacheHit,
+    MarkupExpressionCacheMiss,
+    MarkupExpressionCacheDisallowed,
     Count,
 }
 

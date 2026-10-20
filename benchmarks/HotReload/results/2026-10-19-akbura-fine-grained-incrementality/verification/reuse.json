@@ -1,0 +1,695 @@
+{
+  "PreviousDirectory": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\FineGrained\\retry",
+  "PreviousFingerprint": "A5E6AEC96F017605EFE35D7C58EE9E862876C7093C11FF4C0AB0A00AA5C06D4A",
+  "CurrentFingerprint": "9B649A413E6C9F7AB9EC97BB1EB1CD51067747B53DD8689DA749C6176B6E519C",
+  "ChangedHarnessFiles": [
+    "benchmarks/HotReload/BenchmarkCellOverrides.ps1",
+    "benchmarks/HotReload/Get-VerificationReuse.ps1",
+    "benchmarks/HotReload/Program.ArtifactRetention.cs",
+    "benchmarks/HotReload/Program.cs",
+    "benchmarks/HotReload/Program.Invalidation.cs",
+    "benchmarks/HotReload/Program.Statistics.cs",
+    "benchmarks/HotReload/Start-ContractBenchmarks.ps1",
+    "benchmarks/HotReload/Test-ContractRunner.ps1",
+    "benchmarks/HotReload/Test-LocalizedInputs.ps1",
+    "benchmarks/HotReload/Test-StatisticsCompatibility.ps1",
+    "benchmarks/HotReload/Test-VerificationReuse.ps1",
+    "benchmarks/HotReload/Verify-LocalizedEdits.ps1"
+  ],
+  "Suites": [
+    {
+      "Name": "debugstats",
+      "Directory": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\FineGrained\\retry\\quality\\debugstats-bee849a8f28541a78970857fe9c20033",
+      "Trx": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\FineGrained\\retry\\quality\\debugstats-bee849a8f28541a78970857fe9c20033\\tests.trx",
+      "TrxSha256": "E6B22A47FB2F14F7A1C73DDFAA202C322DE02FD9FDACA4551ADD65A2015F54ED",
+      "Executed": 546,
+      "Passed": 546,
+      "CompletedUtc": "2026-10-19T13:52:27.0114102Z",
+      "Binaries": [
+        {
+          "Name": "Akbura.BlackSilence.dll",
+          "LastWriteUtc": "2026-10-19T13:20:08.0059272Z",
+          "Sha256": "870A1C571DA176C941D34876FE42F6F3BD6DA80D764C19551A54D89E8C042963"
+        },
+        {
+          "Name": "Akbura.Diagnostics.dll",
+          "LastWriteUtc": "2026-10-19T13:21:02.2999024Z",
+          "Sha256": "4EBCB2AF7F1DFD1DD5487E1929E8BB714BDB9C31EED31D4633511DE52138FF38"
+        },
+        {
+          "Name": "Akbura.dll",
+          "LastWriteUtc": "2026-10-19T13:20:46.0246852Z",
+          "Sha256": "EC40689BBB956793791A23F6A9BF15D24AB8AB0F2AE487CEFB9E2594D58E9B35"
+        },
+        {
+          "Name": "Akbura.Furioso.dll",
+          "LastWriteUtc": "2026-10-19T13:20:08.5709229Z",
+          "Sha256": "217637A05E143CDF1F264C0340949ABB4E5EE80EE4B49EF1006D1A96E0819960"
+        },
+        {
+          "Name": "Akbura.Generator.dll",
+          "LastWriteUtc": "2026-10-19T13:20:06.0214651Z",
+          "Sha256": "3AEBA1084FECBE59925ECFB0B59004EBC7917E828BA0D77FE8BBD840671B2DA0"
+        },
+        {
+          "Name": "Akbura.UnitTests.dll",
+          "LastWriteUtc": "2026-10-19T13:21:13.3832454Z",
+          "Sha256": "ED8028AC3179EF2529A3BBEBA3C0A0EF42A764FFA3D8344662B8E953121DA9F7"
+        },
+        {
+          "Name": "Avalonia.Base.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "FF0FBCA98E4233C86150B1B7C649342156AD59C88A2B30EF50E6E492CFD226C0"
+        },
+        {
+          "Name": "Avalonia.Controls.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "EC7244D3BF3F9564E56D5852344BDC99A95D1F992E7B95ABD7508A26B6FD407A"
+        },
+        {
+          "Name": "Avalonia.DesignerSupport.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "E88F39AFF6FC5530C5501FF4827110CB7991FBCAEBA1915E34E0B038DE33276E"
+        },
+        {
+          "Name": "Avalonia.Dialogs.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "557344DB170F8A97B0BABE0A1B1E3EFA104CED3792C5F9B16CEED27E239D3B74"
+        },
+        {
+          "Name": "Avalonia.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "39BCF7A5C834C9340531F66EE888FC55CC465A6C3E041AB7AB38450E6B9C74C8"
+        },
+        {
+          "Name": "Avalonia.Fonts.Inter.dll",
+          "LastWriteUtc": "2026-05-28T12:32:48.0000000Z",
+          "Sha256": "27D12F6B6B38A97F6EBA0AC5117E1E898FF5FBB1FE48A72AF68BBBD41A0136EB"
+        },
+        {
+          "Name": "Avalonia.HarfBuzz.dll",
+          "LastWriteUtc": "2026-05-28T12:32:48.0000000Z",
+          "Sha256": "9F2CA2BCCACC0CC16D20BC190926D83A9B8CE2677A051F1426416040D28A28A1"
+        },
+        {
+          "Name": "Avalonia.Headless.dll",
+          "LastWriteUtc": "2026-05-28T12:32:48.0000000Z",
+          "Sha256": "61785BA40A0F94F96CA026D57E131CFD816EA55ED7C5F7C1E439D9A88B3B954C"
+        },
+        {
+          "Name": "Avalonia.Markup.dll",
+          "LastWriteUtc": "2026-05-28T12:32:48.0000000Z",
+          "Sha256": "C0CB15D0D7BFC9A88BD1A4C8558BBEC65FA88B25B4A1B6C4624D5996D63E11D6"
+        },
+        {
+          "Name": "Avalonia.Markup.Xaml.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "C2A635AC02EB746E14305718304D2E8D97A6224D6F324ABBCEB26883B799D500"
+        },
+        {
+          "Name": "Avalonia.Metal.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "292F1644D1E30DBC2AA3D54307D3050345DB170171706AFD9C57FF254DF4DF3E"
+        },
+        {
+          "Name": "Avalonia.MicroCom.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "E412B450837855D0884555BB66B9BB0E4E14595FA19281B5DAFD59B98EFA128A"
+        },
+        {
+          "Name": "Avalonia.OpenGL.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "C912FF7B7E11D9A2748FCC26DC6C2FF3CA7C76C25EB077C7619738423D8092FF"
+        },
+        {
+          "Name": "Avalonia.Remote.Protocol.dll",
+          "LastWriteUtc": "2026-05-28T12:32:48.0000000Z",
+          "Sha256": "209F78D8E902322AB8F110D6B4E2D8C2BA77CC3DF7C5BD0F223EA17C3DE9A59C"
+        },
+        {
+          "Name": "Avalonia.Themes.Fluent.dll",
+          "LastWriteUtc": "2026-05-28T12:32:48.0000000Z",
+          "Sha256": "6672D70C22336E6C238C60065F5D78C6018B0779BDF02DD5DCCF90BDA46CB060"
+        },
+        {
+          "Name": "Avalonia.Vulkan.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "45C7FE4D606217481CE05A25867EB5FB2B5EFCC1DE63FA589B8B47339BBD672A"
+        },
+        {
+          "Name": "CommunityToolkit.Mvvm.dll",
+          "LastWriteUtc": "2026-03-24T23:20:02.0000000Z",
+          "Sha256": "19B2144FED9600D58A742A5A4A5FD7B10D4D0D2C2E79F5D8019307CF5657044F"
+        },
+        {
+          "Name": "HarfBuzzSharp.dll",
+          "LastWriteUtc": "2026-02-06T16:21:12.0000000Z",
+          "Sha256": "55E72AC23263F8E12484F3435E02EC22FAC9EFF6E6D169BB0A8C246BE6B99D29"
+        },
+        {
+          "Name": "MicroCom.Runtime.dll",
+          "LastWriteUtc": "2026-03-25T20:51:36.0000000Z",
+          "Sha256": "2E0A43BE3D123DAE5AA8A7F1082FD3F1C2A8D842F6C513DEAC526DAED620E318"
+        },
+        {
+          "Name": "Microsoft.CodeAnalysis.CSharp.dll",
+          "LastWriteUtc": "2024-07-26T22:24:10.0000000Z",
+          "Sha256": "C46E884A3F2910FD6098B104131CAE600C1716AE14B27FFE2D22C54C7F71FF11"
+        },
+        {
+          "Name": "Microsoft.CodeAnalysis.dll",
+          "LastWriteUtc": "2024-07-26T22:09:26.0000000Z",
+          "Sha256": "8D919BCF3E2F0E74DC1E79C713F06934201CD2338AD23B9A430E53944EBC0408"
+        },
+        {
+          "Name": "Microsoft.TestPlatform.CommunicationUtilities.dll",
+          "LastWriteUtc": "2025-11-07T14:09:00.0000000Z",
+          "Sha256": "2EBA928C1770209F1FD9F515603A0B4FFBFCADF816681AB36D02B9B36417AB33"
+        },
+        {
+          "Name": "Microsoft.TestPlatform.CoreUtilities.dll",
+          "LastWriteUtc": "2025-11-07T14:08:38.0000000Z",
+          "Sha256": "7837F9DF4B11A9844143FC9419E5752BDD50305436ADCBF84F82B8A52D5909D7"
+        },
+        {
+          "Name": "Microsoft.TestPlatform.CrossPlatEngine.dll",
+          "LastWriteUtc": "2025-11-07T14:09:02.0000000Z",
+          "Sha256": "2F3B463A227B8F30171F8720164B3C0B90451248E0B2F3E8C3DA82C23A3FDFCD"
+        },
+        {
+          "Name": "Microsoft.TestPlatform.PlatformAbstractions.dll",
+          "LastWriteUtc": "2025-11-07T14:08:34.0000000Z",
+          "Sha256": "668C7F0DF2C30FEAC9CEA9DCE808CCABB72FF575C1E820404124212B4EAE1773"
+        },
+        {
+          "Name": "Microsoft.TestPlatform.Utilities.dll",
+          "LastWriteUtc": "2025-11-07T14:08:52.0000000Z",
+          "Sha256": "886EF3AB15251E57CA9C124E41DE3C43BA0520A036B876BB709ED325438501FE"
+        },
+        {
+          "Name": "Microsoft.VisualStudio.CodeCoverage.Shim.dll",
+          "LastWriteUtc": "2025-10-23T14:07:08.0000000Z",
+          "Sha256": "E590F0095B103C635C7FD45AD5FF537DD221B0BC2DB214717940F59FAF4767F0"
+        },
+        {
+          "Name": "Microsoft.VisualStudio.TestPlatform.Common.dll",
+          "LastWriteUtc": "2025-11-07T14:08:54.0000000Z",
+          "Sha256": "96D7B2A7E3F79133E17196FDAD189486B59852379385198B5CD857E9947164FB"
+        },
+        {
+          "Name": "Microsoft.VisualStudio.TestPlatform.ObjectModel.dll",
+          "LastWriteUtc": "2025-11-07T14:08:44.0000000Z",
+          "Sha256": "F6D6BC01A85FD68A0599533FCC0DE7357922051BAD90012B8AD15DE31A4EF5E9"
+        },
+        {
+          "Name": "Newtonsoft.Json.dll",
+          "LastWriteUtc": "2023-03-08T07:09:54.0000000Z",
+          "Sha256": "22C649F75FCE5BE7C7CCDA8880473B634EF69ECF33F5D1AB8AD892CAF47D5A07"
+        },
+        {
+          "Name": "testhost.dll",
+          "LastWriteUtc": "2025-11-07T14:09:06.0000000Z",
+          "Sha256": "F9F95F20F7A99215B50CFD511085B31549B26F87AFAEB02C0A3C21F6875817E8"
+        },
+        {
+          "Name": "xunit.abstractions.dll",
+          "LastWriteUtc": "2018-08-25T19:54:14.0000000Z",
+          "Sha256": "3166DC70323FB30CCF1CEDB0FE86F2AD122C46D254542342D90386EFC4C9285C"
+        },
+        {
+          "Name": "xunit.assert.dll",
+          "LastWriteUtc": "2025-01-08T17:29:24.0000000Z",
+          "Sha256": "BCD9711B22D227AC8CD4C1568E72433A0F576D2EC8AAE64AC508081892015B1D"
+        },
+        {
+          "Name": "xunit.core.dll",
+          "LastWriteUtc": "2025-01-08T17:29:58.0000000Z",
+          "Sha256": "2F7FEEEC8C6DEC7DF684C25FB80AADB292B963D09723460F03D53C5AD2088ACC"
+        },
+        {
+          "Name": "xunit.execution.dotnet.dll",
+          "LastWriteUtc": "2025-01-08T17:30:02.0000000Z",
+          "Sha256": "E70FEBE547C15F8155DB3E2D95C3BA4445A59CBC21A3E7541AB22ED49D3DCF7B"
+        },
+        {
+          "Name": "xunit.runner.visualstudio.testadapter.dll",
+          "LastWriteUtc": "2025-09-27T23:09:56.0000000Z",
+          "Sha256": "384ABA4BAD96399A7FD2205A5A3517B643A16F4D7E843BD0B92E1E42F81FCE2A"
+        }
+      ]
+    },
+    {
+      "Name": "sdk",
+      "Directory": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\FineGrained\\retry\\quality\\sdk-8949f628657b419cb044244aacb46c07",
+      "Trx": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\FineGrained\\retry\\quality\\sdk-8949f628657b419cb044244aacb46c07\\e9a4f9aed6da44e9ab4f9d59f4a893e5\\sdk-invalidation.trx",
+      "TrxSha256": "8E08F97019EEA0A21C762C428F2870059A930F9E5380D4D343F14033636D6015",
+      "Executed": 238,
+      "Passed": 238,
+      "CompletedUtc": "2026-10-19T14:20:29.7184817Z",
+      "Binaries": []
+    },
+    {
+      "Name": "release",
+      "Directory": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\FineGrained\\retry\\quality\\release-2469a105401a40e9afb20081637c567c",
+      "Trx": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\FineGrained\\retry\\quality\\release-2469a105401a40e9afb20081637c567c\\tests.trx",
+      "TrxSha256": "56A817C9DF14E7BBD96CD527CD9527341408D746620CB4832621968A27D7034A",
+      "Executed": 284,
+      "Passed": 284,
+      "CompletedUtc": "2026-10-19T14:28:05.8880119Z",
+      "Binaries": [
+        {
+          "Name": "Akbura.BlackSilence.dll",
+          "LastWriteUtc": "2026-10-19T14:20:40.3546254Z",
+          "Sha256": "4A1F3C6ED09C20AEC59C69F81A063CA4B69F15EF2FC62B080F6BB42A48B0A7E8"
+        },
+        {
+          "Name": "Akbura.Diagnostics.dll",
+          "LastWriteUtc": "2026-10-19T14:21:41.6513597Z",
+          "Sha256": "46C53AE215B0C73F8216A1D7D3E78D8B983EA90CA604C91BF3DDDC2434C8F9D3"
+        },
+        {
+          "Name": "Akbura.dll",
+          "LastWriteUtc": "2026-10-19T14:21:14.5750567Z",
+          "Sha256": "E0009D9A4332F0367EE3D4984E7876F67B73E16ACFDB002AA6D8DBBDFD967C2E"
+        },
+        {
+          "Name": "Akbura.Furioso.dll",
+          "LastWriteUtc": "2026-10-19T14:20:40.7446259Z",
+          "Sha256": "D14DF16881ED7A4AF18488FB06A790EED668EA85387A34DF81E333D6909B3CD5"
+        },
+        {
+          "Name": "Akbura.Generator.dll",
+          "LastWriteUtc": "2026-10-19T14:20:38.4592330Z",
+          "Sha256": "1264FBC11F330493839BB0AC0ADF9803DBC21B0C8BAE75DAC8B1C4CC4DFE127B"
+        },
+        {
+          "Name": "Akbura.UnitTests.dll",
+          "LastWriteUtc": "2026-10-19T14:21:52.8041731Z",
+          "Sha256": "E1F748AD6F1E41F664E7CC8D3053108841B884ABF3D69757216F37E076744352"
+        },
+        {
+          "Name": "Avalonia.Base.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "FF0FBCA98E4233C86150B1B7C649342156AD59C88A2B30EF50E6E492CFD226C0"
+        },
+        {
+          "Name": "Avalonia.Controls.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "EC7244D3BF3F9564E56D5852344BDC99A95D1F992E7B95ABD7508A26B6FD407A"
+        },
+        {
+          "Name": "Avalonia.DesignerSupport.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "E88F39AFF6FC5530C5501FF4827110CB7991FBCAEBA1915E34E0B038DE33276E"
+        },
+        {
+          "Name": "Avalonia.Dialogs.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "557344DB170F8A97B0BABE0A1B1E3EFA104CED3792C5F9B16CEED27E239D3B74"
+        },
+        {
+          "Name": "Avalonia.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "39BCF7A5C834C9340531F66EE888FC55CC465A6C3E041AB7AB38450E6B9C74C8"
+        },
+        {
+          "Name": "Avalonia.Fonts.Inter.dll",
+          "LastWriteUtc": "2026-05-28T12:32:48.0000000Z",
+          "Sha256": "27D12F6B6B38A97F6EBA0AC5117E1E898FF5FBB1FE48A72AF68BBBD41A0136EB"
+        },
+        {
+          "Name": "Avalonia.HarfBuzz.dll",
+          "LastWriteUtc": "2026-05-28T12:32:48.0000000Z",
+          "Sha256": "9F2CA2BCCACC0CC16D20BC190926D83A9B8CE2677A051F1426416040D28A28A1"
+        },
+        {
+          "Name": "Avalonia.Headless.dll",
+          "LastWriteUtc": "2026-05-28T12:32:48.0000000Z",
+          "Sha256": "61785BA40A0F94F96CA026D57E131CFD816EA55ED7C5F7C1E439D9A88B3B954C"
+        },
+        {
+          "Name": "Avalonia.Markup.dll",
+          "LastWriteUtc": "2026-05-28T12:32:48.0000000Z",
+          "Sha256": "C0CB15D0D7BFC9A88BD1A4C8558BBEC65FA88B25B4A1B6C4624D5996D63E11D6"
+        },
+        {
+          "Name": "Avalonia.Markup.Xaml.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "C2A635AC02EB746E14305718304D2E8D97A6224D6F324ABBCEB26883B799D500"
+        },
+        {
+          "Name": "Avalonia.Metal.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "292F1644D1E30DBC2AA3D54307D3050345DB170171706AFD9C57FF254DF4DF3E"
+        },
+        {
+          "Name": "Avalonia.MicroCom.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "E412B450837855D0884555BB66B9BB0E4E14595FA19281B5DAFD59B98EFA128A"
+        },
+        {
+          "Name": "Avalonia.OpenGL.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "C912FF7B7E11D9A2748FCC26DC6C2FF3CA7C76C25EB077C7619738423D8092FF"
+        },
+        {
+          "Name": "Avalonia.Remote.Protocol.dll",
+          "LastWriteUtc": "2026-05-28T12:32:48.0000000Z",
+          "Sha256": "209F78D8E902322AB8F110D6B4E2D8C2BA77CC3DF7C5BD0F223EA17C3DE9A59C"
+        },
+        {
+          "Name": "Avalonia.Themes.Fluent.dll",
+          "LastWriteUtc": "2026-05-28T12:32:48.0000000Z",
+          "Sha256": "6672D70C22336E6C238C60065F5D78C6018B0779BDF02DD5DCCF90BDA46CB060"
+        },
+        {
+          "Name": "Avalonia.Vulkan.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "45C7FE4D606217481CE05A25867EB5FB2B5EFCC1DE63FA589B8B47339BBD672A"
+        },
+        {
+          "Name": "CommunityToolkit.Mvvm.dll",
+          "LastWriteUtc": "2026-03-24T23:20:02.0000000Z",
+          "Sha256": "19B2144FED9600D58A742A5A4A5FD7B10D4D0D2C2E79F5D8019307CF5657044F"
+        },
+        {
+          "Name": "HarfBuzzSharp.dll",
+          "LastWriteUtc": "2026-02-06T16:21:12.0000000Z",
+          "Sha256": "55E72AC23263F8E12484F3435E02EC22FAC9EFF6E6D169BB0A8C246BE6B99D29"
+        },
+        {
+          "Name": "MicroCom.Runtime.dll",
+          "LastWriteUtc": "2026-03-25T20:51:36.0000000Z",
+          "Sha256": "2E0A43BE3D123DAE5AA8A7F1082FD3F1C2A8D842F6C513DEAC526DAED620E318"
+        },
+        {
+          "Name": "Microsoft.CodeAnalysis.CSharp.dll",
+          "LastWriteUtc": "2024-07-26T22:24:10.0000000Z",
+          "Sha256": "C46E884A3F2910FD6098B104131CAE600C1716AE14B27FFE2D22C54C7F71FF11"
+        },
+        {
+          "Name": "Microsoft.CodeAnalysis.dll",
+          "LastWriteUtc": "2024-07-26T22:09:26.0000000Z",
+          "Sha256": "8D919BCF3E2F0E74DC1E79C713F06934201CD2338AD23B9A430E53944EBC0408"
+        },
+        {
+          "Name": "Microsoft.TestPlatform.CommunicationUtilities.dll",
+          "LastWriteUtc": "2025-11-07T14:09:00.0000000Z",
+          "Sha256": "2EBA928C1770209F1FD9F515603A0B4FFBFCADF816681AB36D02B9B36417AB33"
+        },
+        {
+          "Name": "Microsoft.TestPlatform.CoreUtilities.dll",
+          "LastWriteUtc": "2025-11-07T14:08:38.0000000Z",
+          "Sha256": "7837F9DF4B11A9844143FC9419E5752BDD50305436ADCBF84F82B8A52D5909D7"
+        },
+        {
+          "Name": "Microsoft.TestPlatform.CrossPlatEngine.dll",
+          "LastWriteUtc": "2025-11-07T14:09:02.0000000Z",
+          "Sha256": "2F3B463A227B8F30171F8720164B3C0B90451248E0B2F3E8C3DA82C23A3FDFCD"
+        },
+        {
+          "Name": "Microsoft.TestPlatform.PlatformAbstractions.dll",
+          "LastWriteUtc": "2025-11-07T14:08:34.0000000Z",
+          "Sha256": "668C7F0DF2C30FEAC9CEA9DCE808CCABB72FF575C1E820404124212B4EAE1773"
+        },
+        {
+          "Name": "Microsoft.TestPlatform.Utilities.dll",
+          "LastWriteUtc": "2025-11-07T14:08:52.0000000Z",
+          "Sha256": "886EF3AB15251E57CA9C124E41DE3C43BA0520A036B876BB709ED325438501FE"
+        },
+        {
+          "Name": "Microsoft.VisualStudio.CodeCoverage.Shim.dll",
+          "LastWriteUtc": "2025-10-23T14:07:08.0000000Z",
+          "Sha256": "E590F0095B103C635C7FD45AD5FF537DD221B0BC2DB214717940F59FAF4767F0"
+        },
+        {
+          "Name": "Microsoft.VisualStudio.TestPlatform.Common.dll",
+          "LastWriteUtc": "2025-11-07T14:08:54.0000000Z",
+          "Sha256": "96D7B2A7E3F79133E17196FDAD189486B59852379385198B5CD857E9947164FB"
+        },
+        {
+          "Name": "Microsoft.VisualStudio.TestPlatform.ObjectModel.dll",
+          "LastWriteUtc": "2025-11-07T14:08:44.0000000Z",
+          "Sha256": "F6D6BC01A85FD68A0599533FCC0DE7357922051BAD90012B8AD15DE31A4EF5E9"
+        },
+        {
+          "Name": "Newtonsoft.Json.dll",
+          "LastWriteUtc": "2023-03-08T07:09:54.0000000Z",
+          "Sha256": "22C649F75FCE5BE7C7CCDA8880473B634EF69ECF33F5D1AB8AD892CAF47D5A07"
+        },
+        {
+          "Name": "testhost.dll",
+          "LastWriteUtc": "2025-11-07T14:09:06.0000000Z",
+          "Sha256": "F9F95F20F7A99215B50CFD511085B31549B26F87AFAEB02C0A3C21F6875817E8"
+        },
+        {
+          "Name": "xunit.abstractions.dll",
+          "LastWriteUtc": "2018-08-25T19:54:14.0000000Z",
+          "Sha256": "3166DC70323FB30CCF1CEDB0FE86F2AD122C46D254542342D90386EFC4C9285C"
+        },
+        {
+          "Name": "xunit.assert.dll",
+          "LastWriteUtc": "2025-01-08T17:29:24.0000000Z",
+          "Sha256": "BCD9711B22D227AC8CD4C1568E72433A0F576D2EC8AAE64AC508081892015B1D"
+        },
+        {
+          "Name": "xunit.core.dll",
+          "LastWriteUtc": "2025-01-08T17:29:58.0000000Z",
+          "Sha256": "2F7FEEEC8C6DEC7DF684C25FB80AADB292B963D09723460F03D53C5AD2088ACC"
+        },
+        {
+          "Name": "xunit.execution.dotnet.dll",
+          "LastWriteUtc": "2025-01-08T17:30:02.0000000Z",
+          "Sha256": "E70FEBE547C15F8155DB3E2D95C3BA4445A59CBC21A3E7541AB22ED49D3DCF7B"
+        },
+        {
+          "Name": "xunit.runner.visualstudio.testadapter.dll",
+          "LastWriteUtc": "2025-09-27T23:09:56.0000000Z",
+          "Sha256": "384ABA4BAD96399A7FD2205A5A3517B643A16F4D7E843BD0B92E1E42F81FCE2A"
+        }
+      ]
+    },
+    {
+      "Name": "unit-full-release",
+      "Directory": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\FineGrained\\retry\\unit-full-release-20261019T160952439Z",
+      "Trx": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\FineGrained\\retry\\unit-full-release-20261019T160952439Z\\tests.trx",
+      "TrxSha256": "B4766F1D36ECF5551852B474F494C903F0718BD328A1CED6EDB6F2E480CA90C2",
+      "Executed": 3543,
+      "Passed": 3543,
+      "CompletedUtc": "2026-10-19T16:55:16.6847667Z",
+      "Binaries": [
+        {
+          "Name": "Akbura.BlackSilence.dll",
+          "LastWriteUtc": "2026-10-19T14:20:40.3546254Z",
+          "Sha256": "4A1F3C6ED09C20AEC59C69F81A063CA4B69F15EF2FC62B080F6BB42A48B0A7E8"
+        },
+        {
+          "Name": "Akbura.Diagnostics.dll",
+          "LastWriteUtc": "2026-10-19T14:21:41.6513597Z",
+          "Sha256": "46C53AE215B0C73F8216A1D7D3E78D8B983EA90CA604C91BF3DDDC2434C8F9D3"
+        },
+        {
+          "Name": "Akbura.dll",
+          "LastWriteUtc": "2026-10-19T14:21:14.5750567Z",
+          "Sha256": "E0009D9A4332F0367EE3D4984E7876F67B73E16ACFDB002AA6D8DBBDFD967C2E"
+        },
+        {
+          "Name": "Akbura.Furioso.dll",
+          "LastWriteUtc": "2026-10-19T14:20:40.7446259Z",
+          "Sha256": "D14DF16881ED7A4AF18488FB06A790EED668EA85387A34DF81E333D6909B3CD5"
+        },
+        {
+          "Name": "Akbura.Generator.dll",
+          "LastWriteUtc": "2026-10-19T14:20:38.4592330Z",
+          "Sha256": "1264FBC11F330493839BB0AC0ADF9803DBC21B0C8BAE75DAC8B1C4CC4DFE127B"
+        },
+        {
+          "Name": "Akbura.UnitTests.dll",
+          "LastWriteUtc": "2026-10-19T14:21:52.8041731Z",
+          "Sha256": "E1F748AD6F1E41F664E7CC8D3053108841B884ABF3D69757216F37E076744352"
+        },
+        {
+          "Name": "Avalonia.Base.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "FF0FBCA98E4233C86150B1B7C649342156AD59C88A2B30EF50E6E492CFD226C0"
+        },
+        {
+          "Name": "Avalonia.Controls.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "EC7244D3BF3F9564E56D5852344BDC99A95D1F992E7B95ABD7508A26B6FD407A"
+        },
+        {
+          "Name": "Avalonia.DesignerSupport.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "E88F39AFF6FC5530C5501FF4827110CB7991FBCAEBA1915E34E0B038DE33276E"
+        },
+        {
+          "Name": "Avalonia.Dialogs.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "557344DB170F8A97B0BABE0A1B1E3EFA104CED3792C5F9B16CEED27E239D3B74"
+        },
+        {
+          "Name": "Avalonia.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "39BCF7A5C834C9340531F66EE888FC55CC465A6C3E041AB7AB38450E6B9C74C8"
+        },
+        {
+          "Name": "Avalonia.Fonts.Inter.dll",
+          "LastWriteUtc": "2026-05-28T12:32:48.0000000Z",
+          "Sha256": "27D12F6B6B38A97F6EBA0AC5117E1E898FF5FBB1FE48A72AF68BBBD41A0136EB"
+        },
+        {
+          "Name": "Avalonia.HarfBuzz.dll",
+          "LastWriteUtc": "2026-05-28T12:32:48.0000000Z",
+          "Sha256": "9F2CA2BCCACC0CC16D20BC190926D83A9B8CE2677A051F1426416040D28A28A1"
+        },
+        {
+          "Name": "Avalonia.Headless.dll",
+          "LastWriteUtc": "2026-05-28T12:32:48.0000000Z",
+          "Sha256": "61785BA40A0F94F96CA026D57E131CFD816EA55ED7C5F7C1E439D9A88B3B954C"
+        },
+        {
+          "Name": "Avalonia.Markup.dll",
+          "LastWriteUtc": "2026-05-28T12:32:48.0000000Z",
+          "Sha256": "C0CB15D0D7BFC9A88BD1A4C8558BBEC65FA88B25B4A1B6C4624D5996D63E11D6"
+        },
+        {
+          "Name": "Avalonia.Markup.Xaml.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "C2A635AC02EB746E14305718304D2E8D97A6224D6F324ABBCEB26883B799D500"
+        },
+        {
+          "Name": "Avalonia.Metal.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "292F1644D1E30DBC2AA3D54307D3050345DB170171706AFD9C57FF254DF4DF3E"
+        },
+        {
+          "Name": "Avalonia.MicroCom.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "E412B450837855D0884555BB66B9BB0E4E14595FA19281B5DAFD59B98EFA128A"
+        },
+        {
+          "Name": "Avalonia.OpenGL.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "C912FF7B7E11D9A2748FCC26DC6C2FF3CA7C76C25EB077C7619738423D8092FF"
+        },
+        {
+          "Name": "Avalonia.Remote.Protocol.dll",
+          "LastWriteUtc": "2026-05-28T12:32:48.0000000Z",
+          "Sha256": "209F78D8E902322AB8F110D6B4E2D8C2BA77CC3DF7C5BD0F223EA17C3DE9A59C"
+        },
+        {
+          "Name": "Avalonia.Themes.Fluent.dll",
+          "LastWriteUtc": "2026-05-28T12:32:48.0000000Z",
+          "Sha256": "6672D70C22336E6C238C60065F5D78C6018B0779BDF02DD5DCCF90BDA46CB060"
+        },
+        {
+          "Name": "Avalonia.Vulkan.dll",
+          "LastWriteUtc": "2026-05-28T12:32:46.0000000Z",
+          "Sha256": "45C7FE4D606217481CE05A25867EB5FB2B5EFCC1DE63FA589B8B47339BBD672A"
+        },
+        {
+          "Name": "CommunityToolkit.Mvvm.dll",
+          "LastWriteUtc": "2026-03-24T23:20:02.0000000Z",
+          "Sha256": "19B2144FED9600D58A742A5A4A5FD7B10D4D0D2C2E79F5D8019307CF5657044F"
+        },
+        {
+          "Name": "HarfBuzzSharp.dll",
+          "LastWriteUtc": "2026-02-06T16:21:12.0000000Z",
+          "Sha256": "55E72AC23263F8E12484F3435E02EC22FAC9EFF6E6D169BB0A8C246BE6B99D29"
+        },
+        {
+          "Name": "MicroCom.Runtime.dll",
+          "LastWriteUtc": "2026-03-25T20:51:36.0000000Z",
+          "Sha256": "2E0A43BE3D123DAE5AA8A7F1082FD3F1C2A8D842F6C513DEAC526DAED620E318"
+        },
+        {
+          "Name": "Microsoft.CodeAnalysis.CSharp.dll",
+          "LastWriteUtc": "2024-07-26T22:24:10.0000000Z",
+          "Sha256": "C46E884A3F2910FD6098B104131CAE600C1716AE14B27FFE2D22C54C7F71FF11"
+        },
+        {
+          "Name": "Microsoft.CodeAnalysis.dll",
+          "LastWriteUtc": "2024-07-26T22:09:26.0000000Z",
+          "Sha256": "8D919BCF3E2F0E74DC1E79C713F06934201CD2338AD23B9A430E53944EBC0408"
+        },
+        {
+          "Name": "Microsoft.TestPlatform.CommunicationUtilities.dll",
+          "LastWriteUtc": "2025-11-07T14:09:00.0000000Z",
+          "Sha256": "2EBA928C1770209F1FD9F515603A0B4FFBFCADF816681AB36D02B9B36417AB33"
+        },
+        {
+          "Name": "Microsoft.TestPlatform.CoreUtilities.dll",
+          "LastWriteUtc": "2025-11-07T14:08:38.0000000Z",
+          "Sha256": "7837F9DF4B11A9844143FC9419E5752BDD50305436ADCBF84F82B8A52D5909D7"
+        },
+        {
+          "Name": "Microsoft.TestPlatform.CrossPlatEngine.dll",
+          "LastWriteUtc": "2025-11-07T14:09:02.0000000Z",
+          "Sha256": "2F3B463A227B8F30171F8720164B3C0B90451248E0B2F3E8C3DA82C23A3FDFCD"
+        },
+        {
+          "Name": "Microsoft.TestPlatform.PlatformAbstractions.dll",
+          "LastWriteUtc": "2025-11-07T14:08:34.0000000Z",
+          "Sha256": "668C7F0DF2C30FEAC9CEA9DCE808CCABB72FF575C1E820404124212B4EAE1773"
+        },
+        {
+          "Name": "Microsoft.TestPlatform.Utilities.dll",
+          "LastWriteUtc": "2025-11-07T14:08:52.0000000Z",
+          "Sha256": "886EF3AB15251E57CA9C124E41DE3C43BA0520A036B876BB709ED325438501FE"
+        },
+        {
+          "Name": "Microsoft.VisualStudio.CodeCoverage.Shim.dll",
+          "LastWriteUtc": "2025-10-23T14:07:08.0000000Z",
+          "Sha256": "E590F0095B103C635C7FD45AD5FF537DD221B0BC2DB214717940F59FAF4767F0"
+        },
+        {
+          "Name": "Microsoft.VisualStudio.TestPlatform.Common.dll",
+          "LastWriteUtc": "2025-11-07T14:08:54.0000000Z",
+          "Sha256": "96D7B2A7E3F79133E17196FDAD189486B59852379385198B5CD857E9947164FB"
+        },
+        {
+          "Name": "Microsoft.VisualStudio.TestPlatform.ObjectModel.dll",
+          "LastWriteUtc": "2025-11-07T14:08:44.0000000Z",
+          "Sha256": "F6D6BC01A85FD68A0599533FCC0DE7357922051BAD90012B8AD15DE31A4EF5E9"
+        },
+        {
+          "Name": "Newtonsoft.Json.dll",
+          "LastWriteUtc": "2023-03-08T07:09:54.0000000Z",
+          "Sha256": "22C649F75FCE5BE7C7CCDA8880473B634EF69ECF33F5D1AB8AD892CAF47D5A07"
+        },
+        {
+          "Name": "testhost.dll",
+          "LastWriteUtc": "2025-11-07T14:09:06.0000000Z",
+          "Sha256": "F9F95F20F7A99215B50CFD511085B31549B26F87AFAEB02C0A3C21F6875817E8"
+        },
+        {
+          "Name": "xunit.abstractions.dll",
+          "LastWriteUtc": "2018-08-25T19:54:14.0000000Z",
+          "Sha256": "3166DC70323FB30CCF1CEDB0FE86F2AD122C46D254542342D90386EFC4C9285C"
+        },
+        {
+          "Name": "xunit.assert.dll",
+          "LastWriteUtc": "2025-01-08T17:29:24.0000000Z",
+          "Sha256": "BCD9711B22D227AC8CD4C1568E72433A0F576D2EC8AAE64AC508081892015B1D"
+        },
+        {
+          "Name": "xunit.core.dll",
+          "LastWriteUtc": "2025-01-08T17:29:58.0000000Z",
+          "Sha256": "2F7FEEEC8C6DEC7DF684C25FB80AADB292B963D09723460F03D53C5AD2088ACC"
+        },
+        {
+          "Name": "xunit.execution.dotnet.dll",
+          "LastWriteUtc": "2025-01-08T17:30:02.0000000Z",
+          "Sha256": "E70FEBE547C15F8155DB3E2D95C3BA4445A59CBC21A3E7541AB22ED49D3DCF7B"
+        },
+        {
+          "Name": "xunit.runner.visualstudio.testadapter.dll",
+          "LastWriteUtc": "2025-09-27T23:09:56.0000000Z",
+          "Sha256": "384ABA4BAD96399A7FD2205A5A3517B643A16F4D7E843BD0B92E1E42F81FCE2A"
+        }
+      ]
+    }
+  ],
+  "Basis": "Same commit and exact compiler/test source hashes; only explicitly allowed harness changes. Existing binaries predate successful test runs. Binary hashes recorded at reuse validation, not claimed as historical captures."
+}

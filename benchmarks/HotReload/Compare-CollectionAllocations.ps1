@@ -1,5 +1,5 @@
 #requires -Version 7.2
-param([Parameter(Mandatory = $true)][string]$ResultDirectory)
+param([Parameter(Mandatory = $true)][string]$ResultDirectory, [switch]$LocalizedEdits, [switch]$Unprofiled)
 
 $ErrorActionPreference = 'Stop'
 [Globalization.CultureInfo]::CurrentCulture = [Globalization.CultureInfo]::InvariantCulture
@@ -66,17 +66,26 @@ foreach ($mode in @('before','after')) {
     $stages[$mode] = @(Import-Csv -LiteralPath (Join-Path $root 'invalidation-stages.csv') | Where-Object { $_.First -eq 'False' -and $_.Warmup -eq 'False' })
 }
 $summary = [Collections.Generic.List[object]]::new()
+$scalarMetrics = @('GeneratorMs','ProcessCpuMs','ProcessAllocatedBytes','PostGcHeapBytes')
+$stageMetrics = @('SemanticDependencyCapture','DependencySetDetachment','DocumentDependencyValidation','CSharpProbeBinding','CSharpProbeDiagnostics')
+if ($Unprofiled) {
+    $stageMetrics = @()
+}
+if ($LocalizedEdits) {
+    $scalarMetrics += @('ProbeRequest','ProbeCompilationCreated','ProbeSemanticModelAcquired','ProbeDiagnosticQuery',
+        'SemanticCacheHit','SemanticCacheMiss','ParserReusedSubtree','SyntaxSharedGreenNodes','SyntaxNewGreenNodes','SyntaxSharedEmbeddedExpressions')
+    $stageMetrics += @('Parse','SemanticBinding','ComponentPlanning','CSharpEmission','ProbeScopeConstruction','ProbeSyntaxConstruction')
+}
 foreach ($group in ($samples.before | Group-Object Project,File,Scenario,Optimization)) {
     $identity = $group.Group[0]
     $right = @($samples.after | Where-Object { $_.Project -eq $identity.Project -and $_.File -eq $identity.File -and $_.Scenario -eq $identity.Scenario -and $_.Optimization -eq $identity.Optimization })
     if ($group.Count -ne 8 -or $right.Count -ne 8) {
         throw "Incomplete comparison cell: $($group.Name)"
     }
-    foreach ($metric in @('GeneratorMs','ProcessCpuMs','ProcessAllocatedBytes','PostGcHeapBytes',
-        'SemanticDependencyCapture','DependencySetDetachment','DocumentDependencyValidation','CSharpProbeBinding','CSharpProbeDiagnostics')) {
+    foreach ($metric in $scalarMetrics + $stageMetrics) {
         $values = @{}
         foreach ($mode in @('before','after')) {
-            if ($metric -in @('GeneratorMs','ProcessCpuMs','ProcessAllocatedBytes','PostGcHeapBytes')) {
+            if ($metric -in $scalarMetrics) {
                 $batch = if ($mode -eq 'before') { $group.Group } else { $right }
                 $values[$mode] = Median $batch.$metric
             }

@@ -1,0 +1,6 @@
+{
+  "SidebarUpdates": 1,
+  "TimingSamples": false,
+  "Reason": "Functional trace overlapped independent tests in worktree 2cff; elapsed values excluded from accepted before/after timing groups.",
+  "CounterUpdates": 10
+}

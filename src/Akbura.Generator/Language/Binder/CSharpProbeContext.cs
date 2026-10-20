@@ -9,6 +9,8 @@ using System.Runtime.CompilerServices;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 #if STATS
 using Akbura.Language.CodeGeneration;
+using System.Security.Cryptography;
+using System.Text;
 #endif
 
 namespace Akbura.Language.Binder;
@@ -16,11 +18,13 @@ namespace Akbura.Language.Binder;
 /// <summary>
 /// Preparation owned by one document semantic model, never by reusable snapshot
 /// state. Only type probes with exactly matching text and imports share binding
-/// results; expression scopes, target conversions and hook rewrites stay independent.
+/// results. Markup expression results require the complete prepared probe (including
+/// scopes and imports) and the exact target type. No cache crosses document owners.
 /// </summary>
 internal sealed class CSharpProbeContext(AkburaSemanticModel semanticModel)
 {
     private readonly ConcurrentDictionary<TypeProbeKey, CSharpBindingResult> _types = new();
+    private readonly ConcurrentDictionary<ExpressionProbeKey, CSharpBindingResult> _expressions = new();
     private readonly ConcurrentDictionary<string, CSharp.CompilationUnitSyntax> _componentTemplates = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<Symbols.ISymbol, CSharpProbeScope> _symbols = new(SymbolReferenceComparer.Instance);
     private readonly ConditionalWeakTable<SemanticModel, CSharpProbeDiagnostics> _diagnostics = new();
@@ -77,6 +81,57 @@ internal sealed class CSharpProbeContext(AkburaSemanticModel semanticModel)
         result = bind();
         return _types.GetOrAdd(key, result);
     }
+
+    internal CSharpBindingResult BindMarkupExpression(CSharp.CompilationUnitSyntax projection, ITypeSymbol? targetType,
+        Func<CSharpBindingResult> bind)
+    {
+#if STATS
+        GenerationStatistics.Increment(GenerationStatisticCounter.MarkupExpressionRequest);
+#endif
+        // Recovery and directives can carry information not represented by ordinary
+        // syntax equivalence. Keep their original binding path, including diagnostics.
+        if (projection.ContainsDiagnostics || projection.ContainsSkippedText || projection.ContainsDirectives)
+        {
+#if STATS
+            GenerationStatistics.Increment(GenerationStatisticCounter.MarkupExpressionCacheDisallowed);
+            RecordExpressionReuse(projection, "Disallowed", "SyntaxRecoveryOrDirectives");
+#endif
+            return bind();
+        }
+
+        var query = CSharpProbeBuilder.GetReturnProbeExpression(projection);
+        var key = new ExpressionProbeKey(projection, projection.ToFullString(), targetType, query?.Span ?? default);
+        if (_expressions.TryGetValue(key, out var result))
+        {
+#if STATS
+            GenerationStatistics.Increment(GenerationStatisticCounter.MarkupExpressionCacheHit);
+            RecordExpressionReuse(projection, "Reused", "ExactPreparedProjectionAndTarget");
+#endif
+            return result;
+        }
+#if STATS
+        GenerationStatistics.Increment(GenerationStatisticCounter.MarkupExpressionCacheMiss);
+        RecordExpressionReuse(projection, "Miss", "CachedResultUnavailable");
+#endif
+        // A failed or canceled factory publishes nothing. Raw Roslyn diagnostic
+        // locations are probe-relative; presentation is remapped by each caller.
+        result = bind();
+        return result.Diagnostics.IsEmpty ? _expressions.GetOrAdd(key, result) : result;
+    }
+
+#if STATS
+    private void RecordExpressionReuse(CSharp.CompilationUnitSyntax projection, string decision, string reason)
+    {
+        if (!GenerationStatistics.IsInvalidationTrackingEnabled)
+        {
+            return;
+        }
+        using var hash = SHA256.Create();
+        var digest = BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(projection.ToFullString()))).Replace("-", "");
+        GenerationStatistics.RecordInvalidation(new GenerationInvalidationEvent("MarkupExpressionReuse", semanticModel.SyntaxTree.FilePath,
+            decision, [reason], ImmutableDictionary<string, string>.Empty.Add("ProjectionSha256", digest)));
+    }
+#endif
 
     internal CSharp.CompilationUnitSyntax CreateComponentCompilationUnit(CSharpProbeBinder binder,
         ImmutableArray<CSharp.MemberDeclarationSyntax> members, string fallbackTypeName,
@@ -153,6 +208,16 @@ internal sealed class CSharpProbeContext(AkburaSemanticModel semanticModel)
                 as CSharp.LocalFunctionStatementSyntax)).Node as CSharp.LocalFunctionStatementSyntax;
 
     private sealed record MethodSyntax(SyntaxNode? Node);
+
+    private readonly record struct ExpressionProbeKey(CSharp.CompilationUnitSyntax Projection, string Text, ITypeSymbol? TargetType,
+        Microsoft.CodeAnalysis.Text.TextSpan QuerySpan)
+    {
+        public bool Equals(ExpressionProbeKey other) => ReferenceEquals(TargetType, other.TargetType) && QuerySpan == other.QuerySpan && Text == other.Text &&
+            Microsoft.CodeAnalysis.CSharp.SyntaxFactory.AreEquivalent(Projection, other.Projection);
+
+        public override int GetHashCode() => unchecked((StringComparer.Ordinal.GetHashCode(Text) * 397) ^
+            (TargetType == null ? 0 : RuntimeHelpers.GetHashCode(TargetType)) ^ QuerySpan.GetHashCode());
+    }
 
     private readonly record struct ImportKey(CSharp.UsingDirectiveSyntax Syntax, string Text)
     {

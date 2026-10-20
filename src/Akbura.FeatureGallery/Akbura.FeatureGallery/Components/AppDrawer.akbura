@@ -30,6 +30,10 @@ param string CurrentUrl = "";
                   Url="/state-bindings"
                   Router={Router}/>
 
+            <Link Content="Expression bindings"
+                  Url="/expression-bindings"
+                  Router={Router}/>
+
             <Link Content="Commands"
                   Url="/commands"
                   Router={Router}/>

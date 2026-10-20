@@ -1,0 +1,54 @@
+using Avalonia.Controls;
+using Akbura.Styles.akcss;
+using Akbura.FeatureGallery.Pages.Page.akcss;
+
+state string firstName = "Ada";
+state string lastName = "Lovelace";
+state int count = 1;
+state bool isEnabled = true;
+
+<StackPanel gap-4>
+
+    <Grid page-grid-2 ${lg}:page-grid-2-desktop>
+        <StackPanel gap-2>
+            <TextBlock Text="First name" page-card-description/>
+            <TextBox Name="basics-first-name" bind:Text={firstName}/>
+        </StackPanel>
+        <StackPanel page-cell-2 ${lg}:page-cell-2-desktop gap-2>
+            <TextBlock Text="Last name" page-card-description/>
+            <TextBox Name="basics-last-name" bind:Text={lastName}/>
+        </StackPanel>
+    </Grid>
+
+    <Border page-callout>
+        <StackPanel gap-2>
+            <TextBlock Name="basics-full-name"
+                       Text=${x.bind $"{firstName} {lastName}"}
+                       text-xl font-bold text-blue-400 whitespace-normal/>
+            <TextBlock Name="basics-count" Text=${x.bind $"Count: {count}"} text-slate-200/>
+            <TextBlock Name="basics-doubled" Text=${x.bind $"Doubled: {count * 2}"} text-slate-200/>
+            <TextBlock Name="basics-summary"
+                       Text=${x.bind $"{firstName} has {count} {(count == 1 ? "point" : "points")}."}
+                       text-slate-300 whitespace-normal/>
+            <TextBlock Name="basics-enabled"
+                       Text=${x.bind isEnabled ? "Enabled" : "Disabled"}
+                       text-slate-300/>
+        </StackPanel>
+    </Border>
+
+    <WrapPanel Orientation="Horizontal">
+        <Button Name="basics-decrease" Content="Decrease" Click={count--} Margin="0,0,8,8"/>
+        <Button Name="basics-increase" Content="Increase" Click={count++} Margin="0,0,8,8"/>
+        <Button Name="basics-toggle" Content="Toggle enabled" Click={isEnabled = !isEnabled} Margin="0,0,8,8"/>
+        <Button Name="basics-reset" Content="Reset" Margin="0,0,8,8"
+                Click={() => { firstName = "Ada"; lastName = "Lovelace"; count = 1; isEnabled = true; }}/>
+    </WrapPanel>
+
+    <TextBlock Text="x.bind is one-way: it assigns the expression result to a property. These editors use the existing bind:Text mechanism to edit state."
+               page-note-text/>
+    <TextBlock Text="State changes can also schedule the component's normal render. The next demo uses ObservableObject changes to show updates without that render."
+               page-card-description/>
+
+    <ViewThisComponentInGithub/>
+
+</StackPanel>

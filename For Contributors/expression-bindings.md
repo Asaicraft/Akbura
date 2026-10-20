@@ -1,301 +1,357 @@
-# Expression bindings
+# How x.bind is generated
 
-## Editor integration (Stage 5)
+This guide describes how to trace and modify the generated code for
+`${x.bind expression}`. Start with the emitted evaluator and its owner, then
+follow the compiler plan that produced them.
 
-Expression bindings reuse the Workspaces embedded-C# pipeline: the syntactic
-document identifies `CSharpExpressionSyntax`, the compiler builds a scoped probe,
-and the shared Roslyn projection maps positions/edits to the original UTF-16
-document. The `x.bind` prefix and outer delimiters stay outside that C# mapping.
-Editor integration does not change runtime evaluation or observation rules.
+An expression binding is a typed C# evaluator plus a destination callback.
+It does not create a `BindingPath`, a CLR markup extension, or a new
+`State<T>` for the expression result. It can observe an existing `state`
+declaration, but its result is written directly to the destination.
 
-At `${`, `${x.` and `${x.bi`, completion offers the built-in `x.bind` directive,
-even without a semantic project. It reuses the markup value-prefix session and
-safe name-span commit validation, but is not returned by CLR markup-extension
-lookup. Insertion preserves existing delimiters and requests C# completion.
-Binding/CompiledBinding/resource catalogs are unchanged. C# member completion
-requires a loaded semantic project.
+## 1. Read the generated code
 
-Projections preserve state/parameter/inject types, preceding locals and shadowing,
-foreach/template scopes and named-element origins. Completion and reference probes
-use the destination contract's contextual value type (or declared property type),
-never its `BindingBase` assignment channel. The existing compiler reference
-collector supplies real symbol identities and original spans for interpolation
-and nested expressions. Shared references/rename, definition, hover and semantic
-classification consume those identities; signature help uses the same projection.
-The prefix is a directive, delimiters are punctuation, and C# tokens retain
-syntactic classification when semantic information is unavailable.
-
-Diagnostics are the existing compiler expression, conversion, unsupported-target
-and observation diagnostics, mapped to the Akbura file. No duplicate IDE warning
-or automatic partial-observation fix is introduced. Existing code actions remain
-available for diagnostics supported by the shared service; this stage does not
-add a general Roslyn code-fix provider or a missing-using fix for arbitrary C#
-expressions.
-
-Recovery commits retain the parser's outer-opener position separately from the
-C# span, including trivia and paired-brace recovery. Separator whitespace after
-`bind` is included in the projection even for an empty/multiline expression;
-the real binding node owns its completion session. Original Roslyn expression
-nodes are reused with their omitted boundary trivia, not reparsed by a new
-expression parser. Shared completion selection hides the reserved probe method
-in both LSP and Visual Studio. Snapshot validation and
-text-outside-expression checks remain in effect. C# pairing/interpolation and
-outlining reuse existing document services. Markup formatting leaves lines
-crossing a multiline binding expression intact, including raw-string content.
-
-Visual Studio consumes shared semantics and projected documents; its native
-prefix commit adapter uses the same safe name-span rules. LSP handlers/UTF-16
-protocol models require no binding-specific methods. VS Code consumes those
-handlers and a bounded TextMate fallback with C# content and nested braces.
-The existing absence of a native Visual Studio Rename UI adapter is unchanged:
-rename semantics are exposed through Workspaces and LSP/VS Code.
-
-`eng/Verify-ExpressionBindingEditor.ps1` saves focused/full Debug and Release
-results, compiler syntax/semantic regressions, VS Code build/acceptance, and the
-existing Windows editor/VSIX checks. Runs record commands, hashes, logs and test
-counts. `DONE.txt` means the runner stopped, not that everything passed; inspect
-`summary.csv`. Skipped/aborted/timed-out checks are not successes. Interactive
-native VS verification still requires an experimental host and is not performed
-by this script. Shared tests do not count as native-host verification.
-
-## Compiler and runtime contract
-
-`${x.bind expression}` is a built-in, one-way expression binding, not a CLR
-markup extension. Stages 1–3 implement syntax, parsing and semantics. Stage 4
-adds typed code generation and runtime observation in ReleaseDirect,
-DebugStructural and ReleaseConditional generation modes. Full Debug and Release
-validation passes for UnitTests, Workspaces, Language Server unit/integration
-tests and Hot Reload integration tests.
-
-## Binding and ownership
-
-`MarkupBinder.ExpressionBinding.cs` uses the existing
-`BindMarkupAttributeExpression` / `CSharpProbeBinder` scope and conversion path.
-The attribute remains a `BoundMarkupPropertySetter` and
-`IMarkupPropertySetterOperation`, with the distinct `ExpressionBinding` value
-kind. `ValueOperation` and its projected C# operation children are preserved.
-An optional `ExpressionBindingPlan` exposes the semantic analysis. Old dynamic
-expressions and markup extensions have no such plan.
-
-The original expression result type is `plan.ResultType`; the contextual
-destination type and assignment conversion are separate. In particular,
-`AssignBinding` does not turn a C# value into `BindingBase` or erase its type to
-`object`. Existing property metadata resolves contextual assignments such as
-`Setter.Value` before checking the expression conversion.
-
-Plans contain immutable arrays, current-compilation symbols and operations.
-They use the existing bound-node/operation caches; there are no new static or
-cross-snapshot caches. Expression, destination-type and referenced-symbol edits
-therefore use normal semantic-model invalidation. Identity is preserved for
-repeated queries within a model and for no-op bound-tree rewriting.
-
-## Dependency and evaluation structure
-
-`ExpressionBindingDependencyAnalyzer` walks Roslyn `IOperation`, never source
-paths or regular expressions. Each dependency identifies a receiver, actual
-member symbol, receiver/result types, classification and notification contract.
-Indexers additionally retain their index evaluations. Only actual
-`INotifyCollectionChanged` receivers gain collection notification capability;
-an ordinary list or array is not assumed observable.
-
-Evaluation occurrences form a separate immutable tree. Repeated member reads
-can share a dependency/subscription identity without eliminating either read.
-Calls and indexers with potentially different receivers are not deduplicated.
-Ordered condition paths describe `?:`, `&&`, `||`, `??`, `?.`, switch arm order,
-patterns and guards. Generation preserves the C# control flow instead of
-evaluating inactive branches to discover observers.
-
-Observation descriptions include existing Akbura state/parameter sources,
-`INotifyPropertyChanged`, typed Avalonia property registration fields and
-collection notifications. Non-observable CLR members remain explicitly
-unobservable. Constant/readonly reads are not fabricated as subscriptions.
-
-## Supported forms and limitations
-
-Property/field chains, parameters/state, injected services, component members,
-existing foreach/template/local scopes, arithmetic, interpolation, casts,
-indexers, unary operators and scalar patterns are analyzed. Method receivers
-and arguments are traversed. Primitive/string formatting methods have known
-call-site inputs; other calls and user-defined operators/conversions emit
-`ExpressionBindingHiddenDependencies` warnings and a partial plan. The analyzer
-does not inspect arbitrary method bodies or claim to know their hidden reads.
-
-Mutation, deferred lambda/local-function bodies, object construction, await,
-dynamic dispatch, method/event references, recursive/list patterns and unknown
-operation forms emit `ExpressionBindingUnsupportedExpression`. They require a
-future explicit evaluation/observation contract rather than an inaccurate graph.
-
-Only ordinary writable, one-way scalar property targets are accepted. Routed
-events, command handlers, `bind:`/`out:`, directional component parameters,
-metadata directives, collection assignment contracts, readonly/init-only/static
-properties and unresolved contextual target types are diagnosed explicitly;
-unsupported targets do not receive an incomplete usable plan. Missing members,
-invalid expressions and incompatible conversions use existing diagnostics,
-with probe locations mapped back to the expression in the Akbura document.
-
-CLR destinations also require a publicly readable getter so structural rollback
-can restore their baseline. Ref-like destination values cannot be retained by
-the typed binding coordinator. Observable value-type receivers are diagnosed
-rather than copied/boxed into observers, which could change mutable getter
-semantics or observe a different instance. Ordinary unobserved struct reads are
-not subject to that restriction.
-
-A partial plan is not fully reactive. No runtime objects, subscriptions,
-handlers or closures are stored in the semantic model.
-
-## Generated evaluation
-
-`ComponentPlanner` lowers the value to the dedicated `ExpressionBinding` kind
-and retains the semantic plan. `ExpressionBindingWriter` rewrites resolved
-read sites in its Roslyn expression. A generated typed lambda evaluates the
-expression and performs the normal contextual assignment conversion. The
-destination is written with the existing `PropertyWriter` metadata; it does not
-also receive an ordinary dynamic-expression assignment.
-
-The receiver instrumentation returns its argument unchanged. For an INPC read,
-the essential shape is `tracker.Property(receiver, identity, "Name").Name`.
-The receiver expression and getter therefore execute in their original order,
-not once to build a path and again to compute the result. Calls, interpolation,
-arithmetic, `?:`, `&&`, `||`, `??`, switch arms and guards retain their C# control
-flow. Conditional access is lowered using a fresh, collision-checked receiver
-temporary and the original lifted result type. Generated assignment and baseline
-locals use the same collision checks against names in the expression.
-
-State reads use the actual generated `State<T>` accessor, including its stable
-generated name. Parameter and service reads use their existing Avalonia
-descriptors. Avalonia member observation uses the registration resolved by the
-semantic plan, not a runtime naming convention or reflection lookup.
-
-## Notifications and receiver reconciliation
-
-`ExpressionBinding<T>` coordinates one typed evaluator and target writer.
-`ExpressionBindingContext` records the live receivers encountered during that
-evaluation. It supports:
-
-- Existing `State<T>.Subscribe` notifications.
-- Registered Avalonia properties through `StateBindings.ObserveAvaloniaProperty`.
-- Matching INPC properties, including null/empty property-name notifications.
-- Actual INCC collections at indexer reads.
-
-Each successful evaluation marks the observations that it used. Unchanged
-receiver/member pairs keep their subscriptions; obsolete pairs are detached.
-Repeated reads keep their individual C# execution while sharing an observer
-where safe. Collection and state observations are deduplicated per live source.
-Changing a receiver, index or active branch reconciles against the new set of
-actually executed reads. A reset or insertion is an invalidation, not a second
-implementation of collection indexing: the original C# indexer determines the
-result and retains its ordinary exceptions.
-
-There is no runtime expression parser, reflection-based property traversal,
-polling, or second compiled-path interpreter. `CompiledStatePathObserver` is
-not forced to walk expression dependencies, because its additional getter
-reads would change expression evaluation semantics.
-
-Off-thread notifications post an invalidation to the Avalonia UI dispatcher.
-Inactive observation records ignore queued notifications after removal or
-disposal. Weak callback ownership prevents queued work from rooting targets.
-Notifications during evaluation/assignment mark the binding dirty rather than
-recursively entering it. A drain is bounded to 64 synchronous evaluations;
-failure to stabilize is reported, not silently ignored. Equal results can skip
-the target write, but still reconcile dependency observations.
-
-## Lifetime and generation modes
-
-The first active evaluation assigns the destination. Relevant notifications
-subsequently update it without requesting a full-component render.
-
-Generation classifies initialization as `InitialOnly` or `RequiresRenderRefresh`
-using the semantic evaluation tree and resolved declaration identities. State,
-parameters, injected services, constants, readonly receivers and observable
-paths can initialize once. Mutable unobserved fields/properties, render locals,
-iteration/template item captures, unobservable array indexing, arbitrary calls
-and unproven named-control lifetimes retain render-time callback refresh.
-Absence of local variables alone is not proof of stability.
-
-`InitialOnly` registration runs in `FirstUpdate` for direct components. In
-structural/single-pass generation it runs during owning-node initialization
-and actual source revisions, not on ordinary update frames. An existing
-binding still reconciles on a real revision; this optimization does not skip
-Hot Reload ownership or rollback. `RequiresRenderRefresh` keeps the previous
-update behavior and reuses unchanged observers while refreshing captures.
-
-Foreach may prepare a bookkeeping revision for its native name scope on an
-ordinary frame. Stable expression slots preserve their applied resource during
-that revision; the existing reconciliation method refreshes them for actual
-template/source revisions. The observation engine itself is unchanged.
-Stable callbacks in retained local stores are emitted through static local
-factories with explicit component/store/target inputs. This prevents C# from
-sharing a display class with adjacent render-local callbacks and retaining an
-obsolete keyed item that the stable expression never reads.
-
-Named receivers are resolved by projected symbol origins, not text matching.
-Self references and ordinary component-owned peers can be proven stable;
-other cross-scope references fall back conservatively. All owning nodes are
-created before their initial assignments, so a same-element read such as
-`text.Width` can subscribe before a later Width assignment and receive its
-notification. The property is not read from an uninitialized name field.
-
-Expression-binding probes include preceding C# declarations when resolving
-captures and their initializer inputs. A render local that shadows a state is
-therefore a real local, not a duplicate projected state. Ordinary expression
-probe behavior is unchanged. CLR rollback captures the actual target object,
-rather than looking it up after the pending node store has been rolled back.
-
-Direct bindings have per-target slots in their component owner. Structural
-bindings use `AkburaRenderState` owned operation slots, capture target baselines,
-and participate in revision rollback and resource release. Callback refresh is
-separate from stable node identity, so a reused control does not require an
-obsolete evaluator closure to remain alive.
-
-During a structural replacement, old callbacks move into the transient rollback
-record rather than remaining on the retained previous-operation metadata. Abort
-restores those callbacks and their observations; commit releases their captures.
-Final operation release clears callbacks even when old metadata is retained.
-
-Both paths use the existing local render-scope lifecycle. Visual detachment
-suspends observation; reattachment reads the current graph and resumes it.
-Updating callbacks while visually suspended does not reactivate subscriptions.
-Retiring structural ownership prevents a later visual attachment from reviving
-the old binding. Final disposal releases the local scope and evaluator/writer
-callbacks. Cleanup attempts all recorded subscriptions even if an unsubscribe
-throws, then reports the failures.
-
-If a newly installed binding fails during its first evaluation or target write,
-its registration and observers are released. A cleanup failure is reported
-together with the original initialization error, not instead of it.
-
-Template/foreach instances and conditional branches use their existing scope
-and structural owners rather than a global dependency registry. Their runtime
-coverage verifies capture refresh, observer retirement and independent owners.
-Foreach collection bookkeeping still uses that owner's queued invalidation.
-Expression binding does not make structural collection edits synchronous; tests
-drain the UI queue before checking moved or removed render nodes.
-
-## Examples and relationship to state bindings
+Given an injected view model implementing `INotifyPropertyChanged`:
 
 ```akbura
-<TextBlock Text=${x.bind $"{Vm.FirstName} {Vm.LastName}"} />
-<TextBlock Width=${x.bind Vm.Count + 1} />
-<TextBlock Text=${x.bind Vm.Profile?.Name ?? "Unknown"} />
-<TextBlock Text=${x.bind Vm.Enabled ? Vm.Name : Vm.GuestName} />
+inject PersonViewModel Vm;
+
+<TextBlock Text=${x.bind Vm.FirstName + " " + Vm.LastName} />
 ```
 
-The width example preserves the normal `int`-to-`double` conversion. The null
-fallback and conditional name observe only the receivers used by their active
-paths. A method call can observe its known receiver/arguments, but properties
-read only inside that method are not discovered. The existing
-`ExpressionBindingHiddenDependencies` warning describes that partial contract;
-there is no hidden polling fallback. Unsupported semantic plans do not produce
-an executable expression binding.
+The direct-component registration has this shape:
+
+```csharp
+this.__AkburaBindExpression<string?>(
+    textBlock,
+    propertySlot,
+    this,
+    tracker =>
+        tracker.Property(
+            tracker.Avalonia(this, 0, VmProperty.AvaloniaProperty).Vm,
+            1, "FirstName").FirstName
+        + " " +
+        tracker.Property(
+            tracker.Avalonia(this, 0, VmProperty.AvaloniaProperty).Vm,
+            2, "LastName").LastName,
+    value => { ((TextBlock)textBlock).Text = value; });
+```
+
+Throughout this guide, generated identifiers, dependency IDs, property slots
+and revision identities are abbreviated; namespace qualifications, source
+mappings and surrounding component code are omitted. These are code-generation
+shapes, not complete generated component files.
+
+Read the arguments as follows:
+
+- `textBlock` and `propertySlot` identify the destination binding slot.
+- The third argument is the owning lifetime root, here the component.
+- `tracker => ...` is the original expression with observed reads inserted.
+- `value => ...` performs the assignment chosen by `PropertyWriter`.
+
+`tracker.Avalonia(...).Vm` observes replacement of the injected view model
+through its generated descriptor. `tracker.Property(...).FirstName` observes
+the actual view-model instance and then performs the original getter read.
+The second occurrence of `Vm` is still evaluated: subscription deduplication
+must not eliminate C# reads or alter their order.
+
+When `FirstName` changes, the existing binding evaluates this delegate again
+and writes `Text` if the result changed. It does not call component `Update()`
+to do so.
+
+## 2. Trace the compiler pipeline
+
+Use these entry points when following a binding from markup to generated C#:
+
+| Responsibility | Source |
+| --- | --- |
+| Bind the expression and validate its destination/conversion | [MarkupBinder.ExpressionBinding.cs](../src/Akbura.Generator/Language/Binder/MarkupBinder.ExpressionBinding.cs) |
+| Describe observable reads and their evaluation order | [ExpressionBindingDependencyAnalyzer.cs](../src/Akbura.Generator/Language/Binder/ExpressionBindingDependencyAnalyzer.cs), [ExpressionBindingPlan.cs](../src/Akbura.Generator/Language/Binder/ExpressionBindingPlan.cs) |
+| Resolve receivers and decide initialization placement | [ComponentPlanner.ExpressionBindings.cs](../src/Akbura.Generator/Language/CodeGeneration/ComponentPlanner.ExpressionBindings.cs), [ExpressionBindingInitializationKind.cs](../src/Akbura.Generator/Language/CodeGeneration/ExpressionBindingInitializationKind.cs) |
+| Emit the evaluator, registration and assignment callback | [ExpressionBindingWriter.cs](../src/Akbura.Generator/Language/CodeGeneration/ExpressionBindingWriter.cs) |
+| Own direct-component binding slots | [AkburaControl.ExpressionBindings.cs](../src/Akbura/AkburaControl.ExpressionBindings.cs) |
+| Own structural binding slots and revision rollback | [AkburaRenderState.ExpressionBindings.cs](../src/Akbura/HotReload/AkburaRenderState.ExpressionBindings.cs) |
+| Evaluate delegates and reconcile observations | [ExpressionBinding.cs](../src/Akbura/ComponentTree/ExpressionBinding.cs) |
+
+The parser stores the construct in `MarkupExpressionBindingSyntax`, including
+its embedded `CSharpExpressionSyntax`, tokens and trivia. It does not resolve
+`x.bind` as a markup-extension type.
+
+The binder uses `BindMarkupAttributeExpression` and the scoped C# probe.
+A property binding remains a `BoundMarkupPropertySetter` /
+`IMarkupPropertySetterOperation`, but has the distinct `ExpressionBinding`
+value kind and an `ExpressionBindingPlan`.
+
+Keep these parts of the plan separate:
+
+- `ResultType`: the original C# expression's type.
+- `TargetType` and `Conversion`: the destination's contextual type and
+  assignment conversion.
+- `Dependencies`: resolved sources, member symbols and notification contracts.
+- `Evaluation`: individual operation occurrences, children and branch paths.
+
+For example, `Width=${x.bind Vm.Count + 1}` can have an `int` result and a
+`double` destination. The generated typed delegate preserves the contextual
+conversion. A destination's binding-assignment channel does not make the
+expression's value type `BindingBase` or `object`.
+
+The planner lowers the property to `ComponentPropertyValueKind.ExpressionBinding`.
+It must not also emit the ordinary frame-based dynamic-property assignment
+for that destination.
+
+## 3. Instrument reads, not expression strings
+
+`ExpressionBindingWriter.TrackingRewriter` rewrites the Roslyn syntax using
+the semantic evaluation plan. Add observation support there and in the analyzer,
+not by substituting identifier text or constructing string paths.
+
+The runtime helpers have different return contracts:
+
+| Source/read | Emitted shape | Returned value |
+| --- | --- | --- |
+| Existing Akbura state | `tracker.State(__State_count, id)` | The state's current value |
+| Parameter or injected service | `tracker.Avalonia(this, id, VmProperty.AvaloniaProperty).Vm` | The generated property value after observing its owner |
+| INPC property | `tracker.Property(receiver, id, "Name").Name` | The original property read |
+| Registered Avalonia property | `tracker.Avalonia(control, id, Control.WidthProperty).Width` | The original property read |
+| Observable collection indexer | `tracker.Collection(items, id)[index]` | The original indexer read |
+
+Except for `State`, tracker helpers return the receiver unchanged. The
+generated getter/indexer performs the read; runtime observation must not read
+the property again to discover its value.
+
+For a collection/index expression, the evaluator can contain:
+
+```csharp
+tracker.Property(
+    tracker.Collection(
+        tracker.Property(Vm, 0, "Items").Items, 1)
+        [tracker.Property(Vm, 2, "SelectedIndex").SelectedIndex],
+    3, "Name").Name
+```
+
+Here `Vm` stands for an already-resolved receiver; a state or injected root
+also receives its own instrumentation. Collection observation is emitted for
+the notification contract identified by the analyzer. An ordinary array/list
+does not acquire collection notifications merely because it has an indexer.
+
+Preserve C# control flow. For example:
+
+```csharp
+tracker.Property(Vm, 0, "Enabled").Enabled
+    && tracker.Property(Vm, 1, "Ready").Ready
+```
+
+does not read or observe `Ready` while `Enabled` is false. The same rule
+applies to `?:`, `??`, switch arms and guards. Conditional access is lowered
+to a fresh receiver temporary and the correct lifted result type so the
+receiver is evaluated once and the null branch stays inactive.
+
+Use resolved symbols and projected origins for state, foreach, template and
+named-element receivers. A local named `Vm` may shadow an injected `Vm`;
+matching their spelling is not sufficient. Generated temporaries must use the
+rewriter's collision-checked identifiers. Keep source mappings through
+`SourceMappingWriter`.
+
+## 4. Decide when to register or refresh callbacks
+
+Registration placement and notification-driven evaluation are different things.
+A binding can keep observing after its registration code stops running.
+
+`ExpressionBindingInitializationClassifier` classifies property evaluators:
+
+| Classification | Generated placement | Why |
+| --- | --- | --- |
+| `InitialOnly` | Initial creation and actual source revisions | The evaluator can keep resolving its inputs without capturing stale frame values |
+| `RequiresRenderRefresh` | Render-time registration/callback refresh | The evaluator depends on inputs whose current capture must be supplied by the frame |
+
+State, parameter and injected-service reads, constants, readonly receivers and
+proven observable paths can be `InitialOnly`. This does not freeze their
+values: their notifications still reevaluate the installed binding.
+
+Render locals, foreach/template item captures, mutable unobserved members,
+unobservable array indexing, arbitrary calls and unproven named-control
+lifetimes require conservative refresh. Inspect the evaluation tree, not just
+whether the expression contains a local identifier.
+
+For example:
 
 ```akbura
-state string name = bind Vm.Name;
-<TextBlock Text=${x.bind Vm.Name} />
+var current = Vm.Profile;
+<TextBlock Text=${x.bind current.Name} />
 ```
 
-The first declaration creates a directional Akbura state binding with state as
-its consumer. The second maintains a UI property directly with a one-way C#
-expression. They share state/Avalonia observation and lifecycle mechanisms,
-but differ in evaluation and ownership requirements. This feature does not
-introduce two-way expression binding or change ordinary `{expression}`,
-`${Binding ...}` or `${CompiledBinding ...}` semantics.
+The binding observes `current.Name`. It does not observe the initializer
+`Vm.Profile` as if it were part of the expression. A later render supplies
+the current frame's `current` capture. Refresh updates the existing binding's
+callbacks; it does not require duplicate subscriptions to unchanged sources.
+
+The generation mode determines the owning registration API:
+
+| Mode/owner | Registration |
+| --- | --- |
+| Direct component target | `__AkburaBindExpression<T>` |
+| Structural/runtime-stored target | `AkburaRenderState.ReconcileExpressionBinding<T>` |
+| AKCSS utility condition | Candidate-owned `ExpressionBinding<bool>` |
+
+In direct generation, `InitialOnly` property bindings register in
+`FirstUpdate`. Structural/single-pass generation registers them during
+owning-node initialization and real source revisions, not on ordinary steady
+frames. `ReleaseConditional` also uses structural ownership where the target
+requires runtime storage; choose the API from the element plan rather than
+assuming every Release binding is direct.
+
+Stable property bindings in retained local stores use static local factories
+with explicit component/store/target inputs. Keep that capture boundary:
+neighboring lambdas can otherwise share a C# display class and retain an old
+foreach item even when the stable expression never reads it.
+
+## 5. Preserve structural ownership and rollback
+
+A structural registration has this abbreviated shape:
+
+```csharp
+__akburaRenderState.ReconcileExpressionBinding<string?>(
+    localId,
+    propertySlot,
+    expressionIdentity,
+    tracker => tracker.Property(Vm, 0, "Name").Name,
+    value => { textBlock.Text = value; },
+    target: textBlock,
+    property: TextBlock.TextProperty,
+    ownLifetime: binding => this.__AkburaRegisterLocalRenderScope(
+        lifetimeRoot, binding.Resume, binding.Suspend, __akburaRenderState));
+```
+
+The real emitter resolves the root/target expressions from the element's
+scope. Property slots come from `ComponentHotReloadIdentity.CreatePropertySlot`;
+operation syntax identities distinguish source revisions from ordinary frames.
+
+Avalonia destinations supply their target and property so the coordinator can
+capture a baseline. CLR destinations supply a baseline-restoration callback
+that captures the actual target object. Do not look up that target from a
+rolled-back node store when restoring a previous value.
+
+During replacement, callback snapshots belong to the transient rollback
+record. Abort restores the previous callbacks and observations; successful
+commit releases obsolete captures. Completed node snapshots must not retain
+retired operation metadata and its old candidate/item closures.
+
+Foreach name-scope bookkeeping can prepare a revision on an ordinary frame.
+For stable expression slots the emitter uses
+`preserveUnchanged: !__foreachFrameN.IsSourceRevision` so bookkeeping does
+not refresh them as if the template source changed. Actual source revisions
+still reconcile the binding.
+
+## 6. Follow a dependency notification at runtime
+
+`__AkburaBindExpression<T>` finds or creates a per-target/property slot;
+`ReconcileExpressionBinding<T>` does the corresponding owned-operation work.
+Both ultimately install a `Func<ExpressionBindingContext, T>` evaluator and
+an `Action<T>` writer on `ExpressionBinding<T>`.
+
+For an active binding, `Update(evaluate, write)` installs the callbacks and
+invalidates evaluation. Each evaluation:
+
+1. Starts an observation epoch.
+2. Executes the generated C# delegate, recording the sources actually read.
+3. Removes observations not used by this successful evaluation and retains
+   matching receiver/member subscriptions.
+4. Calls the writer on the first value or when the result changes.
+
+Equal results can skip the write, but do not skip observation reconciliation.
+Replacing a receiver, changing an index or selecting a different branch must
+release observations of the previous active path.
+
+Subscriptions use existing state notifications, matching INPC properties,
+registered Avalonia properties and collection-change events. Off-thread
+notifications post to the UI dispatcher. Notifications arriving during
+evaluation mark it dirty rather than recursively entering the evaluator.
+A non-stabilizing synchronous drain is bounded to 64 evaluations and reports
+an error.
+
+An expression binding does not schedule a component render. Existing
+`state`, parameter or service setters may independently request one; expression
+binding neither requires nor suppresses that existing behavior. Do not add a
+new result state merely to route a property or condition update.
+
+Visual detach suspends observation. Reattach evaluates current sources before
+resuming normal notifications. Refreshing callbacks while suspended must not
+restart subscriptions. Retiring an owner prevents later attachment from
+reviving its old bindings. Final disposal releases subscriptions and callbacks;
+cleanup attempts all subscriptions even if one unsubscribe throws.
+Initialization failure must also release newly installed resources.
+
+## 7. Generate a reactive AKCSS condition
+
+```akbura
+state double width = 800;
+<TextBlock ${x.bind width > 1000}:hidden/>
+```
+
+The utility operation carries `ConditionExpressionBinding` with `bool` as
+its contextual type. `AkcssActivatorWriter` uses the same `TrackingRewriter`
+to emit a candidate evaluator:
+
+```csharp
+new AkcssUtilityCandidateActivator(
+    conflictKey: "hidden",
+    sourceOrder: 0,
+    applications: applications,
+    reactiveCondition:
+        ((Func<Owner, Func<ExpressionBindingContext, bool>>)(static owner =>
+            (ExpressionBindingContext tracker) =>
+                tracker.State(owner.__State_width, 0) > 1000))(this));
+```
+
+The static factory isolates stable captures. The candidate owns an
+`ExpressionBinding<bool>` and caches its result. A result change notifies the
+existing AKCSS runtime, which resolves contributions through the cascade.
+`IsActive` reads that cached value; it must not poll the expression. The
+evaluator must not directly assign `IsVisible`, `Background` or another
+utility destination.
+
+For render-local conditions, generated `RefreshReactiveCondition` calls
+replace the candidate's evaluator capture. Dependency notifications continue
+to work between those frames. Ordinary `{condition}:utility` stays
+frame-evaluated, and `${hover}:utility` remains a markup-extension variant.
+
+See [Reactive AKCSS utility conditions](reactive-utility-conditions.md) for
+candidate lifecycle and cascade details.
+
+## 8. Validate a generator change
+
+Check the resulting C# and runtime behavior, not only whether the syntax parses:
+
+- Compile the emitted evaluator in `ReleaseDirect`, `DebugStructural` and
+  `ReleaseConditional` modes, including contextual conversions.
+- Check repeated reads, short-circuit branches, null receivers, nested/indexed
+  paths and state/parameter/injected roots.
+- Change an observable source without calling component `Update()`; assert
+  the actual destination value and unchanged render count where no other
+  mechanism requests a render.
+- Change render-local/item captures on an ordinary frame and confirm old
+  sources are unsubscribed and collectible.
+- Check detach/reattach, conditional removal, independent template instances,
+  keyed replacement and revision rollback.
+
+Use `MarkupExpressionBindingRuntimeTests` (including its initialization
+tests) for generated property bindings and
+`ReactiveUtilityConditionGenerationTests` for generated utility conditions.
+Semantic/dependency tests cover diagnostics and plan structure. Shared
+Workspaces tests cover projected source spans and symbols.
+
+Keep unsupported constructs diagnostic. Deferred/mutating expressions,
+construction, await, dynamic dispatch and unknown operation forms must not
+silently receive an inaccurate reactive plan. Arbitrary method bodies and
+user-defined operations can hide reads; preserve
+`ExpressionBindingHiddenDependencies` warnings and partial-observation
+classification instead of adding polling.
+
+Property targets must satisfy the existing writable, one-way scalar contract.
+Events, directional bindings, collection assignment targets, readonly/init-only
+members and ref-like destinations need different contracts. Utility conditions
+must convert to `bool`; `bool?` needs explicit null resolution.
+
+Editor services reuse the embedded C# syntax, contextual type and real symbol
+origins from this compiler pipeline. Changes to probes or source mappings must
+preserve that projection. They do not require a second IDE-specific evaluator.

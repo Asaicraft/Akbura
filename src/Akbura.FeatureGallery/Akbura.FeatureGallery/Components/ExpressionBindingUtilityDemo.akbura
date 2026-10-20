@@ -1,0 +1,77 @@
+using System;
+using Avalonia.Controls;
+using Akbura.Styles.akcss;
+using Akbura.FeatureGallery.Models;
+using Akbura.FeatureGallery.Pages.Page.akcss;
+
+state double width = 800;
+state ExpressionBindingDemoModel model = new();
+state int refreshTick = 0;
+
+<StackPanel gap-5>
+
+    <Border page-callout>
+        <StackPanel gap-3>
+            <TextBlock Text="A · Cross the visibility threshold" page-card-small-title whitespace-normal/>
+            <TextBlock Name="utility-width" Text=${x.bind $"Demo width: {width:0} · hidden: {width > 1000}"}
+                       text-blue-400 whitespace-normal/>
+            <Border p-4 bg-slate-900 border-1 border-slate-700 rounded-lg MinHeight="64">
+                <TextBlock Name="utility-hidden" Text="I disappear above 1000 and return at 1000 or below."
+                           ${x.bind width > 1000}:hidden text-slate-200 whitespace-normal/>
+            </Border>
+            <WrapPanel Orientation="Horizontal">
+                <Button Name="utility-decrease" Content="− 300" Click={width = Math.Max(0, width - 300)} Margin="0,0,8,8"/>
+                <Button Name="utility-increase" Content="+ 300" Click={width += 300} Margin="0,0,8,8"/>
+                <Button Name="utility-width-reset" Content="Reset width" Click={width = 800} Margin="0,0,8,8"/>
+            </WrapPanel>
+            <TextBlock Text="This is a simulated width, not the measured window width. Its state notifications may also trigger normal component rendering."
+                       page-card-description/>
+        </StackPanel>
+    </Border>
+
+    <StackPanel gap-3>
+        <TextBlock Text="B · Two independent conditions, one cascade" page-card-small-title whitespace-normal/>
+        <Border Name="utility-color" bg-slate-700
+                ${x.bind model.IsSelected}:bg-blue-500
+                ${x.bind model.HasError}:bg-red-500
+                p-5 rounded-xl>
+            <StackPanel gap-2>
+                <TextBlock Text="Reactive AKCSS" text-xl font-bold text-white/>
+                <TextBlock Name="utility-color-status"
+                           Text=${x.bind model.HasError ? "Error · red-500" : model.IsSelected ? "Selected · blue-500" : "Base · slate-700"}
+                           text-white whitespace-normal/>
+            </StackPanel>
+        </Border>
+        <WrapPanel Orientation="Horizontal">
+            <Button Name="utility-selected" Content="Toggle selected" Click={model.IsSelected = !model.IsSelected} Margin="0,0,8,8"/>
+            <Button Name="utility-error" Content="Toggle error" Click={model.HasError = !model.HasError} Margin="0,0,8,8"/>
+            <Button Name="utility-colors-reset" Content="Clear conditions"
+                    Click={() => { model.IsSelected = false; model.HasError = false; }} Margin="0,0,8,8"/>
+        </WrapPanel>
+        <TextBlock Text="Both true? Red wins here because its background utility appears later, with otherwise equal precedence. Turning error off restores blue; turning both off restores slate. These are direct ObservableObject changes."
+                   page-note-text/>
+    </StackPanel>
+
+    <StackPanel gap-3>
+        <TextBlock Text="C · Compare the same INPC condition" page-card-small-title whitespace-normal/>
+        <Grid page-grid-2 ${lg}:page-grid-2-desktop>
+            <Border Name="utility-ordinary" bg-slate-700 {model.IsSelected}:bg-blue-500 p-4 rounded-lg>
+                <TextBlock Text="Ordinary condition · refreshed by a render" text-white whitespace-normal/>
+            </Border>
+            <Border Name="utility-reactive" page-cell-2 ${lg}:page-cell-2-desktop
+                    bg-slate-700 ${x.bind model.IsSelected}:bg-blue-500 p-4 rounded-lg>
+                <TextBlock Text="x.bind condition · follows notifications" text-white whitespace-normal/>
+            </Border>
+        </Grid>
+        <Button Name="utility-refresh" Content="Refresh ordinary condition"
+                Click={refreshTick++} HorizontalAlignment="Left"/>
+        <TextBlock Text={$"Explicit refreshes: {refreshTick}"} page-card-description/>
+        <TextBlock Text="Use Toggle selected above. Only the reactive card follows the model notification immediately. The ordinary condition catches up on its normal refresh path, such as this button or a width-state change."
+                   page-card-description/>
+    </StackPanel>
+
+    <ViewThisComponentInGithub/>
+    <ViewThisInGithub Url="Models/ExpressionBindingDemoModel.cs" Content="View model in GitHub"
+                      HorizontalAlignment="Left"/>
+
+</StackPanel>

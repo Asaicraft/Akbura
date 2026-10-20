@@ -46,6 +46,10 @@ state string url = "/overview";
                                 <StateBindingsPage/>
                             </Page>
 
+                            <Page Url="/expression-bindings">
+                                <ExpressionBindingsPage/>
+                            </Page>
+
                             <Page Url="/commands">
                                 <CommandsPage/>
                             </Page>

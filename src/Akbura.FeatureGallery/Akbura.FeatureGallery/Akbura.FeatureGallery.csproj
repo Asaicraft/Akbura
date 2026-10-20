@@ -13,6 +13,14 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<!-- Akbura already embeds .akbura sources; include the companion model too. -->
+		<EmbeddedResource Include="Models\ExpressionBindingDemoModel.cs">
+			<LogicalName>Models/ExpressionBindingDemoModel.cs</LogicalName>
+			<WithCulture>false</WithCulture>
+		</EmbeddedResource>
+	</ItemGroup>
+
+	<ItemGroup>
 		<PackageReference Include="Avalonia" />
 		<PackageReference Include="Avalonia.AvaloniaEdit" />
 		<PackageReference Include="Avalonia.Themes.Fluent" />

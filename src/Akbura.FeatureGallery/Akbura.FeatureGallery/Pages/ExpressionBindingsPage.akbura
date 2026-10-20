@@ -1,0 +1,171 @@
+using Akbura.FeatureGallery.Models;
+using Akbura.FeatureGallery.Pages.Page.akcss;
+
+<StackPanel page ${md}:page-desktop>
+
+    <StackPanel page-header>
+        <TextBlock Text="Expression bindings" page-title ${md}:page-title-desktop whitespace-normal/>
+        <TextBlock Text="Write native C# expressions that automatically update when their observable dependencies change."
+                   page-description ${md}:page-description-desktop/>
+    </StackPanel>
+
+    <StackPanel page-section>
+        <TextBlock Text="Three ways to supply a property value" page-section-title ${md}:page-section-title-desktop whitespace-normal/>
+        <Grid page-grid-3 ${lg}:page-grid-3-desktop>
+            <Border page-card>
+                <StackPanel gap-3>
+                    <TextBlock Text="Avalonia Binding" page-card-title whitespace-normal/>
+                    <TextBlock Name="comparison-binding" Text={"""
+                        DataContext={model}
+                        Text=${Binding FirstName}
+                        """} page-code/>
+                    <TextBlock Text="A binding path, not a C# expression. FirstName is resolved against DataContext by default; Source or an element reference can select another source."
+                               page-card-description/>
+                    <TextBlock Text="Avalonia's binding engine follows source notifications without a component render. Mode controls direction; Binding supports options such as converters and StringFormat."
+                               page-card-description/>
+                </StackPanel>
+            </Border>
+            <Border page-cell-2 ${lg}:page-cell-2-desktop page-card>
+                <StackPanel gap-3>
+                    <TextBlock Text="A C# expression" page-card-title whitespace-normal/>
+                    <TextBlock Name="comparison-expression" Text={"""
+                        Text={model.FirstName}
+                        """} page-code/>
+                    <TextBlock Text="Uses typed C# values in the component's scope, not a DataContext path. Evaluated through the component's normal render/update mechanism."
+                               page-card-description/>
+                    <TextBlock Text="State changes can trigger that render. An INPC notification by itself does not subscribe this ordinary expression to the model."
+                               page-card-description/>
+                </StackPanel>
+            </Border>
+            <Border page-cell-3 ${lg}:page-cell-3-desktop page-card-accent>
+                <StackPanel gap-3>
+                    <TextBlock Text="An expression binding" page-card-title whitespace-normal/>
+                    <TextBlock Name="comparison-xbind" Text={"""
+                        Text=${x.bind model.FirstName}
+                        """} page-code/>
+                    <TextBlock Text="A typed C# expression with dependency tracking. Use component values, arithmetic, interpolation, conditions or indexers, not just a binding path."
+                               page-card-description/>
+                    <TextBlock Text="Supported observable inputs trigger reevaluation and a one-way target update without a component render. It does not infer hidden reads inside arbitrary methods."
+                               page-card-description/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </StackPanel>
+
+    <StackPanel page-section>
+        <StackPanel page-section-header>
+            <TextBlock Text="1. Start with state and C#" page-section-title ${md}:page-section-title-desktop whitespace-normal/>
+            <TextBlock Text="Edit a name, change one counter, and watch interpolation, arithmetic and a conditional update together."
+                       page-section-description/>
+        </StackPanel>
+        <FeatureView Path="Components/ExpressionBindingBasicsDemo.akbura">
+            <FeatureView.Code>{ExpressionBindingDemoSource.Basics}</FeatureView.Code>
+            <FeatureView.View><ExpressionBindingBasicsDemo/></FeatureView.View>
+        </FeatureView>
+    </StackPanel>
+
+    <StackPanel page-section>
+        <StackPanel page-section-header>
+            <TextBlock Text="2. Follow the live model" page-section-title ${md}:page-section-title-desktop whitespace-normal/>
+            <TextBlock Text="Edit a name to compare Avalonia Binding, an ordinary expression and x.bind. Then replace a profile or switch the active conditional branch."
+                       page-section-description/>
+        </StackPanel>
+        <FeatureView Path="Components/ExpressionBindingModelDemo.akbura + Models/ExpressionBindingDemoModel.cs">
+            <FeatureView.Code>{ExpressionBindingDemoSource.Model}</FeatureView.Code>
+            <FeatureView.View><ExpressionBindingModelDemo/></FeatureView.View>
+        </FeatureView>
+        <Border page-note>
+            <TextBlock Text="The MVVM buttons and editors change ObservableObject properties directly. Both binding forms follow notifications; Render snapshot now explicitly demonstrates when the ordinary C# expression catches up."
+                       page-note-text/>
+        </Border>
+    </StackPanel>
+
+    <StackPanel page-section>
+        <StackPanel page-section-header>
+            <TextBlock Name="indexed-demo-heading" Text="3. Follow a changing index" page-section-title ${md}:page-section-title-desktop whitespace-normal/>
+            <TextBlock Text="model.People[model.SelectedIndex].Name follows the selected person. Try changing the index, renaming the selected or unselected person, and replacing an item."
+                       page-section-description/>
+        </StackPanel>
+        <FeatureView Path="Components/ExpressionBindingIndexedDemo.akbura + Models/ExpressionBindingDemoModel.cs">
+            <FeatureView.Code>{ExpressionBindingDemoSource.Indexed}</FeatureView.Code>
+            <FeatureView.View><ExpressionBindingIndexedDemo/></FeatureView.View>
+        </FeatureView>
+    </StackPanel>
+
+    <StackPanel page-section>
+        <StackPanel page-section-header>
+            <TextBlock Text="4. Make utility conditions reactive" page-section-title ${md}:page-section-title-desktop whitespace-normal/>
+            <TextBlock Text="Cross a visibility threshold, combine selected/error colors, and compare an observed AKCSS condition with an ordinary refresh-based condition."
+                       page-section-description/>
+        </StackPanel>
+        <FeatureView Path="Components/ExpressionBindingUtilityDemo.akbura + Models/ExpressionBindingDemoModel.cs">
+            <FeatureView.Code>{ExpressionBindingDemoSource.Utilities}</FeatureView.Code>
+            <FeatureView.View><ExpressionBindingUtilityDemo/></FeatureView.View>
+        </FeatureView>
+    </StackPanel>
+
+    <StackPanel page-section>
+        <TextBlock Text="What happens when a dependency changes?" page-section-title ${md}:page-section-title-desktop whitespace-normal/>
+        <Grid page-flow-3 ${lg}:page-flow-3-desktop>
+            <Border page-card-compact>
+                <StackPanel gap-2>
+                    <TextBlock Text="1 · Evaluate" page-card-small-title/>
+                    <TextBlock Text="The original strongly typed C# expression produces the target value." page-card-description/>
+                </StackPanel>
+            </Border>
+            <TextBlock Text="→" page-flow-arrow ${lg}:page-flow-arrow-1-desktop text-xl text-slate-500 self-center/>
+            <Border page-flow-second ${lg}:page-flow-second-desktop page-card-compact>
+                <StackPanel gap-2>
+                    <TextBlock Text="2 · Observe" page-card-small-title/>
+                    <TextBlock Text="Akbura subscribes to the observable receivers actually read by the active expression." page-card-description/>
+                </StackPanel>
+            </Border>
+            <TextBlock Text="→" page-flow-arrow ${lg}:page-flow-arrow-2-desktop text-xl text-slate-500 self-center/>
+            <Border page-flow-third ${lg}:page-flow-third-desktop page-card-compact>
+                <StackPanel gap-2>
+                    <TextBlock Text="3 · Update" page-card-small-title/>
+                    <TextBlock Text="Relevant notifications trigger reevaluation and update the target property." page-card-description/>
+                </StackPanel>
+            </Border>
+        </Grid>
+        <TextBlock Text="A different conditional branch or nested receiver can change the active dependencies. There is no polling loop."
+                   page-section-description/>
+    </StackPanel>
+
+    <StackPanel page-section>
+        <TextBlock Text="Keep the contract in mind" page-section-title ${md}:page-section-title-desktop whitespace-normal/>
+        <Border page-code-surface>
+            <TextBlock Text={"""
+                Text=${x.bind model.FirstName}
+                Text=${x.bind model.Profile?.Name ?? "Unknown"}
+                Text=${x.bind model.People[model.SelectedIndex].Name}
+                Text=${x.bind model.UsePrimaryName ? "Primary" : "Fallback"}
+                Width=${x.bind model.SelectedIndex + 10}
+                Text=${x.bind $"{model.FirstName} {model.LastName}"}
+                """} page-code/>
+        </Border>
+        <Grid page-grid-2 ${lg}:page-grid-2-desktop>
+            <Border page-card>
+                <StackPanel gap-3>
+                    <TextBlock Text="Observable inputs, one-way output" page-card-title whitespace-normal/>
+                    <TextBlock Text="Use supported state/parameter notifications, INotifyPropertyChanged (INPC) models, registered Avalonia properties and observable collections. A plain CLR property does not magically raise a change event."
+                               page-card-description/>
+                    <TextBlock Text="x.bind assigns the result to its target. Existing directional state bindings and ordinary expressions are separate mechanisms."
+                               page-card-description/>
+                </StackPanel>
+            </Border>
+            <Border page-cell-2 ${lg}:page-cell-2-desktop page-card>
+                <StackPanel gap-3>
+                    <TextBlock Text="No hidden dependency discovery" page-card-title whitespace-normal/>
+                    <TextBlock Text="Arbitrary method bodies are not inspected for hidden property reads. Partial-observation warnings mean reactivity is not fully guaranteed."
+                               page-card-description/>
+                    <TextBlock Text="Unsupported mutating or deferred expressions are diagnosed. Keep side effects in event handlers, not binding expressions."
+                               page-card-description/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </StackPanel>
+
+    <ViewThisPageInGithub/>
+
+</StackPanel>

@@ -1,0 +1,101 @@
+using Avalonia.Controls;
+using Akbura.Styles.akcss;
+using Akbura.FeatureGallery.Models;
+using Akbura.FeatureGallery.Pages.Page.akcss;
+
+state ExpressionBindingDemoModel model = new();
+state int refreshTick = 0;
+
+<StackPanel gap-5>
+
+    <Grid page-grid-3 ${lg}:page-grid-3-desktop>
+        <Border page-card-compact>
+            <StackPanel gap-2>
+                <TextBlock Text="Avalonia Binding · DataContext path" page-card-description/>
+                <TextBlock Name="model-binding" DataContext={model} Text=${Binding FirstName}
+                           text-lg text-slate-200 whitespace-normal/>
+                <TextBlock Text="Path: FirstName" page-card-description/>
+            </StackPanel>
+        </Border>
+        <Border page-cell-2 ${lg}:page-cell-2-desktop page-card-compact>
+            <StackPanel gap-2>
+                <TextBlock Text="Normal expression · render snapshot" page-card-description/>
+                <TextBlock Name="model-ordinary" Text={$"{model.FirstName} {model.LastName}"}
+                           text-lg text-slate-200 whitespace-normal/>
+            </StackPanel>
+        </Border>
+        <Border page-cell-3 ${lg}:page-cell-3-desktop page-card-accent>
+            <StackPanel gap-2>
+                <TextBlock Text="x.bind · observed live value" page-card-description/>
+                <TextBlock Name="model-reactive" Text=${x.bind $"{model.FirstName} {model.LastName}"}
+                           text-lg text-blue-400 whitespace-normal/>
+            </StackPanel>
+        </Border>
+    </Grid>
+
+    <Grid page-grid-2 ${lg}:page-grid-2-desktop>
+        <StackPanel gap-2>
+            <TextBlock Text="First name" page-card-description/>
+            <TextBox x.Name="firstNameEditor"
+                     Text=${x.bind model.FirstName}
+                     TextChanged={model.FirstName = firstNameEditor.Text ?? ""}/>
+        </StackPanel>
+        <StackPanel page-cell-2 ${lg}:page-cell-2-desktop gap-2>
+            <TextBlock Text="Last name" page-card-description/>
+            <TextBox x.Name="lastNameEditor"
+                     Text=${x.bind model.LastName}
+                     TextChanged={model.LastName = lastNameEditor.Text ?? ""}/>
+        </StackPanel>
+    </Grid>
+
+    <WrapPanel Orientation="Horizontal">
+        <Button Name="model-refresh" Content="Render snapshot now" Click={refreshTick++} Margin="0,0,8,8"/>
+        <Button Name="model-reset" Content="Reset model" Click={model.Reset()} Margin="0,0,8,8"/>
+    </WrapPanel>
+    <TextBlock Text={$"Explicit refreshes: {refreshTick}"} page-card-description/>
+    <TextBlock Text="Typing updates ObservableObject properties directly. Both Avalonia Binding and x.bind follow their observable inputs without a component render; the ordinary expression catches up when you request one. TextChanged writes the model explicitly, not through a two-way x.bind."
+               page-note-text/>
+
+    <Border page-callout>
+        <StackPanel gap-3>
+            <TextBlock Text="Nested receiver · replace, disconnect, reconnect" page-card-small-title whitespace-normal/>
+            <TextBlock Name="model-profile" Text=${x.bind model.Profile?.Name ?? "No profile"}
+                       text-lg text-blue-400 whitespace-normal/>
+            <WrapPanel Orientation="Horizontal">
+                <Button Name="model-profile-rename" Content="Rename profile"
+                        IsEnabled=${x.bind model.Profile != null} Click={model.RenameProfile()} Margin="0,0,8,8"/>
+                <Button Name="model-profile-replace" Content="Replace profile" Click={model.ReplaceProfile()} Margin="0,0,8,8"/>
+                <Button Name="model-profile-clear" Content="Clear profile" Click={model.Profile = null} Margin="0,0,8,8"/>
+                <Button Name="model-profile-restore" Content="Restore profile" Click={model.ReplaceProfile()} Margin="0,0,8,8"/>
+            </WrapPanel>
+            <TextBlock Text="The expression follows the current Profile. Replacing it releases the old receiver; null selects the fallback."
+                       page-card-description/>
+        </StackPanel>
+    </Border>
+
+    <Border page-callout>
+        <StackPanel gap-3>
+            <TextBlock Text="Conditional dependencies · only the active branch" page-card-small-title whitespace-normal/>
+            <TextBlock Name="model-branch"
+                       Text=${x.bind model.UsePrimaryName ? model.PrimaryName : model.FallbackName}
+                       text-lg text-blue-400 whitespace-normal/>
+            <Button Name="model-branch-toggle" Content="Switch active branch"
+                    Click={model.UsePrimaryName = !model.UsePrimaryName} HorizontalAlignment="Left"/>
+            <TextBlock Name="model-branch-status" Text=${x.bind model.UsePrimaryName ? "Primary branch active" : "Fallback branch active"}
+                       page-card-description/>
+            <TextBlock Text="Primary name" page-card-description/>
+            <TextBox x.Name="primaryEditor" PlaceholderText="Primary name"
+                     Text=${x.bind model.PrimaryName} TextChanged={model.PrimaryName = primaryEditor.Text ?? ""}/>
+            <TextBlock Text="Fallback name" page-card-description/>
+            <TextBox x.Name="fallbackEditor" PlaceholderText="Fallback name"
+                     Text=${x.bind model.FallbackName} TextChanged={model.FallbackName = fallbackEditor.Text ?? ""}/>
+            <TextBlock Text="Edit the inactive name: the conditional result stays unchanged. Switch branches to use its latest value. The editors have their own bindings."
+                       page-card-description/>
+        </StackPanel>
+    </Border>
+
+    <ViewThisComponentInGithub/>
+    <ViewThisInGithub Url="Models/ExpressionBindingDemoModel.cs" Content="View model in GitHub"
+                      HorizontalAlignment="Left"/>
+
+</StackPanel>

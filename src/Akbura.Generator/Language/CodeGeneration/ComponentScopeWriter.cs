@@ -694,6 +694,7 @@ internal readonly ref partial struct ComponentScopeWriter
     }
 
     private bool WriteRefresh(
+        in ComponentPlan plan,
         in ComponentElementPlan element,
         string targetExpression)
     {
@@ -709,6 +710,7 @@ internal readonly ref partial struct ComponentScopeWriter
             _sourceMap,
             _generationMode);
         writer.WriteRefresh(
+            plan.Akcss,
             element.Akcss.Activators,
             targetExpression);
         return true;

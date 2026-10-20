@@ -7,3 +7,4 @@ If you want to add your own syntax, start with [Make Your Own Syntax.md](Make%20
 - [Real CLR Hot Reload integration tests](../src/Akbura.HotReloadIntegrationTests/README.md)
 - [Roslyn's Red-Green Trees](red-green-trees.md)
 - [Expression binding semantic model](expression-bindings.md)
+- [Reactive AKCSS utility conditions](reactive-utility-conditions.md)

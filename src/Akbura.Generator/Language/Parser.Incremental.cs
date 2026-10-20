@@ -1032,6 +1032,13 @@ internal sealed partial class Parser
             return prefix;
         }
 
+        if (PeekIncrementalTokenKind() == SyntaxKind.DollarToken && IsMarkupExpressionBindingStart())
+        {
+            var binding = ParseIncrementalMarkupExpressionBindingSyntax();
+            var colon = ReadRequiredIncrementalToken(SyntaxKind.ColonToken);
+            return GreenSyntaxFactory.TailwindExpressionBindingConditionalPrefixSyntax(binding, colon);
+        }
+
         if (PeekIncrementalTokenKind() == SyntaxKind.DollarToken &&
             PeekIncrementalTokenKind(1) == SyntaxKind.OpenBraceToken)
         {

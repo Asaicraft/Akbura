@@ -13,7 +13,7 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace Akbura.Workspaces.UnitTests;
 
-public sealed class WorkspaceExpressionBindingTests
+public sealed partial class WorkspaceExpressionBindingTests
 {
     private const string Prelude = "namespace Gallery;\r\nusing Avalonia.Controls;\r\n" +
         "inject ViewModel Vm;\r\nparam Person Person;\r\nstate int Count = 0;\r\n";
@@ -162,6 +162,35 @@ public sealed class WorkspaceExpressionBindingTests
         var model = context.Project.Compilation.CSharpProbeCompilation.AddSyntaxTrees(tree).GetSemanticModel(tree);
         var expression = CSharpProbeBuilder.GetReturnProbeExpression(tree.GetCompilationUnitRoot())!;
         Assert.Equal(typeName, model.GetTypeInfo(expression).ConvertedType!.Name);
+    }
+
+    [Theory]
+    [InlineData("Vm.Enabled")]
+    [InlineData("Count > 0")]
+    [InlineData("default")]
+    public void UtilityConditionProjection_UsesBoolRatherThanAPropertyContract(string expression)
+    {
+        using var workspace = CreateWorkspace();
+        var (document, position) = Parse(Prelude + "<TextBlock ${x.bind " + expression + "|}:hidden />");
+        var context = Open(workspace, document.Text);
+        Assert.True(document.TryGetCSharpCompletionContext(position, out var csharp));
+        Assert.True(AkburaCSharpProjectionFactory.TryCreate(document, context, csharp, out var projection));
+        var method = projection.Root.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>()
+            .Single(method => method.Identifier.ValueText == "__akbura_probe");
+        Assert.Equal("bool", method.ReturnType.ToString());
+        var tree = CSharpSyntaxTree.Create(projection.Root);
+        var model = context.Project.Compilation.CSharpProbeCompilation.AddSyntaxTrees(tree).GetSemanticModel(tree);
+        var returned = CSharpProbeBuilder.GetReturnProbeExpression(tree.GetCompilationUnitRoot())!;
+        Assert.Equal(SpecialType.System_Boolean, model.GetTypeInfo(returned).ConvertedType!.SpecialType);
+    }
+
+    [Theory]
+    [InlineData("Vm.|", "Enabled")]
+    [InlineData("Vm.Profile.|", "Name")]
+    [InlineData("Count.To|", "ToString")]
+    public async Task UtilityConditionCompletion_UsesTheExistingCSharpProjection(string expression, string member)
+    {
+        await AssertCompletion(Prelude + "<TextBlock ${x.bind " + expression + "}:hidden />", member);
     }
 
     [Fact]

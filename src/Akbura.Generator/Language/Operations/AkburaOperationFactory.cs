@@ -457,7 +457,8 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             CreateCSharpOperationTree(
                 boundNode.Syntax,
                 boundNode.ConditionOperation,
-                mapper));
+                mapper),
+            boundNode.ConditionExpressionBinding);
     }
 
     private AkcssPropertySetterOperation CreateAkcssPropertySetterOperation(

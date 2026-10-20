@@ -254,6 +254,10 @@ internal partial class AkburaSemanticModel
                             tailwindAttribute.Prefix)
                         .Expression));
             }
+            else if (tailwindAttribute.Prefix is TailwindExpressionBindingConditionalPrefixSyntax reactive)
+            {
+                builder.AddRange(GetCSharpSymbolReferences(reactive.Binding.Expression));
+            }
             else if (tailwindAttribute.Prefix?.Kind ==
                 AkburaSyntaxKind.MarkupExtensionConditionalPrefixSyntax)
             {

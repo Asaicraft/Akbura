@@ -133,7 +133,7 @@ internal readonly ref struct ExpressionBindingWriter(CodeWriter writer, Componen
         writer.Write(" }");
     }
 
-    private sealed class TrackingRewriter : CSharpSyntaxRewriter
+    internal sealed class TrackingRewriter : CSharpSyntaxRewriter
     {
         private readonly Dictionary<TextSpan, ExpressionBindingEvaluation> _reads = new();
         private readonly Dictionary<TextSpan, ExpressionSyntax> _projectedLoopSyntax = new();
@@ -167,7 +167,7 @@ internal readonly ref struct ExpressionBindingWriter(CodeWriter writer, Componen
 
         public string NewIdentifier(string prefix) => FreshName(prefix);
 
-        public void SetStableScope(string owner, string store)
+        public void SetStableScope(string owner, string? store)
         {
             _ownerName = owner;
             _storeName = store;

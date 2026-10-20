@@ -54,7 +54,7 @@ internal readonly ref partial struct ComponentScopeWriter
 
         if (phase == ComponentAssignmentPhase.Update)
         {
-            WriteRefresh(element, element.Identifier);
+            WriteRefresh(plan, element, element.Identifier);
         }
     }
 

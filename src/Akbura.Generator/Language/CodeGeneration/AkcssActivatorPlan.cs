@@ -5,6 +5,9 @@ using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using Akbura.Pools;
 using System.Globalization;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using Microsoft.CodeAnalysis.Text;
 using RoslynSymbol = Microsoft.CodeAnalysis.ISymbol;
 
 namespace Akbura.Language.CodeGeneration;
@@ -189,7 +192,11 @@ internal readonly struct AkcssUtilityCandidatePlan
         CSharpOperationDefinition conditionOperation,
         TailwindUtilityVariant variant,
         TailwindUtilityBindingPriority bindingPriority,
-        string? syntaxIdentity = null)
+        string? syntaxIdentity = null,
+        ExpressionBindingPlan? conditionExpressionBinding = null,
+        MarkupExpressionBindingSyntax? conditionSyntax = null,
+        ImmutableDictionary<string, string>? conditionStateAccessors = null,
+        ImmutableDictionary<TextSpan, string>? conditionNamedReceivers = null)
     {
         ConflictKey = conflictKey ?? throw new ArgumentNullException(nameof(conflictKey));
         SourceOrder = sourceOrder;
@@ -202,6 +209,15 @@ internal readonly struct AkcssUtilityCandidatePlan
         Variant = variant;
         BindingPriority = bindingPriority;
         SyntaxIdentity = syntaxIdentity ?? conflictKey;
+        ConditionExpressionBinding = conditionExpressionBinding;
+        ConditionSyntax = conditionSyntax;
+        ConditionStateAccessors = conditionStateAccessors ?? ImmutableDictionary<string, string>.Empty;
+        ConditionNamedReceivers = conditionNamedReceivers ?? ImmutableDictionary<TextSpan, string>.Empty;
+        // Render locals and named/iteration receivers conservatively refresh
+        // their callback. Notifications still evaluate between render frames.
+        RequiresReactiveConditionRefresh = conditionExpressionBinding != null &&
+            ExpressionBindingInitializationClassifier.Classify(conditionExpressionBinding, new HashSet<TextSpan>()) ==
+                ExpressionBindingInitializationKind.RequiresRenderRefresh;
     }
 
     public string ConflictKey { get; }
@@ -221,6 +237,16 @@ internal readonly struct AkcssUtilityCandidatePlan
     public string? ConditionText { get; }
 
     public CSharpOperationDefinition ConditionOperation { get; }
+
+    public ExpressionBindingPlan? ConditionExpressionBinding { get; }
+
+    public MarkupExpressionBindingSyntax? ConditionSyntax { get; }
+
+    public ImmutableDictionary<string, string> ConditionStateAccessors { get; }
+
+    public ImmutableDictionary<TextSpan, string> ConditionNamedReceivers { get; }
+
+    public bool RequiresReactiveConditionRefresh { get; }
 
     public TailwindUtilityVariant Variant { get; }
 

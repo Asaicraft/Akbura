@@ -40,20 +40,7 @@ internal sealed partial class MarkupBinder
         var binding = raw == null ? CSharpBindingResult.Empty :
             SemanticModel.BindMarkupAttributeExpression(syntax.Expression, raw, target);
         var root = binding.OperationDefinition.Operation;
-        // Probe diagnostics use wrapper positions. Project only their relative
-        // expression spans; never expose a synthetic C# file to the user.
-        foreach (var diagnostic in binding.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error))
-        {
-            var relativeStart = root == null ? 0 : diagnostic.Location.SourceSpan.Start - root.Syntax.FullSpan.Start;
-            var start = Math.Max(0, Math.Min(syntax.Expression.FullWidth, relativeStart));
-            var length = Math.Min(diagnostic.Location.SourceSpan.Length, syntax.Expression.FullWidth - start);
-            diagnostics.Add(new AkburaSemanticDiagnostic(syntax.Expression,
-                ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError, [raw?.ToFullString(), diagnostic.GetMessage()],
-                span: new TextSpan(syntax.Expression.Position + start, length)));
-        }
-        if (raw == null || raw.ContainsDiagnostics && !binding.Diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error))
-            diagnostics.Add(new AkburaSemanticDiagnostic(syntax.Expression,
-                ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError, [raw?.ToFullString(), "Invalid C# expression."]));
+        AddExpressionBindingExpressionDiagnostics(syntax, raw, binding, diagnostics);
         if (reason == null && target != null && binding.Conversion.SourceType is { } source &&
             !binding.Conversion.IsImplicit)
             diagnostics.Add(new AkburaSemanticDiagnostic(syntax.Expression,
@@ -80,6 +67,27 @@ internal sealed partial class MarkupBinder
             MarkupAttributeValueKind.ExpressionBinding, syntax, null, null, false,
             resultDiagnostics, reason != null || root == null ||
                 resultDiagnostics.Any(d => d.Severity == AkburaDiagnosticSeverity.Error), plan);
+    }
+
+    private static void AddExpressionBindingExpressionDiagnostics(MarkupExpressionBindingSyntax syntax,
+        Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax? raw, CSharpBindingResult binding,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnostics)
+    {
+        var root = binding.OperationDefinition.Operation;
+        // Property bindings and utility conditions share the same probe/source
+        // mapping. Never expose positions in the generated wrapper to the IDE.
+        foreach (var diagnostic in binding.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error))
+        {
+            var relativeStart = root == null ? 0 : diagnostic.Location.SourceSpan.Start - root.Syntax.FullSpan.Start;
+            var start = Math.Max(0, Math.Min(syntax.Expression.FullWidth, relativeStart));
+            var length = Math.Min(diagnostic.Location.SourceSpan.Length, syntax.Expression.FullWidth - start);
+            diagnostics.Add(new AkburaSemanticDiagnostic(syntax.Expression,
+                ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError, [raw?.ToFullString(), diagnostic.GetMessage()],
+                span: new TextSpan(syntax.Expression.Position + start, length)));
+        }
+        if (raw == null || raw.ContainsDiagnostics && !binding.Diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error))
+            diagnostics.Add(new AkburaSemanticDiagnostic(syntax.Expression,
+                ErrorCodes.AKBURA_SEMANTIC_MarkupExpressionError, [raw?.ToFullString(), "Invalid C# expression."]));
     }
 
     private bool IsExpressionBindingCollectionType(ITypeSymbol? type)

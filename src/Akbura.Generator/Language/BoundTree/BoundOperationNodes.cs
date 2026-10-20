@@ -523,7 +523,8 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
         TailwindUtilityVariant variant = default,
         TailwindUtilityBindingPriority bindingPriority = default,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default,
-        bool hasErrors = false)
+        bool hasErrors = false,
+        ExpressionBindingPlan? conditionExpressionBinding = null)
         : base(
             BoundKind.TailwindUtilityAttribute,
             syntax,
@@ -546,6 +547,7 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
         ConditionType = conditionType;
         ConditionOperation = conditionOperation;
         ConditionMarkupExtension = conditionMarkupExtension;
+        ConditionExpressionBinding = conditionExpressionBinding;
         Variant = variant;
         BindingPriority = bindingPriority;
     }
@@ -569,6 +571,8 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
     public CSharpOperationDefinition ConditionOperation { get; }
 
     public MarkupExtensionValue? ConditionMarkupExtension { get; }
+
+    public ExpressionBindingPlan? ConditionExpressionBinding { get; }
 
     public TailwindUtilityVariant Variant { get; }
 
@@ -620,7 +624,8 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
             variant,
             bindingPriority,
             Diagnostics,
-            HasErrors);
+            HasErrors,
+            ConditionExpressionBinding);
     }
 
     public override void Accept(BoundTreeVisitor visitor) => visitor.VisitTailwindUtilityAttribute(this);

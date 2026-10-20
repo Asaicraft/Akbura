@@ -214,7 +214,7 @@ public sealed class MarkupExpressionBindingIncrementalParserTests
             new TextSpan(start + commonPrefix, oldEnd - commonPrefix), after[commonPrefix..newEnd])));
     }
 
-    private static void AssertMatchesFreshParse(ComponentSyntaxTree incremental)
+    internal static void AssertMatchesFreshParse(ComponentSyntaxTree incremental)
     {
         var code = incremental.Text.ToString();
         var fresh = ComponentSyntaxTree.ParseText(incremental.Text);

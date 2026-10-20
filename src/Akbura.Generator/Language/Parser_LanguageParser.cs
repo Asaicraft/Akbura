@@ -2320,6 +2320,13 @@ partial class Parser
 
     private GreenTailwindPrefixSegmentSyntax? TryParseTailwindPrefixSegmentSyntax()
     {
+        if (CurrentToken.Kind == SyntaxKind.DollarToken && IsMarkupExpressionBindingStart())
+        {
+            var binding = ParseMarkupExpressionBindingSyntax();
+            var colon = EatToken(SyntaxKind.ColonToken);
+            return GreenSyntaxFactory.TailwindExpressionBindingConditionalPrefixSyntax(binding, colon);
+        }
+
         if (CurrentToken.Kind == SyntaxKind.DollarToken &&
             PeekToken(1).Kind == SyntaxKind.OpenBraceToken)
         {

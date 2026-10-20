@@ -192,6 +192,7 @@ namespace Akbura.Language.Syntax
 		TailwindPrefixSegmentSyntax = 553,
 		SimpleConditionalPrefixSyntax = 554,
 		ExpressionConditionalPrefixSyntax = 555,
+		TailwindExpressionBindingConditionalPrefixSyntax = 591,
 		TailwindFullAttributeSyntax = 556,
 		TailwindMarkupExtensionSegmentSyntax = 557,
 		MarkupExtensionConditionalPrefixSyntax = 558,

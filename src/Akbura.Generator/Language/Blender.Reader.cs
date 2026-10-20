@@ -388,9 +388,15 @@ internal readonly partial struct Blender
                 return false;
             }
 
-            if (lastTerminal.GetTrailingTriviaWidth() == 0 &&
-                char.IsWhiteSpace(insertedCharacter))
+            var trailingTrivia = new GreenSyntaxList<GreenNode>(lastTerminal.GetTrailingTrivia());
+            var endsWithLineBreak = trailingTrivia.Count > 0 &&
+                trailingTrivia[trailingTrivia.Count - 1].Kind == SyntaxKind.EndOfLineTrivia;
+            if (char.IsWhiteSpace(insertedCharacter) && !endsWithLineBreak)
             {
+                // Appended whitespace extends the last token's trailing trivia
+                // even when it already owns horizontal whitespace. After an EOL,
+                // the lexer stops trailing trivia; indentation belongs to the next
+                // token and must not invalidate an unchanged preceding sibling.
                 return true;
             }
 

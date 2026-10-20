@@ -697,6 +697,15 @@ node ExpressionConditionalPrefixSyntax : TailwindPrefixSegmentSyntax {
 	Colon      : ColonToken;             // :
 }
 
+/// Reactive C# expression condition; distinct from frame-based conditions.
+[id 591]
+node TailwindExpressionBindingConditionalPrefixSyntax : TailwindPrefixSegmentSyntax {
+    Binding : MarkupExpressionBindingSyntax;
+    Colon   : ColonToken;
+}
+
+[id 556]
+
 
 node TailwindFullAttributeSyntax : TailwindAttributeSyntax {
 	Prefix?   : TailwindPrefixSegmentSyntax;

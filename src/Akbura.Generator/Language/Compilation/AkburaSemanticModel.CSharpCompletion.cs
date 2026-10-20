@@ -144,6 +144,12 @@ internal abstract partial class AkburaSemanticModel
 
     private ITypeSymbol? GetExpressionBindingTargetType(CSharpExpressionSyntax expression)
     {
+        if (expression.Parent is MarkupExpressionBindingSyntax
+            { Parent: TailwindExpressionBindingConditionalPrefixSyntax })
+        {
+            return Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Boolean);
+        }
+
         if (expression.Parent is not MarkupExpressionBindingSyntax { Parent: MarkupAttributeSyntax attribute })
         {
             return null;

@@ -242,10 +242,17 @@ internal static partial class ComponentPlanner
                     (element.Flags & ComponentElementFlags.IsConditionalTemplateRoot) != 0));
             }
 
+            var expressionReceivers = new Dictionary<MarkupElementSyntax, string>();
+            foreach (var entry in _syntaxElementIds)
+            {
+                expressionReceivers.Add(entry.Key, _elements[entry.Value].Identifier);
+            }
+
             return AkcssActivatorPlanner.Create(
                 _semanticModel,
                 inputs.WrittenSpan,
-                _akcssModuleTypeNames);
+                _akcssModuleTypeNames,
+                expressionReceivers);
         }
 
         private void CapturePlanBuffers(ref ComponentPlanBufferOwner owner)

@@ -53,7 +53,7 @@ foreach ($directory in Get-ChildItem -LiteralPath (Join-Path $ResultDirectory 'a
         $first = $group.Group[0]
         $stages.Add([pscustomobject]@{ Profile = $profile; Round = $round; Variant = $variant; Project = $first.Project; File = $first.File
             Scenario = $first.Scenario; Stage = $first.Stage; MedianInclusiveMs = Median $group.Group.InclusiveMs
-            MedianCount = Median $group.Group.Count; MedianInclusiveBytes = Median $group.Group.InclusiveCurrentThreadBytes })
+            MedianCount = Median ($group.Group | ForEach-Object { $_.Count }); MedianInclusiveBytes = Median $group.Group.InclusiveCurrentThreadBytes })
     }
     $tracePath = Join-Path $directory.FullName 'invalidation-traces.jsonl.gz'
     $stream = [IO.File]::OpenRead($tracePath)

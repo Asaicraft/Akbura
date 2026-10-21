@@ -1,0 +1,30 @@
+{
+  "Phase": "AuditEvidenceReadyNeedsDecision",
+  "CompletedUtc": "2026-10-21T05:10:16.3781198Z",
+  "Scope": "Postprocessing recovery only; cross-revision implementation remains incomplete.",
+  "OriginalControllerPhase": "Failed at summarize-audit; original status.json preserved unchanged",
+  "OriginalSourceFingerprint": "84D83463A65B17126F46B983C7D7DFFD89D15859CF5C8FE470C3D05E5A21168A",
+  "VerifiedUnchangedMeasuredSources": 848,
+  "VerifiedUnchangedMeasurementFiles": 384,
+  "CompletedTimingGroups": 96,
+  "MeasuredUpdates": 768,
+  "FreshDriverComparisons": 1056,
+  "ReportRegressionChecksPassed": 9,
+  "TimingGroupsRepeated": 0,
+  "Fix": "Enumerate row Count column values instead of the row-array Count property.",
+  "Commands": [
+    "pwsh -NoProfile -File benchmarks/HotReload/Test-ProbeCacheAudit.ps1",
+    "pwsh -NoProfile -File benchmarks/HotReload/Summarize-ProbeCacheAudit.ps1 -InputDirectory bin/CrossRevision/audit-validated -ResultDirectory benchmarks/HotReload/results/2026-10-21-cross-revision-binding"
+  ],
+  "PostprocessingSources": [
+    {
+      "File": "benchmarks/HotReload/Summarize-ProbeCacheAudit.ps1",
+      "Sha256": "0487E86B46E70944A5AFC568A748FD786FAFF45B41A8572503E1933CD6A8A0DD"
+    },
+    {
+      "File": "benchmarks/HotReload/Test-ProbeCacheAudit.ps1",
+      "Sha256": "89C3C95D6F945426BB438724EB98FADACA8C37C2EE1889C22F319611CE6E897D"
+    }
+  ],
+  "CacheDecision": "Keep the established default unchanged; do not adopt the experimental alternatives. This is not cross-revision reuse sign-off."
+}

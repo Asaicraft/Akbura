@@ -1,0 +1,1541 @@
+{
+  "Files": [
+    {
+      "File": "audit/production-1-current-binding/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-current-binding/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-1-current-binding/invalidation-provenance.json",
+      "Sha256": "FFFEAE63E89B8188CEF8E9C2FD29BE7931F519FF0BC1B06919DFB78FBA5192A7"
+    },
+    {
+      "File": "audit/production-1-current-binding/invalidation-samples.csv",
+      "Sha256": "6E960185FB3239F01DA8111A49B2BE1F72E5FA851BB6040CC61C35482709AB39"
+    },
+    {
+      "File": "audit/production-1-current-binding/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-current-binding/invalidation-steps.csv",
+      "Sha256": "91980819B888A78673BDDE31913374B7BFB73D79C3938BE05D9603C04DB680A5"
+    },
+    {
+      "File": "audit/production-1-current-binding/invalidation-summary.csv",
+      "Sha256": "CF1D413F9DF69D03A5B830DEBFAF20F1950DA3648C49DE9E0EA1025064099474"
+    },
+    {
+      "File": "audit/production-1-current-binding/invalidation-traces.jsonl.gz",
+      "Sha256": "6C35CD99C19A2076F1FA4BCB1AF26DA14A88762472CA48BD210EAA36C8CAF806"
+    },
+    {
+      "File": "audit/production-1-current-binding/invalidation-transitions.csv",
+      "Sha256": "4CF762DFEE822F7775A667A2AB4A0B1EC6455866195944AE7B7BAB0C78CEFEED"
+    },
+    {
+      "File": "audit/production-1-current-binding/purity-source.json",
+      "Sha256": "022CC4089D99713311236C838AF82EBA97F0A8A81E707099372D478B8ED8F7D1"
+    },
+    {
+      "File": "audit/production-1-current-binding/README.md",
+      "Sha256": "83E182F062139C666325221CB163C682EC7462E764876DD3C1B8E7EF21F709E7"
+    },
+    {
+      "File": "audit/production-1-current-binding/run.json",
+      "Sha256": "DE55C06B487957ADAFE13EDFC4A71CF8DCB4BDC609A60FF1D26F80B0A7AA3BC0"
+    },
+    {
+      "File": "audit/production-1-current-literal/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-current-literal/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-1-current-literal/invalidation-provenance.json",
+      "Sha256": "AADBC8DC20D1F6C1B4DD092EF4A7501B5EE3D994A5A7D09A0D2E8B54EAA5712D"
+    },
+    {
+      "File": "audit/production-1-current-literal/invalidation-samples.csv",
+      "Sha256": "B2F7CBC8EF9F1101CC6D9F1DDB62073B9DE4F5946726F85430439991AB8D3989"
+    },
+    {
+      "File": "audit/production-1-current-literal/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-current-literal/invalidation-steps.csv",
+      "Sha256": "93F72AF48950568A91BD68978D86C2A96B4F42FDBAA0C13CA9733E85D2749B00"
+    },
+    {
+      "File": "audit/production-1-current-literal/invalidation-summary.csv",
+      "Sha256": "7D7C68E57B891AF64CDDCBA8B9DA63EDAF0C719F843BD8FB09A7341E2D7CA1C2"
+    },
+    {
+      "File": "audit/production-1-current-literal/invalidation-traces.jsonl.gz",
+      "Sha256": "328606D0AE810A991468A9C8D02729A7F1C734F09CF4A0BB15CD088E5D8ED8DD"
+    },
+    {
+      "File": "audit/production-1-current-literal/invalidation-transitions.csv",
+      "Sha256": "B69A007D92EE1E6A45DD72321D3FA9ADACD7F8B450058EB476856A18DE8E34D0"
+    },
+    {
+      "File": "audit/production-1-current-literal/purity-source.json",
+      "Sha256": "5938EEC0C212E3F91A88E8C0889CF1BA142BDEED670686668121BE3591A4D71E"
+    },
+    {
+      "File": "audit/production-1-current-literal/README.md",
+      "Sha256": "ABC21EB65BAA3B64E7988FCA188B1660FF7E295D66B418A633998F9642EF5E8B"
+    },
+    {
+      "File": "audit/production-1-current-literal/run.json",
+      "Sha256": "977A88A3D058C4C74B6B1018B3447BE36D7A42578B833AEDC99AE760C93998A9"
+    },
+    {
+      "File": "audit/production-1-disabled-binding/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-disabled-binding/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-1-disabled-binding/invalidation-provenance.json",
+      "Sha256": "9261F72E164BBB70629BCFF14B482F31B1B331F21C67E46CE6006610899C7EF8"
+    },
+    {
+      "File": "audit/production-1-disabled-binding/invalidation-samples.csv",
+      "Sha256": "471EFF8FDF70B91C67A4F9D92DA73AF4FCD053215315B95541C76CFDC661146E"
+    },
+    {
+      "File": "audit/production-1-disabled-binding/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-disabled-binding/invalidation-steps.csv",
+      "Sha256": "A0D2B41355F74BA570377E2F8B9C437EF6D65CF1FB012111A48C9F8AC24D817D"
+    },
+    {
+      "File": "audit/production-1-disabled-binding/invalidation-summary.csv",
+      "Sha256": "4ADF370E02EECE8604FCC86403B5309E2FE7D0A6A1BB76E4B5CCE10EB3A65D85"
+    },
+    {
+      "File": "audit/production-1-disabled-binding/invalidation-traces.jsonl.gz",
+      "Sha256": "3DDEDFB425B0866ED0C2D317C1F8F7A6ECE88A0B2A9AAC80EE26DBC48A0CCEF2"
+    },
+    {
+      "File": "audit/production-1-disabled-binding/invalidation-transitions.csv",
+      "Sha256": "4CF762DFEE822F7775A667A2AB4A0B1EC6455866195944AE7B7BAB0C78CEFEED"
+    },
+    {
+      "File": "audit/production-1-disabled-binding/purity-source.json",
+      "Sha256": "5938EEC0C212E3F91A88E8C0889CF1BA142BDEED670686668121BE3591A4D71E"
+    },
+    {
+      "File": "audit/production-1-disabled-binding/README.md",
+      "Sha256": "2D44A30A7EFCCC8721BA4D8F63F3816178033B91632EEAB27C703C968311BD1F"
+    },
+    {
+      "File": "audit/production-1-disabled-binding/run.json",
+      "Sha256": "51FC6D0CB7F9318A39F926454BAD5345A413D02DD44D1BE4F8D6D6E0A783EED3"
+    },
+    {
+      "File": "audit/production-1-disabled-literal/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-disabled-literal/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-1-disabled-literal/invalidation-provenance.json",
+      "Sha256": "0EFF28DF3998D493EA276913F901E8E19EEE146BA66B2E004145B5F328B96B6C"
+    },
+    {
+      "File": "audit/production-1-disabled-literal/invalidation-samples.csv",
+      "Sha256": "5774414FA9EE2B58F9A89DDF74C2FDB94494494274EA50F85A8D54535161DFB7"
+    },
+    {
+      "File": "audit/production-1-disabled-literal/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-disabled-literal/invalidation-steps.csv",
+      "Sha256": "8114422111301C227E0F2EFA4F29D292B0DF0F5798CA0B57BC58428182215280"
+    },
+    {
+      "File": "audit/production-1-disabled-literal/invalidation-summary.csv",
+      "Sha256": "0F576AF650016CF87576861F2030D41BFC00725032E86BA20B92BBFB24A676A7"
+    },
+    {
+      "File": "audit/production-1-disabled-literal/invalidation-traces.jsonl.gz",
+      "Sha256": "81648A2593D77B3A32F069BE498F9D29EFDF22968215E378ECC37DDA1305E335"
+    },
+    {
+      "File": "audit/production-1-disabled-literal/invalidation-transitions.csv",
+      "Sha256": "B69A007D92EE1E6A45DD72321D3FA9ADACD7F8B450058EB476856A18DE8E34D0"
+    },
+    {
+      "File": "audit/production-1-disabled-literal/purity-source.json",
+      "Sha256": "5938EEC0C212E3F91A88E8C0889CF1BA142BDEED670686668121BE3591A4D71E"
+    },
+    {
+      "File": "audit/production-1-disabled-literal/README.md",
+      "Sha256": "8B12353035B6234437AF581BFB16B9FFCC361A7ABA56336FE63DB70FA033701D"
+    },
+    {
+      "File": "audit/production-1-disabled-literal/run.json",
+      "Sha256": "52233D9CD040F9B10B49233CBAEDF739F7A5053ADCE9EC2E82AE3DDD592B742B"
+    },
+    {
+      "File": "audit/production-1-original-binding/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-original-binding/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-1-original-binding/invalidation-provenance.json",
+      "Sha256": "8358B6C0DD10E7205A0D0A9B61BEC458E3D0BC6BEDFBA9F1D85A8CBD91F611C3"
+    },
+    {
+      "File": "audit/production-1-original-binding/invalidation-samples.csv",
+      "Sha256": "EF7191BA39DC62D05E7AAC5642D20179DCA4088D9AD47D5629855F507A580C18"
+    },
+    {
+      "File": "audit/production-1-original-binding/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-original-binding/invalidation-steps.csv",
+      "Sha256": "75EC7C8AEDAB6789A9FD217C7785B6A81AF1D09E32D2A91ABCBB97B192A394C7"
+    },
+    {
+      "File": "audit/production-1-original-binding/invalidation-summary.csv",
+      "Sha256": "C7B832D3896E696638F2DADA3C0D9AD45F1420D54B1D920690D89F2DD3440A7B"
+    },
+    {
+      "File": "audit/production-1-original-binding/invalidation-traces.jsonl.gz",
+      "Sha256": "E58D3A6C900A50B369DA26698C272A9EA969CB43A454E69C46CC27041F4A3A93"
+    },
+    {
+      "File": "audit/production-1-original-binding/invalidation-transitions.csv",
+      "Sha256": "4CF762DFEE822F7775A667A2AB4A0B1EC6455866195944AE7B7BAB0C78CEFEED"
+    },
+    {
+      "File": "audit/production-1-original-binding/purity-source.json",
+      "Sha256": "5938EEC0C212E3F91A88E8C0889CF1BA142BDEED670686668121BE3591A4D71E"
+    },
+    {
+      "File": "audit/production-1-original-binding/README.md",
+      "Sha256": "8DE2440DAB033C25C6B878679A5083412D08646CC90C235301536D500DEACC1A"
+    },
+    {
+      "File": "audit/production-1-original-binding/run.json",
+      "Sha256": "BAF028D5234BB346C7F6726CB5D97078672E951D6ADF300DF126BD1589E179EF"
+    },
+    {
+      "File": "audit/production-1-original-literal/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-original-literal/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-1-original-literal/invalidation-provenance.json",
+      "Sha256": "15E4DB3B51CB9AECC92F7129978A47B8866A7DCCB3A8E729D0026E295ECAE735"
+    },
+    {
+      "File": "audit/production-1-original-literal/invalidation-samples.csv",
+      "Sha256": "DA5196AA18CDD7F9075480F19E5C5FB57CB46E834E5D39425D8C79976FDBD763"
+    },
+    {
+      "File": "audit/production-1-original-literal/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-original-literal/invalidation-steps.csv",
+      "Sha256": "9412EC7468D56D108988B92C93B11545B306D82D16E9AB38A7FA564C92D3F275"
+    },
+    {
+      "File": "audit/production-1-original-literal/invalidation-summary.csv",
+      "Sha256": "C37F130C7361DF31BA1C4ED3DFF3CEB8DD911A292FC1E1A55498F73EF01F6499"
+    },
+    {
+      "File": "audit/production-1-original-literal/invalidation-traces.jsonl.gz",
+      "Sha256": "1AC7F71F4A05DD6C3B9BBF475F37C7299C5DF8753B068C2047177A4E1830F624"
+    },
+    {
+      "File": "audit/production-1-original-literal/invalidation-transitions.csv",
+      "Sha256": "B69A007D92EE1E6A45DD72321D3FA9ADACD7F8B450058EB476856A18DE8E34D0"
+    },
+    {
+      "File": "audit/production-1-original-literal/purity-source.json",
+      "Sha256": "022CC4089D99713311236C838AF82EBA97F0A8A81E707099372D478B8ED8F7D1"
+    },
+    {
+      "File": "audit/production-1-original-literal/README.md",
+      "Sha256": "0522F6DAF817293D71F00EEB55B73830595BAE92833DC6A1543FCB4BE4FCCBEB"
+    },
+    {
+      "File": "audit/production-1-original-literal/run.json",
+      "Sha256": "EA78683281C978D3C7F61341623FF061B4437C3292055E65ACA283D712B58BE4"
+    },
+    {
+      "File": "audit/production-1-prehashed-binding/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-prehashed-binding/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-1-prehashed-binding/invalidation-provenance.json",
+      "Sha256": "802C53A53657921E094062E908B0D89671FDDFC27C3C27EA92F9330E0B670BC7"
+    },
+    {
+      "File": "audit/production-1-prehashed-binding/invalidation-samples.csv",
+      "Sha256": "55371342AB54D56334116974F484997F224F4F40D8F010DACB7BD85A8CB1CD0D"
+    },
+    {
+      "File": "audit/production-1-prehashed-binding/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-prehashed-binding/invalidation-steps.csv",
+      "Sha256": "07A46268B6A4F84A2CCFA95C97AA163CA47F870B7D27944D03F08D11E4EB3651"
+    },
+    {
+      "File": "audit/production-1-prehashed-binding/invalidation-summary.csv",
+      "Sha256": "E94D45DBA9C13F294FF7C8653D176C443E9FA1D76B85966CB4AF7CE9DAF50CCE"
+    },
+    {
+      "File": "audit/production-1-prehashed-binding/invalidation-traces.jsonl.gz",
+      "Sha256": "804C430670BA9C4164C0DBDBE018670F90C440A18B840B5A4BB2B766A0AC5B5C"
+    },
+    {
+      "File": "audit/production-1-prehashed-binding/invalidation-transitions.csv",
+      "Sha256": "4CF762DFEE822F7775A667A2AB4A0B1EC6455866195944AE7B7BAB0C78CEFEED"
+    },
+    {
+      "File": "audit/production-1-prehashed-binding/purity-source.json",
+      "Sha256": "5938EEC0C212E3F91A88E8C0889CF1BA142BDEED670686668121BE3591A4D71E"
+    },
+    {
+      "File": "audit/production-1-prehashed-binding/README.md",
+      "Sha256": "27888649735957A97A6AE1963380BF42078153328CD97B645336F42FBF7324EE"
+    },
+    {
+      "File": "audit/production-1-prehashed-binding/run.json",
+      "Sha256": "4F0332E7BA017A1ED15E0231BF6DF6D4A94D0595160716EE69C9C81C2B62D9FC"
+    },
+    {
+      "File": "audit/production-1-prehashed-literal/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-prehashed-literal/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-1-prehashed-literal/invalidation-provenance.json",
+      "Sha256": "A033E55360350A5504C9D1F0EC22C7C3CCD4C15244102689EDD85F711A073089"
+    },
+    {
+      "File": "audit/production-1-prehashed-literal/invalidation-samples.csv",
+      "Sha256": "C0E16A4058846FA0A466AAD6851A6E035DB2B113637E02B8F76C9BEA81A8991D"
+    },
+    {
+      "File": "audit/production-1-prehashed-literal/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-prehashed-literal/invalidation-steps.csv",
+      "Sha256": "A5CDD0C091C1484797FDA7E2EF1B09F50B17C55D1466A494FB9347E3B340EECC"
+    },
+    {
+      "File": "audit/production-1-prehashed-literal/invalidation-summary.csv",
+      "Sha256": "0A66B6DCCC1C88517C8F83F08849322A58CD6134343AFA8AAE15824C10E572BB"
+    },
+    {
+      "File": "audit/production-1-prehashed-literal/invalidation-traces.jsonl.gz",
+      "Sha256": "EC484BAFF12223C04EF2667DC5B3BF5B91715413DCE95116495538D65C7EF983"
+    },
+    {
+      "File": "audit/production-1-prehashed-literal/invalidation-transitions.csv",
+      "Sha256": "B69A007D92EE1E6A45DD72321D3FA9ADACD7F8B450058EB476856A18DE8E34D0"
+    },
+    {
+      "File": "audit/production-1-prehashed-literal/purity-source.json",
+      "Sha256": "022CC4089D99713311236C838AF82EBA97F0A8A81E707099372D478B8ED8F7D1"
+    },
+    {
+      "File": "audit/production-1-prehashed-literal/README.md",
+      "Sha256": "42F1C1929DF2CFD5AAB5837C8D37634F16D2C8351EC43450BEA604D58474B4C6"
+    },
+    {
+      "File": "audit/production-1-prehashed-literal/run.json",
+      "Sha256": "FD8040BF7676DA8E31CE7656BF73C751D4AB1086673505788C5F975E6B34B783"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-binding/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-binding/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-binding/invalidation-provenance.json",
+      "Sha256": "3A0AD43836BF209CA53DA2473F5ACD74D7385B522086B4FDE410F0B08DDF1A9F"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-binding/invalidation-samples.csv",
+      "Sha256": "FFC736DF62E8FA05A2348B11B0B9238218BAD357AC44042A83461384044835FE"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-binding/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-binding/invalidation-steps.csv",
+      "Sha256": "9CFEB4633D98F8B1356B2A48BBA07F24DC711A3B44BCB306EFC353A5B15A04BD"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-binding/invalidation-summary.csv",
+      "Sha256": "E4B253851698527B696DC10F6D3FF3C6758511E250AD8A5E4AB243C48C6B5BAC"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-binding/invalidation-traces.jsonl.gz",
+      "Sha256": "4AC536072F397C3F3D47D6D480D10890356F3F6E3F40631DE75DC22ACC969614"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-binding/invalidation-transitions.csv",
+      "Sha256": "4CF762DFEE822F7775A667A2AB4A0B1EC6455866195944AE7B7BAB0C78CEFEED"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-binding/purity-source.json",
+      "Sha256": "022CC4089D99713311236C838AF82EBA97F0A8A81E707099372D478B8ED8F7D1"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-binding/README.md",
+      "Sha256": "9F8F2CAF804FE544154496190AD529577B15A267E2E823F3B79B114BF3A0CC10"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-binding/run.json",
+      "Sha256": "7CD7C5F64906F6E757D1C26091FDD39013368AE97BC3830BF1457373527A4537"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-literal/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-literal/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-literal/invalidation-provenance.json",
+      "Sha256": "6C6DF2EE6360FED313E829F821EA9CF9FDAE1C7CE6EEBC318E4E2A50FE1402C1"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-literal/invalidation-samples.csv",
+      "Sha256": "9462FC2092B8BAE5FB29F6F87E5C6C3BB3DACCC76F9A5C489157F4C65F1CCDB6"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-literal/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-literal/invalidation-steps.csv",
+      "Sha256": "7EB2A96D61823FCE633E5E10ACF1FFC6D6BF5F4161A38049A24650031F751A6B"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-literal/invalidation-summary.csv",
+      "Sha256": "6DAC756956452EEF290E0F0AFDD8A115EE3FE79D1682052F793EF53EABA5888D"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-literal/invalidation-traces.jsonl.gz",
+      "Sha256": "BF4FEA14B5553BFC5AE082C6F310E3D4A8576CCD0E0450509D78F5B47359B374"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-literal/invalidation-transitions.csv",
+      "Sha256": "B69A007D92EE1E6A45DD72321D3FA9ADACD7F8B450058EB476856A18DE8E34D0"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-literal/purity-source.json",
+      "Sha256": "022CC4089D99713311236C838AF82EBA97F0A8A81E707099372D478B8ED8F7D1"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-literal/README.md",
+      "Sha256": "02265045E2A764838711D5263F3802E2A9FACD33405C14E1E8D3A1C26DE7D03D"
+    },
+    {
+      "File": "audit/production-1-rebuilt-current-literal/run.json",
+      "Sha256": "3F88148718ED0B5127A0A92CEF7B39B0DA1FA50985650189749634BB6F11574A"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-binding/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-binding/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-binding/invalidation-provenance.json",
+      "Sha256": "717AC674922BF556AAEE9F79247B33A9A392C731FCBE071BB17D6AC832F7AC76"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-binding/invalidation-samples.csv",
+      "Sha256": "E97C3935C263EEA636EB2B74D6D532327B9DDB719BC68DEA6FA393B069F1F98F"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-binding/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-binding/invalidation-steps.csv",
+      "Sha256": "5F8E63709617750CFAB6BA5C8CEDB752F9B9C29211811601848EA763B2647BFE"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-binding/invalidation-summary.csv",
+      "Sha256": "D7865BFBC7881A695A3E1FD00B85ABA1E67E2B24044FEC6235C9ABF21CB43AAF"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-binding/invalidation-traces.jsonl.gz",
+      "Sha256": "C6DDD8C26892F1179E4540364BF6A40222EA010C4F23CCC8B64FF3176BB56DE3"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-binding/invalidation-transitions.csv",
+      "Sha256": "4CF762DFEE822F7775A667A2AB4A0B1EC6455866195944AE7B7BAB0C78CEFEED"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-binding/purity-source.json",
+      "Sha256": "5938EEC0C212E3F91A88E8C0889CF1BA142BDEED670686668121BE3591A4D71E"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-binding/README.md",
+      "Sha256": "6266AE9F11319FF83B3640B9C107C1175C3C847D7DDEA76057A5813340ED11F2"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-binding/run.json",
+      "Sha256": "BD91F1D79ECCAD0FB33DC89103C7A88647C888107B27B6C9133E3E2F283A2E7B"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-literal/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-literal/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-literal/invalidation-provenance.json",
+      "Sha256": "36E4E7D7ED4A429C7B9336D8CB47009F76F4F9D9307EECC758C330B65E291AC4"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-literal/invalidation-samples.csv",
+      "Sha256": "BC7463F86CFCA66D977F35690B1A175B8DCA8631F0A0E0322552917611115781"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-literal/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-literal/invalidation-steps.csv",
+      "Sha256": "45F3C0CEA548CADEA4C1C38A5A5A193CFDFD80C6F15480F70814AE013855420C"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-literal/invalidation-summary.csv",
+      "Sha256": "2CB0DB47F5F905C416B009D99F98E49D2929E7E0B7DA63E5F8F39B3AAC481E30"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-literal/invalidation-traces.jsonl.gz",
+      "Sha256": "9C9FE3178E10E02CF930711678C9EDE46772B150C5AF870096F29B6CD849628A"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-literal/invalidation-transitions.csv",
+      "Sha256": "B69A007D92EE1E6A45DD72321D3FA9ADACD7F8B450058EB476856A18DE8E34D0"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-literal/purity-source.json",
+      "Sha256": "5938EEC0C212E3F91A88E8C0889CF1BA142BDEED670686668121BE3591A4D71E"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-literal/README.md",
+      "Sha256": "DEE5ED1BA229891210CB5A1C52705C06F02CAE565869F1D3158EAE8B0EDCFBB1"
+    },
+    {
+      "File": "audit/production-1-repeat-admission-literal/run.json",
+      "Sha256": "97437C60C42E429704B76F7A4FCBAEE19C82A59635C00F85D44AF431114094EB"
+    },
+    {
+      "File": "audit/production-2-current-binding/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-current-binding/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-2-current-binding/invalidation-provenance.json",
+      "Sha256": "148AE1B0CA0868031E644723323FC61DFCA65B2D4B081848892297027296E27F"
+    },
+    {
+      "File": "audit/production-2-current-binding/invalidation-samples.csv",
+      "Sha256": "0E17FDB690201D33E13A81E1069BB6EFBE9FDBDDD8A33DFCFA38DBE31976EE5D"
+    },
+    {
+      "File": "audit/production-2-current-binding/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-current-binding/invalidation-steps.csv",
+      "Sha256": "74D372BA0BD7D0B36A13C129D39A5530FDB356DF8B8CD89E52EABEE644BB6261"
+    },
+    {
+      "File": "audit/production-2-current-binding/invalidation-summary.csv",
+      "Sha256": "AD147821379DCAD26DA76C8611F1A1CFC822BFF1DD5CF5B4B661731402D47F97"
+    },
+    {
+      "File": "audit/production-2-current-binding/invalidation-traces.jsonl.gz",
+      "Sha256": "CE204ABEEF65D2D3A81A538197E39D22B71C82BE1BBCF124B683293801F2945C"
+    },
+    {
+      "File": "audit/production-2-current-binding/invalidation-transitions.csv",
+      "Sha256": "4CF762DFEE822F7775A667A2AB4A0B1EC6455866195944AE7B7BAB0C78CEFEED"
+    },
+    {
+      "File": "audit/production-2-current-binding/purity-source.json",
+      "Sha256": "022CC4089D99713311236C838AF82EBA97F0A8A81E707099372D478B8ED8F7D1"
+    },
+    {
+      "File": "audit/production-2-current-binding/README.md",
+      "Sha256": "0894373C7CEFCAFE93C54BEFE1F049AC93FC4E2C99E3EE0904601AEC66161FC4"
+    },
+    {
+      "File": "audit/production-2-current-binding/run.json",
+      "Sha256": "71E5EF6A67B6C18524C493B4F31741A94E895FBF3EF1814E0029BFB7C361E04C"
+    },
+    {
+      "File": "audit/production-2-current-literal/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-current-literal/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-2-current-literal/invalidation-provenance.json",
+      "Sha256": "1759DCCE587AAFD8F79DE9B0145963D0E3623DE0C9ADB3BDF51235119982008D"
+    },
+    {
+      "File": "audit/production-2-current-literal/invalidation-samples.csv",
+      "Sha256": "F5FB1A14E1D6B5D2C7575A7D92E14E204EF9110EF9050FE7ABABBF4DA6AAF5FE"
+    },
+    {
+      "File": "audit/production-2-current-literal/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-current-literal/invalidation-steps.csv",
+      "Sha256": "55CE55548A0132312CBB8A6B2841F5F94FF741FFD679834507346D5863BA6BD8"
+    },
+    {
+      "File": "audit/production-2-current-literal/invalidation-summary.csv",
+      "Sha256": "ADE60252824D6EC7E6EC3BE5123585FA0DEDAD2A0F8D0F5A04F2823826FD9277"
+    },
+    {
+      "File": "audit/production-2-current-literal/invalidation-traces.jsonl.gz",
+      "Sha256": "31BE9E91C37FA4E64BF327AD7B1057DB955672BB8A82D385AF8F30B12EFFEF46"
+    },
+    {
+      "File": "audit/production-2-current-literal/invalidation-transitions.csv",
+      "Sha256": "B69A007D92EE1E6A45DD72321D3FA9ADACD7F8B450058EB476856A18DE8E34D0"
+    },
+    {
+      "File": "audit/production-2-current-literal/purity-source.json",
+      "Sha256": "5938EEC0C212E3F91A88E8C0889CF1BA142BDEED670686668121BE3591A4D71E"
+    },
+    {
+      "File": "audit/production-2-current-literal/README.md",
+      "Sha256": "673EC7DD7BA10B6AD7122D21DB7B7A163CA033DCAD84472E46DD658C6FBAF36E"
+    },
+    {
+      "File": "audit/production-2-current-literal/run.json",
+      "Sha256": "28A6C937D663E57E19F85148132968D72AF5317F68A43695EC345B31EBDE74D4"
+    },
+    {
+      "File": "audit/production-2-disabled-binding/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-disabled-binding/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-2-disabled-binding/invalidation-provenance.json",
+      "Sha256": "D90A8BBFD121A179D1C6E117352E72F3AA253610AE3FAAF519CFAB68BDB27545"
+    },
+    {
+      "File": "audit/production-2-disabled-binding/invalidation-samples.csv",
+      "Sha256": "008FFAE1DCA542B7948B7A39872BDFFAC0A48E02AF35BB83A21E936E7BB335DF"
+    },
+    {
+      "File": "audit/production-2-disabled-binding/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-disabled-binding/invalidation-steps.csv",
+      "Sha256": "743438B5663B1AC66EE86AD3052DC20C3D2205BD92F76398A02A2FFEDC5B8D6B"
+    },
+    {
+      "File": "audit/production-2-disabled-binding/invalidation-summary.csv",
+      "Sha256": "E7F6651A22BD0F5A60E81CD294A432823DE4879AE68C682AA4315A6D81E88B8B"
+    },
+    {
+      "File": "audit/production-2-disabled-binding/invalidation-traces.jsonl.gz",
+      "Sha256": "81F10F9775C66395E8930E7AA8B4F9A5165C4EBD44002059E50D091DBC0750AE"
+    },
+    {
+      "File": "audit/production-2-disabled-binding/invalidation-transitions.csv",
+      "Sha256": "4CF762DFEE822F7775A667A2AB4A0B1EC6455866195944AE7B7BAB0C78CEFEED"
+    },
+    {
+      "File": "audit/production-2-disabled-binding/purity-source.json",
+      "Sha256": "022CC4089D99713311236C838AF82EBA97F0A8A81E707099372D478B8ED8F7D1"
+    },
+    {
+      "File": "audit/production-2-disabled-binding/README.md",
+      "Sha256": "2178C644B1192BBE8528E06E47EB2E4A74BC32E9A57E9F07A7211570282FE13E"
+    },
+    {
+      "File": "audit/production-2-disabled-binding/run.json",
+      "Sha256": "F3A1C61318986611BFFA5B4CE68DE0E354A203153C4FCA26188B0938BBF01231"
+    },
+    {
+      "File": "audit/production-2-disabled-literal/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-disabled-literal/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-2-disabled-literal/invalidation-provenance.json",
+      "Sha256": "C9DF79D0DA0EB386CFBB1C4B9F9D035F7FB621797403E5EC82B35A77A85AA694"
+    },
+    {
+      "File": "audit/production-2-disabled-literal/invalidation-samples.csv",
+      "Sha256": "810982AC483063408F1838562FA72C49145F24ACE6C5E1921EA2685178928E5F"
+    },
+    {
+      "File": "audit/production-2-disabled-literal/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-disabled-literal/invalidation-steps.csv",
+      "Sha256": "265BA7C4A2978BA046B1C4CAA39ED012B7BCF86ED3666AE836ACABAEEDC43494"
+    },
+    {
+      "File": "audit/production-2-disabled-literal/invalidation-summary.csv",
+      "Sha256": "3BAD6EF6FAAD6025AFE52FC9C22B30FB60F773D1F78C1C4FDFFF72E0815B6FD6"
+    },
+    {
+      "File": "audit/production-2-disabled-literal/invalidation-traces.jsonl.gz",
+      "Sha256": "BF8B77DAA6714223FAA8585C0E601A11339BD703C2DEBD420ECA3B3823DB57C6"
+    },
+    {
+      "File": "audit/production-2-disabled-literal/invalidation-transitions.csv",
+      "Sha256": "B69A007D92EE1E6A45DD72321D3FA9ADACD7F8B450058EB476856A18DE8E34D0"
+    },
+    {
+      "File": "audit/production-2-disabled-literal/purity-source.json",
+      "Sha256": "022CC4089D99713311236C838AF82EBA97F0A8A81E707099372D478B8ED8F7D1"
+    },
+    {
+      "File": "audit/production-2-disabled-literal/README.md",
+      "Sha256": "FE1C97856224C40AA09B733A882DC127A2671AE40D8EA88E9CDE0B14CD9A79DA"
+    },
+    {
+      "File": "audit/production-2-disabled-literal/run.json",
+      "Sha256": "E9EA2975820CC66EFA8C01C5D8B1893433590EE9C6F987C8B9AFDA9B10C56E8E"
+    },
+    {
+      "File": "audit/production-2-original-binding/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-original-binding/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-2-original-binding/invalidation-provenance.json",
+      "Sha256": "F48DBE8C7DB7E58089B83BDAE848F9401B32D7844AA2A2B64F74E267CD887064"
+    },
+    {
+      "File": "audit/production-2-original-binding/invalidation-samples.csv",
+      "Sha256": "CAE1323D9AB2B99C83E39D0130C0B6246A705F5660AA81E65624CA3BC9757809"
+    },
+    {
+      "File": "audit/production-2-original-binding/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-original-binding/invalidation-steps.csv",
+      "Sha256": "20F16E9D8CCB10674B9BC9015A15B0E30EED965097DBD9B48D0C186E5AAEF3DD"
+    },
+    {
+      "File": "audit/production-2-original-binding/invalidation-summary.csv",
+      "Sha256": "2DCDA5ED5C6A87DEB13C464D5601D5774EA9CEAC7E7B8391173958B76C27CA86"
+    },
+    {
+      "File": "audit/production-2-original-binding/invalidation-traces.jsonl.gz",
+      "Sha256": "87EB6EB0BC7C995344800C6ABAE438971C583BAC13D504A62428A94F84FA22DB"
+    },
+    {
+      "File": "audit/production-2-original-binding/invalidation-transitions.csv",
+      "Sha256": "4CF762DFEE822F7775A667A2AB4A0B1EC6455866195944AE7B7BAB0C78CEFEED"
+    },
+    {
+      "File": "audit/production-2-original-binding/purity-source.json",
+      "Sha256": "5938EEC0C212E3F91A88E8C0889CF1BA142BDEED670686668121BE3591A4D71E"
+    },
+    {
+      "File": "audit/production-2-original-binding/README.md",
+      "Sha256": "682BC2DEB3EE95E3B3FAC906A7BA7D96D4D9ABE363B5A4F543D35C5DA7BCD423"
+    },
+    {
+      "File": "audit/production-2-original-binding/run.json",
+      "Sha256": "D2506F0649CE962345F4446B1BECDF1AC86A5AFA4C2C962BDD9A80098A09B2A8"
+    },
+    {
+      "File": "audit/production-2-original-literal/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-original-literal/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-2-original-literal/invalidation-provenance.json",
+      "Sha256": "516BFD6465DE37632EBB402B73B14B7A8C4AFA70355CD8E41D6D36344C9D63E5"
+    },
+    {
+      "File": "audit/production-2-original-literal/invalidation-samples.csv",
+      "Sha256": "467AD94145CC0F16569AE54AE16955109A45670E719A1323DCB2FEDBCB4BF103"
+    },
+    {
+      "File": "audit/production-2-original-literal/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-original-literal/invalidation-steps.csv",
+      "Sha256": "B2B517EA0541267A76C2B6A1FD0E068E4E48798AF27A2C7028DAD00B95098020"
+    },
+    {
+      "File": "audit/production-2-original-literal/invalidation-summary.csv",
+      "Sha256": "A2CB6C0FC86F9770F69995787957A7F071BFEA874CFB208C2654CA48345CD774"
+    },
+    {
+      "File": "audit/production-2-original-literal/invalidation-traces.jsonl.gz",
+      "Sha256": "5954DB3D184CFD411C7A66E20F99F3B3D232551A7514127B973FF91C319C38FC"
+    },
+    {
+      "File": "audit/production-2-original-literal/invalidation-transitions.csv",
+      "Sha256": "B69A007D92EE1E6A45DD72321D3FA9ADACD7F8B450058EB476856A18DE8E34D0"
+    },
+    {
+      "File": "audit/production-2-original-literal/purity-source.json",
+      "Sha256": "5938EEC0C212E3F91A88E8C0889CF1BA142BDEED670686668121BE3591A4D71E"
+    },
+    {
+      "File": "audit/production-2-original-literal/README.md",
+      "Sha256": "FC3836074D60554C2AD978F74EA8F8DF25C862FF066F693CE5A17D4A6EBE5604"
+    },
+    {
+      "File": "audit/production-2-original-literal/run.json",
+      "Sha256": "08DC6C26E232699537094FF55BAA05CB45496EADC414DA29DDF30C5B575BB662"
+    },
+    {
+      "File": "audit/production-2-prehashed-binding/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-prehashed-binding/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-2-prehashed-binding/invalidation-provenance.json",
+      "Sha256": "C856359E6ACFE3391CD702B63487263407EE464849F6B7DDCB197A8DCFC7C68F"
+    },
+    {
+      "File": "audit/production-2-prehashed-binding/invalidation-samples.csv",
+      "Sha256": "AA6889403DEE4AF74A2A9B2C0FCCF59CC4A9443CA630C7054C569C6658E3D540"
+    },
+    {
+      "File": "audit/production-2-prehashed-binding/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-prehashed-binding/invalidation-steps.csv",
+      "Sha256": "16843A46CD04B1E7503F94998948BAB797C75B8DFF4FEBFC51F040269D1D14F4"
+    },
+    {
+      "File": "audit/production-2-prehashed-binding/invalidation-summary.csv",
+      "Sha256": "EBE1BB399271906B09C3ECDE3898524B2A8E38FF4167FC02F15577AE34A8D786"
+    },
+    {
+      "File": "audit/production-2-prehashed-binding/invalidation-traces.jsonl.gz",
+      "Sha256": "51701F35FA1CA0D7834406D78D92C1052597D1431BAF7D7F814C867A81A7276E"
+    },
+    {
+      "File": "audit/production-2-prehashed-binding/invalidation-transitions.csv",
+      "Sha256": "4CF762DFEE822F7775A667A2AB4A0B1EC6455866195944AE7B7BAB0C78CEFEED"
+    },
+    {
+      "File": "audit/production-2-prehashed-binding/purity-source.json",
+      "Sha256": "5938EEC0C212E3F91A88E8C0889CF1BA142BDEED670686668121BE3591A4D71E"
+    },
+    {
+      "File": "audit/production-2-prehashed-binding/README.md",
+      "Sha256": "94FD12A044E57EFB141C5B665AF1E774486928287A7EFCDA9662EE58A28A7AF2"
+    },
+    {
+      "File": "audit/production-2-prehashed-binding/run.json",
+      "Sha256": "976E2BDE8FDAB35BF951789E3ED7E8A0B36268334B39917BE3DC9FD964C33B27"
+    },
+    {
+      "File": "audit/production-2-prehashed-literal/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-prehashed-literal/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-2-prehashed-literal/invalidation-provenance.json",
+      "Sha256": "07737A9C7FACA604530EA861EE9105696898E47A7C6BC68A016A7437862ACC8A"
+    },
+    {
+      "File": "audit/production-2-prehashed-literal/invalidation-samples.csv",
+      "Sha256": "24A0516ADDE5A286A0F9632E97DDF749D50C04B53830FD1D4E35FF4ED04F2E08"
+    },
+    {
+      "File": "audit/production-2-prehashed-literal/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-prehashed-literal/invalidation-steps.csv",
+      "Sha256": "B69C7683A9572832E649AFACCCA72DCE25CB81BCCFAFA08C249ECE2E5789E3A3"
+    },
+    {
+      "File": "audit/production-2-prehashed-literal/invalidation-summary.csv",
+      "Sha256": "8F875996F96132B712256D0028E3EBCD685A4FD09FA4C563C2E79C776CAC3E59"
+    },
+    {
+      "File": "audit/production-2-prehashed-literal/invalidation-traces.jsonl.gz",
+      "Sha256": "1FF0FA544B00B13705788ACD17F96888F093318F24CF6304DF353201E1ADA802"
+    },
+    {
+      "File": "audit/production-2-prehashed-literal/invalidation-transitions.csv",
+      "Sha256": "B69A007D92EE1E6A45DD72321D3FA9ADACD7F8B450058EB476856A18DE8E34D0"
+    },
+    {
+      "File": "audit/production-2-prehashed-literal/purity-source.json",
+      "Sha256": "5938EEC0C212E3F91A88E8C0889CF1BA142BDEED670686668121BE3591A4D71E"
+    },
+    {
+      "File": "audit/production-2-prehashed-literal/README.md",
+      "Sha256": "0CC8CC10C3BA7484F37894372811579F05CC090076FF20713C6F86409018177C"
+    },
+    {
+      "File": "audit/production-2-prehashed-literal/run.json",
+      "Sha256": "8FB8A973C16D8E0887D19BA041A95327B84702425F8FB7271E9EE5B4DA6222E5"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-binding/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-binding/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-binding/invalidation-provenance.json",
+      "Sha256": "F78693E444BD0AF8D7B7878BD0DFE02C8EC49A1ED32C317E21087D3CABC63B51"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-binding/invalidation-samples.csv",
+      "Sha256": "1CB6FBFB69E3275C820E64096D7929D01D95DB5A969121C5A4334022402C99DD"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-binding/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-binding/invalidation-steps.csv",
+      "Sha256": "266AA241C27ABADEE1CFA233B188D6C11CAB9DDE0A0BC6D5A9D8C37729F35878"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-binding/invalidation-summary.csv",
+      "Sha256": "E655CD2C7606B7623FB66C63D0F4261EDBA6767320F822F30B25E463DDA7EA03"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-binding/invalidation-traces.jsonl.gz",
+      "Sha256": "00546730FC2003D909788A23398F2A2324E62B225654CDF0C14C711F68A2C410"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-binding/invalidation-transitions.csv",
+      "Sha256": "4CF762DFEE822F7775A667A2AB4A0B1EC6455866195944AE7B7BAB0C78CEFEED"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-binding/purity-source.json",
+      "Sha256": "022CC4089D99713311236C838AF82EBA97F0A8A81E707099372D478B8ED8F7D1"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-binding/README.md",
+      "Sha256": "C439907CE3C192F4E0C26C8F37745F86462F7A4A6DB7FB8D0816FFCC252BFFED"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-binding/run.json",
+      "Sha256": "3735F8FE9632A846D652C77234BAEB2D69933A1037F38C35903967B3B119C77E"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-literal/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-literal/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-literal/invalidation-provenance.json",
+      "Sha256": "13A544EF92B064B0F4C1B5E61BC42118822588882F412521833AE105E47FC887"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-literal/invalidation-samples.csv",
+      "Sha256": "2345635372599C571DBE173FC3765C3F306A6E281A9771683B8DC4E9B83ABE87"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-literal/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-literal/invalidation-steps.csv",
+      "Sha256": "3A65CD28526583AE39301132340802E6208F0E980A78EFFDBFA4AD85E7D82356"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-literal/invalidation-summary.csv",
+      "Sha256": "F6DA8B8ABE7F5A35F26CB77E5CE07C8CA73A176E6E8C8B90ECC23E75694FF064"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-literal/invalidation-traces.jsonl.gz",
+      "Sha256": "889E5F7F797782CB317A5914C8B8B15018ECF08F1A41738E3E888AC5988BF9F2"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-literal/invalidation-transitions.csv",
+      "Sha256": "B69A007D92EE1E6A45DD72321D3FA9ADACD7F8B450058EB476856A18DE8E34D0"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-literal/purity-source.json",
+      "Sha256": "022CC4089D99713311236C838AF82EBA97F0A8A81E707099372D478B8ED8F7D1"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-literal/README.md",
+      "Sha256": "587F9564F735DB8E345745DA25D0059CC2362AB3B454DA98ABE672DB3807B4E8"
+    },
+    {
+      "File": "audit/production-2-rebuilt-current-literal/run.json",
+      "Sha256": "BCE44107BA4D9D3D6683B2050058641CA168889C0A1EA52C466E67FF8AAE2364"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-binding/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-binding/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-binding/invalidation-provenance.json",
+      "Sha256": "F0294D71E436DB7813D9F737DA8A0BEE45972AA659A88F53F89DD8BF06A42143"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-binding/invalidation-samples.csv",
+      "Sha256": "B9A370E8BBA6E88A1DFB374BB3470F00D247583B1B105D064582E919DE7E3A57"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-binding/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-binding/invalidation-steps.csv",
+      "Sha256": "00CF53BFDBC31821F0670742486AAE047B2214044D8DDA8FD1E0D43FA72F8428"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-binding/invalidation-summary.csv",
+      "Sha256": "864AB7454367049A2872369C760E0025129D68E0DCCEC94894B667168765D615"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-binding/invalidation-traces.jsonl.gz",
+      "Sha256": "4990BF6A4FE7F1D1636C20BB41A5C858F572BE25AA984F32B3D93E995343724B"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-binding/invalidation-transitions.csv",
+      "Sha256": "4CF762DFEE822F7775A667A2AB4A0B1EC6455866195944AE7B7BAB0C78CEFEED"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-binding/purity-source.json",
+      "Sha256": "5938EEC0C212E3F91A88E8C0889CF1BA142BDEED670686668121BE3591A4D71E"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-binding/README.md",
+      "Sha256": "1DCF9C7751671E90A70E35F9599A655FD163C68A1BD5D9F63E413FA159E4CEC8"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-binding/run.json",
+      "Sha256": "128A729709CB08B62CD7E8B8E4028B7931C82F3BBDE18CBC0B05EC7D300560F9"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-literal/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-literal/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-literal/invalidation-provenance.json",
+      "Sha256": "98C86AC0ED4B70C9471577EB52D23EA9D0C1FBA9D52B545B82C24450DF308472"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-literal/invalidation-samples.csv",
+      "Sha256": "F66B29833C1F524AAF0DB1DF744C70610ADCCEC828F3CD8A4FEB6D670827A9CC"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-literal/invalidation-stages.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-literal/invalidation-steps.csv",
+      "Sha256": "2930CE114ADD37309E14BFAD57C198D20B8EF66C01D053ACD9DFC054B82EDA88"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-literal/invalidation-summary.csv",
+      "Sha256": "DA9742CB2DF8E1578D360AA9C7BAF2D5F0818D1D6BE98876048D20942C207036"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-literal/invalidation-traces.jsonl.gz",
+      "Sha256": "7980E76A0E27B46716BFD459C6C4174E5875FBDAAC885D20765083FC9B6F0014"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-literal/invalidation-transitions.csv",
+      "Sha256": "B69A007D92EE1E6A45DD72321D3FA9ADACD7F8B450058EB476856A18DE8E34D0"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-literal/purity-source.json",
+      "Sha256": "5938EEC0C212E3F91A88E8C0889CF1BA142BDEED670686668121BE3591A4D71E"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-literal/README.md",
+      "Sha256": "1A41DB15D36E3870254019E3CEDF9636B3A98FF0F32DF91230B1D3FF72FD2E9A"
+    },
+    {
+      "File": "audit/production-2-repeat-admission-literal/run.json",
+      "Sha256": "E9434C916F74F7F8CF77B9B4D10DEB0DF42E38E7C371F022ED73F6E2B5B91CCF"
+    },
+    {
+      "File": "audit/stats-current-binding/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/stats-current-binding/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/stats-current-binding/invalidation-provenance.json",
+      "Sha256": "73B019DBE67DECFF19533402084C9FE3F92B7C206E0401F931E80D93C20DB42C"
+    },
+    {
+      "File": "audit/stats-current-binding/invalidation-samples.csv",
+      "Sha256": "2E3FFB9715237DC88A9081C76A1DFDDEE1036873EF865D4E6A1E9E44FCD2688D"
+    },
+    {
+      "File": "audit/stats-current-binding/invalidation-stages.csv",
+      "Sha256": "7DBA9CB6A08FD7109A9055BAF262BF063BA6C5704369E0A0CCCE759229E28503"
+    },
+    {
+      "File": "audit/stats-current-binding/invalidation-steps.csv",
+      "Sha256": "ED84D35847A553A695791E7F986D143CB13877C2A71444815AAED55C6D90932B"
+    },
+    {
+      "File": "audit/stats-current-binding/invalidation-summary.csv",
+      "Sha256": "E16132F5373792BD41CBBD44D1BA731811145FFCB4D7CBDE1FE38B919F6E3D68"
+    },
+    {
+      "File": "audit/stats-current-binding/invalidation-traces.jsonl.gz",
+      "Sha256": "24F1AF875112FF0B15155BDD20EDC0F2061E24616A64E230E88D6A366AA720E8"
+    },
+    {
+      "File": "audit/stats-current-binding/invalidation-transitions.csv",
+      "Sha256": "6398DE82A71FAAD54FB875DBED30E4071CA727AED289218CE8500DC7145BAF25"
+    },
+    {
+      "File": "audit/stats-current-binding/purity-source.json",
+      "Sha256": "5938EEC0C212E3F91A88E8C0889CF1BA142BDEED670686668121BE3591A4D71E"
+    },
+    {
+      "File": "audit/stats-current-binding/README.md",
+      "Sha256": "19AFFEE34D06B4B3CACB92CCC910B8421FE4B68DB3CA0423EF4F175ACB752D23"
+    },
+    {
+      "File": "audit/stats-current-binding/run.json",
+      "Sha256": "958664DFA0D87AC2A2340D97D0AF98FFC4368041711E79A5EB99A6A109F24139"
+    },
+    {
+      "File": "audit/stats-current-literal/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/stats-current-literal/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/stats-current-literal/invalidation-provenance.json",
+      "Sha256": "0F4D13390B4E51169B542B4F2D2AC1391181BD607DBE4781261E983F1B3547B5"
+    },
+    {
+      "File": "audit/stats-current-literal/invalidation-samples.csv",
+      "Sha256": "C5308FBE481B1A76EC7F2D2C385DEB12BFB91A70A9D044118DF554BCD8DCC167"
+    },
+    {
+      "File": "audit/stats-current-literal/invalidation-stages.csv",
+      "Sha256": "B8A8A08FDCDA76053B26B7D4AD8E5C45EA53F9F266229A0D256E42435CB81AD1"
+    },
+    {
+      "File": "audit/stats-current-literal/invalidation-steps.csv",
+      "Sha256": "0A409BA4A64B068DDDAB1FCBDEF3887386B82B8776C39DD00B987EF9F806A29F"
+    },
+    {
+      "File": "audit/stats-current-literal/invalidation-summary.csv",
+      "Sha256": "25F26760A58FF0B08E15463ABD4D6E9CF97F72681AFD9B9A4DA38F35E02467C4"
+    },
+    {
+      "File": "audit/stats-current-literal/invalidation-traces.jsonl.gz",
+      "Sha256": "C79B43FC5333338EC0C35079A67409841B25F2DBC4768222736C160B2B5A9204"
+    },
+    {
+      "File": "audit/stats-current-literal/invalidation-transitions.csv",
+      "Sha256": "78E86C913D05BE1E8447582FB66F1242E81592E4D08C38D235445C201FC85EA0"
+    },
+    {
+      "File": "audit/stats-current-literal/purity-source.json",
+      "Sha256": "022CC4089D99713311236C838AF82EBA97F0A8A81E707099372D478B8ED8F7D1"
+    },
+    {
+      "File": "audit/stats-current-literal/README.md",
+      "Sha256": "0AF2688FF5E13102D546919116D5AE83B7C191A8755DC8FF728F46B0B6040513"
+    },
+    {
+      "File": "audit/stats-current-literal/run.json",
+      "Sha256": "060247DDBA78EC81167C34D90DE3501DAF10BAE698F5006C5D835E43AA44BC1A"
+    },
+    {
+      "File": "audit/stats-disabled-binding/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/stats-disabled-binding/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/stats-disabled-binding/invalidation-provenance.json",
+      "Sha256": "B79763DA89D22B740DDBD569DAA79EB271E2DBDCCB2C296F6B42A2380A5DEBA3"
+    },
+    {
+      "File": "audit/stats-disabled-binding/invalidation-samples.csv",
+      "Sha256": "E9CF6CFEADA323B7372E08FA2AE79A60461B7F53817EB643990B69F142B65525"
+    },
+    {
+      "File": "audit/stats-disabled-binding/invalidation-stages.csv",
+      "Sha256": "27AAC83C538607BF2811A76DC98BD890A4669A0A440957326F2DB14948EE246E"
+    },
+    {
+      "File": "audit/stats-disabled-binding/invalidation-steps.csv",
+      "Sha256": "46291EAF1C33429A10159525E6AAA01159498FBCDA2D0431E841D9FBCD0ABF00"
+    },
+    {
+      "File": "audit/stats-disabled-binding/invalidation-summary.csv",
+      "Sha256": "AEE4E42DFD40EA1B141F087A696C5E03B9CAC326E94D8ED25014410F240CFB2C"
+    },
+    {
+      "File": "audit/stats-disabled-binding/invalidation-traces.jsonl.gz",
+      "Sha256": "2C3B92F09E1BD1E82AAF92B0FA295472927C17437CAD2DF0FFAEE34951D85B05"
+    },
+    {
+      "File": "audit/stats-disabled-binding/invalidation-transitions.csv",
+      "Sha256": "6398DE82A71FAAD54FB875DBED30E4071CA727AED289218CE8500DC7145BAF25"
+    },
+    {
+      "File": "audit/stats-disabled-binding/purity-source.json",
+      "Sha256": "022CC4089D99713311236C838AF82EBA97F0A8A81E707099372D478B8ED8F7D1"
+    },
+    {
+      "File": "audit/stats-disabled-binding/README.md",
+      "Sha256": "016D4546798B405FEFCAE80B0FA3D058F1AD678792780215C7C0645676A73982"
+    },
+    {
+      "File": "audit/stats-disabled-binding/run.json",
+      "Sha256": "D12386280121CFDBAA2E5281F5CAEBB51B8D6EE4A14A222B8CA17F737B813A27"
+    },
+    {
+      "File": "audit/stats-disabled-literal/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/stats-disabled-literal/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/stats-disabled-literal/invalidation-provenance.json",
+      "Sha256": "2B688542E5D5F87C006D3358C3AE5E19C249BE766CC2E705E897FC52D33CB273"
+    },
+    {
+      "File": "audit/stats-disabled-literal/invalidation-samples.csv",
+      "Sha256": "89A3923E6C174D363450F7398CA5347363FD59C03989C6E48DADD14D0B5CF27E"
+    },
+    {
+      "File": "audit/stats-disabled-literal/invalidation-stages.csv",
+      "Sha256": "227253503C3B7D4A0543BC84E69F20AF876D0112FBAC77E233AE23D8F541D01E"
+    },
+    {
+      "File": "audit/stats-disabled-literal/invalidation-steps.csv",
+      "Sha256": "7C34D759EC5CA27F3CF228C26825E624430126101814436B5F8E43675BC78C86"
+    },
+    {
+      "File": "audit/stats-disabled-literal/invalidation-summary.csv",
+      "Sha256": "03EBDC69DFE067AF6946EBAD7C46511EC5FBAE6FBC4F2826DF966338F0271AE4"
+    },
+    {
+      "File": "audit/stats-disabled-literal/invalidation-traces.jsonl.gz",
+      "Sha256": "16C55E2C0CB101FB9DE592065D4F84412A04250599B66BCFCA34B56E22697D3F"
+    },
+    {
+      "File": "audit/stats-disabled-literal/invalidation-transitions.csv",
+      "Sha256": "78E86C913D05BE1E8447582FB66F1242E81592E4D08C38D235445C201FC85EA0"
+    },
+    {
+      "File": "audit/stats-disabled-literal/purity-source.json",
+      "Sha256": "022CC4089D99713311236C838AF82EBA97F0A8A81E707099372D478B8ED8F7D1"
+    },
+    {
+      "File": "audit/stats-disabled-literal/README.md",
+      "Sha256": "21CFFD0D7EE7544A6787DF8B0A6BC415A637A56DFA490633D557DF1781B50B08"
+    },
+    {
+      "File": "audit/stats-disabled-literal/run.json",
+      "Sha256": "E0F296335389029A7C78D347F745A72D69DB9EF5DB0ACE97888024DA614F1919"
+    },
+    {
+      "File": "audit/stats-prehashed-binding/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/stats-prehashed-binding/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/stats-prehashed-binding/invalidation-provenance.json",
+      "Sha256": "11D0E9366386CF7AEB7F4C5FEE4BCDF639471A1A48CBD9800C799086CE6C98E5"
+    },
+    {
+      "File": "audit/stats-prehashed-binding/invalidation-samples.csv",
+      "Sha256": "2255DC0B7CB47A27A6BBD2D2B8EE6E42BA387A720E73A0CD45018C4B3630FD58"
+    },
+    {
+      "File": "audit/stats-prehashed-binding/invalidation-stages.csv",
+      "Sha256": "F6F82454CE7D08FF8C71C9E10A0BE6D527D4C5617DE145E5B0F50A24BBCB61C2"
+    },
+    {
+      "File": "audit/stats-prehashed-binding/invalidation-steps.csv",
+      "Sha256": "0B45EA3E6040728EF695A61BA1E44BF5BB753AF04EC110D7FEBACA30ACDE0C87"
+    },
+    {
+      "File": "audit/stats-prehashed-binding/invalidation-summary.csv",
+      "Sha256": "ED5CA0EBBC7119236FF599DCAC042030C16887E17E9A22739D4764ACD624A3B0"
+    },
+    {
+      "File": "audit/stats-prehashed-binding/invalidation-traces.jsonl.gz",
+      "Sha256": "29F405105F56CB11762D840E8639EF38E520E8FA39B5CD0303A1DDFF2BFE7CAD"
+    },
+    {
+      "File": "audit/stats-prehashed-binding/invalidation-transitions.csv",
+      "Sha256": "6398DE82A71FAAD54FB875DBED30E4071CA727AED289218CE8500DC7145BAF25"
+    },
+    {
+      "File": "audit/stats-prehashed-binding/purity-source.json",
+      "Sha256": "022CC4089D99713311236C838AF82EBA97F0A8A81E707099372D478B8ED8F7D1"
+    },
+    {
+      "File": "audit/stats-prehashed-binding/README.md",
+      "Sha256": "83A673D33032A9BE81FD2F3D4CA60BF4CBD51BE263E8B913F04AA2CF86A6796A"
+    },
+    {
+      "File": "audit/stats-prehashed-binding/run.json",
+      "Sha256": "D6C3FC89DFF89BD8C4BA48373B61A44F854620DCBA29C68AA06644BE2348E59F"
+    },
+    {
+      "File": "audit/stats-prehashed-literal/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/stats-prehashed-literal/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/stats-prehashed-literal/invalidation-provenance.json",
+      "Sha256": "ABF5439AA9CC2D66565A9C91C49A7DA2E94907220CB41D6497B93500966CAB28"
+    },
+    {
+      "File": "audit/stats-prehashed-literal/invalidation-samples.csv",
+      "Sha256": "4B9BFC3E3135662BBC65D6F6689DF13ABAC1D7CFB139B362269DC56099DAB077"
+    },
+    {
+      "File": "audit/stats-prehashed-literal/invalidation-stages.csv",
+      "Sha256": "D8787DF8D551D6D8BFC86BD0CD70B5A8551AA271F42FD60E4B990B75EAFC7165"
+    },
+    {
+      "File": "audit/stats-prehashed-literal/invalidation-steps.csv",
+      "Sha256": "422892FE6CDFC7F0437420421D1156161D7AE827B87951BD04470FEDBE35D450"
+    },
+    {
+      "File": "audit/stats-prehashed-literal/invalidation-summary.csv",
+      "Sha256": "4A429A9F532CCD2DCF86F94DC7129D3F25DCE2FFCD34DC92F4A3C33F608DA27D"
+    },
+    {
+      "File": "audit/stats-prehashed-literal/invalidation-traces.jsonl.gz",
+      "Sha256": "257EAF4EB4C9E1465B689D2418F715B67FDFF9DB1D03EBCAB1A30FA12C546348"
+    },
+    {
+      "File": "audit/stats-prehashed-literal/invalidation-transitions.csv",
+      "Sha256": "78E86C913D05BE1E8447582FB66F1242E81592E4D08C38D235445C201FC85EA0"
+    },
+    {
+      "File": "audit/stats-prehashed-literal/purity-source.json",
+      "Sha256": "022CC4089D99713311236C838AF82EBA97F0A8A81E707099372D478B8ED8F7D1"
+    },
+    {
+      "File": "audit/stats-prehashed-literal/README.md",
+      "Sha256": "8EBD275B5F7EF30A868AF5FAFECC2057E739AD64CEF7407B5D288F5D2D3E0C56"
+    },
+    {
+      "File": "audit/stats-prehashed-literal/run.json",
+      "Sha256": "D661F27FEC651437020FA9CC8343DED51A9697B95FD7DF32E7DC555B070E0399"
+    },
+    {
+      "File": "audit/stats-repeat-admission-binding/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/stats-repeat-admission-binding/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/stats-repeat-admission-binding/invalidation-provenance.json",
+      "Sha256": "EB024A5E459224B7410FAD903EDE025ACA5AB7E4E0B6C20AA8CE1800789A0F11"
+    },
+    {
+      "File": "audit/stats-repeat-admission-binding/invalidation-samples.csv",
+      "Sha256": "95CC24CB4EF7071AEEA3BFA337BE4784DBF9A51698A9A7C2ED1B3A0909BB4CC0"
+    },
+    {
+      "File": "audit/stats-repeat-admission-binding/invalidation-stages.csv",
+      "Sha256": "AF1634BB757B4FBEB6D3F48BB5E6FD8A177A4ABA0E07FF898DBF27BCA3A586B1"
+    },
+    {
+      "File": "audit/stats-repeat-admission-binding/invalidation-steps.csv",
+      "Sha256": "20FB6FB0D56EC56E6CDB88470968C569E201E74A7BE0E64658A57BBD2DA5BBAD"
+    },
+    {
+      "File": "audit/stats-repeat-admission-binding/invalidation-summary.csv",
+      "Sha256": "2027BA86C5C08FC49013F3BB10D2A6188C49039B1C6ED5B601CEC54DDF347266"
+    },
+    {
+      "File": "audit/stats-repeat-admission-binding/invalidation-traces.jsonl.gz",
+      "Sha256": "DE5B2017E1D33007D74328D10FF3D2A7C20E5E4FF6D42D0145BC6441551CC4FC"
+    },
+    {
+      "File": "audit/stats-repeat-admission-binding/invalidation-transitions.csv",
+      "Sha256": "6398DE82A71FAAD54FB875DBED30E4071CA727AED289218CE8500DC7145BAF25"
+    },
+    {
+      "File": "audit/stats-repeat-admission-binding/purity-source.json",
+      "Sha256": "022CC4089D99713311236C838AF82EBA97F0A8A81E707099372D478B8ED8F7D1"
+    },
+    {
+      "File": "audit/stats-repeat-admission-binding/README.md",
+      "Sha256": "88E4256DEF30397B4D96E59BD99F768F55000D24247269A05E0F45FCCD18BF5D"
+    },
+    {
+      "File": "audit/stats-repeat-admission-binding/run.json",
+      "Sha256": "6BD70F2F1E8CE87F7919D7B61140BCC577FE0D4E6B6CC92C5D495FDD5AE2B550"
+    },
+    {
+      "File": "audit/stats-repeat-admission-literal/invalidation-causes.csv",
+      "Sha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6"
+    },
+    {
+      "File": "audit/stats-repeat-admission-literal/invalidation-environment.json",
+      "Sha256": "A669FF99119C92288689716002D79E7BE03A00F5DEBD4C908FB6BE5A702C1D65"
+    },
+    {
+      "File": "audit/stats-repeat-admission-literal/invalidation-provenance.json",
+      "Sha256": "AC863C7A10AA5932AEB4CFE31DF2CE5309518245D67F5428A3A7D5A62B3B3C53"
+    },
+    {
+      "File": "audit/stats-repeat-admission-literal/invalidation-samples.csv",
+      "Sha256": "24AC2D58B123DFDC9A2C81174E4FAAC57951A70BE6E46DD3E9902046BA647A89"
+    },
+    {
+      "File": "audit/stats-repeat-admission-literal/invalidation-stages.csv",
+      "Sha256": "42B3915FCF6259056C61A1494D296274E42A291AD6405BF2177EDD177B5A761B"
+    },
+    {
+      "File": "audit/stats-repeat-admission-literal/invalidation-steps.csv",
+      "Sha256": "E283EAEE18A6C6C615469AE5C8CBAEB8D6F827F5A2D6E62F7DA2CF0A7F188757"
+    },
+    {
+      "File": "audit/stats-repeat-admission-literal/invalidation-summary.csv",
+      "Sha256": "2D27A481292314787CC3346C96867B81FCD3B7EDA1B9AEA91A533DFC9A7A5385"
+    },
+    {
+      "File": "audit/stats-repeat-admission-literal/invalidation-traces.jsonl.gz",
+      "Sha256": "61208331E19908D3CFB6FCACF674ADD21C95D4BEDA32EC32E8FB22EF1638352A"
+    },
+    {
+      "File": "audit/stats-repeat-admission-literal/invalidation-transitions.csv",
+      "Sha256": "78E86C913D05BE1E8447582FB66F1242E81592E4D08C38D235445C201FC85EA0"
+    },
+    {
+      "File": "audit/stats-repeat-admission-literal/purity-source.json",
+      "Sha256": "5938EEC0C212E3F91A88E8C0889CF1BA142BDEED670686668121BE3591A4D71E"
+    },
+    {
+      "File": "audit/stats-repeat-admission-literal/README.md",
+      "Sha256": "DD42D86ACEAB9C3977CA09947CFFA9C46B08889CE41151492D2402A58AB0A6E5"
+    },
+    {
+      "File": "audit/stats-repeat-admission-literal/run.json",
+      "Sha256": "3A8F72764C0E8F013C1CA6B4C2DB63839D289032989F86C49FB895C0DC0D600E"
+    }
+  ],
+  "CapturedUtc": "2026-10-21T05:06:12.1713055Z"
+}

@@ -1,0 +1,40 @@
+[
+  {
+    "Kind": "invalidation-provenance",
+    "Project": "Akbura.FeatureGallery",
+    "File": "DataTemplates.akbura",
+    "Profiling": "off",
+    "BinaryFlavor": "production",
+    "Optimization": "enabled",
+    "VerifyEveryUpdate": true,
+    "RepositoryRevision": "af6c310a8859600f27943fd8cf972b8fcf296f0f",
+    "Sdk": "5.9.0-1.26423.113+e34a38d2ae1fc26406a317517196e55c68ff83ab",
+    "CSharpTrees": 18,
+    "AdditionalFiles": 32,
+    "BlackSilence": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CrossRevision\\audit-validated\\runs\\production-1-disabled-binding\\tool\\Akbura.BlackSilence.dll",
+    "Generator": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CrossRevision\\audit-validated\\runs\\production-1-disabled-binding\\tool\\Akbura.Generator.dll",
+    "BlackSilenceSha256": "4A1F3C6ED09C20AEC59C69F81A063CA4B69F15EF2FC62B080F6BB42A48B0A7E8",
+    "GeneratorSha256": "2636A8407B370F10AE7AFD5377A0FEBFCAF82F2A009552BDBAC699DBD7D5F5AF",
+    "BenchmarkSha256": "078F874836DFE9F94F4A2B8B39D9B4B7F421C676B61DCEE44DE8C218B2927680",
+    "InputsSha256": "1036F6CB79DCC7E715FFE23E69CFAEF81521C494CC637CA74F3B18E1D692B871"
+  },
+  {
+    "Kind": "invalidation-provenance",
+    "Project": "PurityUIDashborad",
+    "File": "NavButton.akbura",
+    "Profiling": "off",
+    "BinaryFlavor": "production",
+    "Optimization": "enabled",
+    "VerifyEveryUpdate": true,
+    "RepositoryRevision": "af6c310a8859600f27943fd8cf972b8fcf296f0f",
+    "Sdk": "5.9.0-1.26423.113+e34a38d2ae1fc26406a317517196e55c68ff83ab",
+    "CSharpTrees": 7,
+    "AdditionalFiles": 17,
+    "BlackSilence": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CrossRevision\\audit-validated\\runs\\production-1-disabled-binding\\tool\\Akbura.BlackSilence.dll",
+    "Generator": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CrossRevision\\audit-validated\\runs\\production-1-disabled-binding\\tool\\Akbura.Generator.dll",
+    "BlackSilenceSha256": "4A1F3C6ED09C20AEC59C69F81A063CA4B69F15EF2FC62B080F6BB42A48B0A7E8",
+    "GeneratorSha256": "2636A8407B370F10AE7AFD5377A0FEBFCAF82F2A009552BDBAC699DBD7D5F5AF",
+    "BenchmarkSha256": "078F874836DFE9F94F4A2B8B39D9B4B7F421C676B61DCEE44DE8C218B2927680",
+    "InputsSha256": "971F15A5CD7DA9AA5CF1126EE4F24AE66E49508AEAD9F7F8DF4C63AE5D5979EC"
+  }
+]

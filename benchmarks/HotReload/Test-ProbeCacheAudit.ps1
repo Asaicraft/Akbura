@@ -21,6 +21,7 @@ function Fixture([string]$fault) {
             [IO.File]::WriteAllText((Join-Path $path 'run.json'), ($configuration | ConvertTo-Json) + "`r`n", $encoding)
             $files = if ($category -eq 'literal') { @('Counter.akbura','DataTemplatesPage.akbura','NeedHelp.akbura','Sidebar.akbura') } else { @('DataTemplates.akbura','NavButton.akbura') }
             $samples = [Collections.Generic.List[object]]::new()
+            $stageRows = [Collections.Generic.List[object]]::new()
             $stream = [IO.File]::Create((Join-Path $path 'invalidation-traces.jsonl.gz'))
             $gzip = [IO.Compression.GZipStream]::new($stream,[IO.Compression.CompressionLevel]::Fastest)
             $writer = [IO.StreamWriter]::new($gzip,$encoding)
@@ -30,6 +31,12 @@ function Fixture([string]$fault) {
                         $isFault = $job -eq 'production-2-prehashed' -and $category -eq 'literal' -and $file -eq 'Counter.akbura' -and $index -eq 10
                         $samples.Add([pscustomobject]@{ Project='Demo'; File=$file; Scenario="localized-$category"; Index=$(if ($isFault -and $fault -eq 'duplicate-index') { 9 } else { $index })
                             First=($index -eq 0); Warmup=($index -in 1..2); VerifyEveryUpdate=$true; GeneratorMs=10; ProcessAllocatedBytes=1000; PostGcHeapBytes=2000 })
+                        $stageFault = $job -eq 'stats-current' -and $category -eq 'literal' -and $file -eq 'Counter.akbura' -and $index -eq 10
+                        if ($profile -eq 'stats' -and -not ($stageFault -and $fault -eq 'missing-stage')) {
+                            $stageRows.Add([pscustomobject]@{ Project='Demo'; File=$file; Scenario="localized-$category"; Index=$index
+                                Stage='ExpressionCacheLookup'; First=($index -eq 0); Warmup=($index -in 1..2)
+                                Count=(17+$index); InclusiveMs=2; InclusiveCurrentThreadBytes=100 })
+                        }
                         $validation = @{ Kind='invalidation-validation'; Project='Demo'; File=$file; Scenario="localized-$category"; Index=$index
                             Diagnostics=@($(if ($isFault -and $fault -eq 'diagnostics') { 'changed' } else { 'same' })) }
                         $parity = @{ Kind='invalidation-parity'; Project='Demo'; File=$file; Scenario="localized-$category"; Index=$index
@@ -41,7 +48,8 @@ function Fixture([string]$fault) {
             }
             finally { $writer.Dispose(); $gzip.Dispose(); $stream.Dispose() }
             $samples | Export-Csv -LiteralPath (Join-Path $path 'invalidation-samples.csv') -NoTypeInformation
-            [IO.File]::WriteAllText((Join-Path $path 'invalidation-stages.csv'), '"Project","File","Scenario","Stage","First","Warmup","Count","InclusiveMs","InclusiveCurrentThreadBytes"' + "`r`n", $encoding)
+            if ($stageRows.Count) { $stageRows | Export-Csv -LiteralPath (Join-Path $path 'invalidation-stages.csv') -NoTypeInformation }
+            else { [IO.File]::WriteAllText((Join-Path $path 'invalidation-stages.csv'), '"Project","File","Scenario","Stage","First","Warmup","Count","InclusiveMs","InclusiveCurrentThreadBytes"' + "`r`n", $encoding) }
         }
     }
     return $fixture
@@ -51,12 +59,19 @@ if ([regex]::Matches($controller, '(?m)^\s*\$null\s*=\s*\$copy(?:Out|Err)\.GetAw
     throw 'Stream-copy task results must not leak into frozen tool paths.'
 }
 $checks = 1
-foreach ($fault in @('valid','diagnostics','sources','duplicate-index','missing-parity','profile')) {
+foreach ($fault in @('valid','diagnostics','sources','duplicate-index','missing-parity','profile','missing-stage')) {
     $fixture = Fixture $fault
     $failed = $false
     try { & (Join-Path $PSScriptRoot 'Summarize-ProbeCacheAudit.ps1') -InputDirectory $fixture -ResultDirectory $fixture 6>$null }
     catch { $failed = $true; if ($fault -eq 'valid') { throw } }
     if (($fault -eq 'valid') -eq $failed) { throw "Unexpected audit guard outcome: $fault" }
     $checks++
+    if ($fault -eq 'valid') {
+        $stageValues = @(Import-Csv -LiteralPath (Join-Path $fixture 'audit-stages.csv'))
+        if ($stageValues.Count -ne 24 -or @($stageValues | Where-Object { [double]$_.MedianCount -ne 23.5 }).Count) {
+            throw 'Stage Count must enumerate column values, not the row-array Count property.'
+        }
+        $checks++
+    }
 }
 Write-Host "$checks scoped-cache audit report checks passed. Fixtures preserved: $root"

@@ -1,0 +1,10 @@
+{
+  "ControllerPid": 25260,
+  "UpdatedUtc": "2026-10-21T04:02:05.2001577Z",
+  "CompletedSteps": 57,
+  "CurrentPid": null,
+  "Failure": "Exception: C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\benchmarks\\HotReload\\Start-ProbeCacheAudit.ps1:104\r\nLine |\r\n 104 |  … $process.ExitCode -ne 0) { throw \"Exit $($process.ExitCode): $logs\" }\r\n     |                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n     | Exit 1:\r\n     | C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CrossRevision\\audit-validated\\summarize-audit-20261021T040156666Z\r\n\r\n",
+  "Phase": "Failed",
+  "TotalSteps": 58,
+  "Current": "summarize-audit"
+}

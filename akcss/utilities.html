@@ -380,7 +380,35 @@ component update so it sees the current state and parameter values.</p>
 <p>See <a href="akcss/markup-extensions">Markup Extensions</a> for the full value and lifecycle
 contract.</p>
 <h2 id="conditional-utilities">Conditional utilities<a class="header-anchor" href="javascript:;" onclick="location.hash='#conditional-utilities'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
-<p>A utility can be applied conditionally with an expression prefix:</p>
+<p>A utility can obtain its Boolean condition in three ways:</p>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Source and refresh mechanism</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{condition}:utility</code></td>
+<td>C# in component scope, evaluated by normal render/AKCSS refresh.</td>
+</tr>
+<tr>
+<td><code>${Binding Path}:utility</code></td>
+<td>Avalonia Binding, normally relative to DataContext, observing source notifications.</td>
+</tr>
+<tr>
+<td><code>${x.bind expression}:utility</code></td>
+<td>Typed C# in component scope, observing supported expression dependencies.</td>
+</tr>
+</tbody>
+</table>
+<p>Both binding-backed forms can update without a component render. The ordinary
+form catches up on its normal refresh path, including renders caused by state
+changes. All three feed the same AKCSS cascade. See
+<a href="/akbura/expression-bindings#three-ways-to-conditionally-apply-akcss-utilities">Expression Bindings</a>
+for runnable examples, DataContext rules and guidance on choosing each form.</p>
+<p>For example, an ordinary C# condition:</p>
 <pre><code class="language-akbura">using Avalonia.Controls;
 using Akbura.Styles.akcss;
 

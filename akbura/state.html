@@ -185,6 +185,11 @@ Akbura									</span>
 									</a>
 								</li>
 								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/expression-bindings" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Expression Bindings
+									</a>
+								</li>
+								<li class="relative">
 									<a href="https://asaicraft.github.io/Akbura/akbura/hooks" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
 										Composable Hooks
 									</a>
@@ -286,7 +291,10 @@ state string query = &quot;&quot;;
 another value does not recreate it. Assigning an equal value is ignored by the
 default equality comparer. A normal initializer is a snapshot, not a computed
 state: <code>state int doubled = count * 2;</code> does not recalculate when <code>count</code> changes.
-Use a markup expression or a <a href="/akbura/hooks">composable hook</a> for a derived value.</p>
+Use an <a href="/akbura/expression-bindings">expression binding</a> such as
+<code>Text=${x.bind $&quot;Double: {count * 2}&quot;}</code> for a reactive calculated property value
+instead of a derived state snapshot. A normal markup expression follows the
+render cycle; <a href="/akbura/hooks">composable hooks</a> provide other derived-state tools.</p>
 <h2 id="directional-connections">Directional connections<a class="header-anchor" href="javascript:;" onclick="location.hash='#directional-connections'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>A mode immediately after <code>=</code> connects a state value to a C# binding path:</p>
 <pre><code class="language-akbura">state MyViewModel vm = new MyViewModel();
@@ -425,8 +433,8 @@ parameters.</p>
 									</div>
 									<div class="hidden md:-mt-px md:flex"></div>
 									<div class="-mt-px flex w-0 flex-1 justify-end">
-											<a href="https://asaicraft.github.io/Akbura/akbura/hooks" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
-												Composable Hooks
+											<a href="https://asaicraft.github.io/Akbura/akbura/expression-bindings" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												Expression Bindings
 												<!-- Heroicon name: mini/arrow-long-right -->
 												<svg class="ml-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 													<path fill-rule="evenodd" d="M2 10a.75.75 0 01.75-.75h12.59l-2.1-1.95a.75.75 0 111.02-1.1l3.5 3.25a.75.75 0 010 1.1l-3.5 3.25a.75.75 0 11-1.02-1.1l2.1-1.95H2.75A.75.75 0 012 10z" clip-rule="evenodd"></path>

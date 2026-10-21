@@ -185,6 +185,11 @@ Akbura									</span>
 									</a>
 								</li>
 								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/expression-bindings" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Expression Bindings
+									</a>
+								</li>
+								<li class="relative">
 									<a href="https://asaicraft.github.io/Akbura/akbura/hooks" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
 										Composable Hooks
 									</a>
@@ -302,6 +307,20 @@ existing binding semantics for contexts such as <code>$self</code>, <code>$paren
 elements, casts, and template item scopes. Completion replaces only the path
 segment being edited, so completing in the middle of a path does not duplicate
 its prefix or suffix.</p>
+<h2 id="expression-bindings">Expression bindings<a class="header-anchor" href="javascript:;" onclick="location.hash='#expression-bindings'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>The editor offers the built-in <code>x.bind</code> directive in markup value prefixes,
+including incomplete <code>${x.</code> and <code>${x.bi</code> input. After the directive, completion
+uses embedded C# with the real component scope and target property type, not an
+Avalonia BindingPath. Nested members, indexers, interpolation, locals and template
+items use the normal scoped C# projection when project semantics are available.</p>
+<p>The same services handle <code>${x.bind condition}:utility</code> with a Boolean context.
+The prefix and utility remain distinct from the embedded C# span. Shared
+classification, hover, definition, references/rename and diagnostics map back to
+the original <code>.akbura</code> text. Syntax-only prefix assistance does not imply that
+semantic member completion works without a loaded project. Ordinary
+<code>${Binding ...}</code> keeps its separate binding-path completion.</p>
+<p>See <a href="/akbura/expression-bindings">Expression Bindings</a> for the property and utility
+contracts, examples and observation limitations.</p>
 <h2 id="resource-keys">Resource keys<a class="header-anchor" href="javascript:;" onclick="location.hash='#resource-keys'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p><code>StaticResource</code> and <code>DynamicResource</code> offer the same set of resource keys:</p>
 <pre><code class="language-akbura">&lt;Border Background=${StaticResource CardBackgroundBrush} /&gt;
@@ -442,6 +461,11 @@ computed import, or another mechanism the editor intentionally does not run.</p>
 									<li class="group text-gray-800 hover:text-gray-900">
 										<span v-hash="'#binding-paths'" data-id="binding-paths" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
 											Binding paths
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#expression-bindings'" data-id="expression-bindings" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Expression bindings
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">

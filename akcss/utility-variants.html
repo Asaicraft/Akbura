@@ -249,6 +249,15 @@ Built-in Styles									</span>
 					<h2 id="utility-variants">Utility variants<a class="header-anchor" href="javascript:;" onclick="location.hash='#utility-variants'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>A utility variant is a markup extension that controls whether a prefixed AKCSS
 utility is currently active.</p>
+<p>Markup-extension-backed variants are one category of utility prefix, not the
+only conditional syntax. Ordinary <code>{condition}:utility</code> uses the render/AKCSS
+refresh path; <code>${x.bind expression}:utility</code> tracks a C# Boolean expression.
+<code>${Binding Path}:utility</code> is a markup-extension-backed condition using Avalonia
+source resolution. Both binding forms can follow notifying sources without a
+component render, and all forms use the existing cascade. See
+<a href="/akbura/expression-bindings#three-ways-to-conditionally-apply-akcss-utilities">the three conditional forms</a>.
+<code>UtilityVariantAttribute</code> retains the ordering semantics described below; it
+does not turn an ordinary C# condition into an expression binding.</p>
 <p>It does not need a dedicated base class or attribute. Standard markup
 extensions can be prefixes too:</p>
 <pre><code class="language-akbura">&lt;ToggleSwitch x.Name=&quot;MyToggle&quot; /&gt;

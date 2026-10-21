@@ -185,6 +185,11 @@ Akbura									</span>
 									</a>
 								</li>
 								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akbura/expression-bindings" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Expression Bindings
+									</a>
+								</li>
+								<li class="relative">
 									<a href="https://asaicraft.github.io/Akbura/akbura/hooks" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
 										Composable Hooks
 									</a>
@@ -393,6 +398,12 @@ contract.</li>
 <p>A public getter alone does not invent change notifications. If the compiler
 cannot observe the property, it reports the existing binding diagnostic instead
 of generating a connection that only appears reactive.</p>
+<h2 id="expression-bindings-are-one-way-assignments">Expression bindings are one-way assignments<a class="header-anchor" href="javascript:;" onclick="location.hash='#expression-bindings-are-one-way-assignments'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>For a calculated one-way property value, use
+<a href="/akbura/expression-bindings">expression bindings</a>. <code>Text=${x.bind expression}</code>
+observes supported inputs and assigns a value; it is not a <code>bind:</code>/<code>out:</code>
+connection and does not write target edits back to the expression. Directional
+component parameters and <code>state bind/out/in</code> remain separate contracts.</p>
 <h2 id="multiple-output-receivers">Multiple output receivers<a class="header-anchor" href="javascript:;" onclick="location.hash='#multiple-output-receivers'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>Output readers do not compete with the one setter of a property. These forms are
 valid:</p>
@@ -470,6 +481,11 @@ braces.</p>
 									<li class="group text-gray-800 hover:text-gray-900">
 										<span v-hash="'#directional-attributes-on-controls'" data-id="directional-attributes-on-controls" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
 											Directional attributes on controls
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#expression-bindings-are-one-way-assignments'" data-id="expression-bindings-are-one-way-assignments" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Expression bindings are one-way assignments
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">

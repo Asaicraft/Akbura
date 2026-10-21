@@ -1,4 +1,5 @@
 using Akbura.Language.CodeGeneration;
+using Akbura.Language.Binder;
 using System.Collections.Immutable;
 using System;
 
@@ -30,7 +31,8 @@ internal sealed class BlackSilenceGenerationRequest
         ImmutableArray<AkcssGenerationRequest> inlineAkcss,
         BlackSilenceProjectSnapshot? previousSnapshot,
         ImmutableArray<DocumentDiagnosticRequest> diagnostics = default,
-        bool computeDiagnostics = true)
+        bool computeDiagnostics = true,
+        CompilationBoundProbeStore.Session? probeSession = null)
     {
         State = state;
         Version = version;
@@ -44,6 +46,7 @@ internal sealed class BlackSilenceGenerationRequest
         _previousSnapshot = previousSnapshot == null ? null : new WeakReference<BlackSilenceProjectSnapshot>(previousSnapshot);
         Diagnostics = diagnostics.IsDefault ? [] : diagnostics;
         ComputeDiagnostics = computeDiagnostics;
+        ProbeSession = probeSession;
     }
 
     public BlackSilenceProjectState State { get; }
@@ -58,6 +61,7 @@ internal sealed class BlackSilenceGenerationRequest
     public BlackSilenceProjectSnapshot? PreviousSnapshot => _previousSnapshot != null && _previousSnapshot.TryGetTarget(out var snapshot) ? snapshot : null;
     public ImmutableArray<DocumentDiagnosticRequest> Diagnostics { get; private set; }
     public bool ComputeDiagnostics { get; }
+    internal CompilationBoundProbeStore.Session? ProbeSession { get; }
 
     // Initialized before publication into the incremental graph, immutable thereafter.
     internal DetachedCSharpInputs? ArtifactInputs { get; private set; }

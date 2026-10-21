@@ -71,6 +71,19 @@ internal enum GenerationStatisticCounter : byte
     ExpressionKeySyntaxComparison,
     ExpressionCacheEntryPublished,
     ExpressionCacheAdmissionOnly,
+    IncrementalParseWholeDocumentChangeRange,
+    IncrementalParsePreciseChangeRange,
+    CrossRevisionRegionCandidate,
+    CrossRevisionRegionGreenIdentityMatch,
+    CrossRevisionRegionContextMatch,
+    CrossRevisionProjectionHit,
+    CrossRevisionProjectionMiss,
+    CrossRevisionProjectionConstructionSkipped,
+    CrossRevisionRegionContextRejected,
+    CrossRevisionProjectionAdmissionRejectedSize,
+    CompilationBoundProbeEntriesPublished,
+    CompilationBoundProjectionCharactersPublished,
+    CompilationBoundProbeGenerationReplaced,
     Count,
 }
 
@@ -160,6 +173,10 @@ internal enum GenerationStatisticStage : byte
     ExpressionCacheLookup,
     ExpressionFactoryBinding,
     ExpressionCachePublication,
+    IncrementalParseChangeRangeComputation,
+    CrossRevisionRegionMatching,
+    CrossRevisionProjectionLookup,
+    CompilationBoundProbePublication,
     Count,
 }
 
@@ -199,7 +216,12 @@ internal static partial class GenerationStatistics
 
     public static void Increment(GenerationStatisticCounter counter)
     {
-        s_current.Value?.Increment(counter);
+        s_current.Value?.Increment(counter, 1);
+    }
+
+    public static void Increment(GenerationStatisticCounter counter, int value)
+    {
+        s_current.Value?.Increment(counter, value);
     }
 
     [Conditional("STATS")]
@@ -353,11 +375,11 @@ internal sealed class GenerationStatisticsSession : IDisposable
         }
     }
 
-    internal void Increment(GenerationStatisticCounter counter)
+    internal void Increment(GenerationStatisticCounter counter, int value)
     {
         if (IsActive)
         {
-            Interlocked.Increment(ref _counters[(int)counter]);
+            Interlocked.Add(ref _counters[(int)counter], value);
         }
     }
 

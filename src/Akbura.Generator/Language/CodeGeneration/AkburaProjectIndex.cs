@@ -78,7 +78,8 @@ internal sealed class AkburaProjectIndex
         string rootNamespace,
         string projectDirectory,
         AkburaCompilation? reuseFrom = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Binder.CompilationBoundProbeStore.Session? probeReuseSession = null)
     {
 #if STATS
         using var indexMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.Catalog);
@@ -149,7 +150,7 @@ internal sealed class AkburaProjectIndex
             akcssSyntaxTrees,
             rootNamespace,
             projectDirectory,
-            reuseFrom);
+            reuseFrom) { ProbeReuseSession = probeReuseSession };
 #if STATS
         compilationMeasurement.Dispose();
 #endif

@@ -28,6 +28,8 @@ internal static class BlackSilenceGenerationRequestBuilder
         var version = state.GetNextVersion();
         var orderedDocuments = OrderDocuments(documents, cancellationToken);
         var canonicalDocuments = CanonicalizeDocuments(orderedDocuments, previous, cancellationToken);
+        var probeSession = computeDiagnostics ? state.ProbeStore?.Begin(state.CSharpCompilation, version, canonicalDocuments,
+            options.RootNamespace, options.ProjectDirectory, cancellationToken) : null;
         AkburaProjectIndex index;
 
         if (previous != null && HaveSameDocuments(canonicalDocuments, previous.Documents))
@@ -45,7 +47,8 @@ internal static class BlackSilenceGenerationRequestBuilder
                 options.RootNamespace,
                 options.ProjectDirectory,
                 previous?.Index.Compilation,
-                cancellationToken);
+                cancellationToken,
+                probeSession);
         }
 
         // Additions, removals, renames and changed lookup order can turn an
@@ -106,7 +109,8 @@ internal static class BlackSilenceGenerationRequestBuilder
             inline.ToImmutableArrayUnsafe(),
             previous,
             diagnostics.ToImmutableArrayUnsafe(),
-            computeDiagnostics);
+            computeDiagnostics,
+            probeSession);
         request.InitializeArtifacts(cancellationToken);
 #if STATS
         if (GenerationStatistics.IsInvalidationTrackingEnabled)

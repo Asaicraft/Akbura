@@ -11,6 +11,10 @@
 	<PropertyGroup Condition="'$(Configuration)' == 'DebugStats' Or '$(Configuration)' == 'ReleaseStats'">
 		<DefineConstants>$(DefineConstants);STATS;ENABLE_QUICK_SCAN_BENCHMARK</DefineConstants>
 	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(ProbeReuseStage)' == 'projection'">
+		<DefineConstants>$(DefineConstants);AKBURA_PROJECTION_REUSE</DefineConstants>
+	</PropertyGroup>
 	<ItemGroup>
 		<PackageReference Include="Avalonia.Headless" />
 		<PackageReference Include="CommunityToolkit.Mvvm" VersionOverride="8.4.2" GeneratePathProperty="true" PrivateAssets="all" />

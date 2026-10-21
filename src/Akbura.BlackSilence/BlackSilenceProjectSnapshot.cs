@@ -1,5 +1,6 @@
 using Akbura.Language;
 using Akbura.Language.CodeGeneration;
+using Akbura.Language.Binder;
 using System.Collections.Immutable;
 
 namespace Akbura.BlackSilence;
@@ -17,7 +18,8 @@ internal sealed class BlackSilenceProjectSnapshot
         ImmutableDictionary<string, DiagnosticDocumentEntry>? diagnosticEntries = null,
         ImmutableArray<ArtifactIdentity> identities = default,
         DetachedCSharpInputs? artifactInputs = null,
-        DetachedProjectArtifacts? detachedArtifacts = null)
+        DetachedProjectArtifacts? detachedArtifacts = null,
+        CompilationBoundProbeStore.Generation? probeGeneration = null)
     {
         Version = version;
         Options = options;
@@ -30,6 +32,7 @@ internal sealed class BlackSilenceProjectSnapshot
         Identities = identities.IsDefault ? [] : identities;
         ArtifactInputs = artifactInputs;
         DetachedArtifacts = detachedArtifacts;
+        ProbeGeneration = probeGeneration;
     }
 
     public long Version { get; }
@@ -43,4 +46,5 @@ internal sealed class BlackSilenceProjectSnapshot
     internal ImmutableArray<ArtifactIdentity> Identities { get; }
     internal DetachedCSharpInputs? ArtifactInputs { get; }
     internal DetachedProjectArtifacts? DetachedArtifacts { get; }
+    internal CompilationBoundProbeStore.Generation? ProbeGeneration { get; }
 }

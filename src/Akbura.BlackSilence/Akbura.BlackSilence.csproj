@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>netstandard2.0</TargetFramework>
@@ -24,6 +24,10 @@
 
 	<PropertyGroup Condition="'$(EnableAkburaStats)' == 'true' Or '$(Configuration)' == 'DebugStats' Or '$(Configuration)' == 'ReleaseStats'">
 		<DefineConstants>$(DefineConstants);STATS</DefineConstants>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(ProbeReuseStage)' == 'projection'">
+		<DefineConstants>$(DefineConstants);AKBURA_PROJECTION_REUSE</DefineConstants>
 	</PropertyGroup>
 
 	<ItemGroup>

@@ -202,6 +202,13 @@ internal sealed partial class BlackSilenceDocumentBatch
 #endif
             artifacts = DetachedProjectArtifacts.Create(request, generatedEntries, diagnosticEntries);
         }
+        var probeGeneration = request.ComputeDiagnostics && diagnosticEntries.Values.All(static entry =>
+            entry.Diagnostics.All(static diagnostic => diagnostic.Severity != Akbura.Language.Syntax.AkburaDiagnosticSeverity.Error))
+            ? request.ProbeSession?.Seal() : null;
+        if (probeGeneration == null)
+        {
+            request.ProbeSession?.Discard();
+        }
         var snapshot = new BlackSilenceProjectSnapshot(
             request.Version,
             request.Options,
@@ -213,7 +220,8 @@ internal sealed partial class BlackSilenceDocumentBatch
             diagnosticEntries,
             request.ArtifactIdentities,
             request.ArtifactInputs,
-            artifacts);
+            artifacts,
+            probeGeneration);
 
         cancellationToken.ThrowIfCancellationRequested();
         if (artifacts != null)

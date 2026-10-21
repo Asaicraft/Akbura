@@ -19,10 +19,13 @@ namespace Akbura.Language.Binder;
 /// Preparation owned by one document semantic model, never by reusable snapshot
 /// state. Only type probes with exactly matching text and imports share binding
 /// results. Markup expression results require the complete prepared probe (including
-/// scopes and imports) and the exact target type. No cache crosses document owners.
+/// scopes and imports) and the exact target type. Semantic result caches never cross
+/// document owners. An opt-in compilation-owned store can supply prepared projections.
 /// </summary>
 internal sealed class CSharpProbeContext(AkburaSemanticModel semanticModel)
 {
+    internal CompilationBoundProbeStore.DocumentSession? ProjectionRegions { get; } =
+        semanticModel.Compilation.ProbeReuseSession?.GetDocument(semanticModel.SyntaxTree);
     private readonly ConcurrentDictionary<TypeProbeKey, CSharpBindingResult> _types = new();
     private readonly ConcurrentDictionary<ExpressionProbeKey, CSharpBindingResult> _expressions = new();
 #if PROBE_CACHE_REPEAT_ADMISSION

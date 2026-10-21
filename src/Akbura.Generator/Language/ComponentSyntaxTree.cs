@@ -73,8 +73,24 @@ internal sealed class ComponentSyntaxTree : AkburaSyntaxTree
             AkburaWorkspaceDiagnostics.Category.Syntax,
             "SyntaxTree: GetChangeRanges started");
 
-        var changeRanges = changes?.ToArray() ??
-            [.. newText.GetChangeRanges(Text)];
+        TextChangeRange[] changeRanges;
+#if STATS
+        using (CodeGeneration.GenerationStatistics.Measure(CodeGeneration.GenerationStatisticStage.IncrementalParseChangeRangeComputation))
+#endif
+        {
+            changeRanges = changes?.ToArray() ?? [.. newText.GetChangeRanges(Text)];
+        }
+#if STATS
+        if (changeRanges.Length == 1 && changeRanges[0].Span.Start == 0 && changeRanges[0].Span.Length == Text.Length &&
+            changeRanges[0].NewLength == newText.Length)
+        {
+            CodeGeneration.GenerationStatistics.Increment(CodeGeneration.GenerationStatisticCounter.IncrementalParseWholeDocumentChangeRange);
+        }
+        else if (changeRanges.Length != 0)
+        {
+            CodeGeneration.GenerationStatistics.Increment(CodeGeneration.GenerationStatisticCounter.IncrementalParsePreciseChangeRange);
+        }
+#endif
 
         AkburaWorkspaceDiagnostics.Write(
             AkburaWorkspaceDiagnostics.Category.Syntax,

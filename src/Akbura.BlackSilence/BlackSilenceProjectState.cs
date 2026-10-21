@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis.CSharp;
 using Akbura.Language.CodeGeneration;
+using Akbura.Language.Binder;
 using System.Threading;
 
 namespace Akbura.BlackSilence;
@@ -20,6 +21,9 @@ internal sealed class BlackSilenceProjectState
 #endif
         CSharpCompilation = compilation;
         Artifacts = artifacts ?? new BoundedArtifactStore();
+#if AKBURA_PROJECTION_REUSE
+        ProbeStore = new CompilationBoundProbeStore(compilation);
+#endif
 #if STATS
         if (GenerationStatistics.IsInvalidationTrackingEnabled)
         {
@@ -31,6 +35,7 @@ internal sealed class BlackSilenceProjectState
 
     public CSharpCompilation CSharpCompilation { get; }
     public BoundedArtifactStore Artifacts { get; }
+    internal CompilationBoundProbeStore? ProbeStore { get; }
 
     public BlackSilenceProjectSnapshot? TryGetSnapshot(GeneratorProjectOptions options)
     {
@@ -60,6 +65,10 @@ internal sealed class BlackSilenceProjectState
             if (_snapshot == null || snapshot.Version > _snapshot.Version)
             {
                 _snapshot = snapshot;
+                if (snapshot.ProbeGeneration != null)
+                {
+                    ProbeStore?.Publish(snapshot.ProbeGeneration);
+                }
 #if STATS
                 if (GenerationStatistics.IsInvalidationTrackingEnabled)
                 {

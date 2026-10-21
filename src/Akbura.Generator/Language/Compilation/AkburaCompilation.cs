@@ -120,6 +120,7 @@ internal sealed partial class AkburaCompilation
     }
     public CSharpCompilation CSharpCompilation { get; }
     internal bool CollectCSharpSemanticDependencies { get; set; }
+    internal Binder.CompilationBoundProbeStore.Session? ProbeReuseSession { get; init; }
 
     internal CSharpCompilation CSharpProbeCompilation
     {

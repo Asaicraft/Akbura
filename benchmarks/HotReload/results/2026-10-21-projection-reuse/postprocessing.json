@@ -1,0 +1,253 @@
+{
+  "SourceManifestSha256": "23DBB372A752C8EEA05176938085D3A572E23DBF141033AB372D7886861766E0",
+  "ScriptsAndGeneratedReports": [
+    {
+      "Path": "benchmarks/HotReload/Summarize-ProjectionReuse.ps1",
+      "Sha256": "18DEAD66064AC6DA544A8B515383D61ED6202A02ECF39BE0BE0E59B49ADF97BC"
+    },
+    {
+      "Path": "benchmarks/HotReload/Test-ProjectionSummary.ps1",
+      "Sha256": "232E1C5C6768F0BC00AFD10B1D856198830958461D15D3E4BF454CF91057C12E"
+    },
+    {
+      "Path": "benchmarks\\HotReload\\results\\2026-10-21-projection-reuse\\projection-cells.csv",
+      "Sha256": "1E5A72761BCEE4D2440ED5030DF2BF4D23CB82A2C064AD1D9D2C93C7A2BE6351"
+    },
+    {
+      "Path": "benchmarks\\HotReload\\results\\2026-10-21-projection-reuse\\projection-stages.csv",
+      "Sha256": "EE469FDCE407B75CA7F8BC0872D2658B3BEE0E0377F5203D2FF26323E337D673"
+    },
+    {
+      "Path": "benchmarks\\HotReload\\results\\2026-10-21-projection-reuse\\projection-samples.csv",
+      "Sha256": "1DC6B227E1CAA76A76F82F3F16C92C0451932EB67F3C70324F88BAAF19E756A9"
+    },
+    {
+      "Path": "benchmarks\\HotReload\\results\\2026-10-21-projection-reuse\\projection-measured-summary.md",
+      "Sha256": "21118D02F18BC33EC9BB5B379ED250B86980932B99DBB04BCD15090B5896EAED"
+    }
+  ],
+  "UpdatedUtc": "2026-10-21T09:46:39.4340297Z",
+  "Reason": "Locale-independent CSV and English Markdown formatting; engineering review of completed projection-only evidence.",
+  "OriginalSourceFingerprint": "CBAE8A411FCF081C09D1B95735DE724BF0BAD035EBA606E146A41C9EABDC93AE",
+  "MeasurementsRerun": false,
+  "RawCells": [
+    {
+      "Sha256": "848A9440C5722336D1B04E934E447042685EBF3506DB4FAAAB1DC6F6A5A60BC8",
+      "Run": "production-1-baseline-binding",
+      "File": "invalidation-gallery-DataTemplates-localized-binding-sibling-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "0CD43C5C44F4B972B2D66D97AA0DFD8B75961F46529217947921847B53B49E04",
+      "Run": "production-1-baseline-binding",
+      "File": "invalidation-purity-NavButton-localized-binding-sibling-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "1229C370A59835F86384C61637B16C3908889E1C021DD090F0AE7EA3A2A600EE",
+      "Run": "production-1-baseline-focused",
+      "File": "invalidation-gallery-Siblings-localized-binding-sibling-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "998B7BF3428EC0DB75939FF7013C1682C869DCA946CDB39D1A9896B71F5A2A7E",
+      "Run": "production-1-baseline-literal",
+      "File": "invalidation-gallery-Counter-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "106B0B3C4818A2233A98478917C750072CFFD339DB1D20B1EE94DCD6169931DB",
+      "Run": "production-1-baseline-literal",
+      "File": "invalidation-gallery-DataTemplatesPage-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "D92F116C4890F84A15DAEC3E5303510AAA1035E4EBF2B67CA7EC7FE7C13FB864",
+      "Run": "production-1-baseline-literal",
+      "File": "invalidation-purity-NeedHelp-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "AF31657FDE04C609C0FAA54258059A55932FD2201085534210A3EB8A90631645",
+      "Run": "production-1-baseline-literal",
+      "File": "invalidation-purity-Sidebar-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "6DEF88A526A772B4CE6201E86AC37497F986F0C0909325EEB793799BCBF1335D",
+      "Run": "production-1-projection-binding",
+      "File": "invalidation-gallery-DataTemplates-localized-binding-sibling-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "F2C5438A2B71DCC866025547C9A2E081FB9A3CD87A7669916882633C68D246E6",
+      "Run": "production-1-projection-binding",
+      "File": "invalidation-purity-NavButton-localized-binding-sibling-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "A533DA01A932DF5D125888B3D50761D7B3ACBC3F30B06AA3E44A4803C07EC0CE",
+      "Run": "production-1-projection-focused",
+      "File": "invalidation-gallery-Siblings-localized-binding-sibling-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "BCEB665ACF0134A350091D3EDC76D1E6F755ACC14E3DA03C6C7856CCF32D3D20",
+      "Run": "production-1-projection-literal",
+      "File": "invalidation-gallery-Counter-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "3A1DD8F7DC5527CB1AAF51E10BAE62A7D164DE6BB536649F88BAB39A810806F7",
+      "Run": "production-1-projection-literal",
+      "File": "invalidation-gallery-DataTemplatesPage-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "7811E5D042F5345363C1CF893B096EA6131A49FBD3727CCE2EDA3302787B5CC3",
+      "Run": "production-1-projection-literal",
+      "File": "invalidation-purity-NeedHelp-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "A0246903C34E9B3B5A8F11FC83E521685B092A121F586E1C184A76FA86159440",
+      "Run": "production-1-projection-literal",
+      "File": "invalidation-purity-Sidebar-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "A9650C98038A301B90B3B4C025BD2AFD3EFF3D28B6A14FEDB5AE78394BAC5BA2",
+      "Run": "production-2-baseline-binding",
+      "File": "invalidation-gallery-DataTemplates-localized-binding-sibling-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "092CD96F6DF51F84A1E2F01E2BD180D49CDB6E0C4345551EA53319BCC216C310",
+      "Run": "production-2-baseline-binding",
+      "File": "invalidation-purity-NavButton-localized-binding-sibling-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "37A77C96FECC8C60906C11323BCD5F8032AC85146B4A4CD6E27588E5E5CB6DA8",
+      "Run": "production-2-baseline-focused",
+      "File": "invalidation-gallery-Siblings-localized-binding-sibling-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "25C951E0122CFEAF17543431359246E062669931B5B1E0DE6E6326EE820CAA9B",
+      "Run": "production-2-baseline-literal",
+      "File": "invalidation-gallery-Counter-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "065DEA64D33383733DFE79CF2D95F7705BE8AC41BBC9DE8E979AFEBBC4D6CFB6",
+      "Run": "production-2-baseline-literal",
+      "File": "invalidation-gallery-DataTemplatesPage-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "84DD94D4858C794EE5D60B38579F3737C315DF499922EFB9194B17870A5DAC50",
+      "Run": "production-2-baseline-literal",
+      "File": "invalidation-purity-NeedHelp-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "D7B4DDFFC186D9ACA8C4EDFA61E316BF8886B6BF1C4CBF33B2D2478C8A1D11A3",
+      "Run": "production-2-baseline-literal",
+      "File": "invalidation-purity-Sidebar-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "A6654E067EBAA27EF7839EF3FCC7374C17C7F54E3DDAD115AA9BABCE7382DD2A",
+      "Run": "production-2-projection-binding",
+      "File": "invalidation-gallery-DataTemplates-localized-binding-sibling-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "FED5FABE2E662D94847A7729565FA752C360AF2EA281EB8555BC34D55442DE83",
+      "Run": "production-2-projection-binding",
+      "File": "invalidation-purity-NavButton-localized-binding-sibling-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "91FDE95710164B740BC8AB41EA1B720501ADA64E1E050E5700C9063F791A9F4B",
+      "Run": "production-2-projection-focused",
+      "File": "invalidation-gallery-Siblings-localized-binding-sibling-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "258B5DD66E4D2C85A2729D46934F21534F751BA30BD7B09A12317CE66C171B19",
+      "Run": "production-2-projection-literal",
+      "File": "invalidation-gallery-Counter-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "9A8C38A2D541F9D2FD5F74C4E980A074876219C9FF1152CCCA5DDEEA5C4E9202",
+      "Run": "production-2-projection-literal",
+      "File": "invalidation-gallery-DataTemplatesPage-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "A07363B1398AEA911451A27B5AF93B16DD4A36B5FDCB38FBF03F21535AF38622",
+      "Run": "production-2-projection-literal",
+      "File": "invalidation-purity-NeedHelp-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "56ADA27FA5A3C0909800F6DBB81CE656D0D8AEE58DB5C4A557BB95153BBE331E",
+      "Run": "production-2-projection-literal",
+      "File": "invalidation-purity-Sidebar-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "D52C78183A4E4E77567FCD53C9BD763C01BB5410DAF5B11D0A748A0D22E65811",
+      "Run": "stats-baseline-binding",
+      "File": "invalidation-gallery-DataTemplates-localized-binding-sibling-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "90B8946060CD9DF7BE879A43F26B79C1BA4887725226F9934CCF7A445B34BFCB",
+      "Run": "stats-baseline-binding",
+      "File": "invalidation-purity-NavButton-localized-binding-sibling-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "BCCDBE5D0A44EBBAB10D27ED7A22038DD9126EE54D2D4B0CCF5002A58B171B3C",
+      "Run": "stats-baseline-focused",
+      "File": "invalidation-gallery-Siblings-localized-binding-sibling-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "2B569F39D61CBD9A4C580191E4F44C26BC6528638DE6EE45B4BA3FF4DCA369DA",
+      "Run": "stats-baseline-literal",
+      "File": "invalidation-gallery-Counter-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "509A7CA6B2C7641ACBA9CDAC6063DF9C3C45B231CD63E4D25FA6A01AB472FFFA",
+      "Run": "stats-baseline-literal",
+      "File": "invalidation-gallery-DataTemplatesPage-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "2A49833D819EB3A9A11AA1E34016DC64F593EEE790FA694C119256F9D31A1537",
+      "Run": "stats-baseline-literal",
+      "File": "invalidation-purity-NeedHelp-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "0AFDEA856B34C614CD876BC9053D0D2177521AC6412771ABE761CB973CC42D06",
+      "Run": "stats-baseline-literal",
+      "File": "invalidation-purity-Sidebar-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "F66FA39CDC3B5721768231FB7068151CE40BC77AB8DF054FEB9EA8CD41FA9121",
+      "Run": "stats-projection-binding",
+      "File": "invalidation-gallery-DataTemplates-localized-binding-sibling-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "7D784F24E4F96E4C26BB5C9977AFAEE0E4CAEA388C31647D905661D16E6A9142",
+      "Run": "stats-projection-binding",
+      "File": "invalidation-purity-NavButton-localized-binding-sibling-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "0D1A7C18F62CABFD25F8094800894F5025635B4E6B989B58C9218EEBD151219B",
+      "Run": "stats-projection-focused",
+      "File": "invalidation-gallery-Siblings-localized-binding-sibling-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "BFB35157CD4CA5F971F324B9B6371B5118C025E6F7E94B92A227A66F83613CEC",
+      "Run": "stats-projection-literal",
+      "File": "invalidation-gallery-Counter-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "7C618E15823B9494B6B95872C7821307EE38323647DCD9304569C095AD094FB9",
+      "Run": "stats-projection-literal",
+      "File": "invalidation-gallery-DataTemplatesPage-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "CF11E030ABEA280BCF20D5F3D4F0AD05927EDB12129647A5775C509A1F2CA71B",
+      "Run": "stats-projection-literal",
+      "File": "invalidation-purity-NeedHelp-localized-literal-stats-enabled.jsonl"
+    },
+    {
+      "Sha256": "124540355409FCA76AC0B19C49D47B17CFEDA5378E5FAC3682416279B35997F8",
+      "Run": "stats-projection-literal",
+      "File": "invalidation-purity-Sidebar-localized-literal-stats-enabled.jsonl"
+    }
+  ],
+  "CompilerSourcesMatchOriginalManifest": true,
+  "Guards": "Complete synthetic matrix, fractional medians, stage sums, en-US/ru-RU byte equality, failed parity, unfinished run and missing heap rejection: passed.",
+  "TestArtifactFormatting": {
+    "AfterSha256": "A800A31F5D56FF61E562C14FC2A211EE24ABE38AD991F8B2FFE75522022ADB5E",
+    "Change": "Mechanical CRLF/final-newline normalization of generated TRX; XML test data unchanged.",
+    "BeforeSha256": "E8D10660F17F3302CAF4AB762A17688A850876440BC5AE67C8E5878614AB113E",
+    "File": "benchmarks/HotReload/results/2026-10-21-projection-reuse/tests/projection-gate.trx"
+  }
+}

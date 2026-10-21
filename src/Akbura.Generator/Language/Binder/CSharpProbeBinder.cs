@@ -155,18 +155,24 @@ internal sealed partial class CSharpProbeBinder : Binder
         using var probeMeasurement = MeasureProbe(expression is CSharp.LambdaExpressionSyntax ? ProbeCategory.Lambda : ProbeCategory.BindingPath, syntax);
         using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeBinding);
 #endif
-        CSharp.CompilationUnitSyntax projection;
-#if STATS
-        using (GenerationStatistics.Measure(GenerationStatisticStage.ExpressionProjectionConstruction))
-#endif
+        var regions = SemanticModel.BindingSession.ProbeContext.ProjectionRegions;
+        if (regions == null || !regions.TryGetProjection(syntax, expression, targetType, out var projection))
         {
+#if STATS
+            using var preparation = GenerationStatistics.Measure(GenerationStatisticStage.ExpressionProjectionConstruction);
+#endif
             projection = new CSharpProbeBuilder(this).CreateReturnExpressionProbe(syntax, expression, targetType);
         }
 #if STATS
         RecordExpressionProbe(syntax, expression, targetType, projection);
 #endif
-        return SemanticModel.BindingSession.ProbeContext.BindMarkupExpression(projection, targetType,
+        var result = SemanticModel.BindingSession.ProbeContext.BindMarkupExpression(projection, targetType,
             () => AkburaSemanticModel.GetCSharpBindingResult(BindExpressionCore(syntax, projection, targetType, isBindingPath: true)));
+        if (result.Diagnostics.IsEmpty)
+        {
+            regions?.Record(syntax, expression, targetType, projection);
+        }
+        return result;
     }
 
     private BoundExpression BindExpressionCore(AkburaSyntax syntax, CSharp.CompilationUnitSyntax projection,

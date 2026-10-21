@@ -11,6 +11,8 @@
   <ItemGroup>
     <Compile Remove="WatchFixture/**/*.cs" />
     <Compile Remove="MemberWatchFixture/**/*.cs" />
+    <Compile Remove="SemanticFixture/**/*.cs" />
+    <Compile Remove="SemanticWatchFixture/**/*.cs" />
     <PackageReference Include="Avalonia.Headless" />
     <PackageReference Include="xunit" />
     <Using Include="Xunit" />
@@ -18,9 +20,18 @@
     <Reference Include="Microsoft.CodeAnalysis.CSharp" HintPath="$(MSBuildBinPath)/Roslyn/bincore/Microsoft.CodeAnalysis.CSharp.dll" />
     <Reference Include="Microsoft.Build" HintPath="$(MSBuildBinPath)/Microsoft.Build.dll" />
     <Reference Include="Microsoft.Build.Framework" HintPath="$(MSBuildBinPath)/Microsoft.Build.Framework.dll" />
-    <Reference Include="Akbura" HintPath="../../src/Akbura/bin/Debug/net10.0/Akbura.dll" />
-    <Reference Include="Akbura.BlackSilence" HintPath="../../src/Akbura.BlackSilence/bin/$(BlackSilenceConfiguration)/netstandard2.0/Akbura.BlackSilence.dll" />
-    <Reference Include="Akbura.Generator" HintPath="../../src/Akbura.Generator/bin/$(BlackSilenceConfiguration)/netstandard2.0/Akbura.Generator.dll" />
+    <Reference Include="Akbura">
+      <HintPath Condition="'$(CompilerToolDirectory)' == ''">../../src/Akbura/bin/Debug/net10.0/Akbura.dll</HintPath>
+      <HintPath Condition="'$(CompilerToolDirectory)' != ''">$(CompilerToolDirectory)/Akbura.dll</HintPath>
+    </Reference>
+    <Reference Include="Akbura.BlackSilence">
+      <HintPath Condition="'$(CompilerToolDirectory)' == ''">../../src/Akbura.BlackSilence/bin/$(BlackSilenceConfiguration)/netstandard2.0/Akbura.BlackSilence.dll</HintPath>
+      <HintPath Condition="'$(CompilerToolDirectory)' != ''">$(CompilerToolDirectory)/Akbura.BlackSilence.dll</HintPath>
+    </Reference>
+    <Reference Include="Akbura.Generator">
+      <HintPath Condition="'$(CompilerToolDirectory)' == ''">../../src/Akbura.Generator/bin/$(BlackSilenceConfiguration)/netstandard2.0/Akbura.Generator.dll</HintPath>
+      <HintPath Condition="'$(CompilerToolDirectory)' != ''">$(CompilerToolDirectory)/Akbura.Generator.dll</HintPath>
+    </Reference>
     <Compile Include="../../src/Akbura.HotReloadIntegrationTests/ClrHotReloadSession.cs" Link="ClrHotReloadSession.cs" />
     <Compile Include="../../src/Akbura.TestUtilities/DiagnosticParity.cs" Link="DiagnosticParity.cs" />
   </ItemGroup>

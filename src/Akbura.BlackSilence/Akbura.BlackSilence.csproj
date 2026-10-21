@@ -26,8 +26,12 @@
 		<DefineConstants>$(DefineConstants);STATS</DefineConstants>
 	</PropertyGroup>
 
-	<PropertyGroup Condition="'$(ProbeReuseStage)' == 'projection'">
+	<PropertyGroup Condition="'$(ProbeReuseStage)' == 'projection' Or '$(ProbeReuseStage)' == 'combined'">
 		<DefineConstants>$(DefineConstants);AKBURA_PROJECTION_REUSE</DefineConstants>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(ProbeReuseStage)' == 'binding' Or '$(ProbeReuseStage)' == 'combined'">
+		<DefineConstants>$(DefineConstants);AKBURA_SEMANTIC_REUSE</DefineConstants>
 	</PropertyGroup>
 
 	<ItemGroup>

@@ -81,7 +81,7 @@ internal static partial class Program
                     semanticDependencies: args[0] == "semantic-memory");
                 break;
             case "watch":
-                MeasureWatch(args[1], args[2], args[3]).GetAwaiter().GetResult();
+                MeasureWatch(args[1], args[2], args[3], args.ElementAtOrDefault(4) == "repair").GetAwaiter().GetResult();
                 break;
             case "binlog":
                 ReadBinlog(args[1]);
@@ -383,7 +383,7 @@ internal static partial class Program
             methods + "\r\n" + source.Substring(end);
     }
 
-    private static async Task MeasureWatch(string projectPath, string sourcePath, string component)
+    private static async Task MeasureWatch(string projectPath, string sourcePath, string component, bool diagnosticRepair = false)
     {
         projectPath = Path.GetFullPath(projectPath);
         sourcePath = Path.GetFullPath(sourcePath);
@@ -402,6 +402,7 @@ internal static partial class Program
         var gate = new object();
         var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource<double>? pending = null;
+        TaskCompletionSource? diagnosticObserved = null;
         long started = 0;
         var expected = 0;
         var processId = "";
@@ -441,6 +442,10 @@ internal static partial class Program
                     }
                     processId = line["PROBE_READY pid=".Length..];
                     ready.TrySetResult();
+                }
+                if (line.Contains("error", StringComparison.OrdinalIgnoreCase) && line.Contains("MissingSemanticWatchMember", StringComparison.Ordinal))
+                {
+                    diagnosticObserved?.TrySetResult();
                 }
                 if (line.Contains("PROBE_VALUE " + expected + " ", StringComparison.Ordinal))
                 {
@@ -499,6 +504,38 @@ internal static partial class Program
                     ApplicationPid = processId,
                     SourceDetectionLogMs = detectionLogMs, PostDeltaClearCacheCallbackMs = clearCacheMs,
                     PostDeltaApplicationCallbackMs = applicationCallbackMs, GeneratorProcessingMs = (double?)null, DeltaSubmissionMs = (double?)null });
+            }
+            if (diagnosticRepair)
+            {
+                Assert.Contains("<TextBlock Text={firstName} />", original);
+                lock (gate)
+                {
+                    pending = null;
+                    diagnosticObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    started = Stopwatch.GetTimestamp();
+                    var invalid = Edit(original, Path.GetFileName(sourcePath), 1 + Samples)
+                        .Replace("<TextBlock Text={firstName} />", "<TextBlock Text={firstName.MissingSemanticWatchMember} />", StringComparison.Ordinal);
+                    File.WriteAllText(sourcePath, invalid, new UTF8Encoding(false));
+                }
+                await diagnosticObserved.Task.WaitAsync(TimeSpan.FromMinutes(2));
+                Write(new { Kind = "watch-diagnostic", Scenario = component, ApplicationPid = processId,
+                    DiagnosticObserved = true, Ms = Elapsed(started) });
+                await Task.Delay(1000);
+                Task<double> repaired;
+                lock (gate)
+                {
+                    Assert.False(applicationRestarted, "The process restarted after the invalid edit.");
+                    diagnosticObserved = null;
+                    expected = Samples + 3;
+                    pending = new TaskCompletionSource<double>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    repaired = pending.Task;
+                    started = Stopwatch.GetTimestamp();
+                    File.WriteAllText(sourcePath, Edit(original, Path.GetFileName(sourcePath), Samples + 2), new UTF8Encoding(false));
+                }
+                var repairMs = await repaired.WaitAsync(TimeSpan.FromMinutes(2));
+                Assert.False(applicationRestarted, "The process restarted during diagnostic repair.");
+                Write(new { Kind = "watch-repair", Scenario = component, ApplicationPid = processId,
+                    DiagnosticRepaired = true, TotalMs = repairMs, GeneratorProcessingMs = (double?)null, DeltaSubmissionMs = (double?)null });
             }
         }
         finally

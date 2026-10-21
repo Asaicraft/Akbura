@@ -1,0 +1,17 @@
+using Avalonia.Controls;
+namespace Demo;
+
+state int count = 7;
+state WatchPerson person = WatchPerson.Current;
+state string firstName = bind person.FirstName;
+state string lastName = bind person.LastName;
+
+<Border Width="100">
+    <StackPanel>
+        <TextBlock Text="Akbura Counter" />
+        <TextBox Text="User input" />
+        <TextBlock Text={count.ToString()} />
+        <TextBlock Text={firstName} />
+        <TextBlock Text={lastName} />
+    </StackPanel>
+</Border>

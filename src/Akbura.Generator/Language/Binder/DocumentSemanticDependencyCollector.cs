@@ -40,12 +40,20 @@ internal sealed class DocumentSemanticDependencyCollector
     private readonly HashSet<string> _incomplete = new(StringComparer.Ordinal);
     private readonly HashSet<ITypeSymbol> _visited = new(SymbolEqualityComparer.Default);
     private readonly bool _fixedSurface;
+    private AsyncLocal<ProbeContributionCapture?>? _capture;
+    private readonly CancellationToken _cancellationToken;
+    internal bool IsEnabled => _enabled;
 
-    internal DocumentSemanticDependencyCollector(AkburaSemanticModel model)
+    internal DocumentSemanticDependencyCollector(AkburaSemanticModel model, bool probeOnly = false, CancellationToken cancellationToken = default)
     {
         _model = model;
         _enabled = model.Compilation.CollectCSharpSemanticDependencies;
+        _cancellationToken = cancellationToken;
         if (!_enabled)
+        {
+            return;
+        }
+        if (probeOnly)
         {
             return;
         }
@@ -85,6 +93,11 @@ internal sealed class DocumentSemanticDependencyCollector
 
     internal void MarkIncomplete(string reason)
     {
+        if (_capture?.Value is { } capture)
+        {
+            capture.Collector.MarkIncomplete(reason);
+            return;
+        }
         if (_enabled)
         {
             lock (_gate)
@@ -94,8 +107,13 @@ internal sealed class DocumentSemanticDependencyCollector
         }
     }
 
-    internal void Import(DetachedCSharpDependencySet? facts)
+    internal void Import(DetachedCSharpDependencySet? facts, bool markIncompleteImport = true)
     {
+        if (_capture?.Value is { } capture)
+        {
+            capture.Collector.Import(facts, markIncompleteImport);
+            return;
+        }
         if (!_enabled)
         {
             return;
@@ -115,7 +133,7 @@ internal sealed class DocumentSemanticDependencyCollector
             {
                 _lookups[lookup.Key] = lookup;
             }
-            if (!facts.IsComplete)
+            if (!facts.IsComplete && markIncompleteImport)
             {
                 _incomplete.Add("IncompleteImportedSemanticDependencies");
             }
@@ -124,6 +142,11 @@ internal sealed class DocumentSemanticDependencyCollector
 
     internal void RecordMarkupType(ITypeSymbol? type)
     {
+        if (_capture?.Value is { } capture)
+        {
+            capture.Collector.RecordMarkupType(type);
+            return;
+        }
         if (!_enabled)
         {
             return;
@@ -145,6 +168,11 @@ internal sealed class DocumentSemanticDependencyCollector
 
     internal void RecordTargetType(ITypeSymbol? type)
     {
+        if (_capture?.Value is { } capture)
+        {
+            capture.Collector.RecordTargetType(type);
+            return;
+        }
         if (!_enabled)
         {
             return;
@@ -161,6 +189,11 @@ internal sealed class DocumentSemanticDependencyCollector
 
     internal void RecordComponentType(ITypeSymbol? type)
     {
+        if (_capture?.Value is { } capture)
+        {
+            capture.Collector.RecordComponentType(type);
+            return;
+        }
         if (!_enabled || type == null)
         {
             return;
@@ -198,10 +231,16 @@ internal sealed class DocumentSemanticDependencyCollector
     internal void Record(CSharp.ExpressionSyntax? syntax, ITypeSymbol? type, ISymbol? symbol, ITypeSymbol? receiver,
         ImmutableArray<ISymbol> candidates, CandidateReason reason, IOperation? operation, SemanticModel semanticModel)
     {
+        if (_capture?.Value is { } capture)
+        {
+            capture.Collector.Record(syntax, type, symbol, receiver, candidates, reason, operation, semanticModel);
+            return;
+        }
         if (!_enabled)
         {
             return;
         }
+        _cancellationToken.ThrowIfCancellationRequested();
 #if STATS
         using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.SemanticDependencyCapture);
         GenerationStatistics.Increment(GenerationStatisticCounter.SemanticBindingOperationsObserved);
@@ -315,6 +354,11 @@ internal sealed class DocumentSemanticDependencyCollector
 
     internal void RecordConversion(ITypeSymbol? source, ITypeSymbol? target, IMethodSymbol? method, string kind)
     {
+        if (_capture?.Value is { } capture)
+        {
+            capture.Collector.RecordConversion(source, target, method, kind);
+            return;
+        }
         if (!_enabled)
         {
             return;
@@ -411,6 +455,7 @@ internal sealed class DocumentSemanticDependencyCollector
 
     private void RecordType(ITypeSymbol? type)
     {
+        _cancellationToken.ThrowIfCancellationRequested();
         if (type == null || !_visited.Add(type))
         {
             return;
@@ -503,6 +548,63 @@ internal sealed class DocumentSemanticDependencyCollector
                 _lookups.Values.ToSortedImmutableArray(s_lookupComparer),
                 _conversions.ToSortedImmutableArray(StringComparer.Ordinal),
                 _incomplete.ToSortedImmutableArray(StringComparer.Ordinal));
+        }
+    }
+
+    internal ProbeContributionCapture? BeginProbeContribution(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!_enabled)
+        {
+            return null;
+        }
+        var ambient = LazyInitializer.EnsureInitialized(ref _capture, static () => new AsyncLocal<ProbeContributionCapture?>())!;
+        var capture = new ProbeContributionCapture(this, ambient, ambient.Value, cancellationToken);
+        ambient.Value = capture;
+        return capture;
+    }
+
+    /// <summary>
+    /// Captures the original collector algorithm into an independent scalar sink.
+    /// Nested probes contribute to their parent; unrelated parallel flows cannot mix.
+    /// The scope and its collectors are never stored with a reusable binding.
+    /// </summary>
+    internal sealed class ProbeContributionCapture : IDisposable
+    {
+        private readonly DocumentSemanticDependencyCollector _owner;
+        private readonly AsyncLocal<ProbeContributionCapture?> _ambient;
+        private readonly ProbeContributionCapture? _previous;
+        private readonly CancellationToken _token;
+        private bool _closed;
+
+        internal ProbeContributionCapture(DocumentSemanticDependencyCollector owner, AsyncLocal<ProbeContributionCapture?> ambient,
+            ProbeContributionCapture? previous, CancellationToken token)
+        {
+            _owner = owner;
+            _ambient = ambient;
+            _previous = previous;
+            _token = token;
+            Collector = new DocumentSemanticDependencyCollector(owner._model, probeOnly: true, token);
+        }
+
+        internal DocumentSemanticDependencyCollector Collector { get; }
+
+        internal DetachedCSharpDependencySet Complete()
+        {
+            _token.ThrowIfCancellationRequested();
+            var facts = Collector.Detach(_token);
+            Dispose();
+            _owner.Import(facts, markIncompleteImport: false);
+            return facts;
+        }
+
+        public void Dispose()
+        {
+            if (!_closed)
+            {
+                _closed = true;
+                _ambient.Value = _previous;
+            }
         }
     }
 }

@@ -167,7 +167,7 @@ internal sealed partial class CSharpProbeBinder : Binder
         RecordExpressionProbe(syntax, expression, targetType, projection);
 #endif
         var result = SemanticModel.BindingSession.ProbeContext.BindMarkupExpression(projection, targetType,
-            () => AkburaSemanticModel.GetCSharpBindingResult(BindExpressionCore(syntax, projection, targetType, isBindingPath: true)));
+            () => AkburaSemanticModel.GetCSharpBindingResult(BindExpressionCore(syntax, projection, targetType, isBindingPath: true)), syntax, expression);
         if (result.Diagnostics.IsEmpty)
         {
             regions?.Record(syntax, expression, targetType, projection);

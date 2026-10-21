@@ -365,10 +365,11 @@ internal static partial class Program
                     if (verifyEveryUpdate || index >= Warmup + Samples - 1)
                     {
                         var freshFiles = files.Select(file => file.Path == original.Path ? previousInput : file);
-                        VerifyFreshArtifacts(freshFiles, directory, rootNamespace, currentParse, compilation, generated, diagnosticKeys, expectedIncompleteInput);
+                        VerifyFreshArtifacts(freshFiles, directory, rootNamespace, currentParse, compilation, generated, diagnosticKeys, expectedIncompleteInput,
+                            optimization == "enabled" ? DetachedDependencyFacts(ArtifactRequest(driver)) : null);
                         Write(new { Kind = "invalidation-parity", Project = rootNamespace, File = fileName, Scenario = scenario, Profiling = profiling,
                             BinaryFlavor = InvalidationBinaryFlavor, Optimization = optimization, VerifyEveryUpdate = verifyEveryUpdate,
-                            Index = index, EqualSources = true, EqualDiagnostics = true,
+                            Index = index, EqualSources = true, EqualDiagnostics = true, EqualDependencies = optimization == "enabled" ? (bool?)true : null,
                             DiagnosticCount = diagnosticKeys.Length, SourceDigests = generated.ToDictionary(pair => pair.Key,
                                 pair => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(pair.Value)))) });
                     }
@@ -381,6 +382,7 @@ internal static partial class Program
                         Profiling = profiling, BinaryFlavor = InvalidationBinaryFlavor, Optimization = optimization, Index = index,
                         PostGcHeapBytes = GC.GetTotalMemory(false), WorkingSetBytes = Environment.WorkingSet,
                         Entries = request.State.Artifacts.Latest?.Entries.Count ?? 0,
+                        ProbeRetention = ProbeRetention(request.State),
                         IdentitySlots = request.State.Artifacts.Read()?.Identities.Length ?? 0 });
                     GC.KeepAlive(driver);
                 }
@@ -430,10 +432,13 @@ internal static partial class Program
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void VerifyFreshArtifacts(IEnumerable<AdditionalText> files, string directory, string rootNamespace,
-        CSharpParseOptions parse, CSharpCompilation compilation, Dictionary<string, string> generated, string[] diagnostics, bool incomplete)
+        CSharpParseOptions parse, CSharpCompilation compilation, Dictionary<string, string> generated, string[] diagnostics, bool incomplete,
+        string[]? dependencyFacts = null)
     {
         using var isolatedMeasurement = GenerationStatistics.BeginMeasurement();
-        var fresh = Driver(files, directory, rootNamespace, parse: parse, reuse: false)
+        // A new driver has no old artifact store. Keep collection enabled when
+        // checking detached facts; disabling it would produce Missing facts.
+        var fresh = Driver(files, directory, rootNamespace, parse: parse, reuse: dependencyFacts != null)
             .RunGeneratorsAndUpdateCompilation(compilation, out var output, out var currentDiagnostics);
         Assert.Null(fresh.GetRunResult().Results.Single().Exception);
         ValidateArtifactDiagnosticStamps(currentDiagnostics, ArtifactRequest(fresh).Version);
@@ -445,7 +450,15 @@ internal static partial class Program
         Assert.Equal(generated.OrderBy(pair => pair.Key), fresh.GetRunResult().Results.Single().GeneratedSources
             .ToDictionary(source => source.HintName, source => source.SourceText.ToString()).OrderBy(pair => pair.Key));
         Assert.Equal(diagnostics, DiagnosticKeys(currentDiagnostics.Concat(output.GetDiagnostics())));
+        if (dependencyFacts != null)
+        {
+            Assert.Equal(dependencyFacts, DetachedDependencyFacts(ArtifactRequest(fresh)));
+        }
     }
+
+    private static string[] DetachedDependencyFacts(Akbura.BlackSilence.BlackSilenceGenerationRequest request) =>
+        request.State.TryGetSnapshot(request.Options)!.Entries.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .Select(pair => pair.Key + "\n" + JsonSerializer.Serialize(pair.Value.SemanticDependencies)).ToArray();
 
     private static string[] DiagnosticKeys(IEnumerable<Diagnostic> diagnostics) => diagnostics.Select(DiagnosticParity.Key).Order(StringComparer.Ordinal).ToArray();
 

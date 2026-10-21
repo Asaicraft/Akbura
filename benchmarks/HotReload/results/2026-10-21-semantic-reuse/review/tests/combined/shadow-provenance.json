@@ -1,0 +1,14 @@
+{
+  "Mode": "Supplementary DebugStats tests compiled with semantic reuse enabled; exact frozen combined-STATS compiler pair replaces the binding-only pair in an isolated test-host copy. No existing outputs or measured closures changed.",
+  "TestAssemblySha256": "9D044AA2EBEE7E873647BFE7FB1526C357F1CC125D4BB9D581466551057A3B88",
+  "Compilers": [
+    {
+      "File": "Akbura.Generator.dll",
+      "Sha256": "2900F98EF6D8E072C7F511F7BE04CACDD62457E9EED3FB56C9D1B04B230FC969"
+    },
+    {
+      "File": "Akbura.BlackSilence.dll",
+      "Sha256": "6B82C7AE7F8D80E8804B8893D1CDE88E5073B182529F07ADDFE350344BA16113"
+    }
+  ]
+}

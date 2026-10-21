@@ -1,0 +1,19 @@
+{
+  "Kind": "invalidation-provenance",
+  "Project": "SemanticFixture",
+  "File": "Siblings.akbura",
+  "Profiling": "stats",
+  "BinaryFlavor": "stats",
+  "Optimization": "enabled",
+  "VerifyEveryUpdate": true,
+  "RepositoryRevision": "f2c29caef38fd8f08b1e6777dd31f4fa231b12dc",
+  "Sdk": "5.9.0-1.26423.113+e34a38d2ae1fc26406a317517196e55c68ff83ab",
+  "CSharpTrees": 1,
+  "AdditionalFiles": 1,
+  "BlackSilence": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticReuse\\gate-release-fix\\runs\\stats-projection-focused\\tool\\Akbura.BlackSilence.dll",
+  "Generator": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticReuse\\gate-release-fix\\runs\\stats-projection-focused\\tool\\Akbura.Generator.dll",
+  "BlackSilenceSha256": "900690220FCCC5BADE26EAF08FD1091D529FB7B972C9F3DAD879370F70BB73E3",
+  "GeneratorSha256": "FAF628F4AF6E06B2745FAEAE2D4CCE3DFE9B0249D58870DF0CD8012025DC1537",
+  "BenchmarkSha256": "0D03EDCF3F15FC6A6519A572DCE471882F58CF33819722610EBC52110020F764",
+  "InputsSha256": "19686A009A7D0731C33CCB845E6D1D7E2F762CE11E7FCCA2AB41C5BF39F00B75"
+}

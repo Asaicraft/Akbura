@@ -1,0 +1,48 @@
+{
+  "Updates": 9,
+  "BinaryHashes": [
+    {
+      "Sha256": "5F3BD409CA3642D67A77E3FFA9993484E7299B9C6529CFDBDFD6145CAFBF5403",
+      "Name": "Akbura.BlackSilence.dll"
+    },
+    {
+      "Sha256": "D4C02B0062C2BFD51F86D8B2E9C93D7CBC26CC4790D4044F2414AEF67636D32E",
+      "Name": "Akbura.Generator.dll"
+    },
+    {
+      "Sha256": "71F3360B36AFEDA02768F98DFD7382C9DA42CB6C1FB63E3E661597D0FAA21F36",
+      "Name": "HotReloadBenchmarks.dll"
+    }
+  ],
+  "Edit": "Existing Text literal, unchanged count binding",
+  "VerifierSha256": "DADA87BD327640A4A3CADBC0478B0D90433A4BE435EA342179AD3CA969D4CD03",
+  "StateAndInputPreserved": true,
+  "DiagnosticRepairVerified": true,
+  "SemanticHitObservation": "Not available inside dotnet watch. Text edits intentionally reject the restricted Margin-only semantic contract.",
+  "MultipleBindings": true,
+  "FixtureHashes": [
+    {
+      "Sha256": "A7861771CA2EA1E3D84D6205BD408803CE14FF6BAC212556A26F164D6CB14B9A",
+      "Name": "Counter.akbura"
+    },
+    {
+      "Sha256": "85D8BF0DE635DFE073EF1A4A4CE2D69227FAEF948282D64545A943F00DD2708E",
+      "Name": "Counter.akbura.cs"
+    },
+    {
+      "Sha256": "02301E81D8E7F6DD3E62AA3D98CB183297F40937AA3661AF2DFF984437251C9F",
+      "Name": "Program.cs"
+    },
+    {
+      "Sha256": "3707A105ADD13726A366B918ADFA1856D1A0A760FBFA44975F0598903C0CB943",
+      "Name": "WatchFixture.csproj"
+    },
+    {
+      "Sha256": "72E42159A1182D3077D945E063A196D0FC3A7D6676260BA96182A00931879996",
+      "Name": "WatchPerson.cs"
+    }
+  ],
+  "Boundaries": "File write to observed rendered value; exact compiler delta submission and per-update generator time unavailable.",
+  "OriginalProcessAndControlPreserved": true,
+  "ReactiveBindingAndSubscriptionChecks": true
+}

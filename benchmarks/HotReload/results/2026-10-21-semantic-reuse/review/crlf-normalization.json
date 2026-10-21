@@ -1,0 +1,60 @@
+{
+  "Representation": "CRLF text with a final CRLF. Gzip evidence remains binary and unchanged. Original execution logs remain in bin where applicable. Normalization changes representation, not measurements.",
+  "Changes": [
+    {
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/release-import-fix/tests/binding/sdk/7a7048d44bc242bfa2d3f0f47b3b85c6/sdk-invalidation.trx",
+      "ArchivedSha256": "30615E2325C427DBF7959568E4DF061895D7C7DBE96F7A75FCFBDEF9E13613B8",
+      "OriginalSha256": "F07A6D2570117F1B5832DB7B0E70C82659B55E0CC9B3D27434A8C0D2F3E32BCF"
+    },
+    {
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/release-import-fix/tests/binding/semantic-gate.trx",
+      "ArchivedSha256": "9E48362D3527497800642A0E744DF1C86094BEC48A4ED9743EF2C8045D2F5B20",
+      "OriginalSha256": "54292C3FB7872EDD30332C32034CD5BCFF243919FE7CA37B51D5F9C3E7C832A4"
+    },
+    {
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/release-import-fix/tests/binding/semantic-release.trx",
+      "ArchivedSha256": "5E4B942F9C419B2106E38B5FE9DA0E9159E89DF9EA1D0B26351DFB78AF536855",
+      "OriginalSha256": "FDCFFE735C316FA3319C36F7F9B85BD67192A93C47FAFAFD48D50F2ABBA12F0C"
+    },
+    {
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/release-import-fix/tests/combined/sdk/38e93c18e15349a2a0575bb22c87555a/sdk-invalidation.trx",
+      "ArchivedSha256": "3CC3CD426A97197DAB1CB5EF94BEA7008F8538484E3471A2CEE97E2A836C51C3",
+      "OriginalSha256": "ADAF2369B84CD0EAE9D3C9E2235AECE8394D6FBDFD740A4F8CA1B6949088A761"
+    },
+    {
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/release-import-fix/tests/combined/semantic-gate.trx",
+      "ArchivedSha256": "F68D11A2985A89E179E7A1AF45974947828D55201FCF94B735A0713F56DD02B1",
+      "OriginalSha256": "B1A7A28CEF9A3CE9D58B5ED29BBAEC9AAE13F4245994AD4092C8D45C1F5F1B47"
+    },
+    {
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/release-import-fix/tests/combined/semantic-release.trx",
+      "ArchivedSha256": "E981795A4BFD32650E7DA8B26D3EC2F6027DA3F7A7440BA6AF37EF23A3D3B44F",
+      "OriginalSha256": "A288710B34B3504032093D2B07D4B6D5194D9414D282E5B9EB5797D5D3374478"
+    },
+    {
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/initial-release-failure/stderr.log",
+      "ArchivedSha256": "7EB70257593DA06F682A3DDDA54A9D260D4FC514F645237F5CA74B08F8DA61A6",
+      "OriginalSha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+    },
+    {
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/tests/binding/supplement-debugstats.trx",
+      "ArchivedSha256": "44B7C07EC45F01A01CD68F8C3EEE1302400155D963A4BA4073E252D7AE2ABEAE",
+      "OriginalSha256": "943553935F9509F4C274B326F806FBB3129473A449635AEE01B64F3D2E18833B"
+    },
+    {
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/tests/combined/supplement-debugstats.trx",
+      "ArchivedSha256": "9368AD317F58CBC7E30FD6ABD7F67A03B9C3966126E73B54906B5D0E253AA7F5",
+      "OriginalSha256": "9F7B4060E4E937BAA1A0F177AC043E45C153F1B2B1229BDF3832D24BDF6A0D6B"
+    },
+    {
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/tests/binding/sdk/c2b2766f6a1b41be87a8dee374fb7040/sdk-invalidation.trx",
+      "ArchivedSha256": "EBB837BE4CE3C10B4CD6762A12339B03467F1D3473117DB218F5726BF9710174",
+      "OriginalSha256": "CF497361BE637E79DF93D7D14F5247C44594D16965338ED1A8B439B445495D65"
+    },
+    {
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/tests/binding/semantic-gate.trx",
+      "ArchivedSha256": "D9EDA8CFF67D49FF34F816B33BB90081F39CFD62BF1D1DADB4106D56F6F39C37",
+      "OriginalSha256": "AF459AF6668747325B2B9D57D372F5281BBD86C13EBC49352C5273F549F98742"
+    }
+  ]
+}

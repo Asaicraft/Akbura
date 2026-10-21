@@ -1,3 +1,4 @@
+using Akbura.Language.CodeGeneration;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using System;
@@ -8,7 +9,6 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 #if STATS
-using Akbura.Language.CodeGeneration;
 using System.Security.Cryptography;
 using System.Text;
 #endif
@@ -19,8 +19,8 @@ namespace Akbura.Language.Binder;
 /// Preparation owned by one document semantic model, never by reusable snapshot
 /// state. Only type probes with exactly matching text and imports share binding
 /// results. Markup expression results require the complete prepared probe (including
-/// scopes and imports) and the exact target type. Semantic result caches never cross
-/// document owners. An opt-in compilation-owned store can supply prepared projections.
+/// scopes and imports) and the exact target type. Cross-owner semantic reuse is an
+/// independent opt-in lookup under an exact compilation owner with dependency replay.
 /// </summary>
 internal sealed class CSharpProbeContext(AkburaSemanticModel semanticModel)
 {
@@ -91,8 +91,9 @@ internal sealed class CSharpProbeContext(AkburaSemanticModel semanticModel)
     }
 
     internal CSharpBindingResult BindMarkupExpression(CSharp.CompilationUnitSyntax projection, ITypeSymbol? targetType,
-        Func<CSharpBindingResult> bind)
+        Func<CSharpBindingResult> bind, AkburaSyntax? scope = null, CSharp.ExpressionSyntax? expression = null)
     {
+        string? preparedText = null;
 #if STATS
         GenerationStatistics.Increment(GenerationStatisticCounter.MarkupExpressionRequest);
 #endif
@@ -117,6 +118,7 @@ internal sealed class CSharpProbeContext(AkburaSemanticModel semanticModel)
 #endif
         {
             text = projection.ToFullString();
+            preparedText = text;
         }
         var key = new ExpressionProbeKey(projection, text, targetType, query?.Span ?? default);
         CSharpBindingResult result;
@@ -174,6 +176,59 @@ internal sealed class CSharpProbeContext(AkburaSemanticModel semanticModel)
 #endif
 
         CSharpBindingResult BindMeasured()
+        {
+            if (ProjectionRegions is not { ReuseBindings: true } regions || !semanticModel.BindingSession.SemanticDependencies.IsEnabled ||
+                scope == null || expression == null ||
+                !ReusableProbeBinding.IsMemberChain(expression) || projection.ContainsDiagnostics || projection.ContainsDirectives || projection.ContainsSkippedText)
+            {
+                return BindFactory();
+            }
+            var token = regions.CancellationToken;
+            token.ThrowIfCancellationRequested();
+            preparedText ??= projection.ToFullString();
+            if (regions.TryGetBinding(scope, expression, targetType, projection, preparedText, out var reused))
+            {
+#if STATS
+                using (GenerationStatistics.Measure(GenerationStatisticStage.CrossRevisionSemanticContributionImport))
+#endif
+                {
+                    // Callers build wrappers and symbol mappings in the current
+                    // semantic model; only Roslyn data and detached facts cross owners.
+                    semanticModel.BindingSession.SemanticDependencies.Import(reused.Dependencies);
+                }
+                token.ThrowIfCancellationRequested();
+#if STATS
+                GenerationStatistics.Increment(GenerationStatisticCounter.CrossRevisionBindingHit);
+                GenerationStatistics.Increment(GenerationStatisticCounter.CrossRevisionSemanticContributionImported);
+                GenerationStatistics.Increment(GenerationStatisticCounter.CrossRevisionFirstBindingSkipped);
+                GenerationStatistics.Increment(GenerationStatisticCounter.CrossRevisionProbeCompilationSkipped);
+                GenerationStatistics.Increment(GenerationStatisticCounter.CrossRevisionProbeSemanticModelSkipped);
+#endif
+                return reused.Result;
+            }
+            if (!regions.CanCaptureBinding || preparedText.Length > ReusableProbeBinding.MaxProjectionCharacters)
+            {
+                return BindFactory();
+            }
+            using var capture = semanticModel.BindingSession.SemanticDependencies.BeginProbeContribution(token);
+            var result = BindFactory();
+            DetachedCSharpDependencySet? facts;
+#if STATS
+            using (GenerationStatistics.Measure(GenerationStatisticStage.CrossRevisionSemanticContributionCapture))
+#endif
+            {
+                facts = capture?.Complete();
+            }
+            token.ThrowIfCancellationRequested();
+#if STATS
+            GenerationStatistics.Increment(facts is { IsComplete: true } ? GenerationStatisticCounter.CrossRevisionSemanticContributionCaptured :
+                GenerationStatisticCounter.CrossRevisionSemanticContributionIncomplete);
+#endif
+            regions.RecordBinding(scope, expression, targetType, projection, preparedText, result, facts);
+            return result;
+        }
+
+        CSharpBindingResult BindFactory()
         {
 #if STATS
             using var binding = GenerationStatistics.Measure(GenerationStatisticStage.ExpressionFactoryBinding);

@@ -14,7 +14,7 @@ namespace Akbura.Language;
 
 internal sealed partial class SyntaxAndDeclarationManager
 {
-    private readonly DeclarationTable? _previousDeclarationTable;
+    private DeclarationTable? _previousDeclarationTable;
     private State? _lazyState;
 
     internal bool HasLazyState => _lazyState != null;
@@ -29,6 +29,9 @@ internal sealed partial class SyntaxAndDeclarationManager
 
         state = CreateState();
         var existing = Interlocked.CompareExchange(ref _lazyState, state, null);
+        // Reuse is needed only while constructing the current declaration state.
+        // Keeping this table afterwards roots the preceding markup syntax tree.
+        Volatile.Write(ref _previousDeclarationTable, null);
         return existing ?? state;
     }
 

@@ -1,0 +1,4 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.Generator\Language\Binder\CSharpProbeContext.cs(215,13): error CS0246: The type or namespace name 'DetachedCSharpDependencySet' could not be found (are you missing a using directive or an assembly reference?) [C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.Generator\Akbura.Generator.csproj]
+C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.Generator\Language\Binder\CSharpProbeContext.cs(227,100): error CS1503: Argument 7: cannot convert from 'DetachedCSharpDependencySet?' to 'Akbura.Language.CodeGeneration.DetachedCSharpDependencySet?' [C:\Users\Asanov\.codex\worktrees\c671\Akbura\src\Akbura.Generator\Akbura.Generator.csproj]

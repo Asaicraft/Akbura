@@ -84,6 +84,18 @@ internal enum GenerationStatisticCounter : byte
     CompilationBoundProbeEntriesPublished,
     CompilationBoundProjectionCharactersPublished,
     CompilationBoundProbeGenerationReplaced,
+    CrossRevisionBindingCandidate,
+    CrossRevisionBindingHit,
+    CrossRevisionBindingMiss,
+    CrossRevisionBindingContextRejected,
+    CrossRevisionFirstBindingSkipped,
+    CrossRevisionProbeCompilationSkipped,
+    CrossRevisionProbeSemanticModelSkipped,
+    CrossRevisionSemanticContributionCaptured,
+    CrossRevisionSemanticContributionImported,
+    CrossRevisionSemanticContributionIncomplete,
+    CompilationBoundSemanticEntriesPublished,
+    CompilationBoundSemanticEntriesRejected,
     Count,
 }
 
@@ -177,6 +189,10 @@ internal enum GenerationStatisticStage : byte
     CrossRevisionRegionMatching,
     CrossRevisionProjectionLookup,
     CompilationBoundProbePublication,
+    CrossRevisionBindingLookup,
+    CrossRevisionBindingValidation,
+    CrossRevisionSemanticContributionCapture,
+    CrossRevisionSemanticContributionImport,
     Count,
 }
 

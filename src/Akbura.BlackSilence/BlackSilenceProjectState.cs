@@ -21,8 +21,18 @@ internal sealed class BlackSilenceProjectState
 #endif
         CSharpCompilation = compilation;
         Artifacts = artifacts ?? new BoundedArtifactStore();
+#if AKBURA_PROJECTION_REUSE || AKBURA_SEMANTIC_REUSE
 #if AKBURA_PROJECTION_REUSE
-        ProbeStore = new CompilationBoundProbeStore(compilation);
+        const bool reuseProjection = true;
+#else
+        const bool reuseProjection = false;
+#endif
+#if AKBURA_SEMANTIC_REUSE
+        const bool reuseBinding = true;
+#else
+        const bool reuseBinding = false;
+#endif
+        ProbeStore = new CompilationBoundProbeStore(compilation, reuseProjection, reuseBinding);
 #endif
 #if STATS
         if (GenerationStatistics.IsInvalidationTrackingEnabled)
@@ -58,17 +68,21 @@ internal sealed class BlackSilenceProjectState
 
     public long GetNextVersion() => Artifacts.GetNextVersion();
 
-    public void Publish(BlackSilenceProjectSnapshot snapshot)
+    public void Publish(BlackSilenceProjectSnapshot snapshot, CancellationToken cancellationToken = default)
     {
+#if STATS
+        using var publication = GenerationStatistics.Measure(GenerationStatisticStage.CompilationBoundProbePublication);
+#endif
         lock (_gate)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (_snapshot == null || snapshot.Version > _snapshot.Version)
             {
-                _snapshot = snapshot;
                 if (snapshot.ProbeGeneration != null)
                 {
                     ProbeStore?.Publish(snapshot.ProbeGeneration);
                 }
+                _snapshot = snapshot;
 #if STATS
                 if (GenerationStatistics.IsInvalidationTrackingEnabled)
                 {

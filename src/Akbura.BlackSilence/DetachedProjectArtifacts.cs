@@ -174,7 +174,7 @@ internal sealed class BoundedArtifactStore
         lock (_gate)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            state.Publish(snapshot);
+            state.Publish(snapshot, cancellationToken);
             if (_latest == null || artifacts.Version > _latest.Artifacts.Version)
             {
                 Volatile.Write(ref _latest, new ArtifactPublication(artifacts, snapshot.Identities));

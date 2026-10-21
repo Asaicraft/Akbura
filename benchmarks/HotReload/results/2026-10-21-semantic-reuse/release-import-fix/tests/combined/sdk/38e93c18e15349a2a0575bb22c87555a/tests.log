@@ -1,0 +1,7 @@
+VSTest version 18.7.0 (x64)
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+Results File: C:\Users\Asanov\.codex\worktrees\c671\Akbura\benchmarks\HotReload\results\2026-10-21-semantic-reuse\release-import-fix\tests\combined\sdk\38e93c18e15349a2a0575bb22c87555a\sdk-invalidation.trx
+
+Passed!  - Failed:     0, Passed:    31, Skipped:     0, Total:    31, Duration: 47 s - Akbura.UnitTests.dll (net10.0)

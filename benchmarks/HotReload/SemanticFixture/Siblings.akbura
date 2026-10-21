@@ -1,0 +1,8 @@
+using Avalonia.Controls;
+
+inject SemanticFixture.ViewModel Vm;
+
+<StackPanel>
+    <TextBlock Margin="10" Text={Vm.FirstName} />
+    <TextBlock Text={Vm.LastName} />
+</StackPanel>

@@ -18,15 +18,19 @@ namespace Akbura.Language.Binder;
 /// Compilation-provider-owned, latest-only prepared probes. This store never enters
 /// detached artifacts. Projection reuse does not imply reuse of a semantic result.
 /// </summary>
-internal sealed class CompilationBoundProbeStore(CSharpCompilation owner)
+internal sealed partial class CompilationBoundProbeStore(CSharpCompilation owner, bool reuseProjections = true, bool reuseBindings = false)
 {
     internal const int MaxEntriesPerDocument = 128;
     internal const int MaxEntriesPerProject = 1024;
     internal const int MaxProjectionCharacters = 32768;
     internal const int MaxProjectProjectionCharacters = 2 * 1024 * 1024;
+    internal const int MaxSemanticEntriesPerDocument = 32;
+    internal const int MaxSemanticEntriesPerProject = 128;
     private Generation? _latest;
 
     internal CSharpCompilation Owner => owner;
+    private bool ReuseProjections => reuseProjections;
+    private bool ReuseBindings => reuseBindings;
     internal Generation? Latest => Volatile.Read(ref _latest);
 
     internal Session? Begin(CSharpCompilation compilation, long version, ImmutableArray<DocumentSyntaxVersion> documents,
@@ -43,9 +47,6 @@ internal sealed class CompilationBoundProbeStore(CSharpCompilation owner)
     // The owning project state's existing publication lock serializes this call.
     internal void Publish(Generation generation)
     {
-#if STATS
-        using var publication = GenerationStatistics.Measure(GenerationStatisticStage.CompilationBoundProbePublication);
-#endif
         if (ReferenceEquals(generation.Owner, owner) && (Latest == null || generation.Version > Latest.Version))
         {
 #if STATS
@@ -56,6 +57,7 @@ internal sealed class CompilationBoundProbeStore(CSharpCompilation owner)
             GenerationStatistics.Increment(GenerationStatisticCounter.CompilationBoundProbeEntriesPublished, generation.EntryCount);
             GenerationStatistics.Increment(GenerationStatisticCounter.CompilationBoundProjectionCharactersPublished,
                 generation.Documents.Values.Sum(static document => document.Entries.Values.Sum(static entry => entry.Characters)));
+            GenerationStatistics.Increment(GenerationStatisticCounter.CompilationBoundSemanticEntriesPublished, generation.SemanticEntryCount);
 #endif
             Volatile.Write(ref _latest, generation);
         }
@@ -71,6 +73,7 @@ internal sealed class CompilationBoundProbeStore(CSharpCompilation owner)
         internal ImmutableArray<DeclarationInput> Declarations { get; } = declarations;
         internal ImmutableDictionary<string, DocumentGeneration> Documents { get; } = documents;
         internal int EntryCount => Documents.Values.Sum(static document => document.Entries.Count);
+        internal int SemanticEntryCount => Documents.Values.Sum(static document => document.Entries.Values.Count(static entry => entry.Binding != null));
     }
 
     internal sealed record DeclarationInput(string Path, SyntaxTreeKind Kind, string LogicalName, string ComponentName, ImmutableArray<string> Surface)
@@ -80,7 +83,8 @@ internal sealed class CompilationBoundProbeStore(CSharpCompilation owner)
     }
 
     internal sealed record DocumentGeneration(string Source, ProbeDocumentContract Contract, ImmutableDictionary<RegionKey, Entry> Entries);
-    internal sealed record Entry(CSharp.CompilationUnitSyntax Projection, int Characters, WeakReference<GreenNode> SourceGreen);
+    internal sealed record Entry(CSharp.CompilationUnitSyntax Projection, int Characters, WeakReference<GreenNode> SourceGreen,
+        ReusableProbeBinding? Binding = null);
 
     internal readonly record struct RegionKey(int Position, ushort Kind, CSharp.ExpressionSyntax Expression, string Text, ITypeSymbol? Target)
     {
@@ -153,7 +157,7 @@ internal sealed class CompilationBoundProbeStore(CSharpCompilation owner)
                 GenerationStatistics.Increment(GenerationStatisticCounter.CrossRevisionRegionContextRejected);
             }
 #endif
-            return _current.GetOrAdd(tree.FilePath, new DocumentSession(contract, previous, _cancellationToken));
+            return _current.GetOrAdd(tree.FilePath, new DocumentSession(contract, previous, _cancellationToken, _store.ReuseProjections, _store.ReuseBindings));
         }
 
         internal Generation Seal()
@@ -162,6 +166,7 @@ internal sealed class CompilationBoundProbeStore(CSharpCompilation owner)
             var result = ImmutableDictionary.CreateBuilder<string, DocumentGeneration>(StringComparer.Ordinal);
             var count = 0;
             var characters = 0;
+            var semanticCount = 0;
             foreach (var pair in _sources.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
             {
                 _cancellationToken.ThrowIfCancellationRequested();
@@ -179,6 +184,7 @@ internal sealed class CompilationBoundProbeStore(CSharpCompilation owner)
                     continue;
                 }
                 var entries = ImmutableDictionary.CreateBuilder<RegionKey, Entry>();
+                var documentSemanticCount = 0;
                 foreach (var entry in document.Entries.OrderBy(static pair => pair.Key.Position).ThenBy(static pair => pair.Key.Text, StringComparer.Ordinal))
                 {
                     if (entries.Count >= MaxEntriesPerDocument || count >= MaxEntriesPerProject ||
@@ -186,7 +192,24 @@ internal sealed class CompilationBoundProbeStore(CSharpCompilation owner)
                     {
                         continue;
                     }
-                    entries.Add(entry.Key, entry.Value);
+                    var value = entry.Value;
+                    if (value.Binding != null)
+                    {
+                        if (documentSemanticCount >= MaxSemanticEntriesPerDocument || semanticCount >= MaxSemanticEntriesPerProject)
+                        {
+                            value = value with { Binding = null };
+                        }
+                        else
+                        {
+                            documentSemanticCount++;
+                            semanticCount++;
+                        }
+                    }
+                    if (!_store.ReuseProjections && value.Binding == null)
+                    {
+                        continue;
+                    }
+                    entries.Add(entry.Key, value);
                     count++;
                     characters += entry.Value.Characters;
                 }
@@ -208,17 +231,24 @@ internal sealed class CompilationBoundProbeStore(CSharpCompilation owner)
         }
     }
 
-    internal sealed class DocumentSession(ProbeDocumentContract contract, DocumentGeneration? previous, CancellationToken cancellationToken)
+    internal sealed partial class DocumentSession(ProbeDocumentContract contract, DocumentGeneration? previous, CancellationToken cancellationToken,
+        bool reuseProjections, bool reuseBindings)
     {
         private DocumentGeneration? _previous = previous;
         private volatile bool _closed;
         internal ProbeDocumentContract Contract => contract;
+        internal bool ReuseBindings => reuseBindings && !_closed;
+        internal CancellationToken CancellationToken => cancellationToken;
         internal ConcurrentDictionary<RegionKey, Entry> Entries { get; } = new();
 
         internal bool TryGetProjection(AkburaSyntax scope, CSharp.ExpressionSyntax expression, ITypeSymbol? target, out CSharp.CompilationUnitSyntax projection)
         {
             projection = null!;
             cancellationToken.ThrowIfCancellationRequested();
+            if (!reuseProjections)
+            {
+                return false;
+            }
 #if STATS
             GenerationStatistics.Increment(GenerationStatisticCounter.CrossRevisionRegionCandidate);
             using var lookup = GenerationStatistics.Measure(GenerationStatisticStage.CrossRevisionProjectionLookup);
@@ -230,7 +260,7 @@ internal sealed class CompilationBoundProbeStore(CSharpCompilation owner)
 #endif
                 return false;
             }
-            Entries.TryAdd(key, entry);
+            Entries.TryAdd(key, entry.Binding == null ? entry : entry with { Binding = null });
             projection = entry.Projection;
 #if STATS
             GenerationStatistics.Increment(GenerationStatisticCounter.CrossRevisionRegionContextMatch);
@@ -246,7 +276,7 @@ internal sealed class CompilationBoundProbeStore(CSharpCompilation owner)
 
         internal void Record(AkburaSyntax scope, CSharp.ExpressionSyntax expression, ITypeSymbol? target, CSharp.CompilationUnitSyntax projection)
         {
-            if (_closed || Entries.Count >= MaxEntriesPerDocument || projection.ContainsDiagnostics || projection.ContainsDirectives ||
+            if (!reuseProjections || _closed || Entries.Count >= MaxEntriesPerDocument || projection.ContainsDiagnostics || projection.ContainsDirectives ||
                 projection.ContainsSkippedText || !TryKey(scope, expression, target, out var key))
             {
                 return;

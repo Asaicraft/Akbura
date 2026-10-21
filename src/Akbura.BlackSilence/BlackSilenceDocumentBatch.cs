@@ -237,7 +237,7 @@ internal sealed partial class BlackSilenceDocumentBatch
         }
         else
         {
-            request.State.Publish(snapshot);
+            request.State.Publish(snapshot, cancellationToken);
         }
         return batch;
 

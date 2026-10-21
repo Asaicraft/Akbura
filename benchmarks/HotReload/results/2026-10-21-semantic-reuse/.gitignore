@@ -1,0 +1,3 @@
+# SDK verification preserves its executable shadow locally, not in the evidence archive.
+!**/*.log
+**/test-host/

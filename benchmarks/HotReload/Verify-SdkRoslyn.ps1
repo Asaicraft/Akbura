@@ -2,6 +2,7 @@
 param(
     [string]$OutputDirectory = (Join-Path $PSScriptRoot '../../bin/CSharpInvalidationInvestigation/sdk-tests'),
     [switch]$Prepare,
+    [string]$TestDirectory = '',
     [string]$TestFilter = 'FullyQualifiedName~InvalidationTrace_|FullyQualifiedName~BlackSilenceGenerationStatisticsTests',
     [int]$ExpectedTestCount = 17
 )
@@ -15,7 +16,7 @@ if ($Prepare) {
         throw 'Could not build the instrumentation tests.'
     }
 }
-$original = Join-Path $repository 'src/Akbura.UnitTests/bin/DebugStats/net10.0'
+$original = if ($TestDirectory) { [IO.Path]::GetFullPath($TestDirectory) } else { Join-Path $repository 'src/Akbura.UnitTests/bin/DebugStats/net10.0' }
 if (-not (Test-Path -LiteralPath (Join-Path $original 'Akbura.UnitTests.dll'))) {
     throw 'Build DebugStats tests first, or pass -Prepare.'
 }

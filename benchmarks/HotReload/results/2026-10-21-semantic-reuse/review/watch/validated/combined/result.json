@@ -1,0 +1,47 @@
+{
+  "Edit": "Existing Text literal, unchanged count binding",
+  "Boundaries": "File write to observed rendered value; exact compiler delta submission and per-update generator time unavailable.",
+  "VerifierSha256": "A7FC42135D41D52026D73811F3B23D129C49F8490E12179AE8A92B74D9EAEF44",
+  "ReactiveBindingAndSubscriptionChecks": true,
+  "FixtureHashes": [
+    {
+      "Sha256": "A7861771CA2EA1E3D84D6205BD408803CE14FF6BAC212556A26F164D6CB14B9A",
+      "Name": "Counter.akbura"
+    },
+    {
+      "Sha256": "85D8BF0DE635DFE073EF1A4A4CE2D69227FAEF948282D64545A943F00DD2708E",
+      "Name": "Counter.akbura.cs"
+    },
+    {
+      "Sha256": "02301E81D8E7F6DD3E62AA3D98CB183297F40937AA3661AF2DFF984437251C9F",
+      "Name": "Program.cs"
+    },
+    {
+      "Sha256": "306906A793D7CE6A85FAC1473CF630718A096711F570176BA425693B1BB49027",
+      "Name": "WatchFixture.csproj"
+    },
+    {
+      "Sha256": "72E42159A1182D3077D945E063A196D0FC3A7D6676260BA96182A00931879996",
+      "Name": "WatchPerson.cs"
+    }
+  ],
+  "Updates": 9,
+  "OriginalProcessAndControlPreserved": true,
+  "SemanticHitObservation": "Not available inside dotnet watch. Text edits intentionally reject the restricted Margin-only semantic contract.",
+  "StateAndInputPreserved": true,
+  "MultipleBindings": true,
+  "BinaryHashes": [
+    {
+      "Sha256": "40AC0E838C68941996035777DD889A08ABB4BE10AFDE8B98E825B943319EB5A1",
+      "Name": "Akbura.BlackSilence.dll"
+    },
+    {
+      "Sha256": "F4003F4AEA4ECF9ED7DC6FDDCFB358F341B83C42D3F20D2088BFA5258AD460F7",
+      "Name": "Akbura.Generator.dll"
+    },
+    {
+      "Sha256": "0D03EDCF3F15FC6A6519A572DCE471882F58CF33819722610EBC52110020F764",
+      "Name": "HotReloadBenchmarks.dll"
+    }
+  ]
+}

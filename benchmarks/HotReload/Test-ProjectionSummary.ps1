@@ -1,4 +1,5 @@
 #requires -Version 7.2
+param([switch]$SemanticReuse)
 $ErrorActionPreference = 'Stop'
 $temporary = Join-Path ([IO.Path]::GetTempPath()) ('AkburaProjectionSummary-' + [Guid]::NewGuid().ToString('N'))
 $encoding = [Text.UTF8Encoding]::new($false)
@@ -14,8 +15,9 @@ function Expect-Failure([scriptblock]$action) {
 $summarize = Join-Path $PSScriptRoot 'Summarize-ProjectionReuse.ps1'
 $result = Join-Path $temporary 'report'
 $firstFile = $null
+$variants = if ($SemanticReuse) { @('baseline', 'projection', 'binding', 'combined') } else { @('baseline', 'projection') }
 foreach ($profile in @('stats', 'production-1', 'production-2')) {
-    foreach ($variant in @('baseline', 'projection')) {
+    foreach ($variant in $variants) {
         foreach ($category in @('literal', 'binding', 'focused')) {
             $directory = Join-Path $temporary "runs/$profile-$variant-$category"
             $null = New-Item -ItemType Directory -Path $directory -Force
@@ -30,8 +32,10 @@ foreach ($profile in @('stats', 'production-1', 'production-2')) {
                         Collections = @(1, 0, 0); Counters = @{ ProbeCompilationCreated = 7 }
                         Stages = @(@{ Stage = 'ExpressionProjectionConstruction'; Count = 23; InclusiveMs = 0.25 }) }
                     $rows.Add(($sample | ConvertTo-Json -Depth 8 -Compress))
-                    $rows.Add((@{ Kind = 'invalidation-parity'; Index = $index; EqualSources = $true; EqualDiagnostics = $true } | ConvertTo-Json -Compress))
-                    $rows.Add((@{ Kind = 'artifact-heap'; Index = $index; PostGcHeapBytes = 5000 } | ConvertTo-Json -Compress))
+                    $rows.Add((@{ Kind = 'invalidation-parity'; Index = $index; EqualSources = $true; EqualDiagnostics = $true; EqualDependencies = $true } | ConvertTo-Json -Compress))
+                    $rows.Add((@{ Kind = 'artifact-heap'; Index = $index; PostGcHeapBytes = 5000; ProbeRetention = @{
+                        Entries = 2; SemanticEntries = 2; ProjectionCharacters = 100; OperationRoots = 2; ProbeSemanticModels = 2; ProbeCompilations = 2; ProbeSyntaxTrees = 2 }
+                    } | ConvertTo-Json -Depth 5 -Compress))
                 }
                 $file = Join-Path $directory "invalidation-$cell.jsonl"
                 [IO.File]::WriteAllText($file, ($rows -join "`r`n") + "`r`n", $encoding)
@@ -40,10 +44,10 @@ foreach ($profile in @('stats', 'production-1', 'production-2')) {
         }
     }
 }
-& $summarize -InputDirectory $temporary -ResultDirectory $result
+& $summarize -InputDirectory $temporary -ResultDirectory $result -SemanticReuse:$SemanticReuse
 $cells = @(Import-Csv -LiteralPath (Join-Path $result 'projection-cells.csv'))
 $stages = @(Import-Csv -LiteralPath (Join-Path $result 'projection-stages.csv'))
-if ($cells.Count -ne 42 -or @($cells | Where-Object Samples -ne 8).Count) { throw 'Wrong sample count.' }
+if ($cells.Count -ne $variants.Count * 21 -or @($cells | Where-Object Samples -ne 8).Count) { throw 'Wrong sample count.' }
 if (@($cells | Where-Object Variant -eq 'projection' | Where-Object { [double]$_.GeneratorMedianMs -ne 9.5 }).Count) { throw 'Wrong median or culture-dependent CSV.' }
 if (@($stages | Where-Object Name -eq 'ExpressionProjectionConstruction' | Where-Object { [double]$_.Count -ne 184 -or [double]$_.InclusiveMs -ne 2 }).Count) {
     throw 'Stage Count values must be summed, not confused with array cardinality.'
@@ -54,7 +58,7 @@ try {
     foreach ($culture in @('en-US', 'ru-RU')) {
         [Globalization.CultureInfo]::CurrentCulture = [Globalization.CultureInfo]::GetCultureInfo($culture)
         $cultureResult = Join-Path $temporary $culture
-        & $summarize -InputDirectory $temporary -ResultDirectory $cultureResult
+        & $summarize -InputDirectory $temporary -ResultDirectory $cultureResult -SemanticReuse:$SemanticReuse
         foreach ($name in @('projection-cells.csv', 'projection-stages.csv', 'projection-samples.csv', 'projection-measured-summary.md')) {
             if ([IO.File]::ReadAllText((Join-Path $result $name)) -cne [IO.File]::ReadAllText((Join-Path $cultureResult $name))) {
                 throw "Locale-dependent report: $culture/$name"
@@ -64,13 +68,20 @@ try {
 }
 finally { [Globalization.CultureInfo]::CurrentCulture = $previousCulture }
 [IO.File]::WriteAllText($firstFile, $original.Replace('"EqualSources":true', '"EqualSources":false'), $encoding)
-Expect-Failure { & $summarize -InputDirectory $temporary -ResultDirectory $result }
+Expect-Failure { & $summarize -InputDirectory $temporary -ResultDirectory $result -SemanticReuse:$SemanticReuse }
 [IO.File]::WriteAllText($firstFile, $original, $encoding)
+if ($SemanticReuse) {
+    [IO.File]::WriteAllText($firstFile, $original.Replace('"EqualDependencies":true', '"EqualDependencies":false'), $encoding)
+    Expect-Failure { & $summarize -InputDirectory $temporary -ResultDirectory $result -SemanticReuse }
+    [IO.File]::WriteAllText($firstFile, $original.Replace('"ProbeRetention":', '"MissingRetention":'), $encoding)
+    Expect-Failure { & $summarize -InputDirectory $temporary -ResultDirectory $result -SemanticReuse }
+    [IO.File]::WriteAllText($firstFile, $original, $encoding)
+}
 $statePath = Join-Path ([IO.Path]::GetDirectoryName($firstFile)) 'status.json'
 Json $statePath @{ Phase = 'Running' }
-Expect-Failure { & $summarize -InputDirectory $temporary -ResultDirectory $result }
+Expect-Failure { & $summarize -InputDirectory $temporary -ResultDirectory $result -SemanticReuse:$SemanticReuse }
 Json $statePath @{ Phase = 'Complete' }
 $rows = @($original -split '\r?\n' | Where-Object { $_ })
 [IO.File]::WriteAllText($firstFile, ($rows[0..($rows.Length - 2)] -join "`r`n") + "`r`n", $encoding)
-Expect-Failure { & $summarize -InputDirectory $temporary -ResultDirectory $result }
+Expect-Failure { & $summarize -InputDirectory $temporary -ResultDirectory $result -SemanticReuse:$SemanticReuse }
 Write-Host "PASS: complete matrix, medians, nontrivial stage sums, identical en-US/ru-RU reports, parity rejection, incomplete-run rejection and missing-heap rejection. Synthetic fixtures: $temporary"

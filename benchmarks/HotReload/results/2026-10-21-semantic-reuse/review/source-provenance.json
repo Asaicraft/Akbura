@@ -1,0 +1,211 @@
+{
+  "AddedSupplementaryTestFile": "src/Akbura.UnitTests/BlackSilenceIncrementalGenerationTests.SemanticReuseInvalidation.cs",
+  "ModifiedAndAddedSources": [
+    {
+      "Sha256": "CA13C43EB5EF4BA57EA1B3529D5C3B7474ED6A829AFEE951916FBBFF5DEA7349",
+      "File": "benchmarks/HotReload/HotReloadBenchmarks.csproj"
+    },
+    {
+      "Sha256": "541DA474DF31A5780F9F82E92633BF50398718DF77181BD82EC6C72B39B00430",
+      "File": "benchmarks/HotReload/Program.cs"
+    },
+    {
+      "Sha256": "4962A8A82582CBDE17B8010E2219E5DAF5F3F40D512D5743D636501A38961BB7",
+      "File": "benchmarks/HotReload/Program.Invalidation.cs"
+    },
+    {
+      "Sha256": "4867057CBC6A6AB41B1D13B97ACFE4978F007B6FE951CC9EF6F154CF6BF4740B",
+      "File": "benchmarks/HotReload/Program.ProbeRetention.cs"
+    },
+    {
+      "Sha256": "85D8BF0DE635DFE073EF1A4A4CE2D69227FAEF948282D64545A943F00DD2708E",
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/watch/repair/baseline/fixture/Counter.akbura.cs"
+    },
+    {
+      "Sha256": "02301E81D8E7F6DD3E62AA3D98CB183297F40937AA3661AF2DFF984437251C9F",
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/watch/repair/baseline/fixture/Program.cs"
+    },
+    {
+      "Sha256": "72E42159A1182D3077D945E063A196D0FC3A7D6676260BA96182A00931879996",
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/watch/repair/baseline/fixture/WatchPerson.cs"
+    },
+    {
+      "Sha256": "85D8BF0DE635DFE073EF1A4A4CE2D69227FAEF948282D64545A943F00DD2708E",
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/watch/repair/combined/fixture/Counter.akbura.cs"
+    },
+    {
+      "Sha256": "02301E81D8E7F6DD3E62AA3D98CB183297F40937AA3661AF2DFF984437251C9F",
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/watch/repair/combined/fixture/Program.cs"
+    },
+    {
+      "Sha256": "72E42159A1182D3077D945E063A196D0FC3A7D6676260BA96182A00931879996",
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/watch/repair/combined/fixture/WatchPerson.cs"
+    },
+    {
+      "Sha256": "85D8BF0DE635DFE073EF1A4A4CE2D69227FAEF948282D64545A943F00DD2708E",
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/watch/validated/baseline/fixture/Counter.akbura.cs"
+    },
+    {
+      "Sha256": "02301E81D8E7F6DD3E62AA3D98CB183297F40937AA3661AF2DFF984437251C9F",
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/watch/validated/baseline/fixture/Program.cs"
+    },
+    {
+      "Sha256": "72E42159A1182D3077D945E063A196D0FC3A7D6676260BA96182A00931879996",
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/watch/validated/baseline/fixture/WatchPerson.cs"
+    },
+    {
+      "Sha256": "85D8BF0DE635DFE073EF1A4A4CE2D69227FAEF948282D64545A943F00DD2708E",
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/watch/validated/binding/fixture/Counter.akbura.cs"
+    },
+    {
+      "Sha256": "02301E81D8E7F6DD3E62AA3D98CB183297F40937AA3661AF2DFF984437251C9F",
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/watch/validated/binding/fixture/Program.cs"
+    },
+    {
+      "Sha256": "72E42159A1182D3077D945E063A196D0FC3A7D6676260BA96182A00931879996",
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/watch/validated/binding/fixture/WatchPerson.cs"
+    },
+    {
+      "Sha256": "85D8BF0DE635DFE073EF1A4A4CE2D69227FAEF948282D64545A943F00DD2708E",
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/watch/validated/combined/fixture/Counter.akbura.cs"
+    },
+    {
+      "Sha256": "02301E81D8E7F6DD3E62AA3D98CB183297F40937AA3661AF2DFF984437251C9F",
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/watch/validated/combined/fixture/Program.cs"
+    },
+    {
+      "Sha256": "72E42159A1182D3077D945E063A196D0FC3A7D6676260BA96182A00931879996",
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/watch/validated/combined/fixture/WatchPerson.cs"
+    },
+    {
+      "Sha256": "85D8BF0DE635DFE073EF1A4A4CE2D69227FAEF948282D64545A943F00DD2708E",
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/watch/validated/projection/fixture/Counter.akbura.cs"
+    },
+    {
+      "Sha256": "02301E81D8E7F6DD3E62AA3D98CB183297F40937AA3661AF2DFF984437251C9F",
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/watch/validated/projection/fixture/Program.cs"
+    },
+    {
+      "Sha256": "72E42159A1182D3077D945E063A196D0FC3A7D6676260BA96182A00931879996",
+      "File": "benchmarks/HotReload/results/2026-10-21-semantic-reuse/review/watch/validated/projection/fixture/WatchPerson.cs"
+    },
+    {
+      "Sha256": "E67C1AB170A1EB33541739A7867D6CED053A69522C11EAC599AAD2941CB791A8",
+      "File": "benchmarks/HotReload/SemanticFixture/Models.cs"
+    },
+    {
+      "Sha256": "CE79AF70C62DD1B0B27150D28F1869E1D1EC25592F2F08700412CD78CC7E3699",
+      "File": "benchmarks/HotReload/SemanticFixture/Siblings.akbura"
+    },
+    {
+      "Sha256": "A7861771CA2EA1E3D84D6205BD408803CE14FF6BAC212556A26F164D6CB14B9A",
+      "File": "benchmarks/HotReload/SemanticWatchFixture/Counter.akbura"
+    },
+    {
+      "Sha256": "02301E81D8E7F6DD3E62AA3D98CB183297F40937AA3661AF2DFF984437251C9F",
+      "File": "benchmarks/HotReload/SemanticWatchFixture/Program.cs"
+    },
+    {
+      "Sha256": "72E42159A1182D3077D945E063A196D0FC3A7D6676260BA96182A00931879996",
+      "File": "benchmarks/HotReload/SemanticWatchFixture/WatchPerson.cs"
+    },
+    {
+      "Sha256": "E9C1FC35081C31F097DB10F1457BA90DD03452CE5C4B99D5ABBFCAE731DEC838",
+      "File": "benchmarks/HotReload/Summarize-ProjectionReuse.ps1"
+    },
+    {
+      "Sha256": "802DADCEE916572ECF7DA9FDC235D4B4930BD58742E40147E66A0BD7D91F5AC2",
+      "File": "benchmarks/HotReload/Test-ProjectionSummary.ps1"
+    },
+    {
+      "Sha256": "DADA87BD327640A4A3CADBC0478B0D90433A4BE435EA342179AD3CA969D4CD03",
+      "File": "benchmarks/HotReload/Verify-MarkupWatch.ps1"
+    },
+    {
+      "Sha256": "B8925C40FFB03288CB61C18C3F2900D0B6508D9CDEDBD7D204C954C015711000",
+      "File": "benchmarks/HotReload/Verify-SdkRoslyn.ps1"
+    },
+    {
+      "Sha256": "5F83FE2EE21A75247773757F0083A982C6B2133A7DD389261747710CDBA7E624",
+      "File": "benchmarks/HotReload/Verify-SemanticReuse.ps1"
+    },
+    {
+      "Sha256": "8FBDFD79DF3D815104FFA3EDB0DEF39FB8483E9C8CBF2293E1EA88E4CFB4DC75",
+      "File": "src/Akbura.BlackSilence/Akbura.BlackSilence.csproj"
+    },
+    {
+      "Sha256": "43F76A0E5310885445A4A9CC85590C9C91C44BB5E7FD6040B5BBA9CEE9AD38C8",
+      "File": "src/Akbura.BlackSilence/BlackSilenceDocumentBatch.cs"
+    },
+    {
+      "Sha256": "53AFFA2D5E70558383AF06C376B75C67A95710BD88F11527FF61D1515ECBAC71",
+      "File": "src/Akbura.BlackSilence/BlackSilenceProjectState.cs"
+    },
+    {
+      "Sha256": "698C91DBB40AD42BDC2B278AFC0603BA93A14E9579B2E801670FFBCF0060E8C0",
+      "File": "src/Akbura.BlackSilence/DetachedProjectArtifacts.cs"
+    },
+    {
+      "Sha256": "89097C9572B22F23E18A5F94253F06808FCAA9D3AF3154A4EBD46CF5FE96443F",
+      "File": "src/Akbura.Generator/Language/Binder/CompilationBoundProbeStore.cs"
+    },
+    {
+      "Sha256": "3E517F274A5DAF2D094DAA10CB7DAC848202E75C075F2727FDA6B7A833B04B3C",
+      "File": "src/Akbura.Generator/Language/Binder/CompilationBoundProbeStore.Semantics.cs"
+    },
+    {
+      "Sha256": "CB630B40D9472BD536C24EBAECE12893D2F90272681F61D2197DEB97661E8DDC",
+      "File": "src/Akbura.Generator/Language/Binder/CSharpProbeBinder.cs"
+    },
+    {
+      "Sha256": "A774DB52A74B7BFF14A474C658EED4A59543D19D7117E7672FB3A0A83A5C171B",
+      "File": "src/Akbura.Generator/Language/Binder/CSharpProbeContext.cs"
+    },
+    {
+      "Sha256": "592AC4C72CFDB6FF63DD1BF330F613664CA89FDDFA8993BC40A6549B6475C38D",
+      "File": "src/Akbura.Generator/Language/Binder/DocumentSemanticDependencyCollector.cs"
+    },
+    {
+      "Sha256": "443BEBDD3DC6C6B2579CF7B10B8CA3677C05927D976983405B0E293CC042C0F0",
+      "File": "src/Akbura.Generator/Language/Binder/ReusableProbeBinding.cs"
+    },
+    {
+      "Sha256": "EAF4969B11A9495CBE0F86A1CFC5611A267B87FF0996BA69FFF22C88F00ADAE2",
+      "File": "src/Akbura.Generator/Language/CodeGeneration/GenerationStatistics.cs"
+    },
+    {
+      "Sha256": "F45E6DC253491E1F73E3D4E0FF9E02B7118023D793C752EBB832286D53C3E12F",
+      "File": "src/Akbura.Generator/Language/Compilation/SyntaxAndDeclarationManager.LazyState.cs"
+    },
+    {
+      "Sha256": "FCD5E395154480327943EFF8D7CD07B06F21C907B3EB4EC6CDD8BD9734A0146D",
+      "File": "src/Akbura.UnitTests/Akbura.UnitTests.csproj"
+    },
+    {
+      "Sha256": "0D729F5817024A1D905CA9C795D2547CD1E704F483FBA731E47E3D1ACA62163B",
+      "File": "src/Akbura.UnitTests/BlackSilenceIncrementalGenerationTests.SemanticReuse.cs"
+    },
+    {
+      "Sha256": "B6410E25E938967B52A453EBC935678F40B2027BEB90A3D7C870EBE47CF7E875",
+      "File": "src/Akbura.UnitTests/BlackSilenceIncrementalGenerationTests.SemanticReuseInvalidation.cs"
+    },
+    {
+      "Sha256": "E23F5A9C7B39BBB293C663E1CC4F28A878074BE917E5F3D5D780A071D12D7EB9",
+      "File": "src/Akbura.UnitTests/BlackSilenceIncrementalGenerationTests.SemanticReuseLifetime.cs"
+    },
+    {
+      "Sha256": "12670D9DE470C1CF463936927C407D96A0926B9022A03689F8A9188FC93752A6",
+      "File": "src/Akbura.UnitTests/BlackSilenceIncrementalGenerationTests.SemanticReusePublication.cs"
+    }
+  ],
+  "MeasuredCompilerSourcesUnchanged": true,
+  "StartingRevision": "f2c29caef38fd8f08b1e6777dd31f4fa231b12dc",
+  "NewWatchFixtureDirectory": "benchmarks/HotReload/SemanticWatchFixture",
+  "ChangedMeasuredHarnessFiles": [
+    "benchmarks/HotReload/HotReloadBenchmarks.csproj",
+    "benchmarks/HotReload/Program.cs",
+    "benchmarks/HotReload/Verify-MarkupWatch.ps1"
+  ],
+  "MeasuredSourceFingerprint": "BC357369A536EC46175AA29324C317F2EC066EB5B9500493653DB8BE2520D0DD",
+  "FinalizedUtc": "2026-10-21T15:34:48.5915565Z"
+}

@@ -24,10 +24,11 @@ public sealed class RouteInputBuilder : InputBuilder
         ArgumentNullException.ThrowIfNull(request);
 
         return request.EditorType == typeof(string) &&
+               request.Variation == DataVariation.State &&
                request.ComponentInstance is Router &&
                string.Equals(
                    request.MemberName,
-                   nameof(Router.Url),
+                   "url",
                    StringComparison.Ordinal);
     }
 

@@ -1,14 +1,12 @@
 using Akbura.Hooks;
 using Avalonia.Media;
+using Akbura.FeatureGallery.Routing;
+
+inject IRouter RouterService;
 
 param string Content = "";
 param string Url = "";
-param Router Router;
-
-state string currentUrl =
-    useAvaloniaProperty(
-        Router,
-        Components.Router.UrlProperty);
+state string currentUrl = out RouteSource.Url;
 
 void Navigate()
 {
@@ -17,7 +15,7 @@ void Navigate()
         Url,
         StringComparison.OrdinalIgnoreCase))
     {
-        Router.Url = Url;
+        RouterService.Url = Url;
     }
 }
 

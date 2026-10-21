@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
@@ -31,6 +32,35 @@ internal static class EmbeddedCSharpSyntaxFacts
         {
             hostSpan = default;
             return false;
+        }
+
+        if (syntax.Parent is MarkupExpressionBindingSyntax binding)
+        {
+            // The markup lexer owns separator trivia after `bind`; an empty
+            // Roslyn node can also omit whitespace retained by the raw token.
+            // Project that exact region without reparsing the expression or
+            // including the directive/outer braces in its C# host span.
+            var start = binding.BindKeyword.Span.End;
+            var end = binding.CloseBrace.Span.Start;
+            var rawStart = tokensFullSpan.Start + expressionFullSpan.Start;
+            var rawEnd = rawStart + expressionFullSpan.Length;
+            if (rawStart < start || rawEnd > end)
+            {
+                hostSpan = default;
+                return false;
+            }
+
+            var text = binding.ToFullString();
+            var prefix = text.Substring(start - binding.FullSpan.Start, rawStart - start);
+            var suffix = text.Substring(rawEnd - binding.FullSpan.Start, end - rawEnd);
+            expression = expressionFullSpan.Length == 0
+                ? expression.WithLeadingTrivia(CSharpSyntaxFactory.ParseLeadingTrivia(prefix + suffix))
+                : expression.WithLeadingTrivia(CSharpSyntaxFactory.ParseLeadingTrivia(prefix)
+                    .AddRange(expression.GetLeadingTrivia()))
+                    .WithTrailingTrivia(expression.GetTrailingTrivia()
+                        .AddRange(CSharpSyntaxFactory.ParseTrailingTrivia(suffix)));
+            hostSpan = TextSpan.FromBounds(start, end);
+            return expression.FullSpan.Length == hostSpan.Length;
         }
 
         hostSpan = new TextSpan(

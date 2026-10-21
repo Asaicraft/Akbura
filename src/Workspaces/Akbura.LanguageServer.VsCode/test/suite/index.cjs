@@ -20,6 +20,10 @@ async function run() {
         content: ''
     });
     const editor = await vscode.window.showTextDocument(document);
+    editor.options = { insertSpaces: true, tabSize: 4 };
+    const newLine = document.eol === vscode.EndOfLine.CRLF
+        ? '\r\n'
+        : '\n';
 
     await type('<');
     assert.equal(document.getText(), '<>');
@@ -30,13 +34,15 @@ async function run() {
     }
 
     await type('>');
-    assert.equal(document.getText(), '<Button></Button>');
-    assert.equal(editor.selection.active.character, 8);
+    const pairedTag = '<Button>' + newLine + '    ' + newLine + '</Button>';
+    assert.equal(document.getText(), pairedTag);
+    assert.equal(editor.selection.active.line, 1);
+    assert.equal(editor.selection.active.character, 4);
 
     await vscode.commands.executeCommand('undo');
     assert.equal(document.getText(), '<Button>');
     await vscode.commands.executeCommand('redo');
-    assert.equal(document.getText(), '<Button></Button>');
+    assert.equal(document.getText(), pairedTag);
 
     await replaceAll(editor, '');
     await type('{');
@@ -97,9 +103,6 @@ async function run() {
     );
     assert.equal(editor.selection.active.character, 23);
 
-    const newLine = document.eol === vscode.EndOfLine.CRLF
-        ? '\r\n'
-        : '\n';
     await vscode.commands.executeCommand(
         'akbura.typing.return'
     );
@@ -153,6 +156,57 @@ async function run() {
     );
 
     await verifyUnsavedResourceCompletion();
+    await verifyExpressionBindings();
+}
+
+async function verifyExpressionBindings() {
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    assert.ok(folder);
+    const uri = vscode.Uri.joinPath(folder.uri, 'Component.akbura');
+    const document = await vscode.workspace.openTextDocument(uri);
+    const editor = await vscode.window.showTextDocument(document);
+    const prefix = 'using Avalonia.Controls;\r\ninject Gallery.ExpressionBindingViewModel Vm;\r\n';
+    await replaceAll(editor, prefix + '<TextBlock Text=${x.bi} />');
+    let position = document.positionAt(document.getText().indexOf('x.bi') + 4);
+    let completion = await waitForCompletion(uri, position, 'x.bind');
+    const binding = completion.items.find(item => item.label === 'x.bind');
+    assert.ok(binding.textEdit);
+    await editor.edit(edit => edit.replace(binding.textEdit.range, binding.textEdit.newText));
+    assert.ok(document.getText().includes('Text=${x.bind }'));
+    assert.equal(document.getText().includes('${${'), false);
+
+    await replaceAll(editor, prefix + '<TextBlock Text=${x.bind Vm.Na' + 'me} />');
+    position = document.positionAt(document.getText().indexOf('Vm.Name') + 'Vm.Na'.length);
+    completion = await waitForCompletion(uri, position, 'Name');
+    const name = completion.items.find(item => item.label === 'Name');
+    assert.ok(name.textEdit);
+    await editor.edit(edit => edit.replace(name.textEdit.range, name.textEdit.newText));
+    assert.ok(document.getText().includes('${x.bind Vm.Name}'));
+    assert.equal(document.getText().includes('NameName'), false);
+
+    position = document.positionAt(document.getText().indexOf('Vm.Name') + 4);
+    const hovers = await vscode.commands.executeCommand('vscode.executeHoverProvider', uri, position);
+    assert.ok(hovers?.length, 'No expression-binding C# hover returned.');
+    const definitions = await vscode.commands.executeCommand('vscode.executeDefinitionProvider', uri, position);
+    assert.ok(definitions?.length, 'No expression-binding definition returned.');
+
+    // Real typing requests go through the same running language server.
+    await replaceAll(editor, prefix + '<TextBlock Text=${x.bind Vm.Format} />');
+    position = document.positionAt(document.getText().indexOf('Vm.Format') + 'Vm.Format'.length);
+    editor.selection = new vscode.Selection(position, position);
+    await type('(');
+    assert.ok(document.getText().includes('${x.bind Vm.Format()}'));
+
+    await replaceAll(editor, prefix + '<TextBlock Text=${x.bind $"Hello "} />');
+    position = document.positionAt(document.getText().indexOf('Hello ') + 6);
+    editor.selection = new vscode.Selection(position, position);
+    await type('{');
+    assert.ok(document.getText().includes('${x.bind $"Hello {}"}'));
+    await type('}');
+    assert.equal(document.getText().includes('Hello {}}'), false);
+
+    await vscode.commands.executeCommand('workbench.action.files.revert');
+    await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
 }
 
 async function verifyUnsavedResourceCompletion() {

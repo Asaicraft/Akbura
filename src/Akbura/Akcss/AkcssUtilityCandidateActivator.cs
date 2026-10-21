@@ -1,4 +1,5 @@
 using Akbura.CompilerAnotations;
+using Akbura.ComponentTree;
 using Akbura.Markup;
 using Akbura.RuntimePools;
 using Avalonia;
@@ -22,6 +23,11 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
     private readonly ImmutableArray<string> _conflictKeys;
     private readonly ImmutableArray<AkcssUtilityValueSource> _arguments;
     private readonly Func<bool>? _condition;
+    private Func<ExpressionBindingContext, bool>? _reactiveCondition;
+    private ExpressionBinding<bool>? _reactiveBinding;
+    private bool _reactiveConditionValue;
+    private bool _hasReactiveConditionValue;
+    private bool _initializingReactiveCondition;
     private readonly AkcssUtilityValueSource? _variant;
     private readonly BindingPriority? _bindingPriority;
     private readonly List<IDisposable> _subscriptions = [];
@@ -76,6 +82,27 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
     }
 
     /// <summary>
+    /// Creates a tracked condition while preserving the existing constructor
+    /// and frame-evaluated condition contract for previously compiled callers.
+    /// </summary>
+    public AkcssUtilityCandidateActivator(
+        string conflictKey,
+        int sourceOrder,
+        ImmutableArray<AkcssUtilityApplication> applications,
+        Func<ExpressionBindingContext, bool> reactiveCondition,
+        ImmutableArray<AkcssUtilityValueSource> arguments = default,
+        AkcssUtilityValueSource? variant = null,
+        double order = 0d,
+        string? conflictGroup = null,
+        UnprefixedUtilityPrecedence unprefixedPrecedence = UnprefixedUtilityPrecedence.SourceOrder,
+        BindingPriority? bindingPriority = null)
+        : this(conflictKey, sourceOrder, applications, arguments, condition: null,
+            variant, order, conflictGroup, unprefixedPrecedence, bindingPriority)
+    {
+        _reactiveCondition = reactiveCondition ?? throw new ArgumentNullException(nameof(reactiveCondition));
+    }
+
+    /// <summary>
     /// Gets the legacy utility-name conflict key.
     /// </summary>
     /// <remarks>
@@ -86,7 +113,28 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
 
     public int SourceOrder { get; }
 
-    public bool IsPrefixed => _condition != null || _variant != null;
+    public bool IsPrefixed => _condition != null || _reactiveCondition != null || _variant != null;
+
+    /// <summary>
+    /// Refreshes generated render-local captures without replacing the candidate,
+    /// its contributions, or its existing dependency subscriptions.
+    /// </summary>
+    public static void RefreshReactiveCondition(object target, int activatorIndex,
+        Func<ExpressionBindingContext, bool> evaluate)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(evaluate);
+        Avalonia.Threading.Dispatcher.UIThread.VerifyAccess();
+        var styles = AkcssRuntime.GetStyles(target);
+        if ((uint)activatorIndex >= (uint)styles.Length ||
+            styles[activatorIndex] is not AkcssUtilityCandidateActivator candidate ||
+            candidate._reactiveCondition == null)
+        {
+            throw new InvalidOperationException("The generated reactive AKCSS condition does not match its owning activator slot.");
+        }
+        candidate._reactiveCondition = evaluate;
+        candidate._reactiveBinding?.Update(evaluate, candidate.SetReactiveConditionValue);
+    }
 
     public double Order { get; }
 
@@ -125,6 +173,11 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
     {
         get
         {
+            if (_reactiveCondition != null && !_hasReactiveConditionValue)
+            {
+                return false;
+            }
+
             if (_variant != null && !_variant.HasValue)
             {
                 return false;
@@ -146,6 +199,13 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
     {
         get
         {
+            // Reactive conditions are evaluated exclusively by ExpressionBinding.
+            // Cascade winner selection only reads the cached result.
+            if (_reactiveCondition != null && !_reactiveConditionValue)
+            {
+                return false;
+            }
+
             if (_condition != null)
             {
                 _lastFrameCondition = _condition();
@@ -239,7 +299,7 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
         ResetOperationCore(index, target);
     }
 
-    internal bool CanUpdateContribution(int index) => UsesBindingPriority && _condition == null &&
+    internal bool CanUpdateContribution(int index) => UsesBindingPriority && _condition == null && _reactiveCondition == null &&
         _operations[index].SupportsContributionUpdates;
 
     internal bool TryUpdateOperation(int index, object target)
@@ -258,6 +318,8 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
     {
         _changed = changed ??
             throw new ArgumentNullException(nameof(changed));
+
+        AttachReactiveCondition();
 
         var watchedUtilities = new List<AkcssUtility>();
         foreach (var application in _applications)
@@ -311,6 +373,18 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
         }
         _observers.Clear();
         List<Exception>? failures = null;
+        var reactiveBinding = _reactiveBinding;
+        _reactiveBinding = null;
+        _hasReactiveConditionValue = false;
+        _reactiveConditionValue = false;
+        try
+        {
+            reactiveBinding?.Dispose();
+        }
+        catch (Exception failure)
+        {
+            (failures ??= []).Add(failure);
+        }
         for (var index = _operationContributions.Length - 1; index >= 0; index--)
         {
             try
@@ -552,6 +626,47 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
     private void OnChanged()
     {
         _changed?.Invoke(this);
+    }
+
+    private void AttachReactiveCondition()
+    {
+        if (_reactiveCondition == null)
+        {
+            return;
+        }
+
+        _reactiveBinding?.Dispose();
+        var binding = new ExpressionBinding<bool>();
+        _reactiveBinding = binding;
+        _hasReactiveConditionValue = false;
+        _initializingReactiveCondition = true;
+        try
+        {
+            binding.Update(_reactiveCondition, SetReactiveConditionValue);
+        }
+        catch (Exception failure)
+        {
+            _reactiveBinding = null;
+            _hasReactiveConditionValue = false;
+            try { binding.Dispose(); }
+            catch (Exception cleanup) { throw new AggregateException(failure, cleanup); }
+            throw;
+        }
+        finally
+        {
+            _initializingReactiveCondition = false;
+        }
+    }
+
+    private void SetReactiveConditionValue(bool value)
+    {
+        var changed = !_hasReactiveConditionValue || _reactiveConditionValue != value;
+        _reactiveConditionValue = value;
+        _hasReactiveConditionValue = true;
+        if (changed && !_initializingReactiveCondition)
+        {
+            OnChanged();
+        }
     }
 
     private static ImmutableArray<CandidateOperation> CreateOperations(

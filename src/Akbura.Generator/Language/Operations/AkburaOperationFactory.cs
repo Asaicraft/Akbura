@@ -364,7 +364,8 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             CreateCSharpOperationTree(
                 boundNode.Syntax,
                 boundNode.ValueOperation,
-                CreateCSharpOperationSymbolMapper(boundNode.Syntax, containingAkcssSymbol: null)));
+                CreateCSharpOperationSymbolMapper(boundNode.Syntax, containingAkcssSymbol: null)),
+            boundNode.ExpressionBindingPlan);
     }
 
     private MarkupCommandBindingOperation CreateMarkupCommandBindingOperation(
@@ -456,7 +457,8 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             CreateCSharpOperationTree(
                 boundNode.Syntax,
                 boundNode.ConditionOperation,
-                mapper));
+                mapper),
+            boundNode.ConditionExpressionBinding);
     }
 
     private AkcssPropertySetterOperation CreateAkcssPropertySetterOperation(

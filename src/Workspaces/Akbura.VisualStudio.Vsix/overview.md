@@ -2,6 +2,15 @@
 
 Language support for `.akbura` and `.akcss` files in Visual Studio.
 
+Expression bindings (`${x.bind ...}`) use shared Workspaces and Roslyn-projected
+C# completion, hover, navigation, classification and diagnostics. The built-in
+prefix has a separate completion item and retains safe `${...}` commit boundaries.
+Syntactic highlighting and prefix completion work before project loading; C#
+semantic features need a loaded project. Shared references/rename semantics are
+also available through LSP; a native Visual Studio Rename UI adapter is not yet
+implemented. Native snapshot translation, pairing and Undo must be verified in
+an experimental Visual Studio instance in addition to component-level tests.
+
 ## Features
 
 - syntax highlighting and classification;

@@ -254,6 +254,10 @@ internal partial class AkburaSemanticModel
                             tailwindAttribute.Prefix)
                         .Expression));
             }
+            else if (tailwindAttribute.Prefix is TailwindExpressionBindingConditionalPrefixSyntax reactive)
+            {
+                builder.AddRange(GetCSharpSymbolReferences(reactive.Binding.Expression));
+            }
             else if (tailwindAttribute.Prefix?.Kind ==
                 AkburaSyntaxKind.MarkupExtensionConditionalPrefixSyntax)
             {
@@ -298,6 +302,11 @@ internal partial class AkburaSemanticModel
         {
             var dynamicValue = Unsafe.As<MarkupDynamicAttributeValueSyntax>(value);
             return GetCSharpSymbolReferences(dynamicValue.Expression);
+        }
+
+        if (value is MarkupExpressionBindingSyntax expressionBinding)
+        {
+            return GetCSharpSymbolReferences(expressionBinding.Expression);
         }
 
         if (value.Kind == AkburaSyntaxKind.MarkupExtensionAttributeValueSyntax)

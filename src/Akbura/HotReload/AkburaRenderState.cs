@@ -1378,6 +1378,13 @@ public sealed partial class AkburaRenderState : IDisposable
         }
         CompleteConditionalRenderCaptureRevision(pendingRevision);
 
+        // Rollback snapshots are needed only until the revision commits. Retaining
+        // them here keeps replaced AKCSS candidates and their old item captures
+        // alive even after their condition subscriptions have been detached.
+        foreach (var node in pendingRevision.Nodes)
+        {
+            node.ForgetPreviousOperations();
+        }
         _nodes = pendingRevision.Nodes;
         _collections = pendingRevision.Collections;
         _properties = pendingRevision.Properties;
@@ -2666,7 +2673,9 @@ public sealed partial class AkburaRenderState : IDisposable
         }
 
         private IReadOnlyDictionary<string, RenderOperationState>
-            PreviousOperations { get; }
+            PreviousOperations { get; set; }
+
+        public void ForgetPreviousOperations() => PreviousOperations = EmptyOperations;
 
         private Dictionary<string, RenderOperationState> Operations { get; } =
             new(StringComparer.Ordinal);

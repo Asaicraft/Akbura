@@ -565,6 +565,22 @@ node MarkupExtensionAttributeValueSyntax : MarkupAttributeValueSyntax {
 	Extension : MarkupExtensionSyntax;
 }
 
+[id 590]
+/// <summary>
+/// Built-in expression binding attribute value, e.g. ${x.bind Vm.FirstName}.
+/// This is dedicated language syntax rather than a CLR markup extension.
+/// </summary>
+node MarkupExpressionBindingSyntax : MarkupAttributeValueSyntax {
+	DollarToken : DollarToken;
+	OpenBrace   : OpenBraceToken;
+	XIdentifier : SimpleName;
+	DotToken    : DotToken;
+	BindKeyword : BindToken;
+	Expression  : CSharpExpressionSyntax;
+	CloseBrace  : CloseBraceToken;
+}
+
+[id 538]
 /// <summary>
 /// Markup extension body, e.g. ${MyMx 123, Property={state}, Nested=${Binding Name}}.
 /// </summary>
@@ -680,6 +696,15 @@ node ExpressionConditionalPrefixSyntax : TailwindPrefixSegmentSyntax {
 	Expression : InlineExpressionSyntax; // { expr }
 	Colon      : ColonToken;             // :
 }
+
+/// Reactive C# expression condition; distinct from frame-based conditions.
+[id 591]
+node TailwindExpressionBindingConditionalPrefixSyntax : TailwindPrefixSegmentSyntax {
+    Binding : MarkupExpressionBindingSyntax;
+    Colon   : ColonToken;
+}
+
+[id 556]
 
 
 node TailwindFullAttributeSyntax : TailwindAttributeSyntax {

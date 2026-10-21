@@ -105,7 +105,11 @@ internal abstract partial class AkburaSemanticModel
                     continue;
                 }
 
-                if (IsMarkupDictionaryKeyDirective(attribute) &&
+                if (expressionSyntax.Parent is MarkupExpressionBindingSyntax)
+                {
+                    expectedType = GetExpressionBindingTargetType(expressionSyntax);
+                }
+                else if (IsMarkupDictionaryKeyDirective(attribute) &&
                     GetContainingMarkupElement(attribute) is { } child &&
                     TryGetMarkupDictionaryContext(child, out var contentModel))
                 {
@@ -136,6 +140,25 @@ internal abstract partial class AkburaSemanticModel
                 expression,
                 relativePosition,
                 expectedType);
+    }
+
+    private ITypeSymbol? GetExpressionBindingTargetType(CSharpExpressionSyntax expression)
+    {
+        if (expression.Parent is MarkupExpressionBindingSyntax
+            { Parent: TailwindExpressionBindingConditionalPrefixSyntax })
+        {
+            return Compilation.CSharpCompilation.GetSpecialType(SpecialType.System_Boolean);
+        }
+
+        if (expression.Parent is not MarkupExpressionBindingSyntax { Parent: MarkupAttributeSyntax attribute })
+        {
+            return null;
+        }
+
+        var property = GetSymbolInfo(attribute).Symbol as Symbols.IPropertySymbol;
+        var contract = GetMarkupPropertyAssignmentContract(property, GetContainingMarkupElement(attribute));
+        // AssignBinding is a destination channel, not the C# expression type.
+        return contract.ContextualValueType ?? contract.DeclaredType;
     }
 
     private bool TryGetMarkupCommandHandlerTargetType(MarkupAttributeSyntax attribute, CSharp.ExpressionSyntax expression, out ITypeSymbol? targetType)

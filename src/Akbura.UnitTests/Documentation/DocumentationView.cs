@@ -2,6 +2,7 @@ using Akbura.ComponentTree;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Themes.Fluent;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -19,7 +20,8 @@ internal sealed class DocumentationView : IDisposable
 {
     private readonly Window _window;
 
-    public DocumentationView(CompiledDocumentationExample example, object? dataContext = null)
+    public DocumentationView(CompiledDocumentationExample example, object? dataContext = null,
+        Action<AkburaControl>? configure = null)
     {
         var application = Assert.IsAssignableFrom<Application>(Application.Current);
         if (!application.Styles.OfType<FluentTheme>().Any())
@@ -27,8 +29,18 @@ internal sealed class DocumentationView : IDisposable
             application.Styles.Add(new FluentTheme());
         }
 
+        // The normal built-in utility theme is part of the documented app setup.
+        if (example.Example.Path == Akbura.TestUtilities.Documentation.DocumentationExampleCatalog.ExpressionBindingsPage)
+        {
+            application.Resources.MergedDictionaries.Add(new ResourceInclude(new Uri("avares://Akbura/"))
+            {
+                Source = new Uri("avares://Akbura/Styles.axaml"),
+            });
+        }
+
         Owner = Assert.IsAssignableFrom<AkburaControl>(Activator.CreateInstance(example.Type));
         Owner.DataContext = dataContext;
+        configure?.Invoke(Owner);
         _window = new Window { Width = 640d, Height = 480d };
         try
         {

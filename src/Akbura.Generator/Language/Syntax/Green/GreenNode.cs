@@ -171,7 +171,9 @@ internal abstract partial class GreenNode
                 ? (ushort)15
                 : (ushort)(value & 0b_0000_0000_0000_1111);
 
-            _nodeFlagsAndSlotCount |= slotCount;
+            // A concrete node replaces the count initialized by its abstract
+            // base. OR-ing the two counts would turn base 1 + concrete 2 into 3.
+            _nodeFlagsAndSlotCount = (ushort)((_nodeFlagsAndSlotCount & ~SlotCountMask) | slotCount);
         }
     }
 

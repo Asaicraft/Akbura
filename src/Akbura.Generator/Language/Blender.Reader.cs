@@ -112,12 +112,16 @@ internal readonly partial struct Blender
 
             var position = _lexer.TextWindow.Position;
             var token = _lexer.Lex(mode);
-            var nextCursor = IsWithinCurrentChangeInNewText(position)
+            _newPosition += token.FullWidth;
+            // A raw C# token can cross the complete edit. Apply its delta
+            // before mapping the old cursor, otherwise a longer expression
+            // can advance past unchanged siblings in the old tree.
+            SkipPastChanges();
+            var nextCursor = IsWithinCurrentChangeInNewText(_newPosition)
                 ? _oldTreeCursor
-                : MoveOldTreePast(position + token.FullWidth);
+                : MoveOldTreePast(_newPosition);
 
             _oldTreeCursor = nextCursor;
-            _newPosition += token.FullWidth;
 
             var blended = new BlendedNode(
                 null,
@@ -223,6 +227,32 @@ internal readonly partial struct Blender
             var lastTerminal =
                 underlyingNode as GreenSyntaxToken ??
                 underlyingNode.GetLastTerminal();
+
+            if (lastTerminal != null &&
+                (nodeOrToken.Parent is MarkupExpressionBindingSyntax ||
+                 nodeOrToken.Parent is SimpleNameSyntax { Parent: MarkupExpressionBindingSyntax } ||
+                 lastTerminal.Kind == SyntaxKind.CloseBraceToken &&
+                 nodeOrToken.AsNode()?.GetLastToken(includeZeroWidth: true).Parent is MarkupExpressionBindingSyntax))
+            {
+                // A boundary deletion/replacement can expose new trailing
+                // trivia on the closing brace or an introducer token. Check
+                // the new lexical boundary before reusing its old owner.
+                var position = _lexer.TextWindow.Position;
+                GreenSyntaxToken freshToken;
+                try
+                {
+                    _lexer.TextWindow.Reset(oldSpan.End - lastTerminal.FullWidth + _changeDelta);
+                    freshToken = _lexer.Lex(Lexer.LexerMode.TopLevel);
+                }
+                finally
+                {
+                    _lexer.TextWindow.Reset(position);
+                }
+                if (freshToken.ToFullString() != lastTerminal.ToFullString())
+                {
+                    return true;
+                }
+            }
 
             // A boundary edit can extend a markup-extension literal through its
             // argument/value owner. Completed quoted attributes use the same
@@ -358,9 +388,15 @@ internal readonly partial struct Blender
                 return false;
             }
 
-            if (lastTerminal.GetTrailingTriviaWidth() == 0 &&
-                char.IsWhiteSpace(insertedCharacter))
+            var trailingTrivia = new GreenSyntaxList<GreenNode>(lastTerminal.GetTrailingTrivia());
+            var endsWithLineBreak = trailingTrivia.Count > 0 &&
+                trailingTrivia[trailingTrivia.Count - 1].Kind == SyntaxKind.EndOfLineTrivia;
+            if (char.IsWhiteSpace(insertedCharacter) && !endsWithLineBreak)
             {
+                // Appended whitespace extends the last token's trailing trivia
+                // even when it already owns horizontal whitespace. After an EOL,
+                // the lexer stops trailing trivia; indentation belongs to the next
+                // token and must not invalidate an unchanged preceding sibling.
                 return true;
             }
 
@@ -517,6 +553,7 @@ internal readonly partial struct Blender
         {
             return mode is
                 Lexer.LexerMode.InInlineExpression or
+                Lexer.LexerMode.InExpressionBinding or
                 Lexer.LexerMode.InMarkupCondition or
                 Lexer.LexerMode.InMarkupForeachHeader or
                 Lexer.LexerMode.InMarkupCodeStatement or

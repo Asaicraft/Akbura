@@ -1,4 +1,3 @@
-param Router Router;
 param string CurrentUrl = "";
 
 <Border p-4 bg-slate-950>
@@ -23,36 +22,31 @@ param string CurrentUrl = "";
                     gap-2>
 
             <Link Content="Overview"
-                  Url="/overview"
-                  Router={Router}/>
+                  Url="/overview"/>
 
             <Link Content="State bindings"
-                  Url="/state-bindings"
-                  Router={Router}/>
+                  Url="/state-bindings"/>
+
+            <Link Content="Expression bindings"
+                  Url="/expression-bindings"/>
 
             <Link Content="Commands"
-                  Url="/commands"
-                  Router={Router}/>
+                  Url="/commands"/>
 
             <Link Content="Data templates"
-                  Url="/data-templates"
-                  Router={Router}/>
+                  Url="/data-templates"/>
 
             <Link Content="XML / XAML / AXAML"
-                  Url="/xml-xaml-axaml"
-                  Router={Router}/>
+                  Url="/xml-xaml-axaml"/>
 
             <Link Content="AKCSS"
-                  Url="/akcss"
-                  Router={Router}/>
+                  Url="/akcss"/>
                   
             <Link Content="Utility variants"
-                  Url="/utility-variants"
-                  Router={Router}/>
+                  Url="/utility-variants"/>
 
             <Link Content="About"
-                  Url="/about"
-                  Router={Router}/>
+                  Url="/about"/>
 
         </StackPanel>
 

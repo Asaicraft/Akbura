@@ -26,6 +26,8 @@ internal interface ITailwindUtilityAttributeOperation : IMarkupAttributeOperatio
 
     MarkupExtensionValue? ConditionMarkupExtension { get; }
 
+    ExpressionBindingPlan? ConditionExpressionBinding { get; }
+
     TailwindUtilityVariant Variant { get; }
 
     TailwindUtilityBindingPriority BindingPriority { get; }

@@ -42,7 +42,8 @@ public sealed class AkburaCompletionItem
         int caretOffsetFromEnd = 0,
         bool triggerCompletionAfterInsert = false,
         string? namespaceImport = null,
-        string? resolveKey = null)
+        string? resolveKey = null,
+        bool isMarkupValuePrefix = false)
     {
         if (string.IsNullOrWhiteSpace(displayText))
         {
@@ -55,6 +56,7 @@ public sealed class AkburaCompletionItem
         InsertText = insertText ??
             throw new ArgumentNullException(nameof(insertText));
         Kind = kind;
+        IsMarkupValuePrefix = isMarkupValuePrefix || kind == AkburaCompletionKind.MarkupExtension;
         _lazyDescription = descriptionFactory != null &&
             string.IsNullOrEmpty(description)
                 ? null
@@ -106,6 +108,9 @@ public sealed class AkburaCompletionItem
     public string ResolveKey { get; }
 
     public AkburaCompletionKind Kind { get; }
+
+    /// <summary>Uses the shared ${...} name-span commit validation.</summary>
+    public bool IsMarkupValuePrefix { get; }
 
     public string Description
     {

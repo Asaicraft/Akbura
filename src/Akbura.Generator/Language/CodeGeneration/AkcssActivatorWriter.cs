@@ -2,6 +2,7 @@ using Akbura.Language.Binder;
 using Akbura.Language.Operations;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -427,6 +428,29 @@ internal readonly ref struct AkcssActivatorWriter
     }
 
     public void WriteRefresh(
+        in AkcssComponentActivatorPlan plan,
+        in AkcssPlanRange activators,
+        string targetExpression)
+    {
+        if (activators.IsEmpty) return;
+        EnsureRange(activators, plan.Activators.Length, nameof(activators));
+        EnsureExpression(targetExpression, nameof(targetExpression));
+        for (var index = 0; index < activators.Length; index++)
+        {
+            var activator = plan.Activators[activators.Start + index];
+            if (activator.Kind != AkcssActivatorKind.UtilityCandidate) continue;
+            var candidate = plan.Candidates[activator.Index];
+            if (!candidate.RequiresReactiveConditionRefresh) continue;
+
+            _writer.Write("global::Akbura.Akcss.AkcssUtilityCandidateActivator.RefreshReactiveCondition(")
+                .Write(targetExpression).Write(", ").WriteIntegerLiteral(index).Write(", ");
+            WriteReactiveEvaluator(candidate);
+            _writer.WriteLine(");");
+        }
+        WriteRefresh(activators, targetExpression);
+    }
+
+    public void WriteRefresh(
         in AkcssPlanRange activators,
         string targetExpression)
     {
@@ -784,7 +808,13 @@ internal readonly ref struct AkcssActivatorWriter
             WriteCandidateValueSources(plan, candidate.ValueSources, context);
         }
 
-        if (candidate.HasCondition)
+        if (candidate.ConditionExpressionBinding != null)
+        {
+            _writer.WriteLine(",");
+            _writer.Write("reactiveCondition: ");
+            WriteReactiveEvaluator(candidate);
+        }
+        else if (candidate.HasCondition)
         {
             _writer.WriteLine(",");
             _writer.Write("condition: () => ");
@@ -839,6 +869,32 @@ internal readonly ref struct AkcssActivatorWriter
         }
 
         _writer.Write(candidate.ConditionText ?? "false");
+    }
+
+    private void WriteReactiveEvaluator(in AkcssUtilityCandidatePlan candidate)
+    {
+        var binding = candidate.ConditionExpressionBinding ??
+            throw new InvalidOperationException("A reactive AKCSS evaluator requires an expression-binding plan.");
+        var rewriter = new ExpressionBindingWriter.TrackingRewriter(binding,
+            candidate.ConditionStateAccessors, candidate.ConditionNamedReceivers);
+        using var mapping = candidate.ConditionSyntax == null ? default :
+            WriteSourceMappingStart(candidate.ConditionSyntax.Expression);
+        if (!candidate.RequiresReactiveConditionRefresh)
+        {
+            // Isolate stable callbacks from adjacent local/iteration closures.
+            // The owner is an explicit input to a static factory, as for stable
+            // property expression bindings; no old item display class is retained.
+            var owner = rewriter.NewIdentifier("__akcssExpressionOwner");
+            rewriter.SetStableScope(owner, store: null);
+            _writer.Write("((global::System.Func<").Write(_ownerTypeName)
+                .Write(", global::System.Func<global::Akbura.ComponentTree.ExpressionBindingContext, bool>>)(static ")
+                .Write(owner).Write(" => ");
+        }
+        _writer.Write("(global::Akbura.ComponentTree.ExpressionBindingContext ")
+            .Write(rewriter.TrackerName).Write(") => ")
+            .Write(rewriter.Visit(binding.Expression.Syntax)!.NormalizeWhitespace().ToFullString());
+        if (!candidate.RequiresReactiveConditionRefresh)
+            _writer.Write("))(this)");
     }
 
     private void WriteVariantArguments(in TailwindUtilityVariant variant)

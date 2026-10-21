@@ -15,7 +15,8 @@ public readonly struct AkburaCSharpCompletionContext
         TextSpan hostSpan,
         int hostPosition,
         AkburaCSharpCompletionLogicalSlot logicalSlot = default,
-        TextSpan logicalOwnerSpan = default)
+        TextSpan logicalOwnerSpan = default,
+        int? expressionOpenBracePosition = null)
     {
         Kind = kind;
         OwnerKind = ownerKind;
@@ -23,6 +24,7 @@ public readonly struct AkburaCSharpCompletionContext
         HostSpan = hostSpan;
         HostPosition = hostPosition;
         LogicalSlot = logicalSlot;
+        ExpressionOpenBracePosition = expressionOpenBracePosition;
         LogicalOwnerSpan = logicalSlot ==
                 AkburaCSharpCompletionLogicalSlot.None
             ? ownerSpan
@@ -56,6 +58,8 @@ public readonly struct AkburaCSharpCompletionContext
     internal AkburaCSharpCompletionLogicalSlot LogicalSlot { get; }
 
     internal TextSpan LogicalOwnerSpan { get; }
+
+    internal int? ExpressionOpenBracePosition { get; }
 }
 
 internal enum AkburaCSharpCompletionLogicalSlot

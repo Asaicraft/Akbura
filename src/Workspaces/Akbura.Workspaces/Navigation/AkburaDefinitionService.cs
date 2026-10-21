@@ -123,7 +123,7 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             switch (node)
             {
                 case CSharpExpressionSyntax condition when condition.Parent is
-                    MarkupIfStatementSyntax or MarkupElseIfClauseSyntax or MarkupCodeIfStatementSyntax or MarkupForeachKeyClauseSyntax:
+                    MarkupIfStatementSyntax or MarkupElseIfClauseSyntax or MarkupCodeIfStatementSyntax or MarkupForeachKeyClauseSyntax or MarkupExpressionBindingSyntax:
                     return GetCSharpDefinition(context,
                         semanticModel.GetCSharpSymbolReferences(condition), position, cancellationToken);
 
@@ -401,7 +401,7 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             ImmutableArray<CSharpSymbolReference> references;
             switch (node)
             {
-                case CSharpExpressionSyntax condition when condition.Parent is MarkupIfStatementSyntax or MarkupElseIfClauseSyntax or MarkupCodeIfStatementSyntax or MarkupForeachKeyClauseSyntax:
+                case CSharpExpressionSyntax condition when condition.Parent is MarkupIfStatementSyntax or MarkupElseIfClauseSyntax or MarkupCodeIfStatementSyntax or MarkupForeachKeyClauseSyntax or MarkupExpressionBindingSyntax:
                     references = semanticModel.GetCSharpSymbolReferences(condition);
                     break;
 

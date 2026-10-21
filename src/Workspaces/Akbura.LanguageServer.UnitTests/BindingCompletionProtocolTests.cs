@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace Akbura.LanguageServer.UnitTests;
 
-public sealed class BindingCompletionProtocolTests
+public sealed partial class BindingCompletionProtocolTests
 {
     [Fact]
     public async Task StaleSemanticContextIsRebasedForBindingCompletion()
@@ -133,6 +133,12 @@ public sealed class BindingCompletionProtocolTests
             var edit = Assert.IsType<TextEdit>(item.TextEdit);
             var span = _services.PositionConverter.ToTextSpan(_context.OpenDocument!.Text, edit.Range);
             return _context.OpenDocument.Text.ToString(span);
+        }
+
+        public async Task<Protocol.CompletionItem> ResolveAsync(Protocol.CompletionItem item)
+        {
+            var result = await new CompletionResolveHandler().HandleAsync(item, _context, CancellationToken.None);
+            return result.TypedResponse;
         }
 
         public string Apply(Protocol.CompletionItem item)

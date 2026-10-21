@@ -6,6 +6,33 @@ namespace Akbura.Workspaces.UnitTests;
 
 public sealed class CompletionPerformancePolicyTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void Selector_HidesOnlyTheReservedProbeMethodInBothHosts(bool isExplicit, bool visualStudio)
+    {
+        var hidden = CompletionItem.Create(Akbura.Language.Binder.CSharpProbeBuilder.ExpressionProbeMethodName,
+            tags: [Microsoft.CodeAnalysis.Tags.WellKnownTags.Method]);
+        var local = CompletionItem.Create(Akbura.Language.Binder.CSharpProbeBuilder.ExpressionProbeMethodName,
+            tags: [Microsoft.CodeAnalysis.Tags.WellKnownTags.Local]);
+        var userMethod = CompletionItem.Create("__akbura_user_method",
+            tags: [Microsoft.CodeAnalysis.Tags.WellKnownTags.Method]);
+        var list = CreateList(new TextSpan(0, 0), hidden, local, userMethod);
+        var selection = visualStudio
+            ? AkburaRoslynCompletionItemSelector.SelectForVisualStudio(list, SourceText.From(""), 0, CancellationToken.None)
+            : AkburaRoslynCompletionItemSelector.Select(list, SourceText.From(""), 0, isExplicit, CancellationToken.None);
+        Assert.Equal(2, selection.Items.Length);
+        Assert.DoesNotContain(selection.Items, item =>
+            item.DisplayText == Akbura.Language.Binder.CSharpProbeBuilder.ExpressionProbeMethodName &&
+            item.Tags.Contains(Microsoft.CodeAnalysis.Tags.WellKnownTags.Method));
+        Assert.Single(selection.Items, item =>
+            item.DisplayText == Akbura.Language.Binder.CSharpProbeBuilder.ExpressionProbeMethodName &&
+            item.Tags.Contains(Microsoft.CodeAnalysis.Tags.WellKnownTags.Local));
+        Assert.Contains(selection.Items, item => item.DisplayText == userMethod.DisplayText &&
+            item.Tags.Contains(Microsoft.CodeAnalysis.Tags.WellKnownTags.Method));
+    }
+
     [Fact]
     public void DeclarationModifiersPublishBeforeDelayedRoslynCompletion()
     {

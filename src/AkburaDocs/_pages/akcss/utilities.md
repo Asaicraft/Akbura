@@ -188,7 +188,21 @@ contract.
 
 ## Conditional utilities
 
-A utility can be applied conditionally with an expression prefix:
+A utility can obtain its Boolean condition in three ways:
+
+| Prefix | Source and refresh mechanism |
+| --- | --- |
+| `{condition}:utility` | C# in component scope, evaluated by normal render/AKCSS refresh. |
+| `${Binding Path}:utility` | Avalonia Binding, normally relative to DataContext, observing source notifications. |
+| `${x.bind expression}:utility` | Typed C# in component scope, observing supported expression dependencies. |
+
+Both binding-backed forms can update without a component render. The ordinary
+form catches up on its normal refresh path, including renders caused by state
+changes. All three feed the same AKCSS cascade. See
+[Expression Bindings](/akbura/expression-bindings#three-ways-to-conditionally-apply-akcss-utilities)
+for runnable examples, DataContext rules and guidance on choosing each form.
+
+For example, an ordinary C# condition:
 
 ```akbura
 using Avalonia.Controls;

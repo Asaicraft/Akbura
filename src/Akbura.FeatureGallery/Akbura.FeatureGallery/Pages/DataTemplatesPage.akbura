@@ -250,7 +250,7 @@ using Akbura.Markup;
                 </Page>
 
                 content = page == null
-                    ? NotFound.Build(Url)
+                    ? NotFound.Build(url)
                     : TemplateContent
                         .Load<Control>(page.Content)
                         .Result;

@@ -51,20 +51,22 @@ internal readonly struct AkcssActivatorElementInput
 /// <summary>
 /// Builds compact AKCSS generation plans without creating emitted C# expressions.
 /// </summary>
-internal static class AkcssActivatorPlanner
+internal static partial class AkcssActivatorPlanner
 {
     public static AkcssComponentActivatorPlan Create(
         AkburaSemanticModel semanticModel,
         ImmutableArray<AkcssActivatorElementInput> elements,
-        IReadOnlyDictionary<AkburaSyntax, string> moduleTypeNames)
+        IReadOnlyDictionary<AkburaSyntax, string> moduleTypeNames,
+        IReadOnlyDictionary<MarkupElementSyntax, string>? expressionElementReceivers = null)
     {
-        return Create(semanticModel, elements.AsSpan(), moduleTypeNames);
+        return Create(semanticModel, elements.AsSpan(), moduleTypeNames, expressionElementReceivers);
     }
 
     public static AkcssComponentActivatorPlan Create(
         AkburaSemanticModel semanticModel,
         ReadOnlySpan<AkcssActivatorElementInput> elements,
-        IReadOnlyDictionary<AkburaSyntax, string> moduleTypeNames)
+        IReadOnlyDictionary<AkburaSyntax, string> moduleTypeNames,
+        IReadOnlyDictionary<MarkupElementSyntax, string>? expressionElementReceivers = null)
     {
         if (semanticModel == null)
         {
@@ -76,14 +78,16 @@ internal static class AkcssActivatorPlanner
             throw new ArgumentNullException(nameof(moduleTypeNames));
         }
 
-        using var planner = new Planner(semanticModel, moduleTypeNames);
+        using var planner = new Planner(semanticModel, moduleTypeNames, expressionElementReceivers);
         return planner.Create(elements);
     }
 
-    private ref struct Planner
+    private ref partial struct Planner
     {
         private readonly AkburaSemanticModel _semanticModel;
         private readonly IReadOnlyDictionary<AkburaSyntax, string> _moduleTypeNames;
+        private readonly IReadOnlyDictionary<MarkupElementSyntax, string>? _expressionElementReceivers;
+        private ImmutableDictionary<string, string>? _conditionStateAccessors;
         private readonly CSharpCompilation _compilation;
         private readonly INamedTypeSymbol? _controlType;
         private readonly INamedTypeSymbol? _bindingBaseType;
@@ -104,10 +108,13 @@ internal static class AkcssActivatorPlanner
 
         public Planner(
             AkburaSemanticModel semanticModel,
-            IReadOnlyDictionary<AkburaSyntax, string> moduleTypeNames)
+            IReadOnlyDictionary<AkburaSyntax, string> moduleTypeNames,
+            IReadOnlyDictionary<MarkupElementSyntax, string>? expressionElementReceivers)
         {
             _semanticModel = semanticModel;
             _moduleTypeNames = moduleTypeNames;
+            _expressionElementReceivers = expressionElementReceivers;
+            _conditionStateAccessors = null;
             _compilation = semanticModel.Compilation.CSharpCompilation;
             _controlType = _compilation.GetTypeByMetadataName("Avalonia.Controls.Control");
             _bindingBaseType = _compilation.GetTypeByMetadataName("Avalonia.Data.BindingBase");
@@ -272,7 +279,12 @@ internal static class AkcssActivatorPlanner
                 operation.ConditionOperation,
                 operation.Variant,
                 operation.BindingPriority,
-                ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(operation.Syntax)));
+                ComponentHotReloadIdentity.CreateOperationSyntaxIdentity(operation.Syntax),
+                operation.ConditionExpressionBinding,
+                (operation.Syntax as TailwindFullAttributeSyntax)?.Prefix is
+                    TailwindExpressionBindingConditionalPrefixSyntax reactive ? reactive.Binding : null,
+                operation.ConditionExpressionBinding == null ? null : GetConditionStateAccessors(),
+                GetConditionNamedReceivers(operation)));
             _activators.Add(AkcssActivatorPlan.CreateCandidate(candidateIndex));
         }
 

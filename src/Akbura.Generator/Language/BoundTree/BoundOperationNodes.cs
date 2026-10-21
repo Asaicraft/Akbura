@@ -78,7 +78,8 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
         object? convertedValue,
         bool assignsCollectionSource,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default,
-        bool hasErrors = false)
+        bool hasErrors = false,
+        ExpressionBindingPlan? expressionBindingPlan = null)
         : base(
             BoundKind.MarkupPropertySetter,
             syntax,
@@ -101,6 +102,7 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
         LiteralValue = literalValue;
         ConvertedValue = convertedValue;
         AssignsCollectionSource = assignsCollectionSource;
+        ExpressionBindingPlan = expressionBindingPlan;
     }
 
     public IPropertySymbol? Property { get; }
@@ -125,6 +127,8 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
 
     public bool AssignsCollectionSource { get; }
 
+    public ExpressionBindingPlan? ExpressionBindingPlan { get; }
+
     public BoundMarkupPropertySetter Update(
         IMarkupComponentSymbol? containingComponent,
         IPropertySymbol? property,
@@ -137,7 +141,25 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
         MarkupAttributeValueSyntax? valueSyntax,
         string? literalValue,
         object? convertedValue,
-        bool assignsCollectionSource)
+        bool assignsCollectionSource) =>
+        Update(containingComponent, property, appliedAkcssSymbols, valueType, valueOperation,
+            valueConversion, bindingKind, valueKind, valueSyntax, literalValue, convertedValue,
+            assignsCollectionSource, ExpressionBindingPlan);
+
+    public BoundMarkupPropertySetter Update(
+        IMarkupComponentSymbol? containingComponent,
+        IPropertySymbol? property,
+        ImmutableArray<IAkcssSymbol> appliedAkcssSymbols,
+        CSharpSymbolDefinition valueType,
+        CSharpOperationDefinition valueOperation,
+        AkburaConversion valueConversion,
+        MarkupAttributeBindingKind bindingKind,
+        MarkupAttributeValueKind valueKind,
+        MarkupAttributeValueSyntax? valueSyntax,
+        string? literalValue,
+        object? convertedValue,
+        bool assignsCollectionSource,
+        ExpressionBindingPlan? expressionBindingPlan)
     {
         if (ReferenceEquals(containingComponent, ContainingComponent) &&
             ReferenceEquals(property, Property) &&
@@ -150,7 +172,8 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
             ReferenceEquals(valueSyntax, ValueSyntax) &&
             literalValue == LiteralValue &&
             Equals(convertedValue, ConvertedValue) &&
-            assignsCollectionSource == AssignsCollectionSource)
+            assignsCollectionSource == AssignsCollectionSource &&
+            ReferenceEquals(expressionBindingPlan, ExpressionBindingPlan))
         {
             return this;
         }
@@ -171,7 +194,8 @@ internal sealed class BoundMarkupPropertySetter : BoundMarkupAttribute
             convertedValue,
             assignsCollectionSource,
             Diagnostics,
-            HasErrors);
+            HasErrors,
+            expressionBindingPlan);
     }
 
     public override void Accept(BoundTreeVisitor visitor) => visitor.VisitMarkupPropertySetter(this);
@@ -499,7 +523,8 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
         TailwindUtilityVariant variant = default,
         TailwindUtilityBindingPriority bindingPriority = default,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default,
-        bool hasErrors = false)
+        bool hasErrors = false,
+        ExpressionBindingPlan? conditionExpressionBinding = null)
         : base(
             BoundKind.TailwindUtilityAttribute,
             syntax,
@@ -522,6 +547,7 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
         ConditionType = conditionType;
         ConditionOperation = conditionOperation;
         ConditionMarkupExtension = conditionMarkupExtension;
+        ConditionExpressionBinding = conditionExpressionBinding;
         Variant = variant;
         BindingPriority = bindingPriority;
     }
@@ -545,6 +571,8 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
     public CSharpOperationDefinition ConditionOperation { get; }
 
     public MarkupExtensionValue? ConditionMarkupExtension { get; }
+
+    public ExpressionBindingPlan? ConditionExpressionBinding { get; }
 
     public TailwindUtilityVariant Variant { get; }
 
@@ -596,7 +624,8 @@ internal sealed class BoundTailwindUtilityAttribute : BoundMarkupAttribute
             variant,
             bindingPriority,
             Diagnostics,
-            HasErrors);
+            HasErrors,
+            ConditionExpressionBinding);
     }
 
     public override void Accept(BoundTreeVisitor visitor) => visitor.VisitTailwindUtilityAttribute(this);

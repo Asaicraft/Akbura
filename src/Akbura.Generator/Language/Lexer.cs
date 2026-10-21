@@ -55,6 +55,7 @@ internal sealed partial class Lexer : IDisposable
 		InMarkupForeachKey = 1 << 13,
 		InMarkupDoubleQuotedText = 1 << 14,
 		InMarkupSingleQuotedText = 1 << 15,
+		InExpressionBinding = 1 << 16,
 	}
 
 	internal struct TokenInfo
@@ -179,6 +180,7 @@ internal sealed partial class Lexer : IDisposable
 			var tokenInfo = mode switch
 			{
 				LexerMode.InInlineExpression => ParseInlineExpression(),
+				LexerMode.InExpressionBinding => ParseExpressionUntil('}', '}', expressionBinding: true),
 				LexerMode.InExpressionUntilSemicolon => ParseExpressionUntilSemicolon(),
 				LexerMode.InExpressionUntilComma => ParseExpressionUntilComma(),
 				LexerMode.InArgumentExpression => ParseArgumentExpression(),
@@ -1602,7 +1604,7 @@ internal sealed partial class Lexer : IDisposable
 		return tokenInfo;
 	}
 
-	private TokenInfo ParseExpressionUntil(char firstTerminator, char secondTerminator)
+	private TokenInfo ParseExpressionUntil(char firstTerminator, char secondTerminator, bool expressionBinding = false)
 	{
 		static void IncreaseDepth(ref int depth, char character, StringBuilder stringBuilder, ref SlidingTextWindow TextWindow)
 		{
@@ -1645,6 +1647,24 @@ internal sealed partial class Lexer : IDisposable
 			if (character == SlidingTextWindow.InvalidCharacter)
 				break;
 
+			if (expressionBinding)
+			{
+				// These token pairs cannot occur in a C# expression outside a
+				// string/comment. Leave following markup to outer recovery.
+				if (character == '/' && TextWindow.PeekChar(1) == '>' ||
+					character == '<' && TextWindow.PeekChar(1) == '/' ||
+					character == '}' && brace == 0)
+				{
+					break;
+				}
+
+				if (character == '/' && TextWindow.PeekChar(1) is '/' or '*')
+				{
+					AppendMarkupConditionComment(_builder);
+					continue;
+				}
+			}
+
 			// handle strings/chars. Interpolated strings may contain nested
 			// braces, so they must be consumed as a single C# expression.
 			if (TryScanCSharpStringOrCharText(out var stringOrCharText))
@@ -1676,7 +1696,9 @@ internal sealed partial class Lexer : IDisposable
 			if (character == ')')
 			{
 				if (DecreaseDepth(ref paren, character, _builder, ref TextWindow))
-					break;
+				{
+					if (!expressionBinding) break;
+				}
 				continue;
 			}
 
@@ -1704,7 +1726,9 @@ internal sealed partial class Lexer : IDisposable
 			if (character == ']')
 			{
 				if (DecreaseDepth(ref bracket, character, _builder, ref TextWindow))
-					break;
+				{
+					if (!expressionBinding) break;
+				}
 				continue;
 			}
 

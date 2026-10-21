@@ -25,7 +25,8 @@ internal sealed class TailwindUtilityAttributeOperation : ITailwindUtilityAttrib
         TailwindUtilityVariant variant,
         TailwindUtilityBindingPriority bindingPriority,
         bool hasErrors,
-        ICSharpOperation? conditionOperationTree = null)
+        ICSharpOperation? conditionOperationTree = null,
+        ExpressionBindingPlan? conditionExpressionBinding = null)
     {
         Syntax = syntax ?? throw new ArgumentNullException(nameof(syntax));
         ContainingComponent = containingComponent;
@@ -42,6 +43,7 @@ internal sealed class TailwindUtilityAttributeOperation : ITailwindUtilityAttrib
         ConditionType = conditionType;
         ConditionOperation = conditionOperation;
         ConditionMarkupExtension = conditionMarkupExtension;
+        ConditionExpressionBinding = conditionExpressionBinding;
         Variant = variant;
         BindingPriority = bindingPriority;
         HasErrors = hasErrors;
@@ -96,6 +98,8 @@ internal sealed class TailwindUtilityAttributeOperation : ITailwindUtilityAttrib
     public ICSharpOperation? ConditionOperationTree { get; }
 
     public MarkupExtensionValue? ConditionMarkupExtension { get; }
+
+    public ExpressionBindingPlan? ConditionExpressionBinding { get; }
 
     public TailwindUtilityVariant Variant { get; }
 

@@ -242,10 +242,17 @@ internal static partial class ComponentPlanner
                     (element.Flags & ComponentElementFlags.IsConditionalTemplateRoot) != 0));
             }
 
+            var expressionReceivers = new Dictionary<MarkupElementSyntax, string>();
+            foreach (var entry in _syntaxElementIds)
+            {
+                expressionReceivers.Add(entry.Key, _elements[entry.Value].Identifier);
+            }
+
             return AkcssActivatorPlanner.Create(
                 _semanticModel,
                 inputs.WrittenSpan,
-                _akcssModuleTypeNames);
+                _akcssModuleTypeNames,
+                expressionReceivers);
         }
 
         private void CapturePlanBuffers(ref ComponentPlanBufferOwner owner)
@@ -1715,7 +1722,9 @@ internal static partial class ComponentPlanner
             }
 
             var writeIndex = _propertyWrites.Count;
-            var phase = GetWritePhase(operation);
+            var phase = GetWritePhase(operation, value.Kind == ComponentPropertyValueKind.ExpressionBinding
+                ? _csharpValues.WrittenSpan[value.Index].ExpressionInitialization
+                : ExpressionBindingInitializationKind.RequiresRenderRefresh);
             _propertyWrites.Add(new ComponentPropertyWritePlan(
                 pending.Destination,
                 value.Kind,
@@ -2157,15 +2166,34 @@ internal static partial class ComponentPlanner
         {
             return pending.Operation.ConvertedValue is MarkupExtensionValue extension
                 ? LowerMarkupExtension(extension, pending.ScopeId, pending.Destination)
-                : LowerCSharpValue(pending.Operation);
+                : LowerCSharpValue(pending);
         }
 
-        private ComponentPropertyValueReference LowerCSharpValue(IMarkupPropertySetterOperation operation)
+        private ImmutableDictionary<string, string>? _expressionStateAccessors;
+
+        private ImmutableDictionary<string, string> GetExpressionStateAccessors()
         {
+            if (_expressionStateAccessors != null) return _expressionStateAccessors;
+            var members = ComponentMemberPlanner.Create(_component, _semanticModel);
+            try
+            {
+                var names = ImmutableDictionary.CreateBuilder<string, string>();
+                foreach (var state in members.States)
+                    names.Add(state.Name, "__State_" + state.GeneratedName);
+                return _expressionStateAccessors = names.ToImmutable();
+            }
+            finally { members.ReturnToPool(); }
+        }
+
+        private ComponentPropertyValueReference LowerCSharpValue(in PendingPropertyWritePlan pending)
+        {
+            var operation = pending.Operation;
             var kind = operation.ValueKind switch
             {
                 MarkupAttributeValueKind.Literal => ComponentPropertyValueKind.Constant,
                 MarkupAttributeValueKind.DynamicExpression => ComponentPropertyValueKind.CSharpExpression,
+                MarkupAttributeValueKind.ExpressionBinding when operation.ExpressionBindingPlan is
+                    { Observability: not ExpressionBindingObservability.Unsupported } => ComponentPropertyValueKind.ExpressionBinding,
                 _ => ComponentPropertyValueKind.None,
             };
 
@@ -2175,11 +2203,18 @@ internal static partial class ComponentPlanner
             }
 
             var index = _csharpValues.Count;
+            var initialization = ExpressionBindingInitializationKind.RequiresRenderRefresh;
+            ImmutableDictionary<Microsoft.CodeAnalysis.Text.TextSpan, string>? namedReceivers = null;
+            if (kind == ComponentPropertyValueKind.ExpressionBinding)
+                initialization = ClassifyExpressionBinding(pending, out namedReceivers);
             _csharpValues.Add(new ComponentCSharpValuePlan(
                 operation.ValueOperation,
                 operation.ConvertedValue,
                 operation.LiteralValue,
-                operation.Property?.Type.Symbol as ITypeSymbol));
+                operation.ExpressionBindingPlan?.TargetType ?? operation.Property?.Type.Symbol as ITypeSymbol,
+                operation.ExpressionBindingPlan,
+                kind == ComponentPropertyValueKind.ExpressionBinding ? GetExpressionStateAccessors() : null,
+                initialization, namedReceivers));
 
             return new ComponentPropertyValueReference(kind, index);
         }
@@ -2472,8 +2507,12 @@ internal static partial class ComponentPlanner
             return null;
         }
 
-        private static ComponentPropertyWritePhase GetWritePhase(IMarkupPropertySetterOperation operation)
+        private static ComponentPropertyWritePhase GetWritePhase(IMarkupPropertySetterOperation operation,
+            ExpressionBindingInitializationKind expressionInitialization)
         {
+            if (operation.ValueKind == MarkupAttributeValueKind.ExpressionBinding)
+                return expressionInitialization == ExpressionBindingInitializationKind.InitialOnly
+                    ? ComponentPropertyWritePhase.FirstUpdate : ComponentPropertyWritePhase.Update;
             var isParameter = operation.Property?.Parameter != null;
             var isInitialValue = operation.ValueKind is
                 MarkupAttributeValueKind.Literal or

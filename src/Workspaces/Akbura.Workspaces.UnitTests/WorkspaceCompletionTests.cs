@@ -6419,8 +6419,10 @@ public sealed partial class WorkspaceCompletionTests
             });
     }
 
-    [Fact]
-    public void CSharpCompletionChangeMapper_MapsAutoImportAndPreservesCrLf()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CSharpCompletionChangeMapper_MapsAutoImportAndPreservesCrLf(bool explicitCaret)
     {
         const string sourceWithCaret =
             "global using System;\r\n" +
@@ -6460,10 +6462,10 @@ public sealed partial class WorkspaceCompletionTests
                     new TextSpan(0, 0),
                     importText);
                 var changes = ImmutableArray.Create(import, replacement);
-                var newProjectedPosition =
+                int? newProjectedPosition = explicitCaret ?
                     replacementSpan.Start +
                     importText.Length +
-                    "ObservableCollection".Length;
+                    "ObservableCollection".Length : null;
                 var changedProjectedText = projectedText.WithChanges(changes);
                 var completionChange = CompletionChange.Create(
                     new TextChange(

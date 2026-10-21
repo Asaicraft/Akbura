@@ -1,11 +1,14 @@
-state string url = "/overview";
+using Akbura.FeatureGallery.Routing;
+
+inject IRouter RouterService;
+
+state string currentUrl = out RouteSource.Url;
 
 <DrawerPage Header="Akbura Feature Gallery"
             DrawerLength="260">
 
     <DrawerPage.Drawer>
-        <AppDrawer Router={Router}
-                   CurrentUrl={url}/>
+        <AppDrawer CurrentUrl={currentUrl}/>
     </DrawerPage.Drawer>
 
     <Grid RowDefinitions="Auto,*"
@@ -25,14 +28,12 @@ state string url = "/overview";
                     shadow-lg>
 
                 <ScrollViewer>
-                    <Router bind:Url={url}
-                            x.Name="Router">
+                    <Router>
 
                         <Router.NotFound x.DataType="string"
                                          x.ItemName="notFoundUrl">
 
-                            <NotFoundPage Url={notFoundUrl}
-                                          Router={Router}/>
+                            <NotFoundPage Url={notFoundUrl}/>
 
                         </Router.NotFound>
 
@@ -44,6 +45,10 @@ state string url = "/overview";
 
                             <Page Url="/state-bindings">
                                 <StateBindingsPage/>
+                            </Page>
+
+                            <Page Url="/expression-bindings">
+                                <ExpressionBindingsPage/>
                             </Page>
 
                             <Page Url="/commands">

@@ -8,7 +8,7 @@ using System.Text.Json;
 
 namespace Akbura.LanguageServer.IntegrationTests;
 
-public sealed class SemanticProjectLifecycleTests
+public sealed partial class SemanticProjectLifecycleTests
 {
     private const string ComponentPrefixSource =
         "using Avalonia.Controls;\r\n" +
@@ -233,6 +233,15 @@ public sealed class SemanticProjectLifecycleTests
         public ClientNotifications Notifications { get; }
 
         public CancellationToken CancellationToken => _cancellation.Token;
+
+        public Task<T> RequestAsync<T>(string method, object parameters) =>
+            _rpc.InvokeWithParameterObjectAsync<T>(method, parameters, CancellationToken);
+
+        public Task CloseAsync(Uri uri) => _rpc.NotifyWithParameterObjectAsync(
+            LspMethods.DidClose, new DidCloseTextDocumentParams
+            {
+                TextDocument = new TextDocumentIdentifier { Uri = uri.AbsoluteUri },
+            });
 
         public static async Task<LanguageServerFixture> CreateAsync(
             bool failWatcherRegistration,

@@ -18,7 +18,10 @@ The initializer runs when that state is first created. A normal render caused by
 another value does not recreate it. Assigning an equal value is ignored by the
 default equality comparer. A normal initializer is a snapshot, not a computed
 state: `state int doubled = count * 2;` does not recalculate when `count` changes.
-Use a markup expression or a [composable hook](/akbura/hooks) for a derived value.
+Use an [expression binding](/akbura/expression-bindings) such as
+`Text=${x.bind $"Double: {count * 2}"}` for a reactive calculated property value
+instead of a derived state snapshot. A normal markup expression follows the
+render cycle; [composable hooks](/akbura/hooks) provide other derived-state tools.
 
 ## Directional connections
 

@@ -32,7 +32,10 @@ public sealed partial class AkburaRenderState
             {
                 try
                 {
-                    operation.Resource?.Release();
+                    if (operation.Resource is IDisposable disposable)
+                        disposable.Dispose();
+                    else
+                        operation.Resource?.Release();
                 }
                 catch (Exception exception)
                 {

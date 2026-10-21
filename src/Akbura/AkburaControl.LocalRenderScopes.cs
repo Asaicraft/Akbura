@@ -117,6 +117,8 @@ public abstract partial class AkburaControl
 
         public WeakReference<LocalRenderScope> Entry { get; }
 
+        public void MarkCurrentFrame() => _renderedFrame = _owner._localRenderScopeFrame;
+
         public void RenderCurrentFrame()
         {
             if (_pendingDetach && _lifetimeOwner?.HasPendingRevision != true)

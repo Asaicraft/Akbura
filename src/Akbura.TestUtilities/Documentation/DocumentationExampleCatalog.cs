@@ -31,8 +31,12 @@ internal static class DocumentationExampleCatalog
     public const string ForeachPage = "akbura/foreach.md";
     public const string ConditionalPage = "akbura/conditional-markup.md";
     public const string GridPage = "akbura/grid.md";
+    public const string ExpressionBindingsPage = "akbura/expression-bindings.md";
     public const string MainPage = "index.md";
     private const string Controls = "using Avalonia.Controls;\n";
+    // The companion is the C# file printed on the page, not a lookalike model.
+    private static string ExpressionModels => MarkdownDocumentation.Get(
+        ExpressionBindingsPage, "A notifying model", 0, "csharp").Code;
 
     // This model is test scaffolding. The conditional page refers to Person but
     // does not provide its declaration; only the properties read by its examples are supplied.
@@ -102,13 +106,31 @@ internal static class DocumentationExampleCatalog
             Context: "Supply the normal Avalonia.Controls import; keep both documented state declarations."),
         new("main.resources", MainPage, "Dictionary Resources"),
         new("main.styles", MainPage, "Avalonia Styles"),
+
+        new("expression-binding.state", ExpressionBindingsPage, "Start with state"),
+        new("expression-binding.ordinary-property", ExpressionBindingsPage, "Ordinary C# property expressions", CompanionCSharp: ExpressionModels),
+        new("expression-binding.avalonia-property", ExpressionBindingsPage, "Avalonia Binding", CompanionCSharp: ExpressionModels),
+        new("expression-binding.property", ExpressionBindingsPage, "C# expression binding", CompanionCSharp: ExpressionModels),
+        new("expression-binding.nested", ExpressionBindingsPage, "Nested and nullable receivers", CompanionCSharp: ExpressionModels),
+        new("expression-binding.indexed", ExpressionBindingsPage, "Indexed collections", CompanionCSharp: ExpressionModels),
+        new("expression-binding.conditional", ExpressionBindingsPage, "Dynamic conditional branches", CompanionCSharp: ExpressionModels),
+        new("expression-binding.avalonia-source", ExpressionBindingsPage, "Avalonia property sources"),
+        new("expression-binding.conversion", ExpressionBindingsPage, "Parameters and contextual conversions"),
+        new("expression-binding.injected", ExpressionBindingsPage, "Injected services", CompanionCSharp: ExpressionModels,
+            Context: "The documented ViewModel.cs is the companion; supply Vm through its public injected property before attachment."),
+        new("expression-binding.utility-frame", ExpressionBindingsPage, "Ordinary C# condition", CompanionCSharp: ExpressionModels),
+        new("expression-binding.utility-avalonia-binding", ExpressionBindingsPage, "Avalonia Binding condition", CompanionCSharp: ExpressionModels),
+        new("expression-binding.utility-reactive-expression", ExpressionBindingsPage, "Reactive C# expression condition", CompanionCSharp: ExpressionModels),
+        new("expression-binding.utility-binding-nested-path", ExpressionBindingsPage, "A nested DataContext path", CompanionCSharp: ExpressionModels),
+        new("expression-binding.utility-comparison", ExpressionBindingsPage, "Compare all three against one model", CompanionCSharp: ExpressionModels),
+        new("expression-binding.utility-cascade", ExpressionBindingsPage, "Shared cascade and restoration", CompanionCSharp: ExpressionModels),
     };
 
     // Inventory assertions cover EVERY akbura fence on these pages. A new block
     // fails the inventory test until it receives a runnable context or a negative expectation.
     public static IReadOnlyList<string> FullyCoveredPages { get; } = new[]
     {
-        ForeachPage, ConditionalPage, GridPage,
+        ForeachPage, ConditionalPage, GridPage, ExpressionBindingsPage,
     };
 
     public static IEnumerable<DocumentationExample> Positive => All.Where(example => example.ExpectedDiagnostic == null);

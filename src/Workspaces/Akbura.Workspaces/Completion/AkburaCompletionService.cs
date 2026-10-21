@@ -192,6 +192,25 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                 ParamModifierItems);
         }
 
+        if (syntaxContext.Kind == AkburaCompletionContextKind.MarkupExtensionType)
+        {
+            var prefixItems = semanticContext == null
+                ? ImmutableArray<AkburaCompletionItem>.Empty
+                : GetMarkupExtensionItems(semanticContext.Project.Compilation.GetSemanticModel(
+                    semanticContext.Document.SyntaxTree), syntaxContext.Prefix, cancellationToken);
+            if (MatchesPrefix("x.bind", syntaxContext.Prefix))
+            {
+                prefixItems = prefixItems.Add(new AkburaCompletionItem(
+                    "x.bind", "x.bind ", AkburaCompletionKind.Keyword,
+                    "One-way reactive C# expression binding. Only observable dependencies trigger updates.",
+                    descriptionFactory: null, priority: 0, triggerCompletionAfterInsert: true,
+                    isMarkupValuePrefix: true));
+            }
+
+            return new AkburaCompletionResult(syntaxContext.ApplicableSpan, prefixItems,
+                isIncomplete: IsSemanticCompletionContext(syntaxContext.Kind));
+        }
+
         if (semanticContext == null ||
             semanticContext.Document.SyntaxTree.Kind ==
                 SyntaxTreeKind.Akcss)
@@ -233,12 +252,6 @@ internal sealed partial class AkburaCompletionService : IAkburaCompletionService
                     semanticModel,
                     syntaxContext,
                     propertyElements: true,
-                    cancellationToken),
-
-            AkburaCompletionContextKind.MarkupExtensionType =>
-                GetMarkupExtensionItems(
-                    semanticModel,
-                    syntaxContext.Prefix,
                     cancellationToken),
 
             AkburaCompletionContextKind.BindingPath =>

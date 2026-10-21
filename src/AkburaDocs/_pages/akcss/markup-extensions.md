@@ -7,6 +7,13 @@ Akbura can evaluate markup extension classes in regular attributes and in
 AKCSS utility attributes. A markup extension is a class with a public instance
 `ProvideValue()` or `ProvideValue(IServiceProvider)` method.
 
+`${Binding ...}` is an ordinary Avalonia markup extension. In contrast,
+`${x.bind expression}` is special Akbura syntax for a typed, one-way reactive
+C# expression, not a CLR extension class. Both may control property values or
+AKCSS conditions through their respective observation mechanisms. See
+[Expression Bindings](/akbura/expression-bindings) for scope versus DataContext
+resolution and the three conditional-utility forms.
+
 The `Extension` suffix is optional:
 
 ```akbura

@@ -736,7 +736,7 @@ internal sealed class ComponentWriter : IDisposable
                 _ownerTypeName,
                 _sourceMap,
                 _generationMode);
-            writer.WriteRefresh(element.Akcss.Activators, targetExpression);
+            writer.WriteRefresh(_plan.Akcss, element.Akcss.Activators, targetExpression);
             return true;
         }
         finally

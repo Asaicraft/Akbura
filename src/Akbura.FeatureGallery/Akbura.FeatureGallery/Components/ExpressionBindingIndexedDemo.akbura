@@ -1,0 +1,44 @@
+using Avalonia.Controls;
+using Akbura.Styles.akcss;
+using Akbura.FeatureGallery.Models;
+using Akbura.FeatureGallery.Pages.Page.akcss;
+
+state ExpressionBindingDemoModel model = new();
+
+<StackPanel gap-4>
+
+    <TextBlock Text={"""
+        Text=${x.bind model.People[model.SelectedIndex].Name}
+        """} page-code/>
+
+    <Border page-callout>
+        <StackPanel gap-2>
+            <TextBlock Text="Currently selected person" page-card-description/>
+            <TextBlock Name="model-person" Text=${x.bind model.People[model.SelectedIndex].Name}
+                       text-xl font-bold text-blue-400 whitespace-normal/>
+            <TextBlock Name="model-index" Text=${x.bind $"Selected index: {model.SelectedIndex}"} page-card-description/>
+        </StackPanel>
+    </Border>
+
+    <WrapPanel Orientation="Horizontal">
+        <Button Name="model-select-ada" Content="Person 1" Click={model.SelectedIndex = 0} Margin="0,0,8,8"/>
+        <Button Name="model-select-grace" Content="Person 2" Click={model.SelectedIndex = 1} Margin="0,0,8,8"/>
+        <Button Name="model-select-linus" Content="Person 3" Click={model.SelectedIndex = 2} Margin="0,0,8,8"/>
+    </WrapPanel>
+    <WrapPanel Orientation="Horizontal">
+        <Button Name="model-person-rename" Content="Rename selected" Click={model.RenameSelected()} Margin="0,0,8,8"/>
+        <Button Name="model-person-replace" Content="Replace selected" Click={model.ReplaceSelected()} Margin="0,0,8,8"/>
+        <Button Name="model-other-rename" Content="Rename unselected" Click={model.RenameUnselected()} Margin="0,0,8,8"/>
+        <Button Name="model-index-reset" Content="Reset people" Click={model.Reset()} Margin="0,0,8,8"/>
+    </WrapPanel>
+
+    <TextBlock Text="Choose a person, then rename or replace that person. Renaming an unselected person leaves the displayed name unchanged. The binding reconnects when the index or selected object changes."
+               page-card-description/>
+    <TextBlock Text="These buttons change ObservableObject properties or the ObservableCollection directly, without requesting a component render. The collection stays nonempty and the index stays in range."
+               page-note-text/>
+
+    <ViewThisComponentInGithub/>
+    <ViewThisInGithub Url="Models/ExpressionBindingDemoModel.cs" Content="View model in GitHub"
+                      HorizontalAlignment="Left"/>
+
+</StackPanel>

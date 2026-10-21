@@ -294,6 +294,7 @@ internal sealed partial class MarkupBinder
             Variant: default(TailwindUtilityVariant));
         var utilities = ImmutableArray<ITailwindUtilitySymbol>.Empty;
         var bindingPriority = default(TailwindUtilityBindingPriority);
+        ExpressionBindingPlan? conditionExpressionBinding;
         {
             using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
             arguments = CreateTailwindUtilityArguments(
@@ -302,7 +303,8 @@ internal sealed partial class MarkupBinder
             validatedArguments = arguments;
             condition = CreateTailwindCondition(
                 attribute,
-                diagnosticsBuilder);
+                diagnosticsBuilder,
+                out conditionExpressionBinding);
             utilities = ResolveTailwindUtilitiesForAttribute(
                 attribute,
                 requestedUtilityName,
@@ -339,7 +341,10 @@ internal sealed partial class MarkupBinder
             condition.Variant,
             bindingPriority,
             diagnostics,
-            hasErrors: utilities.Length == 0 || diagnostics.Length > 0 || componentName.Length == 0);
+            hasErrors: utilities.Length == 0 || componentName.Length == 0 ||
+                (conditionExpressionBinding == null ? diagnostics.Length > 0 :
+                    diagnostics.Any(d => d.Severity == AkburaDiagnosticSeverity.Error)),
+            conditionExpressionBinding: conditionExpressionBinding);
     }
 
     private ImmutableArray<BoundTailwindUtilityArgument> CreateTailwindUtilityArguments(
@@ -480,8 +485,10 @@ internal sealed partial class MarkupBinder
         TailwindUtilityVariant Variant)
         CreateTailwindCondition(
             TailwindAttributeSyntax attribute,
-            ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+            ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder,
+            out ExpressionBindingPlan? expressionBinding)
     {
+        expressionBinding = null;
         if (attribute.Kind != AkburaSyntaxKind.TailwindFullAttributeSyntax)
         {
             return (false, null, default, default, null, default);
@@ -492,6 +499,15 @@ internal sealed partial class MarkupBinder
         if (prefix == null)
         {
             return (false, null, default, default, null, default);
+        }
+
+        if (prefix is TailwindExpressionBindingConditionalPrefixSyntax reactive)
+        {
+            expressionBinding = BindTailwindExpressionCondition(reactive.Binding);
+            diagnosticsBuilder.AddRange(expressionBinding.Diagnostics);
+            return (true, reactive.Binding.Expression.ToFullString(),
+                expressionBinding.ResultType == null ? default : new CSharpSymbolDefinition(expressionBinding.ResultType),
+                expressionBinding.Expression, null, new TailwindUtilityVariant(isPrefixed: true));
         }
 
         if (prefix.Kind == AkburaSyntaxKind.SimpleConditionalPrefixSyntax)

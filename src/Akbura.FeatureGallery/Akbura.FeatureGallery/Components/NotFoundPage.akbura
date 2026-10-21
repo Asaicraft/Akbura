@@ -2,7 +2,6 @@ using Akbura.FeatureGallery.Pages.Page.akcss;
 using Akbura.Markup;
 
 param string Url = "";
-param Router Router;
 
 <StackPanel gap-4
             self-center>
@@ -17,7 +16,6 @@ param Router Router;
                text-center/>
 
     <Link Content="Go to Overview"
-          Url="/overview"
-          Router={Router}/>
+          Url="/overview"/>
 
 </StackPanel>

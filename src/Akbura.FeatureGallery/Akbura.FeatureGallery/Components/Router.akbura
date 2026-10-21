@@ -1,10 +1,15 @@
 using Akbura.Hooks;
+using Akbura.FeatureGallery.Routing;
+
+inject IRouter RouterService;
 
 param Control? Content = null;
 param IList<Page> Pages;
-param bind string Url = ""; 
 param IDataTemplate NotFound;
 
+// A connected alias, not a second route owner. The diagnostics picker writes
+// through this connection to the same service used by links and browser history.
+state string url = bind RouteSource.Url;
 state Control? content = null;
 
 useEffect(() =>
@@ -12,16 +17,16 @@ useEffect(() =>
     var page = Pages.FirstOrDefault(page =>
         string.Equals(
             page.Url,
-            Url,
+            url,
             StringComparison.OrdinalIgnoreCase));
 
     content = page == null
-        ? NotFound.Build(Url)
+        ? NotFound.Build(url)
         : TemplateContent
             .Load<Control>(page.Content)?
             .Result;
 
-}, [Url, Pages, NotFound]);
+}, [url, Pages, NotFound]);
 
 Content = content;
 

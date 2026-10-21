@@ -65,6 +65,12 @@ internal enum GenerationStatisticCounter : byte
     MarkupExpressionCacheHit,
     MarkupExpressionCacheMiss,
     MarkupExpressionCacheDisallowed,
+    ExpressionKeyHash,
+    ExpressionKeyComparison,
+    ExpressionKeyNonEqualComparison,
+    ExpressionKeySyntaxComparison,
+    ExpressionCacheEntryPublished,
+    ExpressionCacheAdmissionOnly,
     Count,
 }
 
@@ -146,6 +152,14 @@ internal enum GenerationStatisticStage : byte
     DependencyGraphPropagation,
     SelectiveArtifactReuse,
     SelectiveDiagnosticReuse,
+    ExpressionProjectionConstruction,
+    ExpressionProjectionText,
+    ExpressionKeyHashing,
+    ExpressionKeyEquality,
+    ExpressionSyntaxEquivalence,
+    ExpressionCacheLookup,
+    ExpressionFactoryBinding,
+    ExpressionCachePublication,
     Count,
 }
 

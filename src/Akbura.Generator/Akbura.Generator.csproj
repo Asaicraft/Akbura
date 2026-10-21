@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>netstandard2.0</TargetFramework>
@@ -26,6 +26,17 @@
 
 	<PropertyGroup Condition="'$(EnableQuickScanBenchmark)' == 'true'">
 		<DefineConstants>$(DefineConstants);ENABLE_QUICK_SCAN_BENCHMARK</DefineConstants>
+	</PropertyGroup>
+
+	<!-- Experimental controls for the scoped-probe audit, never enabled by default. -->
+	<PropertyGroup Condition="'$(ProbeCacheAuditVariant)' == 'disabled'">
+		<DefineConstants>$(DefineConstants);PROBE_CACHE_DISABLED</DefineConstants>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(ProbeCacheAuditVariant)' == 'prehashed' Or '$(ProbeCacheAuditVariant)' == 'repeat-admission'">
+		<DefineConstants>$(DefineConstants);PROBE_CACHE_PREHASHED</DefineConstants>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(ProbeCacheAuditVariant)' == 'repeat-admission'">
+		<DefineConstants>$(DefineConstants);PROBE_CACHE_REPEAT_ADMISSION</DefineConstants>
 	</PropertyGroup>
 
 	<ItemGroup>

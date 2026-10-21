@@ -1,0 +1,9 @@
+{
+  "Command": "dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj -c DebugStats --filter 'FullyQualifiedName~MarkupExpressionReuseTests&FullyQualifiedName!~SequentialEdits' -p:UseSharedCompilation=false -nr:false --logger 'trx;LogFileName=tests.trx' --results-directory bin/CrossRevision/audit/verification/cache-audit -v:minimal",
+  "Passed": 14,
+  "Failed": 0,
+  "Scope": "Focused current-owner cache instrumentation/correctness only. Sequential 100/500 tests deliberately not included in this preparation check. No final cross-revision or full-suite claim.",
+  "SourceBoundary": "Compiler/test code unchanged after execution except CRLF normalization; audit scripts were corrected separately.",
+  "GeneratorSha256": "EAF3A3BDCB3AB5EE9CD2243061006FACEE7AA4703319C4A91C735244BFC51219",
+  "TestAssemblySha256": "C74444277EF0AC9C44F06374493A0788919802D0E660819D6893CD53EB8758BB"
+}

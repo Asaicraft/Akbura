@@ -1,0 +1,10 @@
+{
+  "ControllerPid": 27848,
+  "Current": "abi-current-stats",
+  "Phase": "Failed",
+  "CurrentPid": null,
+  "Failure": "Exception: C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\benchmarks\\HotReload\\Start-ProbeCacheAudit.ps1:104\r\nLine |\r\n 104 |  … $process.ExitCode -ne 0) { throw \"Exit $($process.ExitCode): $logs\" }\r\n     |                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n     | Exit 1:\r\n     | C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\CrossRevision\\audit\\abi-current-stats-20261020T180951611Z\r\n\r\n",
+  "CompletedSteps": 2,
+  "TotalSteps": 58,
+  "UpdatedUtc": "2026-10-20T18:09:52.0071854Z"
+}

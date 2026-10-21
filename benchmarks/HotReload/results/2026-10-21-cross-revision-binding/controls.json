@@ -1,0 +1,67 @@
+{
+  "Revision": "af6c310a8859600f27943fd8cf972b8fcf296f0f",
+  "CapturedUtc": "2026-10-20T17:59:28.6255602Z",
+  "Controls": [
+    {
+      "Control": "original-production",
+      "File": "HotReloadBenchmarks.dll",
+      "Sha256": "078F874836DFE9F94F4A2B8B39D9B4B7F421C676B61DCEE44DE8C218B2927680"
+    },
+    {
+      "Control": "original-production",
+      "File": "Akbura.Generator.dll",
+      "Sha256": "D4A42227353DFF0A2E333AF8EF3911C4F43F6ECFACA4BA0D861F72ABDB5B2F17"
+    },
+    {
+      "Control": "original-production",
+      "File": "Akbura.BlackSilence.dll",
+      "Sha256": "31AE51957729B10347DAD894E55CD213904BD06CB7F59D969B6745FCEA4092FC"
+    },
+    {
+      "Control": "original-stats",
+      "File": "HotReloadBenchmarks.dll",
+      "Sha256": "078F874836DFE9F94F4A2B8B39D9B4B7F421C676B61DCEE44DE8C218B2927680"
+    },
+    {
+      "Control": "original-stats",
+      "File": "Akbura.Generator.dll",
+      "Sha256": "BF7A72CD2D560766DDDACCAD43AA7035AF8EC7A1273C6A88B3AE5848BF13EDF2"
+    },
+    {
+      "Control": "original-stats",
+      "File": "Akbura.BlackSilence.dll",
+      "Sha256": "2B3EC0BD72440EC3EBC9C992E27BCD2DF176D421833FE3A9CBAE5DC854AA4042"
+    },
+    {
+      "Control": "current-production",
+      "File": "HotReloadBenchmarks.dll",
+      "Sha256": "078F874836DFE9F94F4A2B8B39D9B4B7F421C676B61DCEE44DE8C218B2927680"
+    },
+    {
+      "Control": "current-production",
+      "File": "Akbura.Generator.dll",
+      "Sha256": "1264FBC11F330493839BB0AC0ADF9803DBC21B0C8BAE75DAC8B1C4CC4DFE127B"
+    },
+    {
+      "Control": "current-production",
+      "File": "Akbura.BlackSilence.dll",
+      "Sha256": "4A1F3C6ED09C20AEC59C69F81A063CA4B69F15EF2FC62B080F6BB42A48B0A7E8"
+    },
+    {
+      "Control": "current-stats",
+      "File": "HotReloadBenchmarks.dll",
+      "Sha256": "078F874836DFE9F94F4A2B8B39D9B4B7F421C676B61DCEE44DE8C218B2927680"
+    },
+    {
+      "Control": "current-stats",
+      "File": "Akbura.Generator.dll",
+      "Sha256": "3AEBA1084FECBE59925ECFB0B59004EBC7917E828BA0D77FE8BBD840671B2DA0"
+    },
+    {
+      "Control": "current-stats",
+      "File": "Akbura.BlackSilence.dll",
+      "Sha256": "870A1C571DA176C941D34876FE42F6F3BD6DA80D764C19551A54D89E8C042963"
+    }
+  ],
+  "Boundary": "Frozen pre-instrumentation controls copied byte-for-byte from the completed previous investigation; no baseline rebuild."
+}

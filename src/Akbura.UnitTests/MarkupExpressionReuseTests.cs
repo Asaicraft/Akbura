@@ -67,6 +67,32 @@ public sealed class MarkupExpressionReuseTests(Xunit.Abstractions.ITestOutputHel
         Assert.Equal(1, snapshot.GetCounterCount(GenerationStatisticCounter.ProbeCompilationCreated));
         Assert.Equal(1, snapshot.GetCounterCount(GenerationStatisticCounter.ProbeSemanticModelAcquired));
         Assert.Equal(1, snapshot.GetCounterCount(GenerationStatisticCounter.ProbeDiagnosticQuery));
+        Assert.Equal(1, snapshot.GetCounterCount(GenerationStatisticCounter.ExpressionCacheEntryPublished));
+        Assert.True(snapshot.GetCounterCount(GenerationStatisticCounter.ExpressionKeyHash) >= 21);
+        Assert.True(snapshot.GetCounterCount(GenerationStatisticCounter.ExpressionKeySyntaxComparison) >= 20);
+        Assert.Equal(21, snapshot.GetStageInvocationCount(GenerationStatisticStage.ExpressionProjectionConstruction));
+        Assert.Equal(21, snapshot.GetStageInvocationCount(GenerationStatisticStage.ExpressionProjectionText));
+        Assert.Equal(1, snapshot.GetStageInvocationCount(GenerationStatisticStage.ExpressionFactoryBinding));
+    }
+
+    [Fact]
+    public void ConcurrentExactRequests_PublishOneEntryWithoutClaimingSingleFlight()
+    {
+        var context = Model(string.Empty).BindingSession.ProbeContext;
+        var projection = SyntaxFactory.ParseCompilationUnit("class C { int M() { return 1; } }");
+        var calls = 0;
+        using var measurement = GenerationStatistics.BeginMeasurement();
+        Parallel.For(0, 128, _ => context.BindMarkupExpression(projection, null, () =>
+        {
+            Interlocked.Increment(ref calls);
+            return CSharpBindingResult.Empty;
+        }));
+        context.BindMarkupExpression(projection, null, () => throw new InvalidOperationException("Completed result not reused."));
+        var snapshot = measurement.GetSnapshot();
+        Assert.InRange(calls, 1, 128);
+        Assert.Equal(1, snapshot.GetCounterCount(GenerationStatisticCounter.ExpressionCacheEntryPublished));
+        Assert.Equal(calls, snapshot.GetStageInvocationCount(GenerationStatisticStage.ExpressionFactoryBinding));
+        Assert.Equal(129 - calls, snapshot.GetCounterCount(GenerationStatisticCounter.MarkupExpressionCacheHit));
     }
 #endif
 
@@ -147,9 +173,18 @@ public sealed class MarkupExpressionReuseTests(Xunit.Abstractions.ITestOutputHel
         var second = first.ReplaceNode(type, SyntaxFactory.IdentifierName("int").WithTriviaFrom(type));
         Assert.Equal(first.ToFullString(), second.ToFullString());
         var calls = 0;
+#if STATS
+        using var measurement = GenerationStatistics.BeginMeasurement();
+#endif
         context.BindMarkupExpression(first, null, () => { calls++; return CSharpBindingResult.Empty; });
         context.BindMarkupExpression(second, null, () => { calls++; return CSharpBindingResult.Empty; });
         Assert.Equal(2, calls);
+#if STATS
+        var snapshot = measurement.GetSnapshot();
+        Assert.Equal(2, snapshot.GetCounterCount(GenerationStatisticCounter.ExpressionCacheEntryPublished));
+        Assert.True(snapshot.GetCounterCount(GenerationStatisticCounter.ExpressionKeyNonEqualComparison) > 0);
+        Assert.True(snapshot.GetCounterCount(GenerationStatisticCounter.ExpressionKeySyntaxComparison) > 0);
+#endif
     }
 
     [Fact]

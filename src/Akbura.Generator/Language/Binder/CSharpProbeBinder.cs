@@ -155,7 +155,13 @@ internal sealed partial class CSharpProbeBinder : Binder
         using var probeMeasurement = MeasureProbe(expression is CSharp.LambdaExpressionSyntax ? ProbeCategory.Lambda : ProbeCategory.BindingPath, syntax);
         using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeBinding);
 #endif
-        var projection = new CSharpProbeBuilder(this).CreateReturnExpressionProbe(syntax, expression, targetType);
+        CSharp.CompilationUnitSyntax projection;
+#if STATS
+        using (GenerationStatistics.Measure(GenerationStatisticStage.ExpressionProjectionConstruction))
+#endif
+        {
+            projection = new CSharpProbeBuilder(this).CreateReturnExpressionProbe(syntax, expression, targetType);
+        }
 #if STATS
         RecordExpressionProbe(syntax, expression, targetType, projection);
 #endif

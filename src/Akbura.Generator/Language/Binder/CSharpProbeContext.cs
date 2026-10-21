@@ -25,6 +25,11 @@ internal sealed class CSharpProbeContext(AkburaSemanticModel semanticModel)
 {
     private readonly ConcurrentDictionary<TypeProbeKey, CSharpBindingResult> _types = new();
     private readonly ConcurrentDictionary<ExpressionProbeKey, CSharpBindingResult> _expressions = new();
+#if PROBE_CACHE_REPEAT_ADMISSION
+    // Admit retained results only after a second successful exact-input request.
+    // This audit variant still owns all keys in the current document, not a snapshot.
+    private readonly ConcurrentDictionary<ExpressionProbeKey, byte> _expressionAdmissions = new();
+#endif
     private readonly ConcurrentDictionary<string, CSharp.CompilationUnitSyntax> _componentTemplates = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<Symbols.ISymbol, CSharpProbeScope> _symbols = new(SymbolReferenceComparer.Instance);
     private readonly ConditionalWeakTable<SemanticModel, CSharpProbeDiagnostics> _diagnostics = new();
@@ -88,6 +93,9 @@ internal sealed class CSharpProbeContext(AkburaSemanticModel semanticModel)
 #if STATS
         GenerationStatistics.Increment(GenerationStatisticCounter.MarkupExpressionRequest);
 #endif
+#if PROBE_CACHE_DISABLED
+        return BindMeasured();
+#else
         // Recovery and directives can carry information not represented by ordinary
         // syntax equivalence. Keep their original binding path, including diagnostics.
         if (projection.ContainsDiagnostics || projection.ContainsSkippedText || projection.ContainsDirectives)
@@ -96,12 +104,27 @@ internal sealed class CSharpProbeContext(AkburaSemanticModel semanticModel)
             GenerationStatistics.Increment(GenerationStatisticCounter.MarkupExpressionCacheDisallowed);
             RecordExpressionReuse(projection, "Disallowed", "SyntaxRecoveryOrDirectives");
 #endif
-            return bind();
+            return BindMeasured();
         }
 
         var query = CSharpProbeBuilder.GetReturnProbeExpression(projection);
-        var key = new ExpressionProbeKey(projection, projection.ToFullString(), targetType, query?.Span ?? default);
-        if (_expressions.TryGetValue(key, out var result))
+        string text;
+#if STATS
+        using (GenerationStatistics.Measure(GenerationStatisticStage.ExpressionProjectionText))
+#endif
+        {
+            text = projection.ToFullString();
+        }
+        var key = new ExpressionProbeKey(projection, text, targetType, query?.Span ?? default);
+        CSharpBindingResult result;
+        bool found;
+#if STATS
+        using (GenerationStatistics.Measure(GenerationStatisticStage.ExpressionCacheLookup))
+#endif
+        {
+            found = _expressions.TryGetValue(key, out result);
+        }
+        if (found)
         {
 #if STATS
             GenerationStatistics.Increment(GenerationStatisticCounter.MarkupExpressionCacheHit);
@@ -115,8 +138,45 @@ internal sealed class CSharpProbeContext(AkburaSemanticModel semanticModel)
 #endif
         // A failed or canceled factory publishes nothing. Raw Roslyn diagnostic
         // locations are probe-relative; presentation is remapped by each caller.
-        result = bind();
-        return result.Diagnostics.IsEmpty ? _expressions.GetOrAdd(key, result) : result;
+        result = BindMeasured();
+        if (!result.Diagnostics.IsEmpty)
+        {
+            return result;
+        }
+#if STATS
+        using var publication = GenerationStatistics.Measure(GenerationStatisticStage.ExpressionCachePublication);
+#endif
+#if PROBE_CACHE_REPEAT_ADMISSION
+        if (_expressionAdmissions.TryAdd(key, 0))
+        {
+#if STATS
+            GenerationStatistics.Increment(GenerationStatisticCounter.ExpressionCacheAdmissionOnly);
+#endif
+            return result;
+        }
+#endif
+#if STATS
+        if (_expressions.TryAdd(key, result))
+        {
+            GenerationStatistics.Increment(GenerationStatisticCounter.ExpressionCacheEntryPublished);
+        }
+        else if (_expressions.TryGetValue(key, out var completed))
+        {
+            result = completed;
+        }
+        return result;
+#else
+        return _expressions.GetOrAdd(key, result);
+#endif
+#endif
+
+        CSharpBindingResult BindMeasured()
+        {
+#if STATS
+            using var binding = GenerationStatistics.Measure(GenerationStatisticStage.ExpressionFactoryBinding);
+#endif
+            return bind();
+        }
     }
 
 #if STATS
@@ -212,11 +272,51 @@ internal sealed class CSharpProbeContext(AkburaSemanticModel semanticModel)
     private readonly record struct ExpressionProbeKey(CSharp.CompilationUnitSyntax Projection, string Text, ITypeSymbol? TargetType,
         Microsoft.CodeAnalysis.Text.TextSpan QuerySpan)
     {
-        public bool Equals(ExpressionProbeKey other) => ReferenceEquals(TargetType, other.TargetType) && QuerySpan == other.QuerySpan && Text == other.Text &&
-            Microsoft.CodeAnalysis.CSharp.SyntaxFactory.AreEquivalent(Projection, other.Projection);
+#if PROBE_CACHE_PREHASHED
+        private readonly int _hashCode = Hash(Text, TargetType, QuerySpan);
+#endif
 
-        public override int GetHashCode() => unchecked((StringComparer.Ordinal.GetHashCode(Text) * 397) ^
-            (TargetType == null ? 0 : RuntimeHelpers.GetHashCode(TargetType)) ^ QuerySpan.GetHashCode());
+        public bool Equals(ExpressionProbeKey other)
+        {
+#if STATS
+            GenerationStatistics.Increment(GenerationStatisticCounter.ExpressionKeyComparison);
+            using var equality = GenerationStatistics.Measure(GenerationStatisticStage.ExpressionKeyEquality);
+#endif
+            var equal = ReferenceEquals(TargetType, other.TargetType) && QuerySpan == other.QuerySpan && Text == other.Text && Equivalent(other);
+#if STATS
+            if (!equal)
+            {
+                GenerationStatistics.Increment(GenerationStatisticCounter.ExpressionKeyNonEqualComparison);
+            }
+#endif
+            return equal;
+        }
+
+        private bool Equivalent(ExpressionProbeKey other)
+        {
+#if STATS
+            GenerationStatistics.Increment(GenerationStatisticCounter.ExpressionKeySyntaxComparison);
+            using var syntax = GenerationStatistics.Measure(GenerationStatisticStage.ExpressionSyntaxEquivalence);
+#endif
+            return Microsoft.CodeAnalysis.CSharp.SyntaxFactory.AreEquivalent(Projection, other.Projection);
+        }
+
+        public override int GetHashCode() =>
+#if PROBE_CACHE_PREHASHED
+            _hashCode;
+#else
+            Hash(Text, TargetType, QuerySpan);
+#endif
+
+        private static int Hash(string text, ITypeSymbol? targetType, Microsoft.CodeAnalysis.Text.TextSpan querySpan)
+        {
+#if STATS
+            GenerationStatistics.Increment(GenerationStatisticCounter.ExpressionKeyHash);
+            using var hash = GenerationStatistics.Measure(GenerationStatisticStage.ExpressionKeyHashing);
+#endif
+            return unchecked((StringComparer.Ordinal.GetHashCode(text) * 397) ^
+                (targetType == null ? 0 : RuntimeHelpers.GetHashCode(targetType)) ^ querySpan.GetHashCode());
+        }
     }
 
     private readonly record struct ImportKey(CSharp.UsingDirectiveSyntax Syntax, string Text)

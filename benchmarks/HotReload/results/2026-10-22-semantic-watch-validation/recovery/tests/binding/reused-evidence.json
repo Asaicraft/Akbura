@@ -1,0 +1,31 @@
+{
+  "Reason": "Only the allowlisted watch harness changed. Compiler/test sources and frozen compiler binaries are identical.",
+  "OriginFingerprint": "A95D5CD2FF989BAA5126EB51B24FAFCACB9E17233FBFD0B22A753B91268AD55F",
+  "CurrentFingerprint": "E22F9CF56D99D40A6A41B8E691FA196B6E179D75D34CB086E1D39F0C92E68778",
+  "Executions": [
+    {
+      "Marker": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticWatch\\gate\\release-binding.success.json",
+      "MarkerSha256": "01C0CDE29149A46D1AA3DD188E5094C70EB9EE2DEDA16CBCEE7FBA0688517093",
+      "Passed": 229,
+      "TestResultsSha256": "0EF6477A06F02A765DE55A3E18EA7700CF163B5092EE64C4FE621EFBD9008B70",
+      "TestResults": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\benchmarks\\HotReload\\results\\2026-10-22-semantic-watch-validation\\tests\\binding\\release.trx",
+      "CompletedUtc": "2026-10-21T18:08:38.3700304Z"
+    },
+    {
+      "Marker": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticWatch\\gate\\debugstats-binding.success.json",
+      "MarkerSha256": "D4C43EC0CF06C9C79389685A3E537A56378DEB822191770846733044880978C0",
+      "Passed": 155,
+      "TestResultsSha256": "8CA0EFDA98D0DEA4BFB5E843D2E3E3F413F4FD15FFED3DD64A1B18DEF99F0559",
+      "TestResults": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\benchmarks\\HotReload\\results\\2026-10-22-semantic-watch-validation\\tests\\binding\\debugstats.trx",
+      "CompletedUtc": "2026-10-21T18:13:41.3709319Z"
+    },
+    {
+      "Marker": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\SemanticWatch\\gate\\sdk-binding.success.json",
+      "MarkerSha256": "CB47A1F4AE67DF13C566167FCE3B10E0726EDB96722E359BCFEAEDD4C1E5BFF6",
+      "Passed": 47,
+      "TestResultsSha256": "FA10007B099E1E7E593ECEDEC0E507F23F088AA090EBF5C52A7F34046A531F2C",
+      "TestResults": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\benchmarks\\HotReload\\results\\2026-10-22-semantic-watch-validation\\tests\\binding\\sdk\\sdk-invalidation.trx",
+      "CompletedUtc": "2026-10-21T18:14:58.1634082Z"
+    }
+  ]
+}

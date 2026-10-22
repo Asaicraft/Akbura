@@ -1,0 +1,7 @@
+VSTest version 18.7.0 (x64)
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+Results File: C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\SemanticWatch\gate\sdk-combined\97ff384ca0004978baa2d13da36aa5d5\sdk-invalidation.trx
+
+Passed!  - Failed:     0, Passed:    47, Skipped:     0, Total:    47, Duration: 1 m 6 s - Akbura.UnitTests.dll (net10.0)

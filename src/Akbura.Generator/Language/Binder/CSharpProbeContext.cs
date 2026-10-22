@@ -181,6 +181,9 @@ internal sealed class CSharpProbeContext(AkburaSemanticModel semanticModel)
                 scope == null || expression == null ||
                 !ReusableProbeBinding.IsMemberChain(expression) || projection.ContainsDiagnostics || projection.ContainsDirectives || projection.ContainsSkippedText)
             {
+#if STATS
+                RecordSemanticDecision("Fallback", "DisabledOrUnsupportedExpressionOrDependencyContext");
+#endif
                 return BindFactory();
             }
             var token = regions.CancellationToken;
@@ -203,6 +206,7 @@ internal sealed class CSharpProbeContext(AkburaSemanticModel semanticModel)
                 GenerationStatistics.Increment(GenerationStatisticCounter.CrossRevisionFirstBindingSkipped);
                 GenerationStatistics.Increment(GenerationStatisticCounter.CrossRevisionProbeCompilationSkipped);
                 GenerationStatistics.Increment(GenerationStatisticCounter.CrossRevisionProbeSemanticModelSkipped);
+                RecordSemanticDecision("Reused", "ValidatedPayloadAndImportedContribution");
 #endif
                 return reused.Result;
             }
@@ -225,8 +229,23 @@ internal sealed class CSharpProbeContext(AkburaSemanticModel semanticModel)
                 GenerationStatisticCounter.CrossRevisionSemanticContributionIncomplete);
 #endif
             regions.RecordBinding(scope, expression, targetType, projection, preparedText, result, facts);
+#if STATS
+            RecordSemanticDecision("BoundNormally", facts is not { IsComplete: true } ? "IncompleteDependencyContribution" :
+                !ReusableProbeBinding.CanRetain(result) ? "UnsupportedSemanticResult" : "EligibleResultCaptureAttempted");
+#endif
             return result;
         }
+
+#if STATS
+        void RecordSemanticDecision(string decision, string reason)
+        {
+            if (GenerationStatistics.IsInvalidationTrackingEnabled)
+            {
+                GenerationStatistics.RecordInvalidation(new GenerationInvalidationEvent("CrossRevisionSemanticBinding", semanticModel.SyntaxTree.FilePath,
+                    decision, [reason], ImmutableDictionary<string, string>.Empty.Add("Expression", expression?.ToString() ?? string.Empty)));
+            }
+        }
+#endif
 
         CSharpBindingResult BindFactory()
         {

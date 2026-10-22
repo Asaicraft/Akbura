@@ -6,13 +6,14 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <BlackSilenceConfiguration Condition="'$(BlackSilenceConfiguration)' == ''">Debug</BlackSilenceConfiguration>
-    <DefaultItemExcludes>$(DefaultItemExcludes);Akbura-PurityUI-Tutorial/**;PurityHost/**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Akbura-PurityUI-Tutorial/**;PurityHost/**;results/**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="WatchFixture/**/*.cs" />
     <Compile Remove="MemberWatchFixture/**/*.cs" />
     <Compile Remove="SemanticFixture/**/*.cs" />
     <Compile Remove="SemanticWatchFixture/**/*.cs" />
+    <Compile Remove="SupportedWatchFixture/**/*.cs" />
     <PackageReference Include="Avalonia.Headless" />
     <PackageReference Include="xunit" />
     <Using Include="Xunit" />

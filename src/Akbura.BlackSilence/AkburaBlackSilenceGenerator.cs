@@ -25,6 +25,9 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
+#if STATS
+        var watchObservation = BlackSilenceWatchObservation.FromEnvironment();
+#endif
         var componentGenerationMode = context.ParseOptionsProvider
             .Select(static (options, _) => GetComponentGenerationMode(options));
 
@@ -69,11 +72,16 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
         var csharpEnvironment = context.CompilationProvider
             .Combine(collectedDocuments)
             .Combine(projectOptions)
+#if STATS
+            .Select((input, cancellationToken) => watchObservation.ObserveEnvironment(CSharpEnvironmentSnapshot.Create(
+                (CSharpCompilation)input.Left.Left, input.Left.Right, input.Right, cancellationToken), input.Left.Right))
+#else
             .Select(static (input, cancellationToken) => CSharpEnvironmentSnapshot.Create(
                 (CSharpCompilation)input.Left.Left,
                 input.Left.Right,
                 input.Right,
                 cancellationToken))
+#endif
             .WithComparer(CSharpEnvironmentSnapshotComparer.Instance)
             .WithTrackingName("BlackSilence.CSharpEnvironment");
 
@@ -89,7 +97,12 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
             .Combine(projectState)
             .Combine(projectOptions)
             .Combine(computeDiagnostics)
-            .Select(static (input, cancellationToken) => BlackSilenceGenerationRequestBuilder.Create(
+            .Select(
+#if STATS
+                (input, cancellationToken) => watchObservation.CreateRequest(
+#else
+                static (input, cancellationToken) => BlackSilenceGenerationRequestBuilder.Create(
+#endif
                 input.Left.Left.Left,
                 input.Left.Left.Right,
                 input.Left.Right,
@@ -99,9 +112,13 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
             .WithTrackingName(GenerationRequestsTrackingName);
 
         var generated = generationRequests
+#if STATS
+            .Select((request, cancellationToken) => request == null ? null : watchObservation.Generate(request, cancellationToken))
+#else
             .Select(static (request, cancellationToken) => request == null
                 ? null
                 : BlackSilenceDocumentBatch.GenerateSafely(request, cancellationToken))
+#endif
             .WithTrackingName("BlackSilence.GeneratedBatch");
 
         var generatedComponents = generated

@@ -31,6 +31,12 @@ internal static partial class Program
             ClrHotReload = MetadataUpdater.IsSupported, Warmup, Samples });
         switch (args.FirstOrDefault())
         {
+            case "semantic-watch":
+                MeasureSemanticWatch(args[1], args[2], args[3], int.Parse(args[4]), int.Parse(args[5]), args[6]).GetAwaiter().GetResult();
+                break;
+            case "watch-instrumentation-check":
+                Assert.Equal(args[1] == "stats", typeof(AkburaBlackSilenceGenerator).Assembly.GetType("Akbura.BlackSilence.BlackSilenceWatchObservation") != null);
+                break;
             case "statistics-check":
                 CheckStatisticsSnapshot();
                 break;

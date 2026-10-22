@@ -1,0 +1,24 @@
+{
+  "Sdk": "10.0.401",
+  "Passed": 47,
+  "TestFilter": "(FullyQualifiedName~SemanticReuse|FullyQualifiedName~WatchObservation|FullyQualifiedName~InvalidationTrace_UnchangedCompilationSkipsCallbacks)&FullyQualifiedName!~LiveStateKeepsOnlyBounded",
+  "Failed": 0,
+  "Mode": "Isolated copy of the existing tests; SDK Roslyn replaces only the two host assemblies. Repository package references and original test output remain unchanged.",
+  "Assemblies": [
+    {
+      "Name": "Microsoft.CodeAnalysis",
+      "AssemblyVersion": "5.9.0.0",
+      "InformationalVersion": "5.9.0-1.26423.113+e34a38d2ae1fc26406a317517196e55c68ff83ab",
+      "Sha256": "03B3AB9D73D477D259FBC0AE167DD8CAF4775C3C8688F1FDC5E0D3603255C3F4"
+    },
+    {
+      "Name": "Microsoft.CodeAnalysis.CSharp",
+      "AssemblyVersion": "5.9.0.0",
+      "InformationalVersion": "5.9.0-1.26423.113+e34a38d2ae1fc26406a317517196e55c68ff83ab",
+      "Sha256": "12B0428203FAAE6555858D2FF856CEF7450D2764CF00C57E7516587A04885870"
+    }
+  ],
+  "RuntimeVersionAssertion": "InvalidationTrace_UnchangedCompilationSkipsCallbacks asserts the SDK assembly version inside the executing test host.",
+  "TestAssemblySha256": "6D6000633C72A25F11219F25AAFFDCEF3ACEDAFD11B70A6C6F7BB48489D7390A",
+  "Executed": 47
+}

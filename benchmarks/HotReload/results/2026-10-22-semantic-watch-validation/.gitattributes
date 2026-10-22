@@ -1,0 +1,3 @@
+# Preserve native runner evidence and its recorded hashes across checkouts.
+**/*.trx -text -whitespace
+**/*.log -text -whitespace

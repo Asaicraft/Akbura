@@ -1,0 +1,7 @@
+"Scenario","Variant","GeometricMedianReductionPct","BootstrapLowPct","BootstrapHighPct","Bootstrap"
+"margin","projection","3.7759534004335515","-16.087033835343757","16.7116595228897","2000 deterministic hierarchical resamples: independent sessions/rounds, then independent samples within selected sessions; not paired edits."
+"margin","binding","5.417358827887342","-7.593752483324923","20.49079593787032","2000 deterministic hierarchical resamples: independent sessions/rounds, then independent samples within selected sessions; not paired edits."
+"margin","combined","7.113648691641994","-8.110923762352652","21.882379843055855","2000 deterministic hierarchical resamples: independent sessions/rounds, then independent samples within selected sessions; not paired edits."
+"text","projection","-7.084539239805343","-24.959320708174282","11.450377838137605","2000 deterministic hierarchical resamples: independent sessions/rounds, then independent samples within selected sessions; not paired edits."
+"text","binding","-2.0680659934128043","-24.631595456919463","14.732583943138566","2000 deterministic hierarchical resamples: independent sessions/rounds, then independent samples within selected sessions; not paired edits."
+"text","combined","0.6320876283231525","-19.82305639816544","13.841389247826063","2000 deterministic hierarchical resamples: independent sessions/rounds, then independent samples within selected sessions; not paired edits."

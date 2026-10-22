@@ -152,6 +152,14 @@ internal sealed partial class CompilationBoundProbeStore(CSharpCompilation owner
             var previous = _previous != null && _previous.Documents.TryGetValue(tree.FilePath, out var candidate) && contract.Matches(candidate.Contract)
                 ? candidate : null;
 #if STATS
+            if (GenerationStatistics.IsInvalidationTrackingEnabled)
+            {
+                GenerationStatistics.RecordInvalidation(new GenerationInvalidationEvent("ProbeRegion", tree.FilePath,
+                    previous != null ? "Compatible" : "Rejected",
+                    [previous != null ? "ExactRestrictedContract" : _previous == null ? "PreviousGenerationOrDeclarationContractUnavailable" : "DocumentOrRegionContractChanged"],
+                    ImmutableDictionary<string, string>.Empty
+                        .Add("PreviousEntries", (previous?.Entries.Count ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture))));
+            }
             if (_previous != null && previous == null)
             {
                 GenerationStatistics.Increment(GenerationStatisticCounter.CrossRevisionRegionContextRejected);

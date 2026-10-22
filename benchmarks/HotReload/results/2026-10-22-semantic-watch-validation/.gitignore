@@ -1,0 +1,4 @@
+!**/*.log
+**/bin/
+**/obj/
+**/test-host/

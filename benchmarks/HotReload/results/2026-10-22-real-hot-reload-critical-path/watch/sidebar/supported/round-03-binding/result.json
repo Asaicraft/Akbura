@@ -1,0 +1,13 @@
+{
+  "CompletedUtc": "2026-10-22T11:49:33.3499052Z",
+  "Complete": true,
+  "Warmups": 3,
+  "TimingBoundary": "Completed source write to verified original-owner UI acknowledgment; includes state/command validation. No forced GC.",
+  "Updates": 30,
+  "Instrumented": false,
+  "RuntimeCorrectness": true,
+  "CausalGate": "UnverifiedInProduction",
+  "Variant": "binding",
+  "Restarts": 0,
+  "Scenario": "supported"
+}

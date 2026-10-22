@@ -1,0 +1,94 @@
+{
+  "ProjectionOnly": "Restricted",
+  "PrimarySessions": 32,
+  "Complete": true,
+  "NoDefaultActivation": true,
+  "PrimaryUpdates": 840,
+  "Comparisons": [
+    {
+      "Scenario": "supported",
+      "Variant": "projection",
+      "Reference": "baseline",
+      "SessionsPerVariant": 5,
+      "ImprovementPct": -1.9941375031503838,
+      "Low95Pct": -9.747011567590768,
+      "High95Pct": 4.832124532022386,
+      "Bootstrap": "10000 deterministic paired-round session-cluster resamples of session medians; no independent-edit bootstrap"
+    },
+    {
+      "Scenario": "supported",
+      "Variant": "binding",
+      "Reference": "baseline",
+      "SessionsPerVariant": 5,
+      "ImprovementPct": 2.6753806471933372,
+      "Low95Pct": -0.5656258303018191,
+      "High95Pct": 6.539069430704892,
+      "Bootstrap": "10000 deterministic paired-round session-cluster resamples of session medians; no independent-edit bootstrap"
+    },
+    {
+      "Scenario": "supported",
+      "Variant": "combined",
+      "Reference": "baseline",
+      "SessionsPerVariant": 5,
+      "ImprovementPct": 3.2850626545749995,
+      "Low95Pct": -1.5255739939609825,
+      "High95Pct": 7.50151899057111,
+      "Bootstrap": "10000 deterministic paired-round session-cluster resamples of session medians; no independent-edit bootstrap"
+    },
+    {
+      "Scenario": "supported",
+      "Variant": "combined",
+      "Reference": "binding",
+      "SessionsPerVariant": 5,
+      "ImprovementPct": 0.6264417075925399,
+      "Low95Pct": -1.451933426280183,
+      "High95Pct": 3.136323214618586,
+      "Bootstrap": "10000 deterministic paired-round session-cluster resamples of session medians; no independent-edit bootstrap"
+    },
+    {
+      "Scenario": "fallback",
+      "Variant": "projection",
+      "Reference": "baseline",
+      "SessionsPerVariant": 3,
+      "ImprovementPct": -3.7305617742374952,
+      "Low95Pct": -8.316834125066963,
+      "High95Pct": 1.0126655407881713,
+      "Bootstrap": "10000 deterministic paired-round session-cluster resamples of session medians; no independent-edit bootstrap"
+    },
+    {
+      "Scenario": "fallback",
+      "Variant": "binding",
+      "Reference": "baseline",
+      "SessionsPerVariant": 3,
+      "ImprovementPct": -0.8382841629082094,
+      "Low95Pct": -5.978295230357,
+      "High95Pct": 2.560257338339633,
+      "Bootstrap": "10000 deterministic paired-round session-cluster resamples of session medians; no independent-edit bootstrap"
+    },
+    {
+      "Scenario": "fallback",
+      "Variant": "combined",
+      "Reference": "baseline",
+      "SessionsPerVariant": 3,
+      "ImprovementPct": -1.6543444455153766,
+      "Low95Pct": -2.713970508452257,
+      "High95Pct": -0.7267193389699278,
+      "Bootstrap": "10000 deterministic paired-round session-cluster resamples of session medians; no independent-edit bootstrap"
+    },
+    {
+      "Scenario": "fallback",
+      "Variant": "combined",
+      "Reference": "binding",
+      "SessionsPerVariant": 3,
+      "ImprovementPct": -0.8092762479861237,
+      "Low95Pct": -4.199946701158086,
+      "High95Pct": 3.0801823286639274,
+      "Bootstrap": "10000 deterministic paired-round session-cluster resamples of session medians; no independent-edit bootstrap"
+    }
+  ],
+  "BootstrapResamples": 10000,
+  "BindingOnly": "Restricted opt-in: separate correctness/GeneratorDriver/memory/default gates not completed by this benchmark-only stage",
+  "CompletedUtc": "2026-10-22T12:31:51.7714559Z",
+  "WatchMemory": "Not newly measured in this archive",
+  "Combined": "Restricted opt-in"
+}

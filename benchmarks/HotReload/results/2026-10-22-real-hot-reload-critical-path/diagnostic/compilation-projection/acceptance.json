@@ -1,0 +1,8 @@
+{
+  "Profile": "stats-diagnostic",
+  "CompletedUtc": "2026-10-22T11:21:59.5438879Z",
+  "Fingerprint": "B5EFB02C547D1253871542C38942613A3F7C9A9D5E0B7497EE82ED9C231F0D8D",
+  "OriginalSession": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\PurityCriticalPath\\gate\\runs\\diagnostic-compilation-projection-20261022T111917803Z",
+  "TimingContaminationObserved": false,
+  "Meaning": "Diagnostic and production timing populations are separate; no previous measurement is presented as a new execution."
+}

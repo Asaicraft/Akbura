@@ -1,0 +1,13 @@
+{
+  "Scenario": "fallback",
+  "CausalGate": "Passed",
+  "Variant": "baseline",
+  "Warmups": 3,
+  "Complete": true,
+  "Instrumented": true,
+  "RuntimeCorrectness": true,
+  "CompletedUtc": "2026-10-22T11:07:33.0104844Z",
+  "TimingBoundary": "Completed source write to verified original-owner UI acknowledgment; includes state/command validation. No forced GC.",
+  "Updates": 5,
+  "Restarts": 0
+}

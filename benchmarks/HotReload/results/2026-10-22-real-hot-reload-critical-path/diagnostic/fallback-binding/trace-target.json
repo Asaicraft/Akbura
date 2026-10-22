@@ -1,0 +1,11 @@
+{
+  "CollectorSha256": "EDE9CC298BF5F6A91E18B77E9D4928C6136D27A154E8F44147DC89F53E36D5D0",
+  "ApplicationPid": 9940,
+  "CompilerWatch": {
+    "ProcessId": 18648,
+    "ParentProcessId": 31684,
+    "ExecutablePath": "C:\\Program Files\\dotnet\\dotnet.exe",
+    "CommandLine": "\"C:\\Program Files\\dotnet\\dotnet.exe\" \"C:\\Program Files\\dotnet\\sdk\\10.0.401\\DotnetTools\\dotnet-watch\\10.0.401\\tools\\net10.0\\any\\dotnet-watch.dll\" --verbose --non-interactive --project C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\PurityCriticalPath\\gate\\runs\\diagnostic-fallback-binding-20261022T110854688Z\\purity-3b6d7c19acd442bd92bbc374f31b71e1\\PurityHost\\PurityHost.csproj --no-restore run"
+  },
+  "WatchLauncherPid": 31684
+}

@@ -1,0 +1,320 @@
+{
+  "GeneratedCsBytes": 2457753.0,
+  "Scenario": "supported",
+  "PreparedSidebarSha256": "A4B59B2D787A89A30826FB4083F5B1FDED24BDE931F36C63F5D022A7E65E38B3",
+  "ComponentSourceCount": 16,
+  "Instrumented": false,
+  "GeneratedCsFiles": 23,
+  "Adaptation": "<Panel Margin=\"10\">",
+  "HostProject": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\PurityCriticalPath\\gate\\runs\\production-supported-05-baseline-20261022T120230564Z\\purity-61305362b919454a82a99c17565a02e0\\PurityHost\\PurityHost.csproj",
+  "Runtime": [
+    {
+      "Sha256": "54DBD50DEF83426EE8CB5889EE33EF07D8047E2BC0237F8568928869DF134C46",
+      "Assembly": "Akbura"
+    },
+    {
+      "Sha256": "5672649191B200B24739AB7FFC0499A8EA5BC12940B633FE65D8C485B360AE3B",
+      "Assembly": "Akbura.Diagnostics"
+    },
+    {
+      "Sha256": "6EDBA406499391377324A1C21CC438535FC2C0D46B4F56160DFF693E652E638D",
+      "Assembly": "Akbura.Build.Tasks"
+    }
+  ],
+  "Generated": [
+    {
+      "Bytes": 189693,
+      "Sha256": "DDDC88644616AC689A417DA3619751C971CCE703F582891603D9A9E7859B4922",
+      "File": "Akbura.Component.Components_CardTextBox.akbura.7b5c1f76.g.cs"
+    },
+    {
+      "Bytes": 253551,
+      "Sha256": "EBE666A033EDA2C915D311A9A0D7363990A3C2F1C0B6C233B14B2921F2ADF603",
+      "File": "Akbura.Component.Components_CreditCard.akbura.00d43b15.g.cs"
+    },
+    {
+      "Bytes": 40178,
+      "Sha256": "99FD90EF6C0542146BED03F3A2C576657E4377BD8A94395A3FD7A7EC678D32A2",
+      "File": "Akbura.Component.Components_GradientSeparator.akbura.cb32a405.g.cs"
+    },
+    {
+      "Bytes": 52832,
+      "Sha256": "12F2D66EA350B5B74CD4FC6756BC53455FA45C02E6B9DFE0E3B1F1D91711472B",
+      "File": "Akbura.Component.Components_GreetingCard.akbura.75904edb.g.cs"
+    },
+    {
+      "Bytes": 46797,
+      "Sha256": "08CFF23BBE121FE7E7987B0EFADABABD1A5127D978D77428EFE70D5E80DD6237",
+      "File": "Akbura.Component.Components_Icon.akbura.cf6bf82f.g.cs"
+    },
+    {
+      "Bytes": 439672,
+      "Sha256": "860C08B88DA7CCA568A228EEA1ECC182DD29211FC3AE079CB14C536B5295582A",
+      "File": "Akbura.Component.Components_Invoices.akbura.ede02180.g.cs"
+    },
+    {
+      "Bytes": 155866,
+      "Sha256": "8EB0A42BA23D92107D6A73C1D0696C1E7A7643EEEEC9641CE4913DA634B11B56",
+      "File": "Akbura.Component.Components_MainContent.akbura.dc4784ea.g.cs"
+    },
+    {
+      "Bytes": 137659,
+      "Sha256": "32A24CF16E6554B811C3BF608C96A956718553734AF036F6C15B8FB412A11A0D",
+      "File": "Akbura.Component.Components_MoneyCard.akbura.b1bed9f6.g.cs"
+    },
+    {
+      "Bytes": 175665,
+      "Sha256": "AC033CA00C9DBEFCABA7BAD7FD15E20CA9CE3F7160568B4D6E53D95AFF0FAB95",
+      "File": "Akbura.Component.Components_NavButton.akbura.9e833c1b.g.cs"
+    },
+    {
+      "Bytes": 219817,
+      "Sha256": "1C7E11338C3090B9A368CA8F48D3139973B6251D31B7A8A19084B350449315D1",
+      "File": "Akbura.Component.Components_NeedHelp.akbura.769e7cd9.g.cs"
+    },
+    {
+      "Bytes": 158342,
+      "Sha256": "830BEFC197EFA83131E894F1AA0CFE68B5A420B4059924C07174778A488FA92B",
+      "File": "Akbura.Component.Components_PaymentMethods.akbura.2bb40e08.g.cs"
+    },
+    {
+      "Bytes": 294035,
+      "Sha256": "78C58D962A30D4E9D79460743EBA40794CA9421AED1146FB50C198C3CD39AED0",
+      "File": "Akbura.Component.Components_Sidebar.akbura.c36cf8a8.g.cs"
+    },
+    {
+      "Bytes": 102101,
+      "Sha256": "4B92BC69EB716C09CF67AAFA4E15D574E4DCA5C8237E44E3F46E4224F42178B0",
+      "File": "Akbura.Component.Components_SidebarBrand.akbura.6bd9c21b.g.cs"
+    },
+    {
+      "Bytes": 27091,
+      "Sha256": "968582AB5FEF48F4667B9342BFFDBA9A98034157E218A38C6DD65770AD089B57",
+      "File": "Akbura.Component.Views_AppShell.akbura.ee9fd549.g.cs"
+    },
+    {
+      "Bytes": 122369,
+      "Sha256": "1CADF042E8FCA8DB678BDC6BA83D9B888510ABAA3842A04C28B6EDF534BA6E99",
+      "File": "Akbura.Component.Views_MainView.akbura.a1a7df00.g.cs"
+    },
+    {
+      "Bytes": 19854,
+      "Sha256": "F0B02DABEA6B3A3D67B192B19237B3E21DADB634AE5E99A6D5CE84C740B5F3B6",
+      "File": "Akbura.HotReloadService.g.cs"
+    },
+    {
+      "Bytes": 878,
+      "Sha256": "F18AE5262860A7BFF072F3D2FA839A2DEA4E970A1C60C837C6D00CC89E55642F",
+      "File": "PurityUIDashborad.Views.MainWindow.g.cs"
+    },
+    {
+      "Bytes": 3739,
+      "Sha256": "71E58766F4AC4C1C7ADF2D4BCEA2377839A635B446E549C1C89FB324E7D1D6AC",
+      "File": "__KnownINotifyPropertyChangedArgs.g.cs"
+    },
+    {
+      "Bytes": 3756,
+      "Sha256": "EA96E49B7C11D7E7A4D64AF70A856DDF2892803677AB8724A7BFB65F46F77A34",
+      "File": "__KnownINotifyPropertyChangingArgs.g.cs"
+    },
+    {
+      "Bytes": 10679,
+      "Sha256": "292A1E0B86619F5FB9E52A43149220C8C440AEA92127C5F71CBB4E45EEF4CDBC",
+      "File": "PurityUIDashborad.ViewModels.MainViewModel.g.cs"
+    },
+    {
+      "Bytes": 1038,
+      "Sha256": "294DE538D4E8EA5B57545A022768F5CB55D8B41B746C6D26B97DB83773EA9C46",
+      "File": "PurityUIDashborad.ViewModels.MainViewModel.Increment.g.cs"
+    },
+    {
+      "Bytes": 1073,
+      "Sha256": "55FAE3227EA174B156076FAE38DC2373DCDEB6D382EB8F34C4EE24745623253A",
+      "File": "PurityUIDashborad.ViewModels.MainViewModel.ResetCounter.g.cs"
+    },
+    {
+      "Bytes": 1068,
+      "Sha256": "8DAC083BC6B9CFBB82F382A6CB376D1C405C135723EBA45F6C460904C1AE4B21",
+      "File": "PurityUIDashborad.ViewModels.MainViewModel.UseExampleName.g.cs"
+    }
+  ],
+  "OriginalSidebarSha256": "92C1AA146BF5204699F1638E8207B8A3D40A06CC2A4AFEA2E4B10CDA90FFB9FF",
+  "ToolClosure": [
+    {
+      "Sha256": "B50F72C1F82D538D2D825F615D6DA0468F6DCBD09C6AC3590D17EE0C775E35A1",
+      "File": "Akbura.BlackSilence.dll"
+    },
+    {
+      "Sha256": "3C1C5FDF8DA8DEA1760759DD94C713B880CC4D98196EA0A5333A4F0A081C46C7",
+      "File": "Akbura.BlackSilence.pdb"
+    },
+    {
+      "Sha256": "54DBD50DEF83426EE8CB5889EE33EF07D8047E2BC0237F8568928869DF134C46",
+      "File": "Akbura.dll"
+    },
+    {
+      "Sha256": "6198D6BD057B332B4000D882F03B2A49E529F149C6607FE3EE9B040C8D90C2A6",
+      "File": "Akbura.Generator.dll"
+    },
+    {
+      "Sha256": "F49C69386DC03E8D2A1EF84164741170EE5F351A19EBB9683B6EAA3C85B8BD25",
+      "File": "Akbura.Generator.pdb"
+    },
+    {
+      "Sha256": "24F0ABC66A34C3553BAE0376735498B2A09C449B35B05A949F9FCFABC487D795",
+      "File": "Akbura.pdb"
+    },
+    {
+      "Sha256": "AEF1ADDD3F17072FC2F6401DA34482A3AE797AC4A04133D4E18EBF58B99EF515",
+      "File": "Akbura.xml"
+    },
+    {
+      "Sha256": "FF0FBCA98E4233C86150B1B7C649342156AD59C88A2B30EF50E6E492CFD226C0",
+      "File": "Avalonia.Base.dll"
+    },
+    {
+      "Sha256": "EC7244D3BF3F9564E56D5852344BDC99A95D1F992E7B95ABD7508A26B6FD407A",
+      "File": "Avalonia.Controls.dll"
+    },
+    {
+      "Sha256": "E88F39AFF6FC5530C5501FF4827110CB7991FBCAEBA1915E34E0B038DE33276E",
+      "File": "Avalonia.DesignerSupport.dll"
+    },
+    {
+      "Sha256": "557344DB170F8A97B0BABE0A1B1E3EFA104CED3792C5F9B16CEED27E239D3B74",
+      "File": "Avalonia.Dialogs.dll"
+    },
+    {
+      "Sha256": "39BCF7A5C834C9340531F66EE888FC55CC465A6C3E041AB7AB38450E6B9C74C8",
+      "File": "Avalonia.dll"
+    },
+    {
+      "Sha256": "27D12F6B6B38A97F6EBA0AC5117E1E898FF5FBB1FE48A72AF68BBBD41A0136EB",
+      "File": "Avalonia.Fonts.Inter.dll"
+    },
+    {
+      "Sha256": "9F2CA2BCCACC0CC16D20BC190926D83A9B8CE2677A051F1426416040D28A28A1",
+      "File": "Avalonia.HarfBuzz.dll"
+    },
+    {
+      "Sha256": "61785BA40A0F94F96CA026D57E131CFD816EA55ED7C5F7C1E439D9A88B3B954C",
+      "File": "Avalonia.Headless.dll"
+    },
+    {
+      "Sha256": "C0CB15D0D7BFC9A88BD1A4C8558BBEC65FA88B25B4A1B6C4624D5996D63E11D6",
+      "File": "Avalonia.Markup.dll"
+    },
+    {
+      "Sha256": "C2A635AC02EB746E14305718304D2E8D97A6224D6F324ABBCEB26883B799D500",
+      "File": "Avalonia.Markup.Xaml.dll"
+    },
+    {
+      "Sha256": "292F1644D1E30DBC2AA3D54307D3050345DB170171706AFD9C57FF254DF4DF3E",
+      "File": "Avalonia.Metal.dll"
+    },
+    {
+      "Sha256": "E412B450837855D0884555BB66B9BB0E4E14595FA19281B5DAFD59B98EFA128A",
+      "File": "Avalonia.MicroCom.dll"
+    },
+    {
+      "Sha256": "C912FF7B7E11D9A2748FCC26DC6C2FF3CA7C76C25EB077C7619738423D8092FF",
+      "File": "Avalonia.OpenGL.dll"
+    },
+    {
+      "Sha256": "209F78D8E902322AB8F110D6B4E2D8C2BA77CC3DF7C5BD0F223EA17C3DE9A59C",
+      "File": "Avalonia.Remote.Protocol.dll"
+    },
+    {
+      "Sha256": "45C7FE4D606217481CE05A25867EB5FB2B5EFCC1DE63FA589B8B47339BBD672A",
+      "File": "Avalonia.Vulkan.dll"
+    },
+    {
+      "Sha256": "55E72AC23263F8E12484F3435E02EC22FAC9EFF6E6D169BB0A8C246BE6B99D29",
+      "File": "HarfBuzzSharp.dll"
+    },
+    {
+      "Sha256": "F9A0375BD1D9C95FC3D9DCC6B173CF5443FA20E7E26BD4A55E0215317377FAE0",
+      "File": "HotReloadBenchmarks.deps.json"
+    },
+    {
+      "Sha256": "5C6FC5950010C69101E0F9A47CDA7095F461DD692ADC7FD1DE749ED1F8125A5C",
+      "File": "HotReloadBenchmarks.dll"
+    },
+    {
+      "Sha256": "90BBB991155E23227272345C09D48D471A243B6AB2C301DAD7F916E8CA16D578",
+      "File": "HotReloadBenchmarks.exe"
+    },
+    {
+      "Sha256": "FD2BE0DA1F7D1B212F53380AFB31DCDFDCF30D23BF888D8BBBED150D81AB4B37",
+      "File": "HotReloadBenchmarks.pdb"
+    },
+    {
+      "Sha256": "256DDA2706E1151BB95987B6B5BE610BF68D64E058285B19E7E958222FC90414",
+      "File": "HotReloadBenchmarks.runtimeconfig.json"
+    },
+    {
+      "Sha256": "2E0A43BE3D123DAE5AA8A7F1082FD3F1C2A8D842F6C513DEAC526DAED620E318",
+      "File": "MicroCom.Runtime.dll"
+    },
+    {
+      "Sha256": "96896C3C1E0843EA5C4CC03BAAC8DF3A61587E3742599B6B29F99DBD25595EFF",
+      "File": "Microsoft.Build.dll"
+    },
+    {
+      "Sha256": "58A2DA163E77BAA35719982597F92384D8AE442479070DF97B4747B1093F5A2F",
+      "File": "Microsoft.Build.Framework.dll"
+    },
+    {
+      "Sha256": "12B0428203FAAE6555858D2FF856CEF7450D2764CF00C57E7516587A04885870",
+      "File": "Microsoft.CodeAnalysis.CSharp.dll"
+    },
+    {
+      "Sha256": "03B3AB9D73D477D259FBC0AE167DD8CAF4775C3C8688F1FDC5E0D3603255C3F4",
+      "File": "Microsoft.CodeAnalysis.dll"
+    },
+    {
+      "Sha256": "7DD4423497B356AABEBA50367030B5AE2787E7E5391FF3962B600E005A2C7373",
+      "File": "Microsoft.NET.StringTools.dll"
+    },
+    {
+      "Sha256": "5F9C0F74277FE40815316A9C82FAB02A03FCFB227F6C93B7A4B5E43A5B5E59D8",
+      "File": "Microsoft.VisualStudio.SolutionPersistence.dll"
+    },
+    {
+      "Sha256": "CB7AA8739F1E2FB4DB7F021F89DC1951E8476E521A9679CBC2CF575524A2BF23",
+      "File": "NuGet.Frameworks.dll"
+    },
+    {
+      "Sha256": "C8D01C9F262DEF18C965D866478A466537EF9A6E0163962F706969F1B7B360D0",
+      "File": "System.Configuration.ConfigurationManager.dll"
+    },
+    {
+      "Sha256": "63188770E3E521DDD25D81A02EE552F32F25A96D6E9712B03890DA833175BBF0",
+      "File": "System.Diagnostics.EventLog.dll"
+    },
+    {
+      "Sha256": "D86BD5FB250FA66BE31A2A7055ED98C2B865626698A1F6CC09B96459DEEEE68A",
+      "File": "System.Security.Cryptography.ProtectedData.dll"
+    },
+    {
+      "Sha256": "3166DC70323FB30CCF1CEDB0FE86F2AD122C46D254542342D90386EFC4C9285C",
+      "File": "xunit.abstractions.dll"
+    },
+    {
+      "Sha256": "BCD9711B22D227AC8CD4C1568E72433A0F576D2EC8AAE64AC508081892015B1D",
+      "File": "xunit.assert.dll"
+    },
+    {
+      "Sha256": "2F7FEEEC8C6DEC7DF684C25FB80AADB292B963D09723460F03D53C5AD2088ACC",
+      "File": "xunit.core.dll"
+    },
+    {
+      "Sha256": "E70FEBE547C15F8155DB3E2D95C3BA4445A59CBC21A3E7541AB22ED49D3DCF7B",
+      "File": "xunit.execution.dotnet.dll"
+    }
+  ],
+  "CompilationControlMeaning": null,
+  "Variant": "baseline",
+  "PreparedRoot": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\PurityCriticalPath\\gate\\runs\\production-supported-05-baseline-20261022T120230564Z\\purity-61305362b919454a82a99c17565a02e0",
+  "Workload": "Unmodified committed Purity Sidebar plus explicitly recorded scenario fixture adaptation"
+}

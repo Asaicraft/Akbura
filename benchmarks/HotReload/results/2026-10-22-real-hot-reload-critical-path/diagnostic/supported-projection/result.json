@@ -1,0 +1,13 @@
+{
+  "CausalGate": "Passed",
+  "Warmups": 3,
+  "Variant": "projection",
+  "CompletedUtc": "2026-10-22T11:03:44.6408504Z",
+  "Complete": true,
+  "Restarts": 0,
+  "Scenario": "supported",
+  "TimingBoundary": "Completed source write to verified original-owner UI acknowledgment; includes state/command validation. No forced GC.",
+  "Updates": 5,
+  "RuntimeCorrectness": true,
+  "Instrumented": true
+}

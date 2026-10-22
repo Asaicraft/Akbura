@@ -1,0 +1,6 @@
+!**/*.log
+**/*.nettrace
+**/*.dmp
+**/*.gcdump
+**/bin/
+**/obj/

@@ -1,0 +1,3 @@
+# Preserve diagnostic event/log bytes and their recorded hashes.
+**/*.log -text -whitespace
+**/*.trx -text -whitespace

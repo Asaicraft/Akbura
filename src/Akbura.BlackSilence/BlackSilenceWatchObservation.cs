@@ -20,7 +20,7 @@ namespace Akbura.BlackSilence;
 /// are scalar, and each measurement restores its ambient scope before returning.
 /// No semantic cache or production marker is introduced.
 /// </summary>
-internal sealed class BlackSilenceWatchObservation(string? directory)
+internal sealed partial class BlackSilenceWatchObservation(string? directory)
 {
     private readonly string _observer = Guid.NewGuid().ToString("N");
     private readonly object _gate = new();
@@ -80,9 +80,15 @@ internal sealed class BlackSilenceWatchObservation(string? directory)
         record["PreviousGenerationVersion"] = Scalar(request.State.ProbeStore?.Latest?.Version ?? 0);
         record["PreviousSemanticEntries"] = Scalar(request.State.ProbeStore?.Latest?.SemanticEntryCount ?? 0);
         using var measurement = GenerationStatistics.BeginMeasurement(trackInvalidation: true);
+        var coreStarted = Stopwatch.GetTimestamp();
         try
         {
             var batch = BlackSilenceDocumentBatch.GenerateSafely(request, token);
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AKBURA_CRITICAL_REVISION")))
+            {
+                record["GeneratedBatchCoreElapsedMs"] = Scalar((Stopwatch.GetTimestamp() - coreStarted) * 1000.0 / Stopwatch.Frequency);
+            }
+            ObserveCriticalOutput(record, batch, request);
             record["PublishedGenerationVersion"] = Scalar(request.State.ProbeStore?.Latest?.Version ?? 0);
             record["PublishedSemanticEntries"] = Scalar(request.State.ProbeStore?.Latest?.SemanticEntryCount ?? 0);
             record["PublishedProjectionEntries"] = Scalar(request.State.ProbeStore?.Latest?.EntryCount ?? 0);
@@ -117,12 +123,20 @@ internal sealed class BlackSilenceWatchObservation(string? directory)
                 record["counter." + counter] = Scalar(snapshot.GetCounterCount(counter));
             }
         }
-        foreach (var stage in new[] { GenerationStatisticStage.ExpressionFactoryBinding, GenerationStatisticStage.CrossRevisionBindingValidation,
-            GenerationStatisticStage.CrossRevisionSemanticContributionImport })
+        var criticalPath = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AKBURA_CRITICAL_REVISION"));
+        foreach (GenerationStatisticStage stage in Enum.GetValues(typeof(GenerationStatisticStage)))
         {
+            if (stage == GenerationStatisticStage.Count ||
+                !criticalPath &&
+                stage is not (GenerationStatisticStage.ExpressionFactoryBinding or GenerationStatisticStage.CrossRevisionBindingValidation or
+                    GenerationStatisticStage.CrossRevisionSemanticContributionImport))
+            {
+                continue;
+            }
             record["stageCount." + stage] = Scalar(snapshot.GetStageInvocationCount(stage));
             record["stageMs." + stage] = Scalar(snapshot.GetStageElapsed(stage).TotalMilliseconds);
         }
+        ObserveCriticalScope(record, request, snapshot);
         var index = 0;
         foreach (var observation in snapshot.InvalidationEvents)
         {

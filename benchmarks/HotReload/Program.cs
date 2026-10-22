@@ -31,6 +31,9 @@ internal static partial class Program
             ClrHotReload = MetadataUpdater.IsSupported, Warmup, Samples });
         switch (args.FirstOrDefault())
         {
+            case "purity-critical-watch":
+                MeasurePurityCriticalPath(args[1], args[2], args[3], int.Parse(args[4]), int.Parse(args[5]), args[6], args[7], args[8]).GetAwaiter().GetResult();
+                break;
             case "semantic-watch":
                 MeasureSemanticWatch(args[1], args[2], args[3], int.Parse(args[4]), int.Parse(args[5]), args[6], args.ElementAtOrDefault(7)).GetAwaiter().GetResult();
                 break;

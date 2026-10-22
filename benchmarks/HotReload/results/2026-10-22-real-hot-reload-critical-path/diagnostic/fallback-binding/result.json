@@ -1,0 +1,13 @@
+{
+  "Variant": "binding",
+  "Complete": true,
+  "Instrumented": true,
+  "Restarts": 0,
+  "Updates": 5,
+  "TimingBoundary": "Completed source write to verified original-owner UI acknowledgment; includes state/command validation. No forced GC.",
+  "Scenario": "fallback",
+  "CausalGate": "Passed",
+  "Warmups": 3,
+  "CompletedUtc": "2026-10-22T11:10:06.9405510Z",
+  "RuntimeCorrectness": true
+}

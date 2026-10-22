@@ -1,0 +1,13 @@
+{
+  "TimingBoundary": "Completed source write to verified original-owner UI acknowledgment; includes state/command validation. No forced GC.",
+  "Restarts": 0,
+  "CausalGate": "UnverifiedInProduction",
+  "Scenario": "supported",
+  "Updates": 30,
+  "Warmups": 3,
+  "Complete": true,
+  "Instrumented": false,
+  "RuntimeCorrectness": true,
+  "CompletedUtc": "2026-10-22T12:06:34.4863939Z",
+  "Variant": "projection"
+}

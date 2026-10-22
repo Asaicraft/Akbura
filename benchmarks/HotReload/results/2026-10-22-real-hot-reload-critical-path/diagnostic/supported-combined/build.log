@@ -1,0 +1,20 @@
+  Determining projects to restore...
+  Restored C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\PurityCriticalPath\gate\runs\diagnostic-supported-combined-20261022T110502748Z\purity-5856356e949f4e1a842d38119db331a6\PurityUIDashborad\PurityUIDashborad.csproj (in 245 ms).
+  Restored C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\PurityCriticalPath\gate\runs\diagnostic-supported-combined-20261022T110502748Z\purity-5856356e949f4e1a842d38119db331a6\PurityUIDashborad.ViewModels\PurityUIDashborad.ViewModels.csproj (in 245 ms).
+  Restored C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\PurityCriticalPath\gate\runs\diagnostic-supported-combined-20261022T110502748Z\purity-5856356e949f4e1a842d38119db331a6\PurityHost\PurityHost.csproj (in 245 ms).
+  PurityUIDashborad.ViewModels -> C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\PurityCriticalPath\gate\runs\diagnostic-supported-combined-20261022T110502748Z\purity-5856356e949f4e1a842d38119db331a6\PurityUIDashborad.ViewModels\bin\Debug\net10.0\PurityUIDashborad.ViewModels.dll
+  Avalonia Accelerate Community requires telemetry. To opt out, please upgrade to a paid tier. Learn more: https://avaloniaui.net/accelerate/
+C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\PurityCriticalPath\gate\runs\diagnostic-supported-combined-20261022T110502748Z\purity-5856356e949f4e1a842d38119db331a6\PurityUIDashborad\Components\Invoices.akbura(62,182): warning CS8602: Dereference of a possibly null reference. [C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\PurityCriticalPath\gate\runs\diagnostic-supported-combined-20261022T110502748Z\purity-5856356e949f4e1a842d38119db331a6\PurityUIDashborad\PurityUIDashborad.csproj]
+C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\PurityCriticalPath\gate\runs\diagnostic-supported-combined-20261022T110502748Z\purity-5856356e949f4e1a842d38119db331a6\PurityUIDashborad\Components\Invoices.akbura(62,182): warning CS8602: Dereference of a possibly null reference. [C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\PurityCriticalPath\gate\runs\diagnostic-supported-combined-20261022T110502748Z\purity-5856356e949f4e1a842d38119db331a6\PurityUIDashborad\PurityUIDashborad.csproj]
+  PurityUIDashborad -> C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\PurityCriticalPath\gate\runs\diagnostic-supported-combined-20261022T110502748Z\purity-5856356e949f4e1a842d38119db331a6\PurityUIDashborad\bin\Debug\net10.0\PurityUIDashborad.dll
+  Avalonia Accelerate Community requires telemetry. To opt out, please upgrade to a paid tier. Learn more: https://avaloniaui.net/accelerate/
+  PurityHost -> C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\PurityCriticalPath\gate\runs\diagnostic-supported-combined-20261022T110502748Z\purity-5856356e949f4e1a842d38119db331a6\PurityHost\bin\Debug\net10.0\PurityHost.dll
+
+Build succeeded.
+
+C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\PurityCriticalPath\gate\runs\diagnostic-supported-combined-20261022T110502748Z\purity-5856356e949f4e1a842d38119db331a6\PurityUIDashborad\Components\Invoices.akbura(62,182): warning CS8602: Dereference of a possibly null reference. [C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\PurityCriticalPath\gate\runs\diagnostic-supported-combined-20261022T110502748Z\purity-5856356e949f4e1a842d38119db331a6\PurityUIDashborad\PurityUIDashborad.csproj]
+C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\PurityCriticalPath\gate\runs\diagnostic-supported-combined-20261022T110502748Z\purity-5856356e949f4e1a842d38119db331a6\PurityUIDashborad\Components\Invoices.akbura(62,182): warning CS8602: Dereference of a possibly null reference. [C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\PurityCriticalPath\gate\runs\diagnostic-supported-combined-20261022T110502748Z\purity-5856356e949f4e1a842d38119db331a6\PurityUIDashborad\PurityUIDashborad.csproj]
+    2 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:24.48

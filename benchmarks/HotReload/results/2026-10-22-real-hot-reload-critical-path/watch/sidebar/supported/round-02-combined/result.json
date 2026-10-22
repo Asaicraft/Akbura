@@ -1,0 +1,13 @@
+{
+  "Restarts": 0,
+  "RuntimeCorrectness": true,
+  "Variant": "combined",
+  "Instrumented": false,
+  "Complete": true,
+  "Scenario": "supported",
+  "TimingBoundary": "Completed source write to verified original-owner UI acknowledgment; includes state/command validation. No forced GC.",
+  "CompletedUtc": "2026-10-22T11:41:15.4601361Z",
+  "Warmups": 3,
+  "Updates": 30,
+  "CausalGate": "UnverifiedInProduction"
+}

@@ -1,0 +1,20 @@
+  Determining projects to restore...
+  Restored C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\WatchMemory\heavy-feasibility-validated\purity-a6497f6b59f64bbd89d277d05947d765\PurityUIDashborad.ViewModels\PurityUIDashborad.ViewModels.csproj (in 319 ms).
+  Restored C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\WatchMemory\heavy-feasibility-validated\purity-a6497f6b59f64bbd89d277d05947d765\PurityUIDashborad\PurityUIDashborad.csproj (in 339 ms).
+  Restored C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\WatchMemory\heavy-feasibility-validated\purity-a6497f6b59f64bbd89d277d05947d765\PurityHost\PurityHost.csproj (in 339 ms).
+  PurityUIDashborad.ViewModels -> C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\WatchMemory\heavy-feasibility-validated\purity-a6497f6b59f64bbd89d277d05947d765\PurityUIDashborad.ViewModels\bin\Debug\net10.0\PurityUIDashborad.ViewModels.dll
+  Avalonia Accelerate Community requires telemetry. To opt out, please upgrade to a paid tier. Learn more: https://avaloniaui.net/accelerate/
+C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\WatchMemory\heavy-feasibility-validated\purity-a6497f6b59f64bbd89d277d05947d765\PurityUIDashborad\Components\Invoices.akbura(62,182): warning CS8602: Dereference of a possibly null reference. [C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\WatchMemory\heavy-feasibility-validated\purity-a6497f6b59f64bbd89d277d05947d765\PurityUIDashborad\PurityUIDashborad.csproj]
+C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\WatchMemory\heavy-feasibility-validated\purity-a6497f6b59f64bbd89d277d05947d765\PurityUIDashborad\Components\Invoices.akbura(62,182): warning CS8602: Dereference of a possibly null reference. [C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\WatchMemory\heavy-feasibility-validated\purity-a6497f6b59f64bbd89d277d05947d765\PurityUIDashborad\PurityUIDashborad.csproj]
+  PurityUIDashborad -> C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\WatchMemory\heavy-feasibility-validated\purity-a6497f6b59f64bbd89d277d05947d765\PurityUIDashborad\bin\Debug\net10.0\PurityUIDashborad.dll
+  Avalonia Accelerate Community requires telemetry. To opt out, please upgrade to a paid tier. Learn more: https://avaloniaui.net/accelerate/
+  PurityHost -> C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\WatchMemory\heavy-feasibility-validated\purity-a6497f6b59f64bbd89d277d05947d765\PurityHost\bin\Debug\net10.0\PurityHost.dll
+
+Build succeeded.
+
+C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\WatchMemory\heavy-feasibility-validated\purity-a6497f6b59f64bbd89d277d05947d765\PurityUIDashborad\Components\Invoices.akbura(62,182): warning CS8602: Dereference of a possibly null reference. [C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\WatchMemory\heavy-feasibility-validated\purity-a6497f6b59f64bbd89d277d05947d765\PurityUIDashborad\PurityUIDashborad.csproj]
+C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\WatchMemory\heavy-feasibility-validated\purity-a6497f6b59f64bbd89d277d05947d765\PurityUIDashborad\Components\Invoices.akbura(62,182): warning CS8602: Dereference of a possibly null reference. [C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\WatchMemory\heavy-feasibility-validated\purity-a6497f6b59f64bbd89d277d05947d765\PurityUIDashborad\PurityUIDashborad.csproj]
+    2 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:33.40

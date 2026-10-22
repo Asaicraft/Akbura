@@ -6,6 +6,7 @@ param(
     [ValidateSet('baseline','projection','binding','combined')][string]$Variant = 'combined',
     [ValidateRange(1, 500)][int]$Updates = 20,
     [ValidateRange(0, 10)][int]$Warmups = 2,
+    [string]$StudyDirectory = '',
     [switch]$Instrumented
 )
 
@@ -35,7 +36,7 @@ foreach ($step in @(
     @{ Name = 'restore.log'; Arguments = @('restore', $project, '--nologo', '-v:minimal') },
     @{ Name = 'build.log'; Arguments = @('build', $project, '--no-restore', '-p:UseSharedCompilation=false', '-nr:false', '--nologo', '-v:minimal') },
     @{ Name = 'watch.jsonl'; Arguments = @((Join-Path $ToolDirectory 'HotReloadBenchmarks.dll'), 'semantic-watch', $project,
-        (Join-Path $OutputDirectory 'observer-command.json'), $Scenario, "$Updates", "$Warmups", $telemetry) }
+        (Join-Path $OutputDirectory 'observer-command.json'), $Scenario, "$Updates", "$Warmups", $telemetry) + $(if ($StudyDirectory) { @([IO.Path]::GetFullPath($StudyDirectory)) } else { @() }) }
 )) {
     $writer = [IO.StreamWriter]::new((Join-Path $OutputDirectory $step.Name), $false, $encoding)
     $writer.AutoFlush = $true

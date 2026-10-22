@@ -1,0 +1,6 @@
+Exception: C:\Users\Asanov\.codex\worktrees\c671\Akbura\benchmarks\HotReload\Verify-SupportedWatch.ps1:45
+Line |
+  45 |  : XITCODE -ne 0) { throw "Failed $($step.Name); see $OutputDirectory" }
+     |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Failed watch.jsonl; see
+     | C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\WatchMemory\gate-io-recovery\runs\forced-1-combined-release-20261022T072445442Z\watch

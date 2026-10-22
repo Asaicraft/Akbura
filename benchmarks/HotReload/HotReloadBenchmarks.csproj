@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <BlackSilenceConfiguration Condition="'$(BlackSilenceConfiguration)' == ''">Debug</BlackSilenceConfiguration>
-    <DefaultItemExcludes>$(DefaultItemExcludes);Akbura-PurityUI-Tutorial/**;PurityHost/**;results/**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Akbura-PurityUI-Tutorial/**;PurityHost/**;WatchDiagnostics/**;results/**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="WatchFixture/**/*.cs" />

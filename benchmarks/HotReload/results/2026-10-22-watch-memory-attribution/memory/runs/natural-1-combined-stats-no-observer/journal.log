@@ -1,0 +1,24 @@
+2026-10-22T05:11:13.5007605Z START mode=natural variant=combined observer=False revisions=100 ownedPid=22088
+2026-10-22T05:11:28.5948175Z HEARTBEAT checkpoint=0 cpuSeconds=1.40625
+2026-10-22T05:11:34.6685733Z CHECKPOINT 01-startup-0 paused outside UI latency
+2026-10-22T05:11:38.7215693Z RESUMED 01-startup-0 compilerWatchPid=11288 applicationPid=28552
+2026-10-22T05:11:41.6455456Z CHECKPOINT 02-warmup-0 paused outside UI latency
+2026-10-22T05:11:43.0764814Z RESUMED 02-warmup-0 compilerWatchPid=11288 applicationPid=28552
+2026-10-22T05:11:43.6023907Z HEARTBEAT checkpoint=2 cpuSeconds=1.84375
+2026-10-22T05:11:43.8786726Z CHECKPOINT 03-revision-1 paused outside UI latency
+2026-10-22T05:11:45.2377872Z RESUMED 03-revision-1 compilerWatchPid=11288 applicationPid=28552
+2026-10-22T05:11:51.5982016Z CHECKPOINT 04-revision-10 paused outside UI latency
+2026-10-22T05:11:52.9904726Z RESUMED 04-revision-10 compilerWatchPid=11288 applicationPid=28552
+2026-10-22T05:11:58.8194083Z HEARTBEAT checkpoint=4 cpuSeconds=2.109375
+2026-10-22T05:12:03.0628250Z CHECKPOINT 05-revision-25 paused outside UI latency
+2026-10-22T05:12:04.4253755Z RESUMED 05-revision-25 compilerWatchPid=11288 applicationPid=28552
+2026-10-22T05:12:13.9520304Z HEARTBEAT checkpoint=5 cpuSeconds=2.15625
+2026-10-22T05:12:21.0984088Z CHECKPOINT 06-revision-50 paused outside UI latency
+2026-10-22T05:12:22.4572474Z RESUMED 06-revision-50 compilerWatchPid=11288 applicationPid=28552
+2026-10-22T05:12:29.0710356Z HEARTBEAT checkpoint=6 cpuSeconds=2.28125
+2026-10-22T05:12:38.8823543Z CHECKPOINT 07-revision-75 paused outside UI latency
+2026-10-22T05:12:40.2350163Z RESUMED 07-revision-75 compilerWatchPid=11288 applicationPid=28552
+2026-10-22T05:12:44.2060120Z HEARTBEAT checkpoint=7 cpuSeconds=2.328125
+2026-10-22T05:12:56.1082397Z CHECKPOINT 08-revision-100 paused outside UI latency
+2026-10-22T05:12:57.4697480Z RESUMED 08-revision-100 compilerWatchPid=11288 applicationPid=28552
+2026-10-22T05:12:58.1169672Z COMPLETE Memory session and offline analysis finished.

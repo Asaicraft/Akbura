@@ -1,0 +1,24 @@
+2026-10-22T05:04:14.4366072Z START mode=natural variant=combined observer=True revisions=100 ownedPid=32348
+2026-10-22T05:04:29.5000098Z HEARTBEAT checkpoint=0 cpuSeconds=1.46875
+2026-10-22T05:04:34.2509651Z CHECKPOINT 01-startup-0 paused outside UI latency
+2026-10-22T05:04:38.1799772Z RESUMED 01-startup-0 compilerWatchPid=31448 applicationPid=7372
+2026-10-22T05:04:41.0956167Z CHECKPOINT 02-warmup-0 paused outside UI latency
+2026-10-22T05:04:42.4912773Z RESUMED 02-warmup-0 compilerWatchPid=31448 applicationPid=7372
+2026-10-22T05:04:43.5604637Z CHECKPOINT 03-revision-1 paused outside UI latency
+2026-10-22T05:04:44.9346694Z RESUMED 03-revision-1 compilerWatchPid=31448 applicationPid=7372
+2026-10-22T05:04:45.1944407Z HEARTBEAT checkpoint=3 cpuSeconds=1.953125
+2026-10-22T05:04:51.5601528Z CHECKPOINT 04-revision-10 paused outside UI latency
+2026-10-22T05:04:52.9527715Z RESUMED 04-revision-10 compilerWatchPid=31448 applicationPid=7372
+2026-10-22T05:05:00.3741192Z HEARTBEAT checkpoint=4 cpuSeconds=2.125
+2026-10-22T05:05:03.2819792Z CHECKPOINT 05-revision-25 paused outside UI latency
+2026-10-22T05:05:04.6581396Z RESUMED 05-revision-25 compilerWatchPid=31448 applicationPid=7372
+2026-10-22T05:05:15.5113071Z HEARTBEAT checkpoint=5 cpuSeconds=2.203125
+2026-10-22T05:05:21.5991905Z CHECKPOINT 06-revision-50 paused outside UI latency
+2026-10-22T05:05:22.9637414Z RESUMED 06-revision-50 compilerWatchPid=31448 applicationPid=7372
+2026-10-22T05:05:30.6261831Z HEARTBEAT checkpoint=6 cpuSeconds=2.28125
+2026-10-22T05:05:40.1515158Z CHECKPOINT 07-revision-75 paused outside UI latency
+2026-10-22T05:05:41.5254867Z RESUMED 07-revision-75 compilerWatchPid=31448 applicationPid=7372
+2026-10-22T05:05:45.7656820Z HEARTBEAT checkpoint=7 cpuSeconds=2.375
+2026-10-22T05:05:58.5151187Z CHECKPOINT 08-revision-100 paused outside UI latency
+2026-10-22T05:05:59.8932261Z RESUMED 08-revision-100 compilerWatchPid=31448 applicationPid=7372
+2026-10-22T05:06:00.8218068Z COMPLETE Memory session and offline analysis finished.

@@ -1,0 +1,103 @@
+{
+  "StartedUtc": "2026-10-22T08:36:07.7430156Z",
+  "Application": {
+    "Kind": "ack",
+    "Revision": 13,
+    "Phase": "margin",
+    "Pid": 20548,
+    "ActualMargin": 22,
+    "StatePreserved": true,
+    "InputPreserved": true,
+    "ControlsPreserved": true,
+    "BindingsValid": true,
+    "UnaffectedBindingsValid": true,
+    "InvalidExpressionFrozen": false,
+    "InvalidExpressionValue": "First 13",
+    "ExpectedInvalidExpressionValue": null,
+    "ValidatedReactiveBindings": 4,
+    "Subscriptions": 1,
+    "ManagedHeapBytes": 5142608,
+    "PostGc": false,
+    "WorkingSetBytes": 99250176,
+    "AllocatedBytes": 28188152,
+    "Gen0": 6,
+    "Gen1": 4,
+    "Gen2": 3
+  },
+  "Sequence": 4,
+  "Phase": "revision",
+  "Variant": "combined",
+  "Mode": "forced",
+  "Metrics": [
+    {
+      "Pid": 30200,
+      "Role": "compilerWatch",
+      "CpuSeconds": 22.359375,
+      "Collection": "External gcdump full GC, outside file-write-to-UI interval",
+      "WorkingSetBytes": 348532736,
+      "PrivateBytes": 152150016,
+      "SampledUtc": "2026-10-22T08:36:10.2863806Z"
+    },
+    {
+      "Pid": 20548,
+      "Role": "application",
+      "CpuSeconds": 3.328125,
+      "Collection": "External gcdump full GC, outside file-write-to-UI interval",
+      "WorkingSetBytes": 96071680,
+      "PrivateBytes": 28651520,
+      "SampledUtc": "2026-10-22T08:36:11.1900181Z"
+    },
+    {
+      "Pid": 27292,
+      "Role": "launcher",
+      "CpuSeconds": 0.5,
+      "Collection": "Natural GC; no explicit collection requested",
+      "WorkingSetBytes": 53776384,
+      "PrivateBytes": 17055744,
+      "SampledUtc": "2026-10-22T08:36:11.1940464Z"
+    }
+  ],
+  "Observer": false,
+  "Revision": 10,
+  "CompletedUtc": "2026-10-22T08:36:11.1940889Z",
+  "Topology": {
+    "Processes": [
+      {
+        "ProcessId": 27292,
+        "ParentProcessId": 18648,
+        "Name": "dotnet.exe",
+        "ExecutablePath": "C:\\Program Files\\dotnet\\dotnet.exe",
+        "CommandLine": "\"dotnet\" watch --verbose --non-interactive --project C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate-channel-validated\\runs\\forced-3-combined-stats-no-observer-20261022T083524403Z\\watch\\fixture\\WatchFixture.csproj --no-restore run"
+      },
+      {
+        "ProcessId": 27120,
+        "ParentProcessId": 27292,
+        "Name": "conhost.exe",
+        "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe",
+        "CommandLine": "\\??\\C:\\WINDOWS\\system32\\conhost.exe 0x4"
+      },
+      {
+        "ProcessId": 30200,
+        "ParentProcessId": 27292,
+        "Name": "dotnet.exe",
+        "ExecutablePath": "C:\\Program Files\\dotnet\\dotnet.exe",
+        "CommandLine": "\"C:\\Program Files\\dotnet\\dotnet.exe\" \"C:\\Program Files\\dotnet\\sdk\\10.0.401\\DotnetTools\\dotnet-watch\\10.0.401\\tools\\net10.0\\any\\dotnet-watch.dll\" --verbose --non-interactive --project C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate-channel-validated\\runs\\forced-3-combined-stats-no-observer-20261022T083524403Z\\watch\\fixture\\WatchFixture.csproj --no-restore run"
+      },
+      {
+        "ProcessId": 9524,
+        "ParentProcessId": 30200,
+        "Name": "dotnet.exe",
+        "ExecutablePath": "C:\\Program Files\\dotnet\\dotnet.exe",
+        "CommandLine": "\"C:\\Program Files\\dotnet\\dotnet.exe\" run --no-build -e DOTNET_WATCH=1 -e DOTNET_WATCH_ITERATION=1 -e DOTNET_MODIFIABLE_ASSEMBLIES=debug -e \"DOTNET_STARTUP_HOOKS=C:\\Program Files\\dotnet\\sdk\\10.0.401\\DotnetTools\\dotnet-watch\\10.0.401\\tools\\net10.0\\any\\hotreload\\net10.0\\Microsoft.Extensions.DotNetDeltaApplier.dll\" -e DOTNET_WATCH_HOTRELOAD_NAMEDPIPE_NAME=c5d258abf2d3463d9db47185f7662bfb --project C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate-channel-validated\\runs\\forced-3-combined-stats-no-observer-20261022T083524403Z\\watch\\fixture\\WatchFixture.csproj --no-restore"
+      },
+      {
+        "ProcessId": 20548,
+        "ParentProcessId": 9524,
+        "Name": "WatchFixture.exe",
+        "ExecutablePath": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate-channel-validated\\runs\\forced-3-combined-stats-no-observer-20261022T083524403Z\\watch\\fixture\\bin\\Debug\\net10.0\\WatchFixture.exe",
+        "CommandLine": "\"C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate-channel-validated\\runs\\forced-3-combined-stats-no-observer-20261022T083524403Z\\watch\\fixture\\bin\\Debug\\net10.0\\WatchFixture.exe\""
+      }
+    ],
+    "HostPid": 30200
+  }
+}

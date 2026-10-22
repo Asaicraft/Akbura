@@ -9,7 +9,7 @@ using System.Xml.Linq;
 
 internal static partial class Program
 {
-    private static async Task MeasureSemanticWatch(string project, string commandPath, string scenario, int updates, int warmups, string observations)
+    private static async Task MeasureSemanticWatch(string project, string commandPath, string scenario, int updates, int warmups, string observations, string? studyDirectory = null)
     {
         project = Path.GetFullPath(project);
         commandPath = Path.GetFullPath(commandPath);
@@ -162,6 +162,8 @@ internal static partial class Program
         var title = "Akbura Counter";
         var marker = 0;
         var currentSource = original;
+        var study = studyDirectory == null ? null : new WatchMemoryCheckpoint(studyDirectory);
+        JsonElement studyApplication = default;
         try
         {
             process.Start();
@@ -169,6 +171,10 @@ internal static partial class Program
             process.BeginErrorReadLine();
             await ready.Task.WaitAsync(TimeSpan.FromMinutes(4));
             await Update("initial-check", null, warmup: true);
+            if (study != null)
+            {
+                await study.Pause("startup", 0, process.Id, applicationPid, studyApplication);
+            }
             for (var index = 1; index <= updates + warmups; index++)
             {
                 await Task.Delay(500);
@@ -194,6 +200,14 @@ internal static partial class Program
                 }
                 currentSource = Source();
                 await Update(scenario, currentSource, index <= warmups, scenario == "compilation");
+                if (study != null)
+                {
+                    var measured = index - warmups;
+                    if (index == warmups || measured is 1 or 10 or 25 or 50 or 75 or 100 or 200 or 300 or 400 or 500)
+                    {
+                        await study.Pause(index == warmups ? "warmup" : "revision", Math.Max(0, measured), process.Id, applicationPid, studyApplication);
+                    }
+                }
             }
             if (scenario == "stress")
             {
@@ -247,7 +261,7 @@ internal static partial class Program
                 margin = 24;
                 await Update("post-repair-margin", currentSource = Source(), warmup: true);
             }
-            await Update("memory", null, warmup: true);
+            await Update(study == null ? "memory" : "memory-natural", null, warmup: true);
             if (protocolFailure != null)
             {
                 throw protocolFailure;
@@ -359,6 +373,10 @@ internal static partial class Program
                 Application = ack, WatchLauncherWorkingSetBytes = process.WorkingSet64, WatchLauncherPid = process.Id, CausalRecords = records.Count,
                 Causality = observations == "off" ? "Unavailable in non-STATS production run" : "Actual watched analyzer records",
                 GeneratorProcessingMs = (double?)null, ClrDeltaSubmissionMs = (double?)null });
+            if (study != null)
+            {
+                studyApplication = ack;
+            }
         }
 
         static string ReadMvid(string path)

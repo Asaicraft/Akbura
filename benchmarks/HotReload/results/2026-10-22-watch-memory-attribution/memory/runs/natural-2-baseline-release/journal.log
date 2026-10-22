@@ -1,0 +1,24 @@
+2026-10-22T05:18:03.0536124Z START mode=natural variant=baseline observer=False revisions=100 ownedPid=14004
+2026-10-22T05:18:18.3279198Z HEARTBEAT checkpoint=0 cpuSeconds=1.34375
+2026-10-22T05:18:19.6574789Z CHECKPOINT 01-startup-0 paused outside UI latency
+2026-10-22T05:18:23.4922297Z RESUMED 01-startup-0 compilerWatchPid=920 applicationPid=9248
+2026-10-22T05:18:26.1521130Z CHECKPOINT 02-warmup-0 paused outside UI latency
+2026-10-22T05:18:27.5376085Z RESUMED 02-warmup-0 compilerWatchPid=920 applicationPid=9248
+2026-10-22T05:18:28.6059579Z CHECKPOINT 03-revision-1 paused outside UI latency
+2026-10-22T05:18:29.9605714Z RESUMED 03-revision-1 compilerWatchPid=920 applicationPid=9248
+2026-10-22T05:18:33.4143072Z HEARTBEAT checkpoint=3 cpuSeconds=1.640625
+2026-10-22T05:18:36.0689387Z CHECKPOINT 04-revision-10 paused outside UI latency
+2026-10-22T05:18:37.4198213Z RESUMED 04-revision-10 compilerWatchPid=920 applicationPid=9248
+2026-10-22T05:18:47.2429094Z CHECKPOINT 05-revision-25 paused outside UI latency
+2026-10-22T05:18:48.5972042Z RESUMED 05-revision-25 compilerWatchPid=920 applicationPid=9248
+2026-10-22T05:18:48.8606126Z HEARTBEAT checkpoint=5 cpuSeconds=1.796875
+2026-10-22T05:19:03.9327582Z HEARTBEAT checkpoint=5 cpuSeconds=1.921875
+2026-10-22T05:19:04.4680623Z CHECKPOINT 06-revision-50 paused outside UI latency
+2026-10-22T05:19:05.8108293Z RESUMED 06-revision-50 compilerWatchPid=920 applicationPid=9248
+2026-10-22T05:19:19.0502575Z HEARTBEAT checkpoint=6 cpuSeconds=1.9375
+2026-10-22T05:19:21.9698113Z CHECKPOINT 07-revision-75 paused outside UI latency
+2026-10-22T05:19:23.3166677Z RESUMED 07-revision-75 compilerWatchPid=920 applicationPid=9248
+2026-10-22T05:19:34.1574333Z HEARTBEAT checkpoint=7 cpuSeconds=2.078125
+2026-10-22T05:19:39.1924444Z CHECKPOINT 08-revision-100 paused outside UI latency
+2026-10-22T05:19:40.5421172Z RESUMED 08-revision-100 compilerWatchPid=920 applicationPid=9248
+2026-10-22T05:19:41.1583428Z COMPLETE Memory session and offline analysis finished.

@@ -1,0 +1,30 @@
+{
+  "GeneratedCsBytes": 2410937.0,
+  "SidebarLexicalAttributeExpressionCount": 29,
+  "PreparedHost": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityHost\\PurityHost.csproj",
+  "Workload": "Real Purity Sidebar from the tutorial submodule",
+  "BindingCountMeaning": "Lexical markup attribute-expression count, not a semantic binding or admitted-hit count.",
+  "PreparedProject": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\PurityUIDashborad.csproj",
+  "PreparedSidebarSha256": "A4B59B2D787A89A30826FB4083F5B1FDED24BDE931F36C63F5D022A7E65E38B3",
+  "OriginalSidebarSha256": "92C1AA146BF5204699F1638E8207B8A3D40A06CC2A4AFEA2E4B10CDA90FFB9FF",
+  "CompilerPair": [
+    {
+      "Sha256": "6198D6BD057B332B4000D882F03B2A49E529F149C6607FE3EE9B040C8D90C2A6",
+      "File": "Akbura.Generator.dll"
+    },
+    {
+      "Sha256": "B50F72C1F82D538D2D825F615D6DA0468F6DCBD09C6AC3590D17EE0C775E35A1",
+      "File": "Akbura.BlackSilence.dll"
+    }
+  ],
+  "NestedComponentKinds": [
+    "GradientSeparator",
+    "NavButton",
+    "NeedHelp",
+    "SidebarBrand"
+  ],
+  "PreparedRoot": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765",
+  "Adaptation": "Added only Margin=\"10\" to the real root Panel before initial compilation; the tutorial checkout is unchanged.",
+  "ComponentSourceCount": 16,
+  "GeneratedCsFiles": 23
+}

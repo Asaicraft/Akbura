@@ -1,0 +1,10 @@
+{
+  "Runtime": "10.0.1226.42308",
+  "ClrMD": "4.1.14.45802",
+  "RootReachableObjects": 1038985,
+  "RootReachableShallowBytes": 85470044,
+  "Roots": 342,
+  "ManagedModules": 129,
+  "AnalysisMs": 2440.2541,
+  "Meaning": "Strong-root/finalizer reachable object traversal, including dependent handles. Shallow totals are not exclusive owner sizes. Paths are representative shortest strong paths, not proof of obsolete lifetime. No object values or memory addresses are exported."
+}

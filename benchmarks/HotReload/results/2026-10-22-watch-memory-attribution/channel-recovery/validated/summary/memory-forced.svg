@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600" viewBox="0 0 1000 600"><rect width="1000" height="600" fill="white"/><g font-family="sans-serif" font-size="13">
+<text x="60" y="25">Compiler/watch heap, forced GC; thin lines are independent sessions</text>
+<path d="M60 500 H740" stroke="#ddd"/><text x="5" y="500">0.0 MiB</text>
+<path d="M60 390 H740" stroke="#ddd"/><text x="5" y="390">32.3 MiB</text>
+<path d="M60 280 H740" stroke="#ddd"/><text x="5" y="280">64.7 MiB</text>
+<path d="M60 170 H740" stroke="#ddd"/><text x="5" y="170">97.0 MiB</text>
+<path d="M60 60 H740" stroke="#ddd"/><text x="5" y="60">129.4 MiB</text>
+<text x="755" y="62" fill="#225ea8">baseline-observer</text>
+<polyline fill="none" stroke="#225ea8" stroke-width="1.5" opacity="0.7" points="60.00,331.86 66.80,329.83 128.00,308.32 230.00,273.23 400.00,215.27 570.00,155.89 740.00,100.59"/>
+<polyline fill="none" stroke="#225ea8" stroke-width="1.5" opacity="0.7" points="60.00,331.58 66.80,329.64 128.00,308.65 230.00,273.59 400.00,218.57 570.00,158.64 740.00,102.75"/>
+<polyline fill="none" stroke="#225ea8" stroke-width="1.5" opacity="0.7" points="60.00,332.09 66.80,329.58 128.00,307.34 230.00,275.31 400.00,215.67 570.00,156.47 740.00,100.17"/>
+<text x="755" y="84" fill="#d7301f">baseline-release</text>
+<polyline fill="none" stroke="#d7301f" stroke-width="1.5" opacity="0.7" points="60.00,331.93 66.80,330.35 128.00,308.39 230.00,273.93 400.00,215.74 570.00,157.66 740.00,102.24"/>
+<polyline fill="none" stroke="#d7301f" stroke-width="1.5" opacity="0.7" points="60.00,332.04 66.80,329.95 128.00,308.46 230.00,273.40 400.00,216.86 570.00,160.09 740.00,104.11"/>
+<polyline fill="none" stroke="#d7301f" stroke-width="1.5" opacity="0.7" points="60.00,331.39 66.80,329.22 128.00,308.02 230.00,273.64 400.00,216.31 570.00,158.60 740.00,102.93"/>
+<text x="755" y="106" fill="#238b45">baseline-stats-no-observer</text>
+<polyline fill="none" stroke="#238b45" stroke-width="1.5" opacity="0.7" points="60.00,331.77 66.80,330.24 128.00,308.15 230.00,273.46 400.00,216.45 570.00,157.35 740.00,101.87"/>
+<polyline fill="none" stroke="#238b45" stroke-width="1.5" opacity="0.7" points="60.00,331.84 66.80,329.77 128.00,308.10 230.00,273.41 400.00,216.39 570.00,157.46 740.00,101.38"/>
+<polyline fill="none" stroke="#238b45" stroke-width="1.5" opacity="0.7" points="60.00,331.19 66.80,329.02 128.00,307.85 230.00,273.65 400.00,215.62 570.00,158.08 740.00,102.04"/>
+<text x="755" y="128" fill="#88419d">combined-observer</text>
+<polyline fill="none" stroke="#88419d" stroke-width="1.5" opacity="0.7" points="60.00,331.17 66.80,329.65 128.00,307.73 230.00,272.75 400.00,216.92 570.00,159.20 740.00,101.85"/>
+<polyline fill="none" stroke="#88419d" stroke-width="1.5" opacity="0.7" points="60.00,331.63 66.80,329.50 128.00,308.00 230.00,274.41 400.00,217.72 570.00,159.25 740.00,103.64"/>
+<polyline fill="none" stroke="#88419d" stroke-width="1.5" opacity="0.7" points="60.00,330.64 66.80,328.61 128.00,307.37 230.00,272.42 400.00,214.32 570.00,156.29 740.00,100.00"/>
+<text x="755" y="150" fill="#636363">combined-release</text>
+<polyline fill="none" stroke="#636363" stroke-width="1.5" opacity="0.7" points="60.00,331.99 66.80,330.31 128.00,309.39 230.00,275.45 400.00,218.53 570.00,158.68 740.00,102.17"/>
+<polyline fill="none" stroke="#636363" stroke-width="1.5" opacity="0.7" points="60.00,331.78 66.80,329.69 128.00,308.59 230.00,273.74 400.00,216.45 570.00,158.05 740.00,101.64"/>
+<polyline fill="none" stroke="#636363" stroke-width="1.5" opacity="0.7" points="60.00,331.19 66.80,328.99 128.00,307.89 230.00,273.54 400.00,215.92 570.00,157.85 740.00,101.47"/>
+<text x="755" y="172" fill="#dd1c77">combined-stats-no-observer</text>
+<polyline fill="none" stroke="#dd1c77" stroke-width="1.5" opacity="0.7" points="60.00,331.81 66.80,330.28 128.00,308.20 230.00,273.46 400.00,216.36 570.00,157.94 740.00,102.06"/>
+<polyline fill="none" stroke="#dd1c77" stroke-width="1.5" opacity="0.7" points="60.00,331.85 66.80,329.92 128.00,308.18 230.00,273.84 400.00,216.21 570.00,157.69 740.00,101.79"/>
+<polyline fill="none" stroke="#dd1c77" stroke-width="1.5" opacity="0.7" points="60.00,332.00 66.80,329.90 128.00,308.07 230.00,273.75 400.00,216.29 570.00,158.02 740.00,101.68"/>
+<path d="M60 60 V500 H740" stroke="black" fill="none"/><text x="60" y="525">0 (after warmup)</text><text x="690" y="525">100 edits</text><text x="60" y="560">Forced: gcdump live graph bytes. Natural: external last-GC heap less fragmentation; not equivalent measurements.</text></g></svg>

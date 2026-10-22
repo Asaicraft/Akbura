@@ -1,0 +1,11 @@
+{
+  "Checkpoints": 8,
+  "Revisions": 100,
+  "Mode": "natural",
+  "Observer": false,
+  "Complete": true,
+  "CompletedUtc": "2026-10-22T07:12:43.9423892Z",
+  "Meaning": "Dedicated memory study. Profiling, external collectors and checkpoint pauses disqualify these sessions as primary production latency evidence.",
+  "FullHeapProfiles": 0,
+  "Variant": "baseline"
+}

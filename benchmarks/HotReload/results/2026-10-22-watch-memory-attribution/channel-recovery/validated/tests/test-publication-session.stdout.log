@@ -1,0 +1,1 @@
+PASS: Windows read-sharing race recovered atomically; old payload preserved until replacement; invalid destination rejected.

@@ -1,0 +1,24 @@
+2026-10-22T05:07:48.3992463Z START mode=natural variant=combined observer=False revisions=100 ownedPid=2164
+2026-10-22T05:08:03.4198738Z HEARTBEAT checkpoint=0 cpuSeconds=1.546875
+2026-10-22T05:08:06.5946622Z CHECKPOINT 01-startup-0 paused outside UI latency
+2026-10-22T05:08:10.4945160Z RESUMED 01-startup-0 compilerWatchPid=24360 applicationPid=15268
+2026-10-22T05:08:13.4082913Z CHECKPOINT 02-warmup-0 paused outside UI latency
+2026-10-22T05:08:14.8029000Z RESUMED 02-warmup-0 compilerWatchPid=24360 applicationPid=15268
+2026-10-22T05:08:15.6052769Z CHECKPOINT 03-revision-1 paused outside UI latency
+2026-10-22T05:08:16.9552021Z RESUMED 03-revision-1 compilerWatchPid=24360 applicationPid=15268
+2026-10-22T05:08:18.5488695Z HEARTBEAT checkpoint=3 cpuSeconds=1.71875
+2026-10-22T05:08:23.0526789Z CHECKPOINT 04-revision-10 paused outside UI latency
+2026-10-22T05:08:24.4072154Z RESUMED 04-revision-10 compilerWatchPid=24360 applicationPid=15268
+2026-10-22T05:08:33.6637291Z HEARTBEAT checkpoint=4 cpuSeconds=1.90625
+2026-10-22T05:08:34.1995507Z CHECKPOINT 05-revision-25 paused outside UI latency
+2026-10-22T05:08:35.5660334Z RESUMED 05-revision-25 compilerWatchPid=24360 applicationPid=15268
+2026-10-22T05:08:48.7841209Z HEARTBEAT checkpoint=5 cpuSeconds=1.9375
+2026-10-22T05:08:51.6959180Z CHECKPOINT 06-revision-50 paused outside UI latency
+2026-10-22T05:08:53.0389366Z RESUMED 06-revision-50 compilerWatchPid=24360 applicationPid=15268
+2026-10-22T05:09:03.8955484Z HEARTBEAT checkpoint=6 cpuSeconds=2.03125
+2026-10-22T05:09:09.2093763Z CHECKPOINT 07-revision-75 paused outside UI latency
+2026-10-22T05:09:10.5527332Z RESUMED 07-revision-75 compilerWatchPid=24360 applicationPid=15268
+2026-10-22T05:09:19.0059050Z HEARTBEAT checkpoint=7 cpuSeconds=2.125
+2026-10-22T05:09:26.4124189Z CHECKPOINT 08-revision-100 paused outside UI latency
+2026-10-22T05:09:27.7626009Z RESUMED 08-revision-100 compilerWatchPid=24360 applicationPid=15268
+2026-10-22T05:09:28.4671773Z COMPLETE Memory session and offline analysis finished.

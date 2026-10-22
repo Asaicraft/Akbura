@@ -1,0 +1,286 @@
+#requires -Version 7.2
+param(
+    [string]$OutputDirectory = 'bin/WatchMemory/gate',
+    [string]$ResultDirectory = 'benchmarks/HotReload/results/2026-10-22-watch-memory-attribution',
+    [string]$CompilerEvidence = 'bin/SemanticWatch/gate-recovery',
+    [string]$ReuseMemoryEvidence = '',
+    [ValidateRange(3,6)][int]$Rounds = 3,
+    [switch]$Worker
+)
+$ErrorActionPreference = 'Stop'
+$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+Set-Location -LiteralPath $repository
+$OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
+$ResultDirectory = [IO.Path]::GetFullPath($ResultDirectory)
+$CompilerEvidence = [IO.Path]::GetFullPath($CompilerEvidence)
+if ($ReuseMemoryEvidence) { $ReuseMemoryEvidence = [IO.Path]::GetFullPath($ReuseMemoryEvidence) }
+$null = New-Item -ItemType Directory -Path $OutputDirectory -Force
+$encoding = [Text.UTF8Encoding]::new($false)
+if (-not $Worker) {
+    $arguments = @('-NoProfile','-File',$PSCommandPath,'-Worker','-OutputDirectory',$OutputDirectory,'-ResultDirectory',$ResultDirectory,
+        '-CompilerEvidence',$CompilerEvidence,'-Rounds',"$Rounds")
+    if ($ReuseMemoryEvidence) { $arguments += @('-ReuseMemoryEvidence',$ReuseMemoryEvidence) }
+    $stamp = [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ')
+    $process = Start-Process (Get-Command pwsh).Source -WindowStyle Hidden -WorkingDirectory $repository -PassThru `
+        -ArgumentList @($arguments | ForEach-Object { '"' + $_ + '"' }) `
+        -RedirectStandardOutput (Join-Path $OutputDirectory "controller-$stamp.stdout.log") `
+        -RedirectStandardError (Join-Path $OutputDirectory "controller-$stamp.stderr.log")
+    Write-Output "Controller PID: $($process.Id)"
+    Write-Output "Progress: Get-Content -LiteralPath '$OutputDirectory/journal.log' -Tail 20 -Wait"
+    return
+}
+$lock = [IO.File]::Open((Join-Path $OutputDirectory 'controller.lock'),'OpenOrCreate','ReadWrite','None')
+$journal = [IO.StreamWriter]::new((Join-Path $OutputDirectory 'journal.log'),$true,$encoding)
+$journal.AutoFlush = $true
+$current = 'preflight'; $childPid = $null; $completed = 0
+function Save([string]$path, $value) {
+    if ([IO.Directory]::Exists($path)) { throw "Atomic JSON destination is a directory: $path" }
+    [IO.File]::WriteAllText(($path + '.tmp'),(($value | ConvertTo-Json -Depth 12).ReplaceLineEndings("`r`n") + "`r`n"),$encoding)
+    $publicationTimer = [Diagnostics.Stopwatch]::StartNew()
+    $retried = $false
+    while ($true) {
+        try {
+            [IO.File]::Move(($path + '.tmp'),$path,$true)
+            if ($retried) { Log "PUBLICATION_RECOVERED $path" }
+            return
+        }
+        catch {
+            $nativeError = $_.Exception
+            while ($nativeError.InnerException) { $nativeError = $nativeError.InnerException }
+            $code = $nativeError.HResult -band 0xFFFF
+            if (($nativeError -isnot [IO.IOException] -and $nativeError -isnot [UnauthorizedAccessException]) -or
+                $code -notin @(5,32,33) -or $publicationTimer.Elapsed.TotalSeconds -ge 10) { throw }
+            if (-not $retried) { Log "PUBLICATION_RETRY win32=$code $path"; $retried = $true }
+            Start-Sleep -Milliseconds 25
+        }
+    }
+}
+function Log([string]$message) { $journal.WriteLine([DateTime]::UtcNow.ToString('o') + ' ' + $message); $journal.BaseStream.Flush($true) }
+function Status([string]$phase, [string]$failure = '') {
+    Save (Join-Path $OutputDirectory 'status.json') @{ Phase = $phase; Current = $script:current; CurrentPid = $script:childPid
+        ControllerPid = $PID; CompletedSteps = $script:completed; Failure = $failure; UpdatedUtc = [DateTime]::UtcNow.ToString('o') }
+}
+function Source-Hashes {
+    @(& git ls-files --cached --others --exclude-standard -- src/Akbura.Generator src/Akbura.BlackSilence src/Akbura.UnitTests benchmarks/HotReload |
+        Where-Object { -not $_.StartsWith('benchmarks/HotReload/results/') -and (Test-Path -LiteralPath $_ -PathType Leaf) } |
+        Sort-Object -Unique | ForEach-Object { "$_ $((Get-FileHash -LiteralPath $_).Hash)" })
+}
+function Assert-Sources {
+    if (((Source-Hashes) -join "`n") -cne ($script:manifest.Files -join "`n")) { throw 'Sources changed; preserve this gate and use a new output directory.' }
+}
+function Run([string]$name, [string[]]$arguments, [string]$session = '') {
+    Assert-Sources
+    $script:current = $name
+    $marker = Join-Path $OutputDirectory "$name.success.json"
+    if (Test-Path -LiteralPath $marker) {
+        $saved = Get-Content -LiteralPath $marker -Raw | ConvertFrom-Json
+        if ($saved.Fingerprint -ne $manifest.Fingerprint) { throw 'Incompatible success marker.' }
+        $script:completed++; Log "REUSED $name"; return $saved
+    }
+    $originalMarker = if ($ReuseMemoryEvidence) { Join-Path $ReuseMemoryEvidence "$name.success.json" } else { '' }
+    if ($session -and $originalMarker -and (Test-Path -LiteralPath $originalMarker)) {
+        $original = Get-Content -LiteralPath $originalMarker -Raw | ConvertFrom-Json
+        if ($original.Fingerprint -ne $reuseManifest.Fingerprint -or $original.Session -ne $session) { throw 'Incompatible original memory session.' }
+        $result = Get-Content (Join-Path $session 'session.json') -Raw | ConvertFrom-Json
+        if (-not $result.Complete -or $result.Revisions -ne 100 -or $result.Checkpoints -ne 8) { throw 'Original memory session is incomplete.' }
+        $measurementFingerprint = if ($original.MeasurementFingerprint) { $original.MeasurementFingerprint } else { $original.Fingerprint }
+        $saved = @{ Fingerprint = $manifest.Fingerprint; MeasurementFingerprint = $measurementFingerprint; Arguments = $original.Arguments
+            Session = $session; Logs = $original.Logs; CompletedUtc = $original.CompletedUtc; ReusedUtc = [DateTime]::UtcNow.ToString('o')
+            OriginalSuccessMarker = $originalMarker; OriginalSuccessMarkerSha256 = (Get-FileHash -LiteralPath $originalMarker).Hash }
+        Save $marker $saved; $script:completed++; Log "REUSED_ORIGINAL_SESSION $name original measurement=$measurementFingerprint; not a new execution"
+        return $saved
+    }
+    $logs = Join-Path $OutputDirectory "$name-$([DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ'))"
+    $null = New-Item -ItemType Directory -Path $logs
+    $info = [Diagnostics.ProcessStartInfo]::new($arguments[0])
+    $info.UseShellExecute = $false; $info.CreateNoWindow = $true
+    $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true; $info.WorkingDirectory = $repository
+    foreach ($argument in $arguments | Select-Object -Skip 1) { $info.ArgumentList.Add($argument) }
+    $process = [Diagnostics.Process]::new(); $process.StartInfo = $info
+    $stdout = [IO.FileStream]::new((Join-Path $logs 'stdout.log'),'CreateNew','Write','ReadWrite')
+    $stderr = [IO.FileStream]::new((Join-Path $logs 'stderr.log'),'CreateNew','Write','ReadWrite')
+    try {
+        $null = $process.Start(); $script:childPid = $process.Id
+        $copyOut = $process.StandardOutput.BaseStream.CopyToAsync($stdout)
+        $copyErr = $process.StandardError.BaseStream.CopyToAsync($stderr)
+        Log "START $name pid=$script:childPid logs=$logs"; Status 'Running'
+        while (-not $process.WaitForExit(15000)) {
+            $stdout.Flush($true); $stderr.Flush($true)
+            $last = if ($session -and (Test-Path -LiteralPath (Join-Path $session 'journal.log'))) {
+                (Get-Content -LiteralPath (Join-Path $session 'journal.log') -Tail 1) -replace '^\S+\s+', ''
+            } else { 'active' }
+            Log "HEARTBEAT $name $last"; Status 'Running'
+            if (([DateTime]::Now - $process.StartTime).TotalHours -gt 2) { $process.Kill($true); throw 'Owned child exceeded two-hour deadline.' }
+        }
+        $null = $copyOut.GetAwaiter().GetResult(); $null = $copyErr.GetAwaiter().GetResult()
+        if ($process.ExitCode -ne 0) { throw "Exit $($process.ExitCode): $logs" }
+        Assert-Sources
+        $saved = @{ Fingerprint = $manifest.Fingerprint; Arguments = $arguments; Session = $session; Logs = $logs; CompletedUtc = [DateTime]::UtcNow.ToString('o') }
+        Save $marker $saved; $script:completed++; Log "DONE $name"
+        return $saved
+    }
+    finally { $stdout.Dispose(); $stderr.Dispose(); $process.Dispose(); $script:childPid = $null }
+}
+function Archive-Session([string]$name, [string]$session, [string]$measurementFingerprint) {
+    $destination = Join-Path $ResultDirectory "memory/runs/$name"
+    $null = New-Item -ItemType Directory -Path $destination -Force
+    foreach ($file in Get-ChildItem -LiteralPath $session -File | Where-Object { $_.Name -match 'checkpoint\.json$|^session\.json$|^counters-.*\.csv$|heapstat\.stdout\.log$|^journal\.log$' }) {
+        Copy-Item -LiteralPath $file.FullName -Destination $destination -Force
+    }
+    foreach ($directory in Get-ChildItem -LiteralPath $session -Directory -Filter '*-analysis') {
+        $target = Join-Path $destination $directory.Name; $null = New-Item -ItemType Directory -Path $target -Force
+        Get-ChildItem -LiteralPath $directory.FullName -File | Copy-Item -Destination $target -Force
+    }
+    foreach ($file in @('watch.jsonl','result.json')) { Copy-Item -LiteralPath (Join-Path $session "watch/$file") -Destination $destination -Force }
+    Save (Join-Path $destination 'provenance.json') @{ Fingerprint = $measurementFingerprint; ReviewControllerFingerprint = $manifest.Fingerprint; OriginalLocalSession = $session
+        RawDumpsLocalOnly = $true; Purpose = 'Dedicated memory evidence, not accepted production latency.' }
+}
+try {
+    $statusPath = Join-Path $OutputDirectory 'status.json'
+    if (Test-Path -LiteralPath $statusPath) {
+        $previous = Get-Content -LiteralPath $statusPath -Raw | ConvertFrom-Json
+        if ($previous.CurrentPid) {
+            $active = Get-CimInstance Win32_Process -Filter "ProcessId=$($previous.CurrentPid)" -ErrorAction SilentlyContinue
+            if ($active -and $active.CommandLine.Contains($OutputDirectory)) { throw 'A previous owned child is still running; do not duplicate it.' }
+        }
+    }
+    $files = Source-Hashes
+    $fingerprint = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($files -join "`n"))))
+    $originPath = Join-Path $CompilerEvidence 'sources.json'
+    $origin = Get-Content -LiteralPath $originPath -Raw | ConvertFrom-Json
+    foreach ($line in $origin.Files | Where-Object { $_.StartsWith('src/') }) {
+        if ($line -notmatch '^(.*) ([A-F0-9]{64})$' -or (Get-FileHash -LiteralPath $Matches[1]).Hash -ne $Matches[2]) { throw 'Compiler/test sources differ from the frozen evidence.' }
+    }
+    $reuseManifest = $null; $reuseProof = $null; $checkpointProtocolChanged = $false
+    if ($ReuseMemoryEvidence) {
+        if ($ReuseMemoryEvidence -eq $OutputDirectory) { throw 'Preserve the original memory gate; use a separate recovery directory.' }
+        $previousManifest = Join-Path $ReuseMemoryEvidence 'sources.json'
+        $reuseManifest = Get-Content -LiteralPath $previousManifest -Raw | ConvertFrom-Json
+        $previousFingerprint = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($reuseManifest.Files -join "`n"))))
+        if ($previousFingerprint -ne $reuseManifest.Fingerprint -or $reuseManifest.Revision -ne (& git rev-parse HEAD) -or
+            $reuseManifest.CompilerEvidence -ne $CompilerEvidence -or $reuseManifest.Rounds -ne $Rounds) { throw 'Incompatible original memory provenance.' }
+        $allowed = @('benchmarks/HotReload/Run-WatchMemorySession.ps1','benchmarks/HotReload/Start-WatchMemoryAttribution.ps1',
+            'benchmarks/HotReload/Test-WatchMemoryPublication.ps1','benchmarks/HotReload/Program.WatchMemory.cs','benchmarks/HotReload/Test-WatchMemoryChannel.ps1')
+        $before = @{}; $after = @{}
+        foreach ($line in $reuseManifest.Files) { if ($line -notmatch '^(.*) ([A-F0-9]{64})$') { throw 'Invalid original source manifest.' }; $before[$Matches[1]] = $Matches[2] }
+        foreach ($line in $files) { if ($line -notmatch '^(.*) ([A-F0-9]{64})$') { throw 'Invalid current source manifest.' }; $after[$Matches[1]] = $Matches[2] }
+        $differences = @(@($before.Keys)+@($after.Keys) | Sort-Object -Unique | Where-Object { $before[$_] -cne $after[$_] })
+        foreach ($path in $differences) { if ($path -notin $allowed) { throw "Measurement/compilation/profiling input changed outside the I/O repair: $path" } }
+        $checkpointProtocolChanged = 'benchmarks/HotReload/Program.WatchMemory.cs' -in $differences
+        $reuseProof = @{ Manifest = $previousManifest; ManifestSha256 = (Get-FileHash -LiteralPath $previousManifest).Hash
+            OriginalFingerprint = $reuseManifest.Fingerprint; HarnessChanges = $differences; RebuildCheckpointHost = $checkpointProtocolChanged
+            Reason = 'Checkpoint transport repair outside the target processes and measured UI interval. Rebuild the parent checkpoint client only when its source changed; compiler, application fixture and offline profiler inputs remain unchanged.' }
+    }
+    $manifestPath = Join-Path $OutputDirectory 'sources.json'
+    $manifest = @{ Revision = (& git rev-parse HEAD); Fingerprint = $fingerprint; Files = $files; Rounds = $Rounds; ResultDirectory = $ResultDirectory
+        CompilerEvidence = $CompilerEvidence; OriginManifestSha256 = (Get-FileHash -LiteralPath $originPath).Hash
+        ReuseMemoryEvidence = $ReuseMemoryEvidence; ReuseProof = $reuseProof }
+    if (Test-Path -LiteralPath $manifestPath) {
+        $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+        if ($manifest.Fingerprint -ne $fingerprint -or $manifest.Rounds -ne $Rounds -or $manifest.ResultDirectory -ne $ResultDirectory -or
+            $manifest.CompilerEvidence -ne $CompilerEvidence -or $manifest.ReuseMemoryEvidence -ne $ReuseMemoryEvidence -or
+            ($ReuseMemoryEvidence -and $manifest.ReuseProof.ManifestSha256 -ne $reuseProof.ManifestSha256) -or
+            $manifest.OriginManifestSha256 -ne (Get-FileHash -LiteralPath $originPath).Hash) { throw 'Source, protocol or compiler origin changed; use a new gate.' }
+    }
+    else { Save $manifestPath $manifest }
+    $null = New-Item -ItemType Directory -Path $ResultDirectory -Force
+    Copy-Item -LiteralPath $manifestPath -Destination $ResultDirectory -Force
+    $diagnostics = Join-Path $repository 'bin/WatchMemory/tools'
+    foreach ($name in @('dotnet-dump','dotnet-gcdump','dotnet-counters','dotnet-trace')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $diagnostics "$name.exe"))) {
+            $null = Run "install-$name" @('dotnet','tool','install',$name,'--version','10.0.745401','--tool-path',$diagnostics)
+        }
+    }
+    $seed = Join-Path $CompilerEvidence 'tools/baseline-stats'
+    if ($ReuseMemoryEvidence) {
+        $reuseDirectories = if ($checkpointProtocolChanged) { @('profiler') } else { @('host','profiler') }
+        foreach ($directory in $reuseDirectories) {
+            $destination = Join-Path $OutputDirectory $directory
+            if (-not (Test-Path -LiteralPath (Join-Path $destination 'bin'))) {
+                $null = New-Item -ItemType Directory -Path $destination -Force
+                Copy-Item -LiteralPath (Join-Path $ReuseMemoryEvidence "$directory/bin") -Destination $destination -Recurse
+            }
+        }
+        $oldControls = Get-Content (Join-Path $reuseManifest.ResultDirectory 'controls.json') -Raw | ConvertFrom-Json
+        if ((Get-FileHash -LiteralPath (Join-Path $OutputDirectory 'profiler/bin/WatchDiagnostics/debug/WatchDiagnostics.dll')).Hash -ne $oldControls.ProfilerSha256) { throw 'Reused profiler binary changed.' }
+        Log "REUSED_BUILD_ARTIFACTS exact original $($reuseDirectories -join '/') binaries; no new compiler or profiler build claimed"
+    }
+    else {
+        $null = Run 'build-profiler' @('dotnet','build','benchmarks/HotReload/WatchDiagnostics/WatchDiagnostics.csproj','--artifacts-path',(Join-Path $OutputDirectory 'profiler'),
+            '-p:UseSharedCompilation=false','-nr:false','--nologo','-v:minimal')
+    }
+    if (-not $ReuseMemoryEvidence -or $checkpointProtocolChanged) {
+        $null = Run 'build-host' @('dotnet','build','benchmarks/HotReload/HotReloadBenchmarks.csproj','--artifacts-path',(Join-Path $OutputDirectory 'host'),
+            "-p:CompilerToolDirectory=$seed",'-p:UseSharedCompilation=false','-nr:false','--nologo','-v:minimal')
+    }
+    $null = Run 'test-report' @('pwsh','-NoProfile','-File',(Join-Path $PSScriptRoot 'Test-WatchMemoryReport.ps1'))
+    $null = Run 'test-publication-session' @('pwsh','-NoProfile','-File',(Join-Path $PSScriptRoot 'Test-WatchMemoryPublication.ps1'))
+    $null = Run 'test-publication-controller' @('pwsh','-NoProfile','-File',(Join-Path $PSScriptRoot 'Test-WatchMemoryPublication.ps1'),'-Publisher','Start-WatchMemoryAttribution.ps1')
+    $null = Run 'test-request-reader' @('pwsh','-NoProfile','-File',(Join-Path $PSScriptRoot 'Test-WatchMemoryPublication.ps1'),'-RequestReader')
+    $null = Run 'test-checkpoint-channel' @('pwsh','-NoProfile','-File',(Join-Path $PSScriptRoot 'Test-WatchMemoryChannel.ps1'))
+    $profiler = Join-Path $OutputDirectory 'profiler/bin/WatchDiagnostics/debug/WatchDiagnostics.dll'
+    $tools = @{}
+    foreach ($variant in @('baseline','combined')) { foreach ($profile in @('stats','production')) {
+        $name = "$variant-$profile"; $destination = Join-Path $OutputDirectory "tools/$name"
+        $proofPath = Join-Path $OutputDirectory "$name.closure.json"
+        if (-not (Test-Path -LiteralPath $proofPath)) {
+            if (Test-Path -LiteralPath $destination) { throw 'Incomplete frozen closure; preserve it and use a new gate.' }
+            $closureOrigin = if ($ReuseMemoryEvidence) { $ReuseMemoryEvidence } else { $CompilerEvidence }
+            $old = Get-Content (Join-Path $closureOrigin "$name.closure.json") -Raw | ConvertFrom-Json
+            foreach ($binary in $old.Binaries) { if ((Get-FileHash -LiteralPath (Join-Path $closureOrigin "tools/$name/$($binary.File)")).Hash -ne $binary.Sha256) { throw 'Changed original compiler closure.' } }
+            $null = New-Item -ItemType Directory -Path (Split-Path $destination) -Force
+            Copy-Item -LiteralPath (Join-Path $closureOrigin "tools/$name") -Destination $destination -Recurse
+            foreach ($file in @('HotReloadBenchmarks.dll','HotReloadBenchmarks.pdb','HotReloadBenchmarks.deps.json','HotReloadBenchmarks.runtimeconfig.json')) {
+                Copy-Item -LiteralPath (Join-Path $OutputDirectory "host/bin/HotReloadBenchmarks/debug/$file") -Destination $destination -Force
+            }
+            foreach ($binary in $old.Binaries | Where-Object { $_.File -notin @('HotReloadBenchmarks.dll','HotReloadBenchmarks.pdb','HotReloadBenchmarks.deps.json','HotReloadBenchmarks.runtimeconfig.json') }) {
+                if ((Get-FileHash -LiteralPath (Join-Path $destination $binary.File)).Hash -ne $binary.Sha256) { throw 'A non-client binary changed during checkpoint repair.' }
+            }
+            Save $proofPath @{ Fingerprint = $manifest.Fingerprint; CompilerOrigin = (Join-Path $CompilerEvidence "$name.closure.json")
+                ReusedStudyClosure = $(if ($ReuseMemoryEvidence) { Join-Path $closureOrigin "$name.closure.json" } else { $null })
+                CheckpointClientRebuilt = $checkpointProtocolChanged
+                Binaries = @(Get-ChildItem -LiteralPath $destination -File | ForEach-Object { @{ File = $_.Name; Sha256 = (Get-FileHash -LiteralPath $_.FullName).Hash } }) }
+        }
+        $proof = Get-Content -LiteralPath $proofPath -Raw | ConvertFrom-Json
+        foreach ($binary in $proof.Binaries) { if ((Get-FileHash -LiteralPath (Join-Path $destination $binary.File)).Hash -ne $binary.Sha256) { throw 'Frozen study closure changed.' } }
+        Copy-Item -LiteralPath $proofPath -Destination $ResultDirectory -Force
+        $tools[$name] = $destination
+    } }
+    Save (Join-Path $ResultDirectory 'controls.json') @{ Runtime = (& dotnet --info | Out-String); LocalTimeZone = [TimeZoneInfo]::Local.Id
+        CounterTimestampMeaning = 'dotnet-counters CSV uses OS local wall clock at one-second resolution; UTC checkpoint boundaries are approximate joins, not latency subtraction.'
+        Tools = @('dotnet-dump','dotnet-gcdump','dotnet-counters','dotnet-trace') | ForEach-Object { @{ Name = $_; Version = (& (Join-Path $diagnostics "$_.exe") --version | Out-String).Trim() } }
+        ProductionCompilerChanged = $false; CheckpointClientRebuilt = $checkpointProtocolChanged
+        CheckpointClientSha256 = (Get-FileHash -LiteralPath (Join-Path $OutputDirectory 'host/bin/HotReloadBenchmarks/debug/HotReloadBenchmarks.dll')).Hash
+        ProfilerSha256 = (Get-FileHash -LiteralPath $profiler).Hash; ProfilerPackage = 'Microsoft.Diagnostics.Runtime 4.1.745802' }
+    $configurations = @(
+        @{ Name = 'baseline-observer'; Variant = 'baseline'; Profile = 'stats'; Observer = $true },
+        @{ Name = 'combined-observer'; Variant = 'combined'; Profile = 'stats'; Observer = $true },
+        @{ Name = 'baseline-release'; Variant = 'baseline'; Profile = 'production'; Observer = $false },
+        @{ Name = 'combined-release'; Variant = 'combined'; Profile = 'production'; Observer = $false },
+        @{ Name = 'baseline-stats-no-observer'; Variant = 'baseline'; Profile = 'stats'; Observer = $false },
+        @{ Name = 'combined-stats-no-observer'; Variant = 'combined'; Profile = 'stats'; Observer = $false })
+    foreach ($mode in @('natural','forced')) { foreach ($round in 1..$Rounds) {
+        $order = if ($round % 2) { $configurations } else { @($configurations[5],$configurations[4],$configurations[3],$configurations[2],$configurations[1],$configurations[0]) }
+        foreach ($configuration in $order) {
+            $name = "$mode-$round-$($configuration.Name)"
+            $marker = Join-Path $OutputDirectory "$name.success.json"
+            $previousMarker = if ($ReuseMemoryEvidence) { Join-Path $ReuseMemoryEvidence "$name.success.json" } else { '' }
+            $session = if (Test-Path -LiteralPath $marker) { (Get-Content -LiteralPath $marker -Raw | ConvertFrom-Json).Session }
+                elseif ($previousMarker -and (Test-Path -LiteralPath $previousMarker)) { (Get-Content -LiteralPath $previousMarker -Raw | ConvertFrom-Json).Session }
+                else { Join-Path $OutputDirectory "runs/$name-$([DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ'))" }
+            $arguments = @('pwsh','-NoProfile','-File',(Join-Path $PSScriptRoot 'Run-WatchMemorySession.ps1'),'-OutputDirectory',$session,
+                '-ToolDirectory',$tools["$($configuration.Variant)-$($configuration.Profile)"],'-DiagnosticTools',$diagnostics,'-Profiler',$profiler,
+                '-Variant',$configuration.Variant,'-Mode',$mode,'-Revisions','100')
+            if ($configuration.Observer) { $arguments += '-Observer' }
+            if ($mode -eq 'forced' -and $round -eq 1) { $arguments += '-Profile' }
+            $execution = Run $name $arguments $session
+            $measurementFingerprint = if ($execution.MeasurementFingerprint) { $execution.MeasurementFingerprint } else { $execution.Fingerprint }
+            Archive-Session $name $session $measurementFingerprint
+        }
+    } }
+    $null = Run 'summarize-memory' @('pwsh','-NoProfile','-File',(Join-Path $PSScriptRoot 'Summarize-WatchMemory.ps1'),'-ResultDirectory',$ResultDirectory,'-Rounds',"$Rounds")
+    Status 'Memory100EvidenceReadyNeedsReview'
+    Log 'COMPLETE Matched natural/forced 100-edit matrix and sanitized profiles are ready. Review retained roots before choosing selective 500-edit extensions, observer-disabled STATS controls or heavy-workload timing. No default activation, production fix, commit or next optimization was performed.'
+}
+catch { Status 'Failed' ($_ | Out-String); Log ('FAILED ' + ($_ | Out-String)); exit 1 }
+finally { $journal.Dispose(); $lock.Dispose() }

@@ -1,0 +1,17 @@
+2026-10-22T07:24:46.9877638Z START mode=forced variant=combined observer=False revisions=100 ownedPid=30492
+2026-10-22T07:25:02.2650347Z HEARTBEAT checkpoint=0 cpuSeconds=1.140625
+2026-10-22T07:25:04.4478618Z CHECKPOINT 01-startup-0 paused outside UI latency
+2026-10-22T07:25:13.4499766Z RESUMED 01-startup-0 compilerWatchPid=16192 applicationPid=26328
+2026-10-22T07:25:16.0335343Z CHECKPOINT 02-warmup-0 paused outside UI latency
+2026-10-22T07:25:42.4514470Z RESUMED 02-warmup-0 compilerWatchPid=16192 applicationPid=26328
+2026-10-22T07:25:42.7437038Z HEARTBEAT checkpoint=2 cpuSeconds=1.390625
+2026-10-22T07:25:44.8243097Z CHECKPOINT 03-revision-1 paused outside UI latency
+2026-10-22T07:25:52.6451027Z RESUMED 03-revision-1 compilerWatchPid=16192 applicationPid=26328
+2026-10-22T07:25:57.9901092Z HEARTBEAT checkpoint=3 cpuSeconds=1.40625
+2026-10-22T07:26:00.2510911Z FAILED Exception: C:\Users\Asanov\.codex\worktrees\c671\Akbura\benchmarks\HotReload\Run-WatchMemorySession.ps1:75
+Line |
+  75 |  … de -ne 0) { throw "Owned process $($process.Id) exited $($process.Exi …
+     |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Owned process 30492 exited 1; inspect session logs.
+
+

@@ -1,0 +1,220 @@
+{
+  "FirstBindingsSkipped": 204.0,
+  "Fixture": [
+    {
+      "Sha256": "8F406612CCBE98B05DFD3EC7D1C27843F89411C753E05336839EA5A1D27763E5",
+      "File": "CompilationControl.cs"
+    },
+    {
+      "Sha256": "172125BACF973C6C6BB4E6D138D80A91B45343291E42CD849F86CB6A26B4192D",
+      "File": "Counter.akbura"
+    },
+    {
+      "Sha256": "85D8BF0DE635DFE073EF1A4A4CE2D69227FAEF948282D64545A943F00DD2708E",
+      "File": "Counter.akbura.cs"
+    },
+    {
+      "Sha256": "114192E85E0DFE2F55ACC9959655F038AC386C59E01E402911C28078FACEE719",
+      "File": "Program.cs"
+    },
+    {
+      "Sha256": "098E81CFA9348E7985B65954ED864604C7DF9440DAD1CF047E214D1D1E7E40AF",
+      "File": "WatchFixture.csproj"
+    },
+    {
+      "Sha256": "72E42159A1182D3077D945E063A196D0FC3A7D6676260BA96182A00931879996",
+      "File": "WatchPerson.cs"
+    }
+  ],
+  "RuntimeCorrectness": true,
+  "CausalEvidence": "Observed in the watched analyzer; see per-revision records.",
+  "Restarts": 0,
+  "Scenario": "margin",
+  "CompletedUtc": "2026-10-22T07:21:06.0055304Z",
+  "Binaries": [
+    {
+      "Sha256": "A78B0E1970093B7F177E2855645109FB5E81FBE08310D88EB018AA29374F2688",
+      "File": "Akbura.BlackSilence.dll"
+    },
+    {
+      "Sha256": "33FA7ED523BE07EF9906E209CC5D0961563075F4092CE8E29F541EE07CFE331F",
+      "File": "Akbura.BlackSilence.pdb"
+    },
+    {
+      "Sha256": "54DBD50DEF83426EE8CB5889EE33EF07D8047E2BC0237F8568928869DF134C46",
+      "File": "Akbura.dll"
+    },
+    {
+      "Sha256": "9D3DD88276341E8B12CF369E7EAC1240224C9B18E17350D9394598D832C60500",
+      "File": "Akbura.Generator.dll"
+    },
+    {
+      "Sha256": "3B81057E89F82C5290F0FD7B78E44805D3217F557D04AD3EEF317DD47DE7629A",
+      "File": "Akbura.Generator.pdb"
+    },
+    {
+      "Sha256": "24F0ABC66A34C3553BAE0376735498B2A09C449B35B05A949F9FCFABC487D795",
+      "File": "Akbura.pdb"
+    },
+    {
+      "Sha256": "AEF1ADDD3F17072FC2F6401DA34482A3AE797AC4A04133D4E18EBF58B99EF515",
+      "File": "Akbura.xml"
+    },
+    {
+      "Sha256": "FF0FBCA98E4233C86150B1B7C649342156AD59C88A2B30EF50E6E492CFD226C0",
+      "File": "Avalonia.Base.dll"
+    },
+    {
+      "Sha256": "EC7244D3BF3F9564E56D5852344BDC99A95D1F992E7B95ABD7508A26B6FD407A",
+      "File": "Avalonia.Controls.dll"
+    },
+    {
+      "Sha256": "E88F39AFF6FC5530C5501FF4827110CB7991FBCAEBA1915E34E0B038DE33276E",
+      "File": "Avalonia.DesignerSupport.dll"
+    },
+    {
+      "Sha256": "557344DB170F8A97B0BABE0A1B1E3EFA104CED3792C5F9B16CEED27E239D3B74",
+      "File": "Avalonia.Dialogs.dll"
+    },
+    {
+      "Sha256": "39BCF7A5C834C9340531F66EE888FC55CC465A6C3E041AB7AB38450E6B9C74C8",
+      "File": "Avalonia.dll"
+    },
+    {
+      "Sha256": "27D12F6B6B38A97F6EBA0AC5117E1E898FF5FBB1FE48A72AF68BBBD41A0136EB",
+      "File": "Avalonia.Fonts.Inter.dll"
+    },
+    {
+      "Sha256": "9F2CA2BCCACC0CC16D20BC190926D83A9B8CE2677A051F1426416040D28A28A1",
+      "File": "Avalonia.HarfBuzz.dll"
+    },
+    {
+      "Sha256": "61785BA40A0F94F96CA026D57E131CFD816EA55ED7C5F7C1E439D9A88B3B954C",
+      "File": "Avalonia.Headless.dll"
+    },
+    {
+      "Sha256": "C0CB15D0D7BFC9A88BD1A4C8558BBEC65FA88B25B4A1B6C4624D5996D63E11D6",
+      "File": "Avalonia.Markup.dll"
+    },
+    {
+      "Sha256": "C2A635AC02EB746E14305718304D2E8D97A6224D6F324ABBCEB26883B799D500",
+      "File": "Avalonia.Markup.Xaml.dll"
+    },
+    {
+      "Sha256": "292F1644D1E30DBC2AA3D54307D3050345DB170171706AFD9C57FF254DF4DF3E",
+      "File": "Avalonia.Metal.dll"
+    },
+    {
+      "Sha256": "E412B450837855D0884555BB66B9BB0E4E14595FA19281B5DAFD59B98EFA128A",
+      "File": "Avalonia.MicroCom.dll"
+    },
+    {
+      "Sha256": "C912FF7B7E11D9A2748FCC26DC6C2FF3CA7C76C25EB077C7619738423D8092FF",
+      "File": "Avalonia.OpenGL.dll"
+    },
+    {
+      "Sha256": "209F78D8E902322AB8F110D6B4E2D8C2BA77CC3DF7C5BD0F223EA17C3DE9A59C",
+      "File": "Avalonia.Remote.Protocol.dll"
+    },
+    {
+      "Sha256": "45C7FE4D606217481CE05A25867EB5FB2B5EFCC1DE63FA589B8B47339BBD672A",
+      "File": "Avalonia.Vulkan.dll"
+    },
+    {
+      "Sha256": "55E72AC23263F8E12484F3435E02EC22FAC9EFF6E6D169BB0A8C246BE6B99D29",
+      "File": "HarfBuzzSharp.dll"
+    },
+    {
+      "Sha256": "F9A0375BD1D9C95FC3D9DCC6B173CF5443FA20E7E26BD4A55E0215317377FAE0",
+      "File": "HotReloadBenchmarks.deps.json"
+    },
+    {
+      "Sha256": "5D181CA6481F47DDE1CCBD04C9AE97D90C0B16B3E39F7070D6C65FA96F40B4F4",
+      "File": "HotReloadBenchmarks.dll"
+    },
+    {
+      "Sha256": "90BBB991155E23227272345C09D48D471A243B6AB2C301DAD7F916E8CA16D578",
+      "File": "HotReloadBenchmarks.exe"
+    },
+    {
+      "Sha256": "64DB6B5E4D1BF1A886C9CBD6BDCF9FF2ABF541AC49A203E0545EBEF46B93ABE7",
+      "File": "HotReloadBenchmarks.pdb"
+    },
+    {
+      "Sha256": "256DDA2706E1151BB95987B6B5BE610BF68D64E058285B19E7E958222FC90414",
+      "File": "HotReloadBenchmarks.runtimeconfig.json"
+    },
+    {
+      "Sha256": "2E0A43BE3D123DAE5AA8A7F1082FD3F1C2A8D842F6C513DEAC526DAED620E318",
+      "File": "MicroCom.Runtime.dll"
+    },
+    {
+      "Sha256": "96896C3C1E0843EA5C4CC03BAAC8DF3A61587E3742599B6B29F99DBD25595EFF",
+      "File": "Microsoft.Build.dll"
+    },
+    {
+      "Sha256": "58A2DA163E77BAA35719982597F92384D8AE442479070DF97B4747B1093F5A2F",
+      "File": "Microsoft.Build.Framework.dll"
+    },
+    {
+      "Sha256": "12B0428203FAAE6555858D2FF856CEF7450D2764CF00C57E7516587A04885870",
+      "File": "Microsoft.CodeAnalysis.CSharp.dll"
+    },
+    {
+      "Sha256": "03B3AB9D73D477D259FBC0AE167DD8CAF4775C3C8688F1FDC5E0D3603255C3F4",
+      "File": "Microsoft.CodeAnalysis.dll"
+    },
+    {
+      "Sha256": "7DD4423497B356AABEBA50367030B5AE2787E7E5391FF3962B600E005A2C7373",
+      "File": "Microsoft.NET.StringTools.dll"
+    },
+    {
+      "Sha256": "5F9C0F74277FE40815316A9C82FAB02A03FCFB227F6C93B7A4B5E43A5B5E59D8",
+      "File": "Microsoft.VisualStudio.SolutionPersistence.dll"
+    },
+    {
+      "Sha256": "CB7AA8739F1E2FB4DB7F021F89DC1951E8476E521A9679CBC2CF575524A2BF23",
+      "File": "NuGet.Frameworks.dll"
+    },
+    {
+      "Sha256": "C8D01C9F262DEF18C965D866478A466537EF9A6E0163962F706969F1B7B360D0",
+      "File": "System.Configuration.ConfigurationManager.dll"
+    },
+    {
+      "Sha256": "63188770E3E521DDD25D81A02EE552F32F25A96D6E9712B03890DA833175BBF0",
+      "File": "System.Diagnostics.EventLog.dll"
+    },
+    {
+      "Sha256": "D86BD5FB250FA66BE31A2A7055ED98C2B865626698A1F6CC09B96459DEEEE68A",
+      "File": "System.Security.Cryptography.ProtectedData.dll"
+    },
+    {
+      "Sha256": "3166DC70323FB30CCF1CEDB0FE86F2AD122C46D254542342D90386EFC4C9285C",
+      "File": "xunit.abstractions.dll"
+    },
+    {
+      "Sha256": "BCD9711B22D227AC8CD4C1568E72433A0F576D2EC8AAE64AC508081892015B1D",
+      "File": "xunit.assert.dll"
+    },
+    {
+      "Sha256": "2F7FEEEC8C6DEC7DF684C25FB80AADB292B963D09723460F03D53C5AD2088ACC",
+      "File": "xunit.core.dll"
+    },
+    {
+      "Sha256": "E70FEBE547C15F8155DB3E2D95C3BA4445A59CBC21A3E7541AB22ED49D3DCF7B",
+      "File": "xunit.execution.dotnet.dll"
+    }
+  ],
+  "ProbeCompilationsSkipped": 204.0,
+  "TelemetryRecords": 306,
+  "Warmups": 2,
+  "Variant": "combined",
+  "SubscriptionFailures": 0,
+  "Instrumented": true,
+  "TimingBoundary": "File write completed (including closing the file) to received live UI acknowledgment after property and runtime-invariant verification.",
+  "Updates": 100,
+  "ProbeModelsSkipped": 204.0,
+  "ContributionsImported": 204.0,
+  "SemanticHits": 204.0,
+  "CausalSkipGate": "Passed"
+}

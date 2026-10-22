@@ -1,0 +1,9 @@
+{
+  "Phase": "SummaryCompleteNeedsReview",
+  "RejectedNearerIncompleteSamples": 24.0,
+  "RawInputsUnchanged": true,
+  "CompletedUtc": "2026-10-22T09:13:23.4178778Z",
+  "CheckpointRows": 864,
+  "Sessions": 36,
+  "MeasuredUpdates": 3600
+}

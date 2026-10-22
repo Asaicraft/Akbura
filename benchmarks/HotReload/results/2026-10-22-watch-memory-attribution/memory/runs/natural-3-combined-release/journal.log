@@ -1,0 +1,24 @@
+2026-10-22T05:28:25.1808233Z START mode=natural variant=combined observer=False revisions=100 ownedPid=31740
+2026-10-22T05:28:40.2146158Z HEARTBEAT checkpoint=0 cpuSeconds=1.390625
+2026-10-22T05:28:40.5017823Z CHECKPOINT 01-startup-0 paused outside UI latency
+2026-10-22T05:28:44.3313690Z RESUMED 01-startup-0 compilerWatchPid=9104 applicationPid=31564
+2026-10-22T05:28:46.7268593Z CHECKPOINT 02-warmup-0 paused outside UI latency
+2026-10-22T05:28:48.0657787Z RESUMED 02-warmup-0 compilerWatchPid=9104 applicationPid=31564
+2026-10-22T05:28:48.8727612Z CHECKPOINT 03-revision-1 paused outside UI latency
+2026-10-22T05:28:50.2163375Z RESUMED 03-revision-1 compilerWatchPid=9104 applicationPid=31564
+2026-10-22T05:28:55.2217787Z HEARTBEAT checkpoint=3 cpuSeconds=1.5625
+2026-10-22T05:28:56.2859715Z CHECKPOINT 04-revision-10 paused outside UI latency
+2026-10-22T05:28:57.6330994Z RESUMED 04-revision-10 compilerWatchPid=9104 applicationPid=31564
+2026-10-22T05:29:07.1675144Z CHECKPOINT 05-revision-25 paused outside UI latency
+2026-10-22T05:29:08.5091147Z RESUMED 05-revision-25 compilerWatchPid=9104 applicationPid=31564
+2026-10-22T05:29:10.3527496Z HEARTBEAT checkpoint=5 cpuSeconds=1.78125
+2026-10-22T05:29:24.6172043Z CHECKPOINT 06-revision-50 paused outside UI latency
+2026-10-22T05:29:25.9342784Z RESUMED 06-revision-50 compilerWatchPid=9104 applicationPid=31564
+2026-10-22T05:29:26.2010259Z HEARTBEAT checkpoint=6 cpuSeconds=1.890625
+2026-10-22T05:29:41.2631747Z HEARTBEAT checkpoint=6 cpuSeconds=2
+2026-10-22T05:29:41.5359194Z CHECKPOINT 07-revision-75 paused outside UI latency
+2026-10-22T05:29:42.8622238Z RESUMED 07-revision-75 compilerWatchPid=9104 applicationPid=31564
+2026-10-22T05:29:56.2979871Z HEARTBEAT checkpoint=7 cpuSeconds=2.046875
+2026-10-22T05:29:58.4112698Z CHECKPOINT 08-revision-100 paused outside UI latency
+2026-10-22T05:29:59.7328409Z RESUMED 08-revision-100 compilerWatchPid=9104 applicationPid=31564
+2026-10-22T05:30:00.3043879Z COMPLETE Memory session and offline analysis finished.

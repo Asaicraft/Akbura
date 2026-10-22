@@ -1,0 +1,40 @@
+using System.Diagnostics;
+using System.Text;
+using System.Text.Json;
+
+internal static partial class Program
+{
+    private sealed class WatchMemoryCheckpoint(string directory)
+    {
+        private int _sequence;
+
+        internal async Task Pause(string phase, int revision, int launcherPid, int applicationPid, JsonElement application)
+        {
+            Directory.CreateDirectory(directory);
+            var sequence = ++_sequence;
+            var path = Path.Combine(directory, "request.json");
+            var nonce = Guid.NewGuid().ToString("N");
+            File.WriteAllText(path + ".tmp", JsonSerializer.Serialize(new { Sequence = sequence, Nonce = nonce, Phase = phase,
+                Revision = revision, LauncherPid = launcherPid, ApplicationPid = applicationPid, Application = application, RequestedUtc = DateTime.UtcNow }) + "\r\n", new UTF8Encoding(false));
+            File.Move(path + ".tmp", path, overwrite: true);
+            Write(new { Kind = "watch-memory-paused", Sequence = sequence, phase, revision, launcherPid, applicationPid });
+            var started = Stopwatch.GetTimestamp();
+            var responsePath = Path.Combine(directory, "response.json");
+            while (Stopwatch.GetElapsedTime(started).TotalMinutes < 10)
+            {
+                if (File.Exists(responsePath))
+                {
+                    using var response = JsonDocument.Parse(File.ReadAllText(responsePath));
+                    if (response.RootElement.GetProperty("Nonce").GetString() == nonce)
+                    {
+                        Assert.True(response.RootElement.GetProperty("Succeeded").GetBoolean(), response.RootElement.ToString());
+                        Write(new { Kind = "watch-memory-resumed", Sequence = sequence, phase, revision });
+                        return;
+                    }
+                }
+                await Task.Delay(100);
+            }
+            throw new TimeoutException("The external memory checkpoint did not complete. Preserve the partial session.");
+        }
+    }
+}

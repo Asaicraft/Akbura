@@ -1,0 +1,25 @@
+2026-10-22T08:28:56.3805210Z START mode=forced variant=baseline observer=False revisions=100 ownedPid=29568
+2026-10-22T08:29:11.4313061Z HEARTBEAT checkpoint=0 cpuSeconds=1.40625
+2026-10-22T08:29:12.7540644Z CHECKPOINT 01-startup-0 paused outside UI latency
+2026-10-22T08:29:19.3241073Z RESUMED 01-startup-0 compilerWatchPid=24500 applicationPid=21444
+2026-10-22T08:29:21.9792728Z CHECKPOINT 02-warmup-0 paused outside UI latency
+2026-10-22T08:29:26.5147053Z RESUMED 02-warmup-0 compilerWatchPid=24500 applicationPid=21444
+2026-10-22T08:29:26.7781580Z HEARTBEAT checkpoint=2 cpuSeconds=1.578125
+2026-10-22T08:29:27.3097566Z CHECKPOINT 03-revision-1 paused outside UI latency
+2026-10-22T08:29:31.9281513Z RESUMED 03-revision-1 compilerWatchPid=24500 applicationPid=21444
+2026-10-22T08:29:37.7670465Z CHECKPOINT 04-revision-10 paused outside UI latency
+2026-10-22T08:29:42.4689851Z RESUMED 04-revision-10 compilerWatchPid=24500 applicationPid=21444
+2026-10-22T08:29:42.7348409Z HEARTBEAT checkpoint=4 cpuSeconds=1.734375
+2026-10-22T08:29:51.9966334Z CHECKPOINT 05-revision-25 paused outside UI latency
+2026-10-22T08:29:56.9082489Z RESUMED 05-revision-25 compilerWatchPid=24500 applicationPid=21444
+2026-10-22T08:29:57.9646075Z HEARTBEAT checkpoint=5 cpuSeconds=1.78125
+2026-10-22T08:30:12.7073875Z CHECKPOINT 06-revision-50 paused outside UI latency
+2026-10-22T08:30:17.7628238Z RESUMED 06-revision-50 compilerWatchPid=24500 applicationPid=21444
+2026-10-22T08:30:18.0325479Z HEARTBEAT checkpoint=6 cpuSeconds=1.859375
+2026-10-22T08:30:33.0820555Z HEARTBEAT checkpoint=6 cpuSeconds=1.953125
+2026-10-22T08:30:33.8867684Z CHECKPOINT 07-revision-75 paused outside UI latency
+2026-10-22T08:30:39.0844062Z RESUMED 07-revision-75 compilerWatchPid=24500 applicationPid=21444
+2026-10-22T08:30:48.3112328Z HEARTBEAT checkpoint=7 cpuSeconds=2
+2026-10-22T08:30:54.9026898Z CHECKPOINT 08-revision-100 paused outside UI latency
+2026-10-22T08:31:00.5283099Z RESUMED 08-revision-100 compilerWatchPid=24500 applicationPid=21444
+2026-10-22T08:31:01.0746893Z COMPLETE Memory session and offline analysis finished.

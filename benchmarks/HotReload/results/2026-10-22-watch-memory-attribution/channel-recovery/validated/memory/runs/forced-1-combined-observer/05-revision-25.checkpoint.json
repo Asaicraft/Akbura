@@ -1,0 +1,103 @@
+{
+  "StartedUtc": "2026-10-22T07:19:08.7556543Z",
+  "Application": {
+    "Kind": "ack",
+    "Revision": 28,
+    "Phase": "margin",
+    "Pid": 19892,
+    "ActualMargin": 37,
+    "StatePreserved": true,
+    "InputPreserved": true,
+    "ControlsPreserved": true,
+    "BindingsValid": true,
+    "UnaffectedBindingsValid": true,
+    "InvalidExpressionFrozen": false,
+    "InvalidExpressionValue": "First 28",
+    "ExpectedInvalidExpressionValue": null,
+    "ValidatedReactiveBindings": 4,
+    "Subscriptions": 1,
+    "ManagedHeapBytes": 2872120,
+    "PostGc": false,
+    "WorkingSetBytes": 97157120,
+    "AllocatedBytes": 35301976,
+    "Gen0": 9,
+    "Gen1": 6,
+    "Gen2": 4
+  },
+  "Metrics": [
+    {
+      "Collection": "External gcdump full GC, outside file-write-to-UI interval",
+      "CpuSeconds": 26.15625,
+      "Role": "compilerWatch",
+      "Pid": 27864,
+      "WorkingSetBytes": 377466880,
+      "PrivateBytes": 158441472,
+      "SampledUtc": "2026-10-22T07:19:11.7327498Z"
+    },
+    {
+      "Collection": "External gcdump full GC, outside file-write-to-UI interval",
+      "CpuSeconds": 5.109375,
+      "Role": "application",
+      "Pid": 19892,
+      "WorkingSetBytes": 96104448,
+      "PrivateBytes": 26685440,
+      "SampledUtc": "2026-10-22T07:19:12.5463979Z"
+    },
+    {
+      "Collection": "Natural GC; no explicit collection requested",
+      "CpuSeconds": 0.515625,
+      "Role": "launcher",
+      "Pid": 24944,
+      "WorkingSetBytes": 55836672,
+      "PrivateBytes": 18329600,
+      "SampledUtc": "2026-10-22T07:19:12.5502689Z"
+    }
+  ],
+  "Phase": "revision",
+  "Variant": "combined",
+  "Revision": 25,
+  "Mode": "forced",
+  "Sequence": 5,
+  "Topology": {
+    "HostPid": 27864,
+    "Processes": [
+      {
+        "ProcessId": 24944,
+        "ParentProcessId": 24548,
+        "Name": "dotnet.exe",
+        "ExecutablePath": "C:\\Program Files\\dotnet\\dotnet.exe",
+        "CommandLine": "\"dotnet\" watch --verbose --non-interactive --project C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate-io-recovery\\runs\\forced-1-combined-observer-20261022T071750429Z\\watch\\fixture\\WatchFixture.csproj --no-restore run"
+      },
+      {
+        "ProcessId": 27424,
+        "ParentProcessId": 24944,
+        "Name": "conhost.exe",
+        "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe",
+        "CommandLine": "\\??\\C:\\WINDOWS\\system32\\conhost.exe 0x4"
+      },
+      {
+        "ProcessId": 27864,
+        "ParentProcessId": 24944,
+        "Name": "dotnet.exe",
+        "ExecutablePath": "C:\\Program Files\\dotnet\\dotnet.exe",
+        "CommandLine": "\"C:\\Program Files\\dotnet\\dotnet.exe\" \"C:\\Program Files\\dotnet\\sdk\\10.0.401\\DotnetTools\\dotnet-watch\\10.0.401\\tools\\net10.0\\any\\dotnet-watch.dll\" --verbose --non-interactive --project C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate-io-recovery\\runs\\forced-1-combined-observer-20261022T071750429Z\\watch\\fixture\\WatchFixture.csproj --no-restore run"
+      },
+      {
+        "ProcessId": 19500,
+        "ParentProcessId": 27864,
+        "Name": "dotnet.exe",
+        "ExecutablePath": "C:\\Program Files\\dotnet\\dotnet.exe",
+        "CommandLine": "\"C:\\Program Files\\dotnet\\dotnet.exe\" run --no-build -e DOTNET_WATCH=1 -e DOTNET_WATCH_ITERATION=1 -e DOTNET_MODIFIABLE_ASSEMBLIES=debug -e \"DOTNET_STARTUP_HOOKS=C:\\Program Files\\dotnet\\sdk\\10.0.401\\DotnetTools\\dotnet-watch\\10.0.401\\tools\\net10.0\\any\\hotreload\\net10.0\\Microsoft.Extensions.DotNetDeltaApplier.dll\" -e DOTNET_WATCH_HOTRELOAD_NAMEDPIPE_NAME=2fbc5d508b8d48d3b3464bdad3cc3206 --project C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate-io-recovery\\runs\\forced-1-combined-observer-20261022T071750429Z\\watch\\fixture\\WatchFixture.csproj --no-restore"
+      },
+      {
+        "ProcessId": 19892,
+        "ParentProcessId": 19500,
+        "Name": "WatchFixture.exe",
+        "ExecutablePath": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate-io-recovery\\runs\\forced-1-combined-observer-20261022T071750429Z\\watch\\fixture\\bin\\Debug\\net10.0\\WatchFixture.exe",
+        "CommandLine": "\"C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate-io-recovery\\runs\\forced-1-combined-observer-20261022T071750429Z\\watch\\fixture\\bin\\Debug\\net10.0\\WatchFixture.exe\""
+      }
+    ]
+  },
+  "Observer": true,
+  "CompletedUtc": "2026-10-22T07:19:12.5503102Z"
+}

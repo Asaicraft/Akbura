@@ -32,7 +32,7 @@ internal static partial class Program
         switch (args.FirstOrDefault())
         {
             case "semantic-watch":
-                MeasureSemanticWatch(args[1], args[2], args[3], int.Parse(args[4]), int.Parse(args[5]), args[6]).GetAwaiter().GetResult();
+                MeasureSemanticWatch(args[1], args[2], args[3], int.Parse(args[4]), int.Parse(args[5]), args[6], args.ElementAtOrDefault(7)).GetAwaiter().GetResult();
                 break;
             case "watch-instrumentation-check":
                 Assert.Equal(args[1] == "stats", typeof(AkburaBlackSilenceGenerator).Assembly.GetType("Akbura.BlackSilence.BlackSilenceWatchObservation") != null);

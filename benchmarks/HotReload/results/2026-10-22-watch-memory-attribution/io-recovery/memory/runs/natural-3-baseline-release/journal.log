@@ -1,0 +1,24 @@
+2026-10-22T05:26:41.3691873Z START mode=natural variant=baseline observer=False revisions=100 ownedPid=1984
+2026-10-22T05:26:56.3965143Z HEARTBEAT checkpoint=0 cpuSeconds=1.375
+2026-10-22T05:26:59.0543967Z CHECKPOINT 01-startup-0 paused outside UI latency
+2026-10-22T05:27:02.9264461Z RESUMED 01-startup-0 compilerWatchPid=18568 applicationPid=31552
+2026-10-22T05:27:05.8602717Z CHECKPOINT 02-warmup-0 paused outside UI latency
+2026-10-22T05:27:07.2523274Z RESUMED 02-warmup-0 compilerWatchPid=18568 applicationPid=31552
+2026-10-22T05:27:08.3160310Z CHECKPOINT 03-revision-1 paused outside UI latency
+2026-10-22T05:27:09.6699047Z RESUMED 03-revision-1 compilerWatchPid=18568 applicationPid=31552
+2026-10-22T05:27:11.5216037Z HEARTBEAT checkpoint=3 cpuSeconds=1.59375
+2026-10-22T05:27:16.0287170Z CHECKPOINT 04-revision-10 paused outside UI latency
+2026-10-22T05:27:17.3827650Z RESUMED 04-revision-10 compilerWatchPid=18568 applicationPid=31552
+2026-10-22T05:27:26.6603614Z HEARTBEAT checkpoint=4 cpuSeconds=1.921875
+2026-10-22T05:27:27.1963671Z CHECKPOINT 05-revision-25 paused outside UI latency
+2026-10-22T05:27:28.5461422Z RESUMED 05-revision-25 compilerWatchPid=18568 applicationPid=31552
+2026-10-22T05:27:41.7731282Z HEARTBEAT checkpoint=5 cpuSeconds=1.96875
+2026-10-22T05:27:44.4250848Z CHECKPOINT 06-revision-50 paused outside UI latency
+2026-10-22T05:27:45.7634049Z RESUMED 06-revision-50 compilerWatchPid=18568 applicationPid=31552
+2026-10-22T05:27:56.8570645Z HEARTBEAT checkpoint=6 cpuSeconds=2
+2026-10-22T05:28:01.8990682Z CHECKPOINT 07-revision-75 paused outside UI latency
+2026-10-22T05:28:03.3542255Z RESUMED 07-revision-75 compilerWatchPid=18568 applicationPid=31552
+2026-10-22T05:28:12.2545616Z HEARTBEAT checkpoint=7 cpuSeconds=2.125
+2026-10-22T05:28:21.4007227Z CHECKPOINT 08-revision-100 paused outside UI latency
+2026-10-22T05:28:22.7433415Z RESUMED 08-revision-100 compilerWatchPid=18568 applicationPid=31552
+2026-10-22T05:28:23.2817469Z COMPLETE Memory session and offline analysis finished.

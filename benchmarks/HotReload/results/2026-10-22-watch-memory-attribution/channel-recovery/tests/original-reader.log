@@ -1,0 +1,1 @@
+REPRODUCED: original checkpoint reader fails on a transient Windows response-file sharing lock.

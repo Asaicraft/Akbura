@@ -1,0 +1,27 @@
+2026-10-22T08:23:34.3312787Z START mode=forced variant=baseline observer=True revisions=100 ownedPid=10940
+2026-10-22T08:23:49.4563006Z HEARTBEAT checkpoint=0 cpuSeconds=1.21875
+2026-10-22T08:24:02.8802140Z CHECKPOINT 01-startup-0 paused outside UI latency
+2026-10-22T08:24:10.6739370Z RESUMED 01-startup-0 compilerWatchPid=21752 applicationPid=8660
+2026-10-22T08:24:10.9411626Z HEARTBEAT checkpoint=1 cpuSeconds=1.953125
+2026-10-22T08:24:13.6490461Z CHECKPOINT 02-warmup-0 paused outside UI latency
+2026-10-22T08:24:19.5679587Z RESUMED 02-warmup-0 compilerWatchPid=21752 applicationPid=8660
+2026-10-22T08:24:20.7410893Z CHECKPOINT 03-revision-1 paused outside UI latency
+2026-10-22T08:24:27.8225817Z RESUMED 03-revision-1 compilerWatchPid=21752 applicationPid=8660
+2026-10-22T08:24:28.0986340Z HEARTBEAT checkpoint=3 cpuSeconds=2.125
+2026-10-22T08:24:34.9738550Z CHECKPOINT 04-revision-10 paused outside UI latency
+2026-10-22T08:24:41.5343555Z RESUMED 04-revision-10 compilerWatchPid=21752 applicationPid=8660
+2026-10-22T08:24:43.7124893Z HEARTBEAT checkpoint=4 cpuSeconds=2.359375
+2026-10-22T08:25:21.2974284Z HEARTBEAT checkpoint=4 cpuSeconds=2.484375
+2026-10-22T08:25:22.8218824Z CHECKPOINT 05-revision-25 paused outside UI latency
+2026-10-22T08:25:31.9567375Z RESUMED 05-revision-25 compilerWatchPid=21752 applicationPid=8660
+2026-10-22T08:25:38.0705525Z HEARTBEAT checkpoint=5 cpuSeconds=2.53125
+2026-10-22T08:25:48.8667828Z CHECKPOINT 06-revision-50 paused outside UI latency
+2026-10-22T08:25:54.0343498Z RESUMED 06-revision-50 compilerWatchPid=21752 applicationPid=8660
+2026-10-22T08:25:54.2968614Z HEARTBEAT checkpoint=6 cpuSeconds=2.625
+2026-10-22T08:26:09.3559801Z HEARTBEAT checkpoint=6 cpuSeconds=2.734375
+2026-10-22T08:26:10.6848725Z CHECKPOINT 07-revision-75 paused outside UI latency
+2026-10-22T08:26:15.9755424Z RESUMED 07-revision-75 compilerWatchPid=21752 applicationPid=8660
+2026-10-22T08:26:24.4184895Z HEARTBEAT checkpoint=7 cpuSeconds=2.796875
+2026-10-22T08:26:32.3374782Z CHECKPOINT 08-revision-100 paused outside UI latency
+2026-10-22T08:26:37.7533531Z RESUMED 08-revision-100 compilerWatchPid=21752 applicationPid=8660
+2026-10-22T08:26:38.6197256Z COMPLETE Memory session and offline analysis finished.

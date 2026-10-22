@@ -1,0 +1,26 @@
+2026-10-22T08:31:05.0204204Z START mode=forced variant=combined observer=False revisions=100 ownedPid=28180
+2026-10-22T08:31:20.0523162Z HEARTBEAT checkpoint=0 cpuSeconds=1.25
+2026-10-22T08:31:21.1345647Z CHECKPOINT 01-startup-0 paused outside UI latency
+2026-10-22T08:31:27.9524475Z RESUMED 01-startup-0 compilerWatchPid=10064 applicationPid=22136
+2026-10-22T08:31:30.5857122Z CHECKPOINT 02-warmup-0 paused outside UI latency
+2026-10-22T08:31:35.2160858Z RESUMED 02-warmup-0 compilerWatchPid=10064 applicationPid=22136
+2026-10-22T08:31:35.4852473Z HEARTBEAT checkpoint=2 cpuSeconds=1.53125
+2026-10-22T08:31:36.0388631Z CHECKPOINT 03-revision-1 paused outside UI latency
+2026-10-22T08:31:40.8389760Z RESUMED 03-revision-1 compilerWatchPid=10064 applicationPid=22136
+2026-10-22T08:31:46.6654093Z CHECKPOINT 04-revision-10 paused outside UI latency
+2026-10-22T08:31:51.8703360Z RESUMED 04-revision-10 compilerWatchPid=10064 applicationPid=22136
+2026-10-22T08:31:52.5089573Z HEARTBEAT checkpoint=4 cpuSeconds=1.640625
+2026-10-22T08:32:01.3951350Z CHECKPOINT 05-revision-25 paused outside UI latency
+2026-10-22T08:32:07.4062735Z RESUMED 05-revision-25 compilerWatchPid=10064 applicationPid=22136
+2026-10-22T08:32:07.6912617Z HEARTBEAT checkpoint=5 cpuSeconds=1.6875
+2026-10-22T08:32:22.7538507Z HEARTBEAT checkpoint=5 cpuSeconds=1.75
+2026-10-22T08:32:23.3467267Z CHECKPOINT 06-revision-50 paused outside UI latency
+2026-10-22T08:32:28.6540487Z RESUMED 06-revision-50 compilerWatchPid=10064 applicationPid=22136
+2026-10-22T08:32:37.7934697Z HEARTBEAT checkpoint=6 cpuSeconds=1.796875
+2026-10-22T08:32:44.2932892Z CHECKPOINT 07-revision-75 paused outside UI latency
+2026-10-22T08:32:49.8864536Z RESUMED 07-revision-75 compilerWatchPid=10064 applicationPid=22136
+2026-10-22T08:32:52.9695970Z HEARTBEAT checkpoint=7 cpuSeconds=1.828125
+2026-10-22T08:33:05.6449561Z CHECKPOINT 08-revision-100 paused outside UI latency
+2026-10-22T08:33:10.9237740Z RESUMED 08-revision-100 compilerWatchPid=10064 applicationPid=22136
+2026-10-22T08:33:11.1853625Z HEARTBEAT checkpoint=8 cpuSeconds=1.984375
+2026-10-22T08:33:11.5009155Z COMPLETE Memory session and offline analysis finished.

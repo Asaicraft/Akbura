@@ -1,0 +1,3 @@
+# Diagnostic tool output is immutable evidence, not reformatted source.
+**/*.log -text -whitespace
+**/counters-*.csv -text -whitespace

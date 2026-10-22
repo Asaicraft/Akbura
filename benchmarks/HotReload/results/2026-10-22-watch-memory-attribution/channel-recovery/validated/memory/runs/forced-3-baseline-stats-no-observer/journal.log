@@ -1,0 +1,25 @@
+2026-10-22T08:33:14.9081529Z START mode=forced variant=baseline observer=False revisions=100 ownedPid=9080
+2026-10-22T08:33:30.0168708Z HEARTBEAT checkpoint=0 cpuSeconds=1.328125
+2026-10-22T08:33:30.2988421Z CHECKPOINT 01-startup-0 paused outside UI latency
+2026-10-22T08:33:36.8608282Z RESUMED 01-startup-0 compilerWatchPid=3476 applicationPid=27848
+2026-10-22T08:33:39.5083191Z CHECKPOINT 02-warmup-0 paused outside UI latency
+2026-10-22T08:33:43.9469915Z RESUMED 02-warmup-0 compilerWatchPid=3476 applicationPid=27848
+2026-10-22T08:33:45.0065448Z CHECKPOINT 03-revision-1 paused outside UI latency
+2026-10-22T08:33:49.4777615Z RESUMED 03-revision-1 compilerWatchPid=3476 applicationPid=27848
+2026-10-22T08:33:49.7441175Z HEARTBEAT checkpoint=3 cpuSeconds=1.59375
+2026-10-22T08:33:55.3145328Z CHECKPOINT 04-revision-10 paused outside UI latency
+2026-10-22T08:34:01.2987016Z RESUMED 04-revision-10 compilerWatchPid=3476 applicationPid=27848
+2026-10-22T08:34:04.7913966Z HEARTBEAT checkpoint=4 cpuSeconds=1.734375
+2026-10-22T08:34:12.1609802Z CHECKPOINT 05-revision-25 paused outside UI latency
+2026-10-22T08:34:17.1668819Z RESUMED 05-revision-25 compilerWatchPid=3476 applicationPid=27848
+2026-10-22T08:34:19.8552329Z HEARTBEAT checkpoint=5 cpuSeconds=1.8125
+2026-10-22T08:34:33.3747016Z CHECKPOINT 06-revision-50 paused outside UI latency
+2026-10-22T08:34:38.5551157Z RESUMED 06-revision-50 compilerWatchPid=3476 applicationPid=27848
+2026-10-22T08:34:38.8273657Z HEARTBEAT checkpoint=6 cpuSeconds=1.828125
+2026-10-22T08:34:53.9023742Z HEARTBEAT checkpoint=6 cpuSeconds=1.953125
+2026-10-22T08:34:54.7014141Z CHECKPOINT 07-revision-75 paused outside UI latency
+2026-10-22T08:35:00.0343295Z RESUMED 07-revision-75 compilerWatchPid=3476 applicationPid=27848
+2026-10-22T08:35:08.9727922Z HEARTBEAT checkpoint=7 cpuSeconds=2.0625
+2026-10-22T08:35:15.8514792Z CHECKPOINT 08-revision-100 paused outside UI latency
+2026-10-22T08:35:21.5824905Z RESUMED 08-revision-100 compilerWatchPid=3476 applicationPid=27848
+2026-10-22T08:35:22.1806784Z COMPLETE Memory session and offline analysis finished.

@@ -1,0 +1,1 @@
+REPRODUCED: original atomic publication fails while a reader holds the destination without delete sharing.

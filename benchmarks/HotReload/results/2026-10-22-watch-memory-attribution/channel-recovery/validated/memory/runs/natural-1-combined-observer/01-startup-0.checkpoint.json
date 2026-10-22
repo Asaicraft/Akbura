@@ -1,0 +1,103 @@
+{
+  "Revision": 0,
+  "Variant": "combined",
+  "Sequence": 1,
+  "Topology": {
+    "Processes": [
+      {
+        "ProcessId": 29024,
+        "ParentProcessId": 12372,
+        "Name": "dotnet.exe",
+        "ExecutablePath": "C:\\Program Files\\dotnet\\dotnet.exe",
+        "CommandLine": "\"dotnet\" watch --verbose --non-interactive --project C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate\\runs\\natural-1-combined-observer-20261022T050413049Z\\watch\\fixture\\WatchFixture.csproj --no-restore run"
+      },
+      {
+        "ProcessId": 20996,
+        "ParentProcessId": 29024,
+        "Name": "conhost.exe",
+        "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe",
+        "CommandLine": "\\??\\C:\\WINDOWS\\system32\\conhost.exe 0x4"
+      },
+      {
+        "ProcessId": 31448,
+        "ParentProcessId": 29024,
+        "Name": "dotnet.exe",
+        "ExecutablePath": "C:\\Program Files\\dotnet\\dotnet.exe",
+        "CommandLine": "\"C:\\Program Files\\dotnet\\dotnet.exe\" \"C:\\Program Files\\dotnet\\sdk\\10.0.401\\DotnetTools\\dotnet-watch\\10.0.401\\tools\\net10.0\\any\\dotnet-watch.dll\" --verbose --non-interactive --project C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate\\runs\\natural-1-combined-observer-20261022T050413049Z\\watch\\fixture\\WatchFixture.csproj --no-restore run"
+      },
+      {
+        "ProcessId": 18208,
+        "ParentProcessId": 31448,
+        "Name": "dotnet.exe",
+        "ExecutablePath": "C:\\Program Files\\dotnet\\dotnet.exe",
+        "CommandLine": "\"C:\\Program Files\\dotnet\\dotnet.exe\" run --no-build -e DOTNET_WATCH=1 -e DOTNET_WATCH_ITERATION=1 -e DOTNET_MODIFIABLE_ASSEMBLIES=debug -e \"DOTNET_STARTUP_HOOKS=C:\\Program Files\\dotnet\\sdk\\10.0.401\\DotnetTools\\dotnet-watch\\10.0.401\\tools\\net10.0\\any\\hotreload\\net10.0\\Microsoft.Extensions.DotNetDeltaApplier.dll\" -e DOTNET_WATCH_HOTRELOAD_NAMEDPIPE_NAME=a08e8b93991743b886650a3c67ec4cc5 --project C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate\\runs\\natural-1-combined-observer-20261022T050413049Z\\watch\\fixture\\WatchFixture.csproj --no-restore"
+      },
+      {
+        "ProcessId": 7372,
+        "ParentProcessId": 18208,
+        "Name": "WatchFixture.exe",
+        "ExecutablePath": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate\\runs\\natural-1-combined-observer-20261022T050413049Z\\watch\\fixture\\bin\\Debug\\net10.0\\WatchFixture.exe",
+        "CommandLine": "\"C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate\\runs\\natural-1-combined-observer-20261022T050413049Z\\watch\\fixture\\bin\\Debug\\net10.0\\WatchFixture.exe\""
+      }
+    ],
+    "HostPid": 31448
+  },
+  "Phase": "startup",
+  "StartedUtc": "2026-10-22T05:04:38.1258707Z",
+  "Application": {
+    "Kind": "ack",
+    "Revision": 1,
+    "Phase": "initial-check",
+    "Pid": 7372,
+    "ActualMargin": 10,
+    "StatePreserved": true,
+    "InputPreserved": true,
+    "ControlsPreserved": true,
+    "BindingsValid": true,
+    "UnaffectedBindingsValid": true,
+    "InvalidExpressionFrozen": false,
+    "InvalidExpressionValue": "First 1",
+    "ExpectedInvalidExpressionValue": null,
+    "ValidatedReactiveBindings": 4,
+    "Subscriptions": 1,
+    "ManagedHeapBytes": 1789760,
+    "PostGc": false,
+    "WorkingSetBytes": 53555200,
+    "AllocatedBytes": 1793048,
+    "Gen0": 0,
+    "Gen1": 0,
+    "Gen2": 0
+  },
+  "Metrics": [
+    {
+      "WorkingSetBytes": 267284480,
+      "Pid": 31448,
+      "PrivateBytes": 113127424,
+      "SampledUtc": "2026-10-22T05:04:38.1396998Z",
+      "CpuSeconds": 8.71875,
+      "Role": "compilerWatch",
+      "Collection": "Natural GC; no explicit collection requested"
+    },
+    {
+      "WorkingSetBytes": 61341696,
+      "Pid": 7372,
+      "PrivateBytes": 16809984,
+      "SampledUtc": "2026-10-22T05:04:38.1468412Z",
+      "CpuSeconds": 1.3125,
+      "Role": "application",
+      "Collection": "Natural GC; no explicit collection requested"
+    },
+    {
+      "WorkingSetBytes": 53411840,
+      "Pid": 29024,
+      "PrivateBytes": 16920576,
+      "SampledUtc": "2026-10-22T05:04:38.1519459Z",
+      "CpuSeconds": 0.46875,
+      "Role": "launcher",
+      "Collection": "Natural GC; no explicit collection requested"
+    }
+  ],
+  "Mode": "natural",
+  "Observer": true,
+  "CompletedUtc": "2026-10-22T05:04:38.1520437Z"
+}

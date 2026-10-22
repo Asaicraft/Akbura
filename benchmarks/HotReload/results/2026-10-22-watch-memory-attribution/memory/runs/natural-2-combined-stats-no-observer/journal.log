@@ -1,0 +1,24 @@
+2026-10-22T05:13:00.2073967Z START mode=natural variant=combined observer=False revisions=100 ownedPid=23600
+2026-10-22T05:13:15.4701584Z HEARTBEAT checkpoint=0 cpuSeconds=1.53125
+2026-10-22T05:13:17.8423580Z CHECKPOINT 01-startup-0 paused outside UI latency
+2026-10-22T05:13:21.7147708Z RESUMED 01-startup-0 compilerWatchPid=20140 applicationPid=28780
+2026-10-22T05:13:24.3801712Z CHECKPOINT 02-warmup-0 paused outside UI latency
+2026-10-22T05:13:25.7437140Z RESUMED 02-warmup-0 compilerWatchPid=20140 applicationPid=28780
+2026-10-22T05:13:26.8093884Z CHECKPOINT 03-revision-1 paused outside UI latency
+2026-10-22T05:13:28.1739139Z RESUMED 03-revision-1 compilerWatchPid=20140 applicationPid=28780
+2026-10-22T05:13:30.5434552Z HEARTBEAT checkpoint=3 cpuSeconds=1.8125
+2026-10-22T05:13:34.2470334Z CHECKPOINT 04-revision-10 paused outside UI latency
+2026-10-22T05:13:35.6137777Z RESUMED 04-revision-10 compilerWatchPid=20140 applicationPid=28780
+2026-10-22T05:13:45.4063887Z CHECKPOINT 05-revision-25 paused outside UI latency
+2026-10-22T05:13:46.7640598Z RESUMED 05-revision-25 compilerWatchPid=20140 applicationPid=28780
+2026-10-22T05:13:47.0283874Z HEARTBEAT checkpoint=5 cpuSeconds=2.0625
+2026-10-22T05:14:02.0790619Z HEARTBEAT checkpoint=5 cpuSeconds=2.21875
+2026-10-22T05:14:02.8805748Z CHECKPOINT 06-revision-50 paused outside UI latency
+2026-10-22T05:14:04.2277288Z RESUMED 06-revision-50 compilerWatchPid=20140 applicationPid=28780
+2026-10-22T05:14:17.2021011Z HEARTBEAT checkpoint=6 cpuSeconds=2.296875
+2026-10-22T05:14:20.3828535Z CHECKPOINT 07-revision-75 paused outside UI latency
+2026-10-22T05:14:21.7233060Z RESUMED 07-revision-75 compilerWatchPid=20140 applicationPid=28780
+2026-10-22T05:14:32.2770506Z HEARTBEAT checkpoint=7 cpuSeconds=2.390625
+2026-10-22T05:14:37.8373464Z CHECKPOINT 08-revision-100 paused outside UI latency
+2026-10-22T05:14:39.1775912Z RESUMED 08-revision-100 compilerWatchPid=20140 applicationPid=28780
+2026-10-22T05:14:39.7542778Z COMPLETE Memory session and offline analysis finished.

@@ -1,0 +1,24 @@
+2026-10-22T05:14:42.0042050Z START mode=natural variant=baseline observer=False revisions=100 ownedPid=24108
+2026-10-22T05:14:57.0678370Z HEARTBEAT checkpoint=0 cpuSeconds=1.34375
+2026-10-22T05:14:59.9890427Z CHECKPOINT 01-startup-0 paused outside UI latency
+2026-10-22T05:15:03.8627688Z RESUMED 01-startup-0 compilerWatchPid=26412 applicationPid=5696
+2026-10-22T05:15:06.5262620Z CHECKPOINT 02-warmup-0 paused outside UI latency
+2026-10-22T05:15:07.9108900Z RESUMED 02-warmup-0 compilerWatchPid=26412 applicationPid=5696
+2026-10-22T05:15:08.9763837Z CHECKPOINT 03-revision-1 paused outside UI latency
+2026-10-22T05:15:10.3282723Z RESUMED 03-revision-1 compilerWatchPid=26412 applicationPid=5696
+2026-10-22T05:15:12.1812146Z HEARTBEAT checkpoint=3 cpuSeconds=1.5625
+2026-10-22T05:15:16.4313998Z CHECKPOINT 04-revision-10 paused outside UI latency
+2026-10-22T05:15:17.7837354Z RESUMED 04-revision-10 compilerWatchPid=26412 applicationPid=5696
+2026-10-22T05:15:27.2914596Z HEARTBEAT checkpoint=4 cpuSeconds=1.78125
+2026-10-22T05:15:27.5640800Z CHECKPOINT 05-revision-25 paused outside UI latency
+2026-10-22T05:15:28.9103959Z RESUMED 05-revision-25 compilerWatchPid=26412 applicationPid=5696
+2026-10-22T05:15:42.4314560Z HEARTBEAT checkpoint=5 cpuSeconds=1.890625
+2026-10-22T05:15:45.0836474Z CHECKPOINT 06-revision-50 paused outside UI latency
+2026-10-22T05:15:46.4247210Z RESUMED 06-revision-50 compilerWatchPid=26412 applicationPid=5696
+2026-10-22T05:15:57.5250082Z HEARTBEAT checkpoint=6 cpuSeconds=1.984375
+2026-10-22T05:16:02.5601803Z CHECKPOINT 07-revision-75 paused outside UI latency
+2026-10-22T05:16:03.9165999Z RESUMED 07-revision-75 compilerWatchPid=26412 applicationPid=5696
+2026-10-22T05:16:12.6383548Z HEARTBEAT checkpoint=7 cpuSeconds=2.015625
+2026-10-22T05:16:19.7993919Z CHECKPOINT 08-revision-100 paused outside UI latency
+2026-10-22T05:16:21.1445051Z RESUMED 08-revision-100 compilerWatchPid=26412 applicationPid=5696
+2026-10-22T05:16:21.7005253Z COMPLETE Memory session and offline analysis finished.

@@ -1,0 +1,26 @@
+2026-10-22T07:11:00.1223657Z START mode=natural variant=baseline observer=False revisions=100 ownedPid=31524
+2026-10-22T07:11:15.1718597Z HEARTBEAT checkpoint=0 cpuSeconds=1.296875
+2026-10-22T07:11:23.6619542Z CHECKPOINT 01-startup-0 paused outside UI latency
+2026-10-22T07:11:27.5326858Z RESUMED 01-startup-0 compilerWatchPid=19232 applicationPid=18232
+2026-10-22T07:11:30.2570643Z HEARTBEAT checkpoint=1 cpuSeconds=1.71875
+2026-10-22T07:11:30.2672208Z CHECKPOINT 02-warmup-0 paused outside UI latency
+2026-10-22T07:11:31.6258306Z RESUMED 02-warmup-0 compilerWatchPid=19232 applicationPid=18232
+2026-10-22T07:11:32.4470857Z CHECKPOINT 03-revision-1 paused outside UI latency
+2026-10-22T07:11:33.7819360Z RESUMED 03-revision-1 compilerWatchPid=19232 applicationPid=18232
+2026-10-22T07:11:39.7339596Z CHECKPOINT 04-revision-10 paused outside UI latency
+2026-10-22T07:11:41.0629505Z RESUMED 04-revision-10 compilerWatchPid=19232 applicationPid=18232
+2026-10-22T07:11:45.3842334Z HEARTBEAT checkpoint=4 cpuSeconds=1.84375
+2026-10-22T07:11:50.5242848Z CHECKPOINT 05-revision-25 paused outside UI latency
+2026-10-22T07:11:51.8546768Z RESUMED 05-revision-25 compilerWatchPid=19232 applicationPid=18232
+2026-10-22T07:12:00.4647594Z HEARTBEAT checkpoint=5 cpuSeconds=1.921875
+2026-10-22T07:12:07.4224826Z CHECKPOINT 06-revision-50 paused outside UI latency
+2026-10-22T07:12:08.7582683Z PUBLICATION_RETRY win32=5 C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\WatchMemory\gate-io-recovery\runs\natural-3-baseline-stats-no-observer-20261022T071058838Z\checkpoints\response.json
+2026-10-22T07:12:08.7949281Z PUBLICATION_RECOVERED C:\Users\Asanov\.codex\worktrees\c671\Akbura\bin\WatchMemory\gate-io-recovery\runs\natural-3-baseline-stats-no-observer-20261022T071058838Z\checkpoints\response.json
+2026-10-22T07:12:08.7962388Z RESUMED 06-revision-50 compilerWatchPid=19232 applicationPid=18232
+2026-10-22T07:12:15.5456167Z HEARTBEAT checkpoint=6 cpuSeconds=2.0625
+2026-10-22T07:12:24.5131245Z CHECKPOINT 07-revision-75 paused outside UI latency
+2026-10-22T07:12:25.8484387Z RESUMED 07-revision-75 compilerWatchPid=19232 applicationPid=18232
+2026-10-22T07:12:30.5994486Z HEARTBEAT checkpoint=7 cpuSeconds=2.15625
+2026-10-22T07:12:42.0688057Z CHECKPOINT 08-revision-100 paused outside UI latency
+2026-10-22T07:12:43.4022443Z RESUMED 08-revision-100 compilerWatchPid=19232 applicationPid=18232
+2026-10-22T07:12:43.9441775Z COMPLETE Memory session and offline analysis finished.

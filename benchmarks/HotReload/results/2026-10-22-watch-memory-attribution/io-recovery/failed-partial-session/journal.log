@@ -1,0 +1,19 @@
+2026-10-22T05:30:02.1319536Z START mode=natural variant=baseline observer=False revisions=100 ownedPid=1824
+2026-10-22T05:30:17.3816649Z HEARTBEAT checkpoint=0 cpuSeconds=1.265625
+2026-10-22T05:30:17.4023256Z CHECKPOINT 01-startup-0 paused outside UI latency
+2026-10-22T05:30:21.1961822Z RESUMED 01-startup-0 compilerWatchPid=11052 applicationPid=32096
+2026-10-22T05:30:23.8585614Z CHECKPOINT 02-warmup-0 paused outside UI latency
+2026-10-22T05:30:25.2302241Z RESUMED 02-warmup-0 compilerWatchPid=11052 applicationPid=32096
+2026-10-22T05:30:26.0338452Z CHECKPOINT 03-revision-1 paused outside UI latency
+2026-10-22T05:30:27.3773267Z RESUMED 03-revision-1 compilerWatchPid=11052 applicationPid=32096
+2026-10-22T05:30:32.4091198Z HEARTBEAT checkpoint=3 cpuSeconds=1.515625
+2026-10-22T05:30:33.4768892Z CHECKPOINT 04-revision-10 paused outside UI latency
+2026-10-22T05:30:34.8225809Z RESUMED 04-revision-10 compilerWatchPid=11052 applicationPid=32096
+2026-10-22T05:30:44.3280871Z CHECKPOINT 05-revision-25 paused outside UI latency
+2026-10-22T05:30:45.7655709Z FAILED MethodInvocationException: C:\Users\Asanov\.codex\worktrees\c671\Akbura\benchmarks\HotReload\Run-WatchMemorySession.ps1:34
+Line |
+  34 |      [IO.File]::Move(($path + '.tmp'),$path,$true)
+     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Exception calling "Move" with "3" argument(s): "Access to the path is denied."
+
+

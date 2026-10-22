@@ -1,0 +1,1 @@
+PASS: request reader recovers from an exclusive sharing lock, treats a missing request or not-yet-created parent directory as pending, and rejects malformed JSON.

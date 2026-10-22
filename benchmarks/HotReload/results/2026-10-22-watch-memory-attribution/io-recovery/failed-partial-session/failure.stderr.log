@@ -1,0 +1,5 @@
+ParentContainsErrorRecordException: C:\Users\Asanov\.codex\worktrees\c671\Akbura\benchmarks\HotReload\Run-WatchMemorySession.ps1:34
+Line |
+  34 |      [IO.File]::Move(($path + '.tmp'),$path,$true)
+     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Exception calling "Move" with "3" argument(s): "Access to the path is denied."

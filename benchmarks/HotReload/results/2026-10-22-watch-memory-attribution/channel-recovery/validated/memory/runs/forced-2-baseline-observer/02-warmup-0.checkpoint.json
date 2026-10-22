@@ -1,0 +1,103 @@
+{
+  "Variant": "baseline",
+  "StartedUtc": "2026-10-22T08:21:44.2695087Z",
+  "Observer": true,
+  "CompletedUtc": "2026-10-22T08:21:47.7378070Z",
+  "Sequence": 2,
+  "Topology": {
+    "HostPid": 4516,
+    "Processes": [
+      {
+        "ProcessId": 32704,
+        "ParentProcessId": 10556,
+        "Name": "dotnet.exe",
+        "ExecutablePath": "C:\\Program Files\\dotnet\\dotnet.exe",
+        "CommandLine": "\"dotnet\" watch --verbose --non-interactive --project C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate-channel-validated\\runs\\forced-2-baseline-observer-20261022T082113102Z\\watch\\fixture\\WatchFixture.csproj --no-restore run"
+      },
+      {
+        "ProcessId": 13588,
+        "ParentProcessId": 32704,
+        "Name": "conhost.exe",
+        "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe",
+        "CommandLine": "\\??\\C:\\WINDOWS\\system32\\conhost.exe 0x4"
+      },
+      {
+        "ProcessId": 4516,
+        "ParentProcessId": 32704,
+        "Name": "dotnet.exe",
+        "ExecutablePath": "C:\\Program Files\\dotnet\\dotnet.exe",
+        "CommandLine": "\"C:\\Program Files\\dotnet\\dotnet.exe\" \"C:\\Program Files\\dotnet\\sdk\\10.0.401\\DotnetTools\\dotnet-watch\\10.0.401\\tools\\net10.0\\any\\dotnet-watch.dll\" --verbose --non-interactive --project C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate-channel-validated\\runs\\forced-2-baseline-observer-20261022T082113102Z\\watch\\fixture\\WatchFixture.csproj --no-restore run"
+      },
+      {
+        "ProcessId": 26964,
+        "ParentProcessId": 4516,
+        "Name": "dotnet.exe",
+        "ExecutablePath": "C:\\Program Files\\dotnet\\dotnet.exe",
+        "CommandLine": "\"C:\\Program Files\\dotnet\\dotnet.exe\" run --no-build -e DOTNET_WATCH=1 -e DOTNET_WATCH_ITERATION=1 -e DOTNET_MODIFIABLE_ASSEMBLIES=debug -e \"DOTNET_STARTUP_HOOKS=C:\\Program Files\\dotnet\\sdk\\10.0.401\\DotnetTools\\dotnet-watch\\10.0.401\\tools\\net10.0\\any\\hotreload\\net10.0\\Microsoft.Extensions.DotNetDeltaApplier.dll\" -e DOTNET_WATCH_HOTRELOAD_NAMEDPIPE_NAME=854f44c051b74e44b0e1b4c4497aa95f --project C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate-channel-validated\\runs\\forced-2-baseline-observer-20261022T082113102Z\\watch\\fixture\\WatchFixture.csproj --no-restore"
+      },
+      {
+        "ProcessId": 15696,
+        "ParentProcessId": 26964,
+        "Name": "WatchFixture.exe",
+        "ExecutablePath": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate-channel-validated\\runs\\forced-2-baseline-observer-20261022T082113102Z\\watch\\fixture\\bin\\Debug\\net10.0\\WatchFixture.exe",
+        "CommandLine": "\"C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate-channel-validated\\runs\\forced-2-baseline-observer-20261022T082113102Z\\watch\\fixture\\bin\\Debug\\net10.0\\WatchFixture.exe\""
+      }
+    ]
+  },
+  "Phase": "warmup",
+  "Mode": "forced",
+  "Revision": 0,
+  "Metrics": [
+    {
+      "SampledUtc": "2026-10-22T08:21:46.9051461Z",
+      "Role": "compilerWatch",
+      "CpuSeconds": 16.5625,
+      "Pid": 4516,
+      "Collection": "External gcdump full GC, outside file-write-to-UI interval",
+      "WorkingSetBytes": 310681600,
+      "PrivateBytes": 126959616
+    },
+    {
+      "SampledUtc": "2026-10-22T08:21:47.7327407Z",
+      "Role": "application",
+      "CpuSeconds": 2.5,
+      "Pid": 15696,
+      "Collection": "External gcdump full GC, outside file-write-to-UI interval",
+      "WorkingSetBytes": 94175232,
+      "PrivateBytes": 29147136
+    },
+    {
+      "SampledUtc": "2026-10-22T08:21:47.7377578Z",
+      "Role": "launcher",
+      "CpuSeconds": 0.625,
+      "Pid": 32704,
+      "Collection": "Natural GC; no explicit collection requested",
+      "WorkingSetBytes": 55488512,
+      "PrivateBytes": 18771968
+    }
+  ],
+  "Application": {
+    "Kind": "ack",
+    "Revision": 3,
+    "Phase": "margin",
+    "Pid": 15696,
+    "ActualMargin": 12,
+    "StatePreserved": true,
+    "InputPreserved": true,
+    "ControlsPreserved": true,
+    "BindingsValid": true,
+    "UnaffectedBindingsValid": true,
+    "InvalidExpressionFrozen": false,
+    "InvalidExpressionValue": "First 3",
+    "ExpectedInvalidExpressionValue": null,
+    "ValidatedReactiveBindings": 4,
+    "Subscriptions": 1,
+    "ManagedHeapBytes": 2619352,
+    "PostGc": false,
+    "WorkingSetBytes": 88928256,
+    "AllocatedBytes": 15751672,
+    "Gen0": 4,
+    "Gen1": 2,
+    "Gen2": 2
+  }
+}

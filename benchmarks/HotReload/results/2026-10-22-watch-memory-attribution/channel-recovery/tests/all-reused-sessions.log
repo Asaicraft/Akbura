@@ -1,0 +1,3 @@
+PASS: all 21 reused sessions are complete, each with 100 verified live updates, eight checkpoints, zero restarts and zero subscription failures; every reuse-chain marker hash and original measurement/completion attribution verified.
+Measurement 0BA4677B0E6921F33E2E818CE469FB2397157F98788A4F921696BEDCF34D17F3: 5 completed sessions.
+Measurement B87C1092B513927B4FEAB48863C520A81E7A01FFFAC53D78F1619C5BF1E0D5CF: 16 completed sessions.

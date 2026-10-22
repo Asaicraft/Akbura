@@ -1,0 +1,8 @@
+2026-10-22T09:11:17.5808763Z START read-only postprocessing; no builds, watch sessions, forced GC or measurement reruns
+2026-10-22T09:11:41.4458758Z TEST Summarized 1 dedicated sessions. Review roots and matched variants; no automatic leak or performance conclusion.
+2026-10-22T09:11:41.7392864Z TEST Summarized 1 dedicated sessions. Review roots and matched variants; no automatic leak or performance conclusion.
+2026-10-22T09:11:41.9381823Z TEST Summarized 1 dedicated sessions. Review roots and matched variants; no automatic leak or performance conclusion.
+2026-10-22T09:11:42.1735109Z TEST PASS: UTC/local joins, nearest complete GC sample, CPU-only/partial/duplicate tails, skew bound, missing metrics, missing forced graph, optional nulls, slope/completion guards and immutable raw evidence; fixture retained at C:\Users\Asanov\AppData\Local\Temp\Akbura-WatchMemoryReport-b23c76e39aa24fd5bc3702141bfd170c
+2026-10-22T09:11:42.2344737Z VERIFIED 36 completed runtime sessions; processing external counters and archived object graphs
+2026-10-22T09:13:20.7576549Z Summarized 36 dedicated sessions. Review roots and matched variants; no automatic leak or performance conclusion.
+2026-10-22T09:13:23.4247529Z COMPLETE summary ready; raw input hashes unchanged. Retention attribution and production performance are not automatically accepted.

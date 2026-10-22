@@ -1,0 +1,153 @@
+#requires -Version 7.2
+param(
+    [Parameter(Mandatory)][string]$OutputDirectory,
+    [Parameter(Mandatory)][string]$ToolDirectory,
+    [Parameter(Mandatory)][string]$DiagnosticTools,
+    [Parameter(Mandatory)][string]$Profiler,
+    [ValidateSet('baseline','combined')][string]$Variant = 'baseline',
+    [ValidateSet('natural','forced')][string]$Mode = 'natural',
+    [ValidateRange(1,500)][int]$Revisions = 100,
+    [switch]$Observer,
+    [switch]$Profile
+)
+$ErrorActionPreference = 'Stop'
+$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+Set-Location -LiteralPath $repository
+$OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
+$ToolDirectory = [IO.Path]::GetFullPath($ToolDirectory)
+$DiagnosticTools = [IO.Path]::GetFullPath($DiagnosticTools)
+$Profiler = [IO.Path]::GetFullPath($Profiler)
+if (Test-Path -LiteralPath $OutputDirectory) { throw 'Use a fresh session directory; preserve partial runs.' }
+if ($Profile -and $Mode -ne 'forced') { throw 'Heap profiles induce GC and belong only to dedicated forced-GC sessions.' }
+$null = New-Item -ItemType Directory -Path $OutputDirectory
+$encoding = [Text.UTF8Encoding]::new($false)
+$journal = [IO.StreamWriter]::new((Join-Path $OutputDirectory 'journal.log'),$false,$encoding)
+$journal.AutoFlush = $true
+$owned = [Collections.Generic.List[object]]::new()
+$watch = Join-Path $OutputDirectory 'watch'
+$checkpointDirectory = Join-Path $OutputDirectory 'checkpoints'
+$collectors = @{}
+$snapshots = [Collections.Generic.List[string]]::new()
+$sequence = 0
+function Save([string]$path, $value) {
+    [IO.File]::WriteAllText(($path + '.tmp'),(($value | ConvertTo-Json -Depth 10).ReplaceLineEndings("`r`n") + "`r`n"),$encoding)
+    [IO.File]::Move(($path + '.tmp'),$path,$true)
+}
+function Log([string]$message) { $journal.WriteLine([DateTime]::UtcNow.ToString('o') + ' ' + $message); $journal.BaseStream.Flush($true) }
+function Start-Owned([string]$name, [string[]]$arguments) {
+    $info = [Diagnostics.ProcessStartInfo]::new($arguments[0])
+    $info.UseShellExecute = $false; $info.CreateNoWindow = $true
+    $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
+    $info.WorkingDirectory = $repository
+    foreach ($argument in $arguments | Select-Object -Skip 1) { $info.ArgumentList.Add($argument) }
+    $process = [Diagnostics.Process]::new(); $process.StartInfo = $info
+    $stdout = [IO.FileStream]::new((Join-Path $OutputDirectory "$name.stdout.log"),'CreateNew','Write','ReadWrite')
+    $stderr = [IO.FileStream]::new((Join-Path $OutputDirectory "$name.stderr.log"),'CreateNew','Write','ReadWrite')
+    $null = $process.Start()
+    $entry = @{ Process = $process; Out = $stdout; Err = $stderr
+        CopyOut = $process.StandardOutput.BaseStream.CopyToAsync($stdout); CopyErr = $process.StandardError.BaseStream.CopyToAsync($stderr) }
+    $owned.Add($entry)
+    return $entry
+}
+function Wait-Owned($entry, [int]$seconds = 300) {
+    $process = $entry.Process
+    if (-not $process.WaitForExit($seconds * 1000)) { $process.Kill($true); throw 'Owned diagnostic process timed out.' }
+    $null = $entry.CopyOut.GetAwaiter().GetResult(); $null = $entry.CopyErr.GetAwaiter().GetResult()
+    $entry.Out.Flush($true); $entry.Err.Flush($true)
+    if ($process.ExitCode -ne 0) { throw "Owned process $($process.Id) exited $($process.ExitCode); inspect session logs." }
+}
+function Topology([int]$launcherPid, [int]$applicationPid) {
+    $all = @(Get-CimInstance Win32_Process)
+    $descendants = [Collections.Generic.HashSet[int]]::new(); $null = $descendants.Add($launcherPid)
+    do {
+        $changed = $false
+        foreach ($item in $all) { if ($descendants.Contains([int]$item.ParentProcessId) -and $descendants.Add([int]$item.ProcessId)) { $changed = $true } }
+    } while ($changed)
+    $tree = @($all | Where-Object { $descendants.Contains([int]$_.ProcessId) })
+    if ($applicationPid -notin $tree.ProcessId) { throw 'The acknowledged application is not an owned watch descendant.' }
+    $hosts = @($tree | Where-Object { $_.CommandLine -match 'dotnet-watch\.(dll|exe)' -or $_.Name -like 'dotnet-watch*' })
+    if ($hosts.Count -ne 1) { throw "Cannot identify exactly one native compiler/watch host; found $($hosts.Count)." }
+    return @{ HostPid = [int]$hosts[0].ProcessId; Processes = @($tree | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine) }
+}
+try {
+    $arguments = @('pwsh','-NoProfile','-File',(Join-Path $PSScriptRoot 'Verify-SupportedWatch.ps1'),'-OutputDirectory',$watch,
+        '-ToolDirectory',$ToolDirectory,'-Scenario','margin','-Variant',$Variant,'-Updates',"$Revisions",'-Warmups','2','-StudyDirectory',$checkpointDirectory)
+    if ($Observer) { $arguments += '-Instrumented' }
+    $run = Start-Owned 'watch-runner' $arguments
+    Log "START mode=$Mode variant=$Variant observer=$Observer revisions=$Revisions ownedPid=$($run.Process.Id)"
+    $lastHeartbeat = [DateTime]::UtcNow
+    while (-not $run.Process.WaitForExit(250)) {
+        foreach ($entry in $owned) { $entry.Out.Flush($true); $entry.Err.Flush($true) }
+        if (([DateTime]::UtcNow - $lastHeartbeat).TotalSeconds -ge 15) {
+            Log "HEARTBEAT checkpoint=$sequence cpuSeconds=$($run.Process.TotalProcessorTime.TotalSeconds)"
+            $lastHeartbeat = [DateTime]::UtcNow
+        }
+        $requestPath = Join-Path $checkpointDirectory 'request.json'
+        if (-not (Test-Path -LiteralPath $requestPath)) { continue }
+        $request = Get-Content -LiteralPath $requestPath -Raw | ConvertFrom-Json
+        if ($request.Sequence -le $sequence) { continue }
+        if ($request.Sequence -ne $sequence + 1) { throw 'Missing or out-of-order memory checkpoint.' }
+        $sequence = $request.Sequence
+        $name = '{0:D2}-{1}-{2}' -f $sequence,$request.Phase,$request.Revision
+        Log "CHECKPOINT $name paused outside UI latency"
+        $topology = Topology $request.LauncherPid $request.ApplicationPid
+        $roles = [ordered]@{ compilerWatch = $topology.HostPid; application = [int]$request.ApplicationPid }
+        if ($request.LauncherPid -notin $roles.Values) { $roles.launcher = [int]$request.LauncherPid }
+        foreach ($role in $roles.Keys) {
+            if (-not $collectors.ContainsKey($role)) {
+                $counterPath = Join-Path $OutputDirectory "counters-$role.csv"
+                $collectors[$role] = Start-Owned "collector-$role" @((Join-Path $DiagnosticTools 'dotnet-counters.exe'),'collect','--process-id',"$($roles[$role])",
+                    '--counters','System.Runtime','--refresh-interval','1','--format','csv','--output',$counterPath,'--duration','00:30:00')
+            }
+        }
+        Start-Sleep -Milliseconds $(if ($sequence -eq 1) { 3500 } else { 1200 })
+        $checkpoint = @{ Sequence = $sequence; Phase = $request.Phase; Revision = $request.Revision; Mode = $Mode
+            Observer = [bool]$Observer; Variant = $Variant; StartedUtc = [DateTime]::UtcNow.ToString('o'); Topology = $topology; Metrics = @(); Application = $request.Application }
+        foreach ($role in $roles.Keys) {
+            $targetPid = [int]$roles[$role]
+            if ($Mode -eq 'forced' -and $role -ne 'launcher') {
+                $gcdump = Join-Path $OutputDirectory "$name-$role.gcdump"
+                $capture = Start-Owned "$name-$role-gcdump" @((Join-Path $DiagnosticTools 'dotnet-gcdump.exe'),'collect','--process-id',"$targetPid",'--output',$gcdump,'--timeout','180')
+                Wait-Owned $capture
+                $report = Start-Owned "$name-$role-heapstat" @((Join-Path $DiagnosticTools 'dotnet-gcdump.exe'),'report',$gcdump)
+                Wait-Owned $report
+            }
+            $native = Get-Process -Id $targetPid
+            $checkpoint.Metrics += @{ Role = $role; Pid = $targetPid; WorkingSetBytes = $native.WorkingSet64
+                PrivateBytes = $native.PrivateMemorySize64; CpuSeconds = $native.TotalProcessorTime.TotalSeconds; SampledUtc = [DateTime]::UtcNow.ToString('o')
+                Collection = $(if ($Mode -eq 'forced' -and $role -ne 'launcher') { 'External gcdump full GC, outside file-write-to-UI interval' } else { 'Natural GC; no explicit collection requested' }) }
+        }
+        if ($Profile -and ($request.Phase -eq 'warmup' -or $request.Revision -in @(50,100,500))) {
+            $dump = Join-Path $OutputDirectory "$name-compilerWatch.dmp"
+            Wait-Owned (Start-Owned "$name-heap-dump" @((Join-Path $DiagnosticTools 'dotnet-dump.exe'),'collect','--process-id',"$($topology.HostPid)",'--type','Heap','--output',$dump))
+            $snapshots.Add($dump)
+        }
+        $checkpoint.CompletedUtc = [DateTime]::UtcNow.ToString('o')
+        Save (Join-Path $OutputDirectory "$name.checkpoint.json") $checkpoint
+        Save (Join-Path $checkpointDirectory 'response.json') @{ Nonce = $request.Nonce; Succeeded = $true }
+        Log "RESUMED $name compilerWatchPid=$($topology.HostPid) applicationPid=$($request.ApplicationPid)"
+    }
+    Wait-Owned $run
+    foreach ($entry in $collectors.Values) {
+        if (-not $entry.Process.WaitForExit(30000)) { $entry.Process.Kill($true); throw 'Counter collector did not exit when its owned target terminated.' }
+        $null = $entry.CopyOut.GetAwaiter().GetResult(); $null = $entry.CopyErr.GetAwaiter().GetResult()
+    }
+    foreach ($dump in $snapshots) {
+        $name = [IO.Path]::GetFileNameWithoutExtension($dump)
+        Log "OFFLINE_ANALYSIS $name"
+        Wait-Owned (Start-Owned "$name-analysis" @('dotnet',$Profiler,$dump,(Join-Path $OutputDirectory "$name-analysis"))) 900
+    }
+    Save (Join-Path $OutputDirectory 'session.json') @{ Complete = $true; Variant = $Variant; Mode = $Mode; Observer = [bool]$Observer
+        Revisions = $Revisions; Checkpoints = $sequence; FullHeapProfiles = $snapshots.Count; CompletedUtc = [DateTime]::UtcNow.ToString('o')
+        Meaning = 'Dedicated memory study. Profiling, external collectors and checkpoint pauses disqualify these sessions as primary production latency evidence.' }
+    Log 'COMPLETE Memory session and offline analysis finished.'
+}
+catch { Log ('FAILED ' + ($_ | Out-String)); throw }
+finally {
+    foreach ($entry in $owned) {
+        if (-not $entry.Process.HasExited) { $entry.Process.Kill($true); $entry.Process.WaitForExit() }
+        $null = $entry.CopyOut.GetAwaiter().GetResult(); $null = $entry.CopyErr.GetAwaiter().GetResult()
+        $entry.Out.Dispose(); $entry.Err.Dispose(); $entry.Process.Dispose()
+    }
+    $journal.Dispose()
+}

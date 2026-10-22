@@ -1,0 +1,24 @@
+2026-10-22T05:24:57.3835242Z START mode=natural variant=combined observer=True revisions=100 ownedPid=16568
+2026-10-22T05:25:12.4011231Z HEARTBEAT checkpoint=0 cpuSeconds=1.453125
+2026-10-22T05:25:15.5871722Z CHECKPOINT 01-startup-0 paused outside UI latency
+2026-10-22T05:25:19.4572924Z RESUMED 01-startup-0 compilerWatchPid=404 applicationPid=29988
+2026-10-22T05:25:22.3865458Z CHECKPOINT 02-warmup-0 paused outside UI latency
+2026-10-22T05:25:23.7862071Z RESUMED 02-warmup-0 compilerWatchPid=404 applicationPid=29988
+2026-10-22T05:25:24.8508861Z CHECKPOINT 03-revision-1 paused outside UI latency
+2026-10-22T05:25:26.2145213Z RESUMED 03-revision-1 compilerWatchPid=404 applicationPid=29988
+2026-10-22T05:25:27.5358255Z HEARTBEAT checkpoint=3 cpuSeconds=1.75
+2026-10-22T05:25:32.3152354Z CHECKPOINT 04-revision-10 paused outside UI latency
+2026-10-22T05:25:33.6706755Z RESUMED 04-revision-10 compilerWatchPid=404 applicationPid=29988
+2026-10-22T05:25:42.6462135Z HEARTBEAT checkpoint=4 cpuSeconds=2.015625
+2026-10-22T05:25:43.4487903Z CHECKPOINT 05-revision-25 paused outside UI latency
+2026-10-22T05:25:44.7959154Z RESUMED 05-revision-25 compilerWatchPid=404 applicationPid=29988
+2026-10-22T05:25:57.7374369Z HEARTBEAT checkpoint=5 cpuSeconds=2.140625
+2026-10-22T05:26:01.1821764Z CHECKPOINT 06-revision-50 paused outside UI latency
+2026-10-22T05:26:02.5293040Z RESUMED 06-revision-50 compilerWatchPid=404 applicationPid=29988
+2026-10-22T05:26:12.8374609Z HEARTBEAT checkpoint=6 cpuSeconds=2.296875
+2026-10-22T05:26:18.9334539Z CHECKPOINT 07-revision-75 paused outside UI latency
+2026-10-22T05:26:20.2803358Z RESUMED 07-revision-75 compilerWatchPid=404 applicationPid=29988
+2026-10-22T05:26:27.9505992Z HEARTBEAT checkpoint=7 cpuSeconds=2.359375
+2026-10-22T05:26:36.6819902Z CHECKPOINT 08-revision-100 paused outside UI latency
+2026-10-22T05:26:38.0273851Z RESUMED 08-revision-100 compilerWatchPid=404 applicationPid=29988
+2026-10-22T05:26:38.8487898Z COMPLETE Memory session and offline analysis finished.

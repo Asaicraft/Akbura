@@ -1,0 +1,6 @@
+{
+  "Meaning": "Derived statistics and type deltas only; no new measurement, source rewrite or automatic leak attribution.",
+  "AnalysisSourceSha256": "2A52CEF67462D6B8D90A86BC83F371284EDB020132384351257F07F57D57041F",
+  "GeneratedUtc": "2026-10-22T09:21:46.4574534Z",
+  "SummaryProvenanceSha256": "579B933906807DF2BA90C7AE39EC4736EEA76D15811C935D0AD6F2E810893AF0"
+}

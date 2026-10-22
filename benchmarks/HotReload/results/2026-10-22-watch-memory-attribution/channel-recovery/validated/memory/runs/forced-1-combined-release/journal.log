@@ -1,0 +1,30 @@
+2026-10-22T07:59:16.5380735Z START mode=forced variant=combined observer=False revisions=100 ownedPid=16952
+2026-10-22T07:59:31.7563793Z HEARTBEAT checkpoint=0 cpuSeconds=1.328125
+2026-10-22T07:59:33.8370277Z CHECKPOINT 01-startup-0 paused outside UI latency
+2026-10-22T07:59:40.8839680Z RESUMED 01-startup-0 compilerWatchPid=7604 applicationPid=32216
+2026-10-22T07:59:43.5353460Z CHECKPOINT 02-warmup-0 paused outside UI latency
+2026-10-22T08:00:11.2567579Z RESUMED 02-warmup-0 compilerWatchPid=7604 applicationPid=32216
+2026-10-22T08:00:11.5331407Z HEARTBEAT checkpoint=2 cpuSeconds=1.671875
+2026-10-22T08:00:13.0918026Z CHECKPOINT 03-revision-1 paused outside UI latency
+2026-10-22T08:00:18.2430737Z RESUMED 03-revision-1 compilerWatchPid=7604 applicationPid=32216
+2026-10-22T08:00:24.2540940Z CHECKPOINT 04-revision-10 paused outside UI latency
+2026-10-22T08:00:29.2748725Z RESUMED 04-revision-10 compilerWatchPid=7604 applicationPid=32216
+2026-10-22T08:00:29.5548747Z HEARTBEAT checkpoint=4 cpuSeconds=1.796875
+2026-10-22T08:00:39.1286402Z CHECKPOINT 05-revision-25 paused outside UI latency
+2026-10-22T08:00:44.3476189Z RESUMED 05-revision-25 compilerWatchPid=7604 applicationPid=32216
+2026-10-22T08:00:44.6349007Z HEARTBEAT checkpoint=5 cpuSeconds=1.984375
+2026-10-22T08:00:59.7689927Z HEARTBEAT checkpoint=5 cpuSeconds=2.015625
+2026-10-22T08:01:00.3761004Z CHECKPOINT 06-revision-50 paused outside UI latency
+2026-10-22T08:01:31.5190675Z RESUMED 06-revision-50 compilerWatchPid=7604 applicationPid=32216
+2026-10-22T08:01:31.7905552Z HEARTBEAT checkpoint=6 cpuSeconds=2.03125
+2026-10-22T08:01:46.9700795Z HEARTBEAT checkpoint=6 cpuSeconds=2.25
+2026-10-22T08:01:47.2411427Z CHECKPOINT 07-revision-75 paused outside UI latency
+2026-10-22T08:01:52.6340011Z RESUMED 07-revision-75 compilerWatchPid=7604 applicationPid=32216
+2026-10-22T08:02:02.2163890Z HEARTBEAT checkpoint=7 cpuSeconds=2.3125
+2026-10-22T08:02:08.3683743Z CHECKPOINT 08-revision-100 paused outside UI latency
+2026-10-22T08:02:39.9712133Z RESUMED 08-revision-100 compilerWatchPid=7604 applicationPid=32216
+2026-10-22T08:02:40.2419118Z HEARTBEAT checkpoint=8 cpuSeconds=2.4375
+2026-10-22T08:02:40.5953087Z OFFLINE_ANALYSIS 02-warmup-0-compilerWatch
+2026-10-22T08:02:43.0116752Z OFFLINE_ANALYSIS 06-revision-50-compilerWatch
+2026-10-22T08:02:46.2068117Z OFFLINE_ANALYSIS 08-revision-100-compilerWatch
+2026-10-22T08:02:50.3107562Z COMPLETE Memory session and offline analysis finished.

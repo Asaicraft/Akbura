@@ -1,0 +1,11 @@
+{
+  "Mode": "natural",
+  "FullHeapProfiles": 0,
+  "Variant": "baseline",
+  "Complete": true,
+  "Meaning": "Dedicated memory study. Profiling, external collectors and checkpoint pauses disqualify these sessions as primary production latency evidence.",
+  "Checkpoints": 8,
+  "Observer": false,
+  "Revisions": 100,
+  "CompletedUtc": "2026-10-22T05:11:11.3200781Z"
+}

@@ -1,0 +1,103 @@
+{
+  "Metrics": [
+    {
+      "Collection": "External gcdump full GC, outside file-write-to-UI interval",
+      "PrivateBytes": 115585024,
+      "SampledUtc": "2026-10-22T08:03:16.8500800Z",
+      "WorkingSetBytes": 274100224,
+      "Pid": 14084,
+      "Role": "compilerWatch",
+      "CpuSeconds": 8.5625
+    },
+    {
+      "Collection": "External gcdump full GC, outside file-write-to-UI interval",
+      "PrivateBytes": 18063360,
+      "SampledUtc": "2026-10-22T08:03:17.6422066Z",
+      "WorkingSetBytes": 64741376,
+      "Pid": 20048,
+      "Role": "application",
+      "CpuSeconds": 1.515625
+    },
+    {
+      "Collection": "Natural GC; no explicit collection requested",
+      "PrivateBytes": 18677760,
+      "SampledUtc": "2026-10-22T08:03:17.6464035Z",
+      "WorkingSetBytes": 55242752,
+      "Pid": 10312,
+      "Role": "launcher",
+      "CpuSeconds": 0.53125
+    }
+  ],
+  "Revision": 0,
+  "Observer": false,
+  "Application": {
+    "Kind": "ack",
+    "Revision": 1,
+    "Phase": "initial-check",
+    "Pid": 20048,
+    "ActualMargin": 10,
+    "StatePreserved": true,
+    "InputPreserved": true,
+    "ControlsPreserved": true,
+    "BindingsValid": true,
+    "UnaffectedBindingsValid": true,
+    "InvalidExpressionFrozen": false,
+    "InvalidExpressionValue": "First 1",
+    "ExpectedInvalidExpressionValue": null,
+    "ValidatedReactiveBindings": 4,
+    "Subscriptions": 1,
+    "ManagedHeapBytes": 1742760,
+    "PostGc": false,
+    "WorkingSetBytes": 53051392,
+    "AllocatedBytes": 1746184,
+    "Gen0": 0,
+    "Gen1": 0,
+    "Gen2": 0
+  },
+  "Topology": {
+    "Processes": [
+      {
+        "ProcessId": 10312,
+        "ParentProcessId": 19464,
+        "Name": "dotnet.exe",
+        "ExecutablePath": "C:\\Program Files\\dotnet\\dotnet.exe",
+        "CommandLine": "\"dotnet\" watch --verbose --non-interactive --project C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate-channel-validated\\runs\\forced-1-baseline-stats-no-observer-20261022T080253527Z\\watch\\fixture\\WatchFixture.csproj --no-restore run"
+      },
+      {
+        "ProcessId": 28520,
+        "ParentProcessId": 10312,
+        "Name": "conhost.exe",
+        "ExecutablePath": "C:\\WINDOWS\\system32\\conhost.exe",
+        "CommandLine": "\\??\\C:\\WINDOWS\\system32\\conhost.exe 0x4"
+      },
+      {
+        "ProcessId": 14084,
+        "ParentProcessId": 10312,
+        "Name": "dotnet.exe",
+        "ExecutablePath": "C:\\Program Files\\dotnet\\dotnet.exe",
+        "CommandLine": "\"C:\\Program Files\\dotnet\\dotnet.exe\" \"C:\\Program Files\\dotnet\\sdk\\10.0.401\\DotnetTools\\dotnet-watch\\10.0.401\\tools\\net10.0\\any\\dotnet-watch.dll\" --verbose --non-interactive --project C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate-channel-validated\\runs\\forced-1-baseline-stats-no-observer-20261022T080253527Z\\watch\\fixture\\WatchFixture.csproj --no-restore run"
+      },
+      {
+        "ProcessId": 7496,
+        "ParentProcessId": 14084,
+        "Name": "dotnet.exe",
+        "ExecutablePath": "C:\\Program Files\\dotnet\\dotnet.exe",
+        "CommandLine": "\"C:\\Program Files\\dotnet\\dotnet.exe\" run --no-build -e DOTNET_WATCH=1 -e DOTNET_WATCH_ITERATION=1 -e DOTNET_MODIFIABLE_ASSEMBLIES=debug -e \"DOTNET_STARTUP_HOOKS=C:\\Program Files\\dotnet\\sdk\\10.0.401\\DotnetTools\\dotnet-watch\\10.0.401\\tools\\net10.0\\any\\hotreload\\net10.0\\Microsoft.Extensions.DotNetDeltaApplier.dll\" -e DOTNET_WATCH_HOTRELOAD_NAMEDPIPE_NAME=60c43a1d154d4f1bb6f85efb5c50aae9 --project C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate-channel-validated\\runs\\forced-1-baseline-stats-no-observer-20261022T080253527Z\\watch\\fixture\\WatchFixture.csproj --no-restore"
+      },
+      {
+        "ProcessId": 20048,
+        "ParentProcessId": 7496,
+        "Name": "WatchFixture.exe",
+        "ExecutablePath": "C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate-channel-validated\\runs\\forced-1-baseline-stats-no-observer-20261022T080253527Z\\watch\\fixture\\bin\\Debug\\net10.0\\WatchFixture.exe",
+        "CommandLine": "\"C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\gate-channel-validated\\runs\\forced-1-baseline-stats-no-observer-20261022T080253527Z\\watch\\fixture\\bin\\Debug\\net10.0\\WatchFixture.exe\""
+      }
+    ],
+    "HostPid": 14084
+  },
+  "Mode": "forced",
+  "StartedUtc": "2026-10-22T08:03:14.6416350Z",
+  "Phase": "startup",
+  "Variant": "baseline",
+  "CompletedUtc": "2026-10-22T08:03:17.6465079Z",
+  "Sequence": 1
+}

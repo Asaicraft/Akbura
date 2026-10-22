@@ -1,0 +1,254 @@
+{"Kind":"environment","Utc":"2026-10-22T04:57:31.1193278Z","Runtime":"10.0.12","CpuCount":12,"OS":"Microsoft Windows NT 10.0.26200.0","Roslyn":"5.9.0.0","ClrHotReload":false,"Warmup":2,"Samples":8}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : Working directory: \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityHost\u0027"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : Watching with Hot Reload."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : Hot reload enabled. For a list of supported edits, see https://aka.ms/dotnet/hot-reload."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : Press Ctrl\u002BR to restart."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : Building C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityHost\\PurityHost.csproj ..."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : Launched \u0027C:\\Program Files\\dotnet\\dotnet.exe\u0027 with arguments \u0027build C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityHost\\PurityHost.csproj --property:NuGetInteractive=false -restore:false\u0027: process id 21720"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"  PurityUIDashborad.ViewModels -\u003E C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad.ViewModels\\bin\\Debug\\net10.0\\PurityUIDashborad.ViewModels.dll"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"  Avalonia Accelerate Community requires telemetry. To opt out, please upgrade to a paid tier. Learn more: https://avaloniaui.net/accelerate/"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"  PurityUIDashborad -\u003E C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\bin\\Debug\\net10.0\\PurityUIDashborad.dll"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"  Avalonia Accelerate Community requires telemetry. To opt out, please upgrade to a paid tier. Learn more: https://avaloniaui.net/accelerate/"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"  PurityHost -\u003E C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityHost\\bin\\Debug\\net10.0\\PurityHost.dll"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":""}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"Build succeeded."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"    0 Warning(s)"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"    0 Error(s)"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":""}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"Time Elapsed 00:00:02.47"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : Process id 21720 ran for 2883ms and exited with exit code 0."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : Project graph loaded in 0,7s."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : Loading projects ..."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : Design-time build completed in 0,7s."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : Loaded 3 project(s) in 0,7s."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : Watching 40 file(s) for changes"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : Exclusion glob: \u0027bin\\Debug\\/**;obj\\Debug\\/**;bin\\/**;obj\\/**;bin\\Debug\\net10.0\\publish\\/**;**/*.user;**/*.*proj;**/*.sln;**/*.slnx;**/*.vssscc;**/.DS_Store\u0027 under project \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad.ViewModels\u0027"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : Exclusion glob: \u0027bin\\Debug\\/**;obj\\Debug\\/**;bin\\/**;obj\\/**;bin\\Debug\\net10.0\\publish\\/**;**/*.user;**/*.*proj;**/*.sln;**/*.slnx;**/*.vssscc;**/.DS_Store\u0027 under project \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityHost\u0027"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : Exclusion glob: \u0027bin\\Debug\\/**;obj\\Debug\\/**;bin\\/**;obj\\/**;bin\\Debug\\net10.0\\publish\\/**;**/*.user;**/*.*proj;**/*.sln;**/*.slnx;**/*.vssscc;**/.DS_Store\u0027 under project \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\u0027"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : Solution after project update: v1"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : Hot reload session started."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : Application kind: Default."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : launchSettings does not allow launching browsers."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : [PurityHost (net10.0)] Waiting for application to connect to pipe \u00275f9700b4b1e84bfaafdd103a27cdf5f0\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : [PurityHost (net10.0)] Launched \u0027C:\\Program Files\\dotnet\\dotnet.exe\u0027 with arguments \u0027run --no-build -e DOTNET_WATCH=1 -e DOTNET_WATCH_ITERATION=1 -e DOTNET_MODIFIABLE_ASSEMBLIES=debug -e \u0022DOTNET_STARTUP_HOOKS=C:\\Program Files\\dotnet\\sdk\\10.0.401\\DotnetTools\\dotnet-watch\\10.0.401\\tools\\net10.0\\any\\hotreload\\net10.0\\Microsoft.Extensions.DotNetDeltaApplier.dll\u0022 -e DOTNET_WATCH_HOTRELOAD_NAMEDPIPE_NAME=5f9700b4b1e84bfaafdd103a27cdf5f0 --project C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityHost\\PurityHost.csproj --no-restore\u0027: process id 11288"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : [PurityHost (net10.0)] Capabilities: \u0027Baseline AddMethodToExistingType AddStaticFieldToExistingType AddInstanceFieldToExistingType NewTypeDefinition ChangeCustomAttributes UpdateParameters GenericUpdateMethod GenericAddMethodToExistingType GenericAddFieldToExistingType AddFieldRva AddExplicitInterfaceImplementation\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"dotnet watch : Waiting for changes"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"PROBE_READY pid=17776"}
+{"Kind":"watch-startup","Scenario":"Sidebar","Ms":11143.9694}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0,"Text":"PROBE_VALUE 1 pid=17776 same_control=True same_owner=True sidebar_checks=True"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":7.7591,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":9.0243,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":76.7768,"Text":"dotnet watch : File updated: C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":106.085,"Text":"dotnet watch : Updating document text of \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":115.5202,"Text":"dotnet watch : Solution after document update: v2"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":14855.7755,"Text":"dotnet watch : Hot reload capabilities: AddExplicitInterfaceImplementation AddFieldRva AddInstanceFieldToExistingType AddMethodToExistingType AddStaticFieldToExistingType Baseline ChangeCustomAttributes GenericAddFieldToExistingType GenericAddMethodToExistingType GenericUpdateMethod NewTypeDefinition UpdateParameters."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":20066.2534,"Text":"dotnet watch : [PurityHost (net10.0)] Sending update batch #0"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":20463.3595,"Text":"dotnet watch : [PurityHost (net10.0)] Writing capabilities: Baseline AddMethodToExistingType AddStaticFieldToExistingType AddInstanceFieldToExistingType NewTypeDefinition ChangeCustomAttributes UpdateParameters GenericUpdateMethod GenericAddMethodToExistingType GenericAddFieldToExistingType AddFieldRva"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":20463.8206,"Text":"dotnet watch : [PurityHost (net10.0)] Applying updates to module d60d2b86-3097-40a7-bbb7-6888350d443a."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":20463.9638,"Text":"dotnet watch : [PurityHost (net10.0)] Invoking metadata update handlers."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":20464.0811,"Text":"dotnet watch : [PurityHost (net10.0)] System.Reflection.Metadata.RuntimeTypeMetadataUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":20464.2586,"Text":"dotnet watch : [PurityHost (net10.0)] System.ComponentModel.ReflectionCachesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":20464.4114,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":20464.5531,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_41A6B48DE9398063.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":20464.7677,"Text":"dotnet watch : [PurityHost (net10.0)] Microsoft.Extensions.DependencyInjection.ActivatorUtilities\u002BActivatorUtilitiesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":20464.9148,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_36D8DAC9BA3E4A00.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":20465.0354,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":20465.2247,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_41A6B48DE9398063.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":20465.3332,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_36D8DAC9BA3E4A00.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":20465.4468,"Text":"dotnet watch : [PurityHost (net10.0)] Updates applied."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":20466.5534,"Text":"dotnet watch : [PurityHost (net10.0)] Update batch #0 completed."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":20469.9371,"Text":"dotnet watch : C# and Razor changes applied in 20351ms."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":20510.3527,"Text":"PROBE_VALUE 2 pid=17776 same_control=True same_owner=True sidebar_checks=True"}
+{"Kind":"watch","Scenario":"Sidebar","Index":1,"Warmup":true,"TotalMs":20510.3991,"ApplicationPid":"17776","SourceDetectionLogMs":7.9063,"PostDeltaClearCacheCallbackMs":null,"PostDeltaApplicationCallbackMs":null,"GeneratorProcessingMs":null,"DeltaSubmissionMs":null}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":1.0609,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":1.2964,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":31.5101,"Text":"dotnet watch : File updated: C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":32.7256,"Text":"dotnet watch : Updating document text of \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":33.1221,"Text":"dotnet watch : Solution after document update: v3"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2276.619,"Text":"dotnet watch : Hot reload capabilities: AddExplicitInterfaceImplementation AddFieldRva AddInstanceFieldToExistingType AddMethodToExistingType AddStaticFieldToExistingType Baseline ChangeCustomAttributes GenericAddFieldToExistingType GenericAddMethodToExistingType GenericUpdateMethod NewTypeDefinition UpdateParameters."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":6422.6827,"Text":"dotnet watch : [PurityHost (net10.0)] Sending update batch #1"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":6545.2002,"Text":"dotnet watch : [PurityHost (net10.0)] Applying updates to module d60d2b86-3097-40a7-bbb7-6888350d443a."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":6545.5073,"Text":"dotnet watch : [PurityHost (net10.0)] Invoking metadata update handlers."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":6545.707,"Text":"dotnet watch : [PurityHost (net10.0)] System.Reflection.Metadata.RuntimeTypeMetadataUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":6545.8385,"Text":"dotnet watch : [PurityHost (net10.0)] System.ComponentModel.ReflectionCachesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":6545.9822,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":6546.101,"Text":"dotnet watch : [PurityHost (net10.0)] System.Text.Json.JsonSerializerOptionsUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":6546.2437,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_41A6B48DE9398063.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":6546.3924,"Text":"dotnet watch : [PurityHost (net10.0)] Microsoft.Extensions.DependencyInjection.ActivatorUtilities\u002BActivatorUtilitiesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":6546.5395,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_36D8DAC9BA3E4A00.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":6546.6892,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":6546.8471,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_41A6B48DE9398063.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":6547.054,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_36D8DAC9BA3E4A00.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":6547.1994,"Text":"dotnet watch : [PurityHost (net10.0)] Updates applied."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":6547.3505,"Text":"dotnet watch : [PurityHost (net10.0)] Update batch #1 completed."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":6547.5032,"Text":"dotnet watch : C# and Razor changes applied in 6514ms."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":6583.8195,"Text":"PROBE_VALUE 3 pid=17776 same_control=True same_owner=True sidebar_checks=True"}
+{"Kind":"watch","Scenario":"Sidebar","Index":2,"Warmup":false,"TotalMs":6583.9099,"ApplicationPid":"17776","SourceDetectionLogMs":1.1797,"PostDeltaClearCacheCallbackMs":null,"PostDeltaApplicationCallbackMs":null,"GeneratorProcessingMs":null,"DeltaSubmissionMs":null}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0.9792,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":1.2272,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":16.4629,"Text":"dotnet watch : File updated: C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":17.3971,"Text":"dotnet watch : Updating document text of \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":17.5903,"Text":"dotnet watch : Solution after document update: v4"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":1563.6559,"Text":"dotnet watch : Hot reload capabilities: AddExplicitInterfaceImplementation AddFieldRva AddInstanceFieldToExistingType AddMethodToExistingType AddStaticFieldToExistingType Baseline ChangeCustomAttributes GenericAddFieldToExistingType GenericAddMethodToExistingType GenericUpdateMethod NewTypeDefinition UpdateParameters."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":4216.8066,"Text":"dotnet watch : [PurityHost (net10.0)] Sending update batch #2"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":4243.4069,"Text":"dotnet watch : [PurityHost (net10.0)] Applying updates to module d60d2b86-3097-40a7-bbb7-6888350d443a."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":4243.5585,"Text":"dotnet watch : [PurityHost (net10.0)] Invoking metadata update handlers."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":4243.8708,"Text":"dotnet watch : [PurityHost (net10.0)] System.Reflection.Metadata.RuntimeTypeMetadataUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":4243.9799,"Text":"dotnet watch : [PurityHost (net10.0)] System.ComponentModel.ReflectionCachesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":4244.0805,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":4244.207,"Text":"dotnet watch : [PurityHost (net10.0)] System.Text.Json.JsonSerializerOptionsUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":4244.3151,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_41A6B48DE9398063.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":4244.4817,"Text":"dotnet watch : [PurityHost (net10.0)] Microsoft.Extensions.DependencyInjection.ActivatorUtilities\u002BActivatorUtilitiesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":4244.5619,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_36D8DAC9BA3E4A00.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":4244.6719,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":4244.7409,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_41A6B48DE9398063.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":4244.8238,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_36D8DAC9BA3E4A00.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":4244.9163,"Text":"dotnet watch : [PurityHost (net10.0)] Updates applied."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":4244.9643,"Text":"dotnet watch : [PurityHost (net10.0)] Update batch #2 completed."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":4245.016,"Text":"dotnet watch : C# and Razor changes applied in 4227ms."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":4270.09,"Text":"PROBE_VALUE 4 pid=17776 same_control=True same_owner=True sidebar_checks=True"}
+{"Kind":"watch","Scenario":"Sidebar","Index":3,"Warmup":false,"TotalMs":4270.1256,"ApplicationPid":"17776","SourceDetectionLogMs":1.0564,"PostDeltaClearCacheCallbackMs":null,"PostDeltaApplicationCallbackMs":null,"GeneratorProcessingMs":null,"DeltaSubmissionMs":null}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":1.02,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":1.1936,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":62.7824,"Text":"dotnet watch : File updated: C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":63.7866,"Text":"dotnet watch : Updating document text of \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":63.9928,"Text":"dotnet watch : Solution after document update: v5"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":1232.1282,"Text":"dotnet watch : Hot reload capabilities: AddExplicitInterfaceImplementation AddFieldRva AddInstanceFieldToExistingType AddMethodToExistingType AddStaticFieldToExistingType Baseline ChangeCustomAttributes GenericAddFieldToExistingType GenericAddMethodToExistingType GenericUpdateMethod NewTypeDefinition UpdateParameters."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2839.5743,"Text":"dotnet watch : [PurityHost (net10.0)] Sending update batch #3"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2843.3594,"Text":"dotnet watch : [PurityHost (net10.0)] Applying updates to module d60d2b86-3097-40a7-bbb7-6888350d443a."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2843.4598,"Text":"dotnet watch : [PurityHost (net10.0)] Invoking metadata update handlers."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2843.5839,"Text":"dotnet watch : [PurityHost (net10.0)] System.Reflection.Metadata.RuntimeTypeMetadataUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2843.6902,"Text":"dotnet watch : [PurityHost (net10.0)] System.ComponentModel.ReflectionCachesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2843.8223,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2843.906,"Text":"dotnet watch : [PurityHost (net10.0)] System.Text.Json.JsonSerializerOptionsUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2844.022,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_41A6B48DE9398063.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2844.1773,"Text":"dotnet watch : [PurityHost (net10.0)] Microsoft.Extensions.DependencyInjection.ActivatorUtilities\u002BActivatorUtilitiesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2844.2892,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_36D8DAC9BA3E4A00.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2844.3905,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2844.4867,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_41A6B48DE9398063.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2844.5743,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_36D8DAC9BA3E4A00.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2844.6606,"Text":"dotnet watch : [PurityHost (net10.0)] Updates applied."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2844.7211,"Text":"dotnet watch : [PurityHost (net10.0)] Update batch #3 completed."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2844.7667,"Text":"dotnet watch : C# and Razor changes applied in 2780ms."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2868.3361,"Text":"PROBE_VALUE 5 pid=17776 same_control=True same_owner=True sidebar_checks=True"}
+{"Kind":"watch","Scenario":"Sidebar","Index":4,"Warmup":false,"TotalMs":2868.3669,"ApplicationPid":"17776","SourceDetectionLogMs":1.0807,"PostDeltaClearCacheCallbackMs":null,"PostDeltaApplicationCallbackMs":null,"GeneratorProcessingMs":null,"DeltaSubmissionMs":null}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0.8852,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":1.0533,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":15.6533,"Text":"dotnet watch : File updated: C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":16.4721,"Text":"dotnet watch : Updating document text of \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":16.677,"Text":"dotnet watch : Solution after document update: v6"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":1012.4249,"Text":"dotnet watch : Hot reload capabilities: AddExplicitInterfaceImplementation AddFieldRva AddInstanceFieldToExistingType AddMethodToExistingType AddStaticFieldToExistingType Baseline ChangeCustomAttributes GenericAddFieldToExistingType GenericAddMethodToExistingType GenericUpdateMethod NewTypeDefinition UpdateParameters."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2469.7043,"Text":"dotnet watch : [PurityHost (net10.0)] Sending update batch #4"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2472.5239,"Text":"dotnet watch : [PurityHost (net10.0)] Applying updates to module d60d2b86-3097-40a7-bbb7-6888350d443a."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2472.5779,"Text":"dotnet watch : [PurityHost (net10.0)] Invoking metadata update handlers."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2472.7526,"Text":"dotnet watch : [PurityHost (net10.0)] System.Reflection.Metadata.RuntimeTypeMetadataUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2472.7579,"Text":"dotnet watch : [PurityHost (net10.0)] System.ComponentModel.ReflectionCachesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2472.8211,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2472.9245,"Text":"dotnet watch : [PurityHost (net10.0)] System.Text.Json.JsonSerializerOptionsUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2473.0124,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_41A6B48DE9398063.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2473.1087,"Text":"dotnet watch : [PurityHost (net10.0)] Microsoft.Extensions.DependencyInjection.ActivatorUtilities\u002BActivatorUtilitiesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2473.2085,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_36D8DAC9BA3E4A00.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2473.3171,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2473.4711,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_41A6B48DE9398063.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2473.7783,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_36D8DAC9BA3E4A00.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2473.8571,"Text":"dotnet watch : [PurityHost (net10.0)] Updates applied."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2473.9065,"Text":"dotnet watch : [PurityHost (net10.0)] Update batch #4 completed."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2473.9444,"Text":"dotnet watch : C# and Razor changes applied in 2457ms."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2500.5215,"Text":"PROBE_VALUE 6 pid=17776 same_control=True same_owner=True sidebar_checks=True"}
+{"Kind":"watch","Scenario":"Sidebar","Index":5,"Warmup":false,"TotalMs":2500.5545,"ApplicationPid":"17776","SourceDetectionLogMs":0.9855,"PostDeltaClearCacheCallbackMs":null,"PostDeltaApplicationCallbackMs":null,"GeneratorProcessingMs":null,"DeltaSubmissionMs":null}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":0.9859,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":1.1335,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":15.1822,"Text":"dotnet watch : File updated: C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":16.1068,"Text":"dotnet watch : Updating document text of \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":16.2871,"Text":"dotnet watch : Solution after document update: v7"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":1008.2719,"Text":"dotnet watch : Hot reload capabilities: AddExplicitInterfaceImplementation AddFieldRva AddInstanceFieldToExistingType AddMethodToExistingType AddStaticFieldToExistingType Baseline ChangeCustomAttributes GenericAddFieldToExistingType GenericAddMethodToExistingType GenericUpdateMethod NewTypeDefinition UpdateParameters."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2479.7445,"Text":"dotnet watch : [PurityHost (net10.0)] Sending update batch #5"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2483.0677,"Text":"dotnet watch : [PurityHost (net10.0)] Applying updates to module d60d2b86-3097-40a7-bbb7-6888350d443a."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2483.1281,"Text":"dotnet watch : [PurityHost (net10.0)] Invoking metadata update handlers."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2483.2233,"Text":"dotnet watch : [PurityHost (net10.0)] System.Reflection.Metadata.RuntimeTypeMetadataUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2483.3213,"Text":"dotnet watch : [PurityHost (net10.0)] System.ComponentModel.ReflectionCachesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2483.405,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2483.473,"Text":"dotnet watch : [PurityHost (net10.0)] System.Text.Json.JsonSerializerOptionsUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2483.5591,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_41A6B48DE9398063.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2483.6174,"Text":"dotnet watch : [PurityHost (net10.0)] Microsoft.Extensions.DependencyInjection.ActivatorUtilities\u002BActivatorUtilitiesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2483.7425,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_36D8DAC9BA3E4A00.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2483.8115,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2483.8815,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_41A6B48DE9398063.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2483.9615,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_36D8DAC9BA3E4A00.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2484.0466,"Text":"dotnet watch : [PurityHost (net10.0)] Updates applied."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2484.0986,"Text":"dotnet watch : [PurityHost (net10.0)] Update batch #5 completed."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2484.1433,"Text":"dotnet watch : C# and Razor changes applied in 2467ms."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2510.1471,"Text":"PROBE_VALUE 7 pid=17776 same_control=True same_owner=True sidebar_checks=True"}
+{"Kind":"watch","Scenario":"Sidebar","Index":6,"Warmup":false,"TotalMs":2510.2016,"ApplicationPid":"17776","SourceDetectionLogMs":1.0646,"PostDeltaClearCacheCallbackMs":null,"PostDeltaApplicationCallbackMs":null,"GeneratorProcessingMs":null,"DeltaSubmissionMs":null}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":1.4727,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":1.7572,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":16.1826,"Text":"dotnet watch : File updated: C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":17.1002,"Text":"dotnet watch : Updating document text of \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":17.2778,"Text":"dotnet watch : Solution after document update: v8"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":1140.0755,"Text":"dotnet watch : Hot reload capabilities: AddExplicitInterfaceImplementation AddFieldRva AddInstanceFieldToExistingType AddMethodToExistingType AddStaticFieldToExistingType Baseline ChangeCustomAttributes GenericAddFieldToExistingType GenericAddMethodToExistingType GenericUpdateMethod NewTypeDefinition UpdateParameters."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2575.2008,"Text":"dotnet watch : [PurityHost (net10.0)] Sending update batch #6"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2581.1914,"Text":"dotnet watch : [PurityHost (net10.0)] Applying updates to module d60d2b86-3097-40a7-bbb7-6888350d443a."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2581.2648,"Text":"dotnet watch : [PurityHost (net10.0)] Invoking metadata update handlers."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2581.3812,"Text":"dotnet watch : [PurityHost (net10.0)] System.Reflection.Metadata.RuntimeTypeMetadataUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2581.4765,"Text":"dotnet watch : [PurityHost (net10.0)] System.ComponentModel.ReflectionCachesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2581.5856,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2581.7023,"Text":"dotnet watch : [PurityHost (net10.0)] System.Text.Json.JsonSerializerOptionsUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2581.7697,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_41A6B48DE9398063.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2581.872,"Text":"dotnet watch : [PurityHost (net10.0)] Microsoft.Extensions.DependencyInjection.ActivatorUtilities\u002BActivatorUtilitiesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2582.0045,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_36D8DAC9BA3E4A00.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2582.1173,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2582.2348,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_41A6B48DE9398063.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2582.3318,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_36D8DAC9BA3E4A00.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2582.4413,"Text":"dotnet watch : [PurityHost (net10.0)] Updates applied."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2582.4968,"Text":"dotnet watch : [PurityHost (net10.0)] Update batch #6 completed."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2582.5451,"Text":"dotnet watch : C# and Razor changes applied in 2565ms."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2614.6859,"Text":"PROBE_VALUE 8 pid=17776 same_control=True same_owner=True sidebar_checks=True"}
+{"Kind":"watch","Scenario":"Sidebar","Index":7,"Warmup":false,"TotalMs":2614.7403,"ApplicationPid":"17776","SourceDetectionLogMs":1.524,"PostDeltaClearCacheCallbackMs":null,"PostDeltaApplicationCallbackMs":null,"GeneratorProcessingMs":null,"DeltaSubmissionMs":null}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":1.004,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":1.2507,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":16.1868,"Text":"dotnet watch : File updated: C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":17.1524,"Text":"dotnet watch : Updating document text of \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":17.3466,"Text":"dotnet watch : Solution after document update: v9"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":966.0323,"Text":"dotnet watch : Hot reload capabilities: AddExplicitInterfaceImplementation AddFieldRva AddInstanceFieldToExistingType AddMethodToExistingType AddStaticFieldToExistingType Baseline ChangeCustomAttributes GenericAddFieldToExistingType GenericAddMethodToExistingType GenericUpdateMethod NewTypeDefinition UpdateParameters."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2107.9291,"Text":"dotnet watch : [PurityHost (net10.0)] Sending update batch #7"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2111.173,"Text":"dotnet watch : [PurityHost (net10.0)] Applying updates to module d60d2b86-3097-40a7-bbb7-6888350d443a."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2111.2513,"Text":"dotnet watch : [PurityHost (net10.0)] Invoking metadata update handlers."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2111.3527,"Text":"dotnet watch : [PurityHost (net10.0)] System.Reflection.Metadata.RuntimeTypeMetadataUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2111.4431,"Text":"dotnet watch : [PurityHost (net10.0)] System.ComponentModel.ReflectionCachesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2111.589,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2111.6758,"Text":"dotnet watch : [PurityHost (net10.0)] System.Text.Json.JsonSerializerOptionsUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2111.763,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_41A6B48DE9398063.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2111.8614,"Text":"dotnet watch : [PurityHost (net10.0)] Microsoft.Extensions.DependencyInjection.ActivatorUtilities\u002BActivatorUtilitiesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2111.9439,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_36D8DAC9BA3E4A00.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2112.0496,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2112.1255,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_41A6B48DE9398063.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2112.2148,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_36D8DAC9BA3E4A00.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2112.2986,"Text":"dotnet watch : [PurityHost (net10.0)] Updates applied."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2112.3584,"Text":"dotnet watch : [PurityHost (net10.0)] Update batch #7 completed."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2112.3995,"Text":"dotnet watch : C# and Razor changes applied in 2095ms."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2139.8453,"Text":"PROBE_VALUE 9 pid=17776 same_control=True same_owner=True sidebar_checks=True"}
+{"Kind":"watch","Scenario":"Sidebar","Index":8,"Warmup":false,"TotalMs":2139.8745,"ApplicationPid":"17776","SourceDetectionLogMs":1.0489,"PostDeltaClearCacheCallbackMs":null,"PostDeltaApplicationCallbackMs":null,"GeneratorProcessingMs":null,"DeltaSubmissionMs":null}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":1.2166,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":1.4481,"Text":"dotnet watch : File change: Update \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":15.7329,"Text":"dotnet watch : File updated: C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":16.7219,"Text":"dotnet watch : Updating document text of \u0027C:\\Users\\Asanov\\.codex\\worktrees\\c671\\Akbura\\bin\\WatchMemory\\heavy-feasibility-validated\\purity-a6497f6b59f64bbd89d277d05947d765\\PurityUIDashborad\\Components\\Sidebar.akbura\u0027."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":16.9134,"Text":"dotnet watch : Solution after document update: v10"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":1106.013,"Text":"dotnet watch : Hot reload capabilities: AddExplicitInterfaceImplementation AddFieldRva AddInstanceFieldToExistingType AddMethodToExistingType AddStaticFieldToExistingType Baseline ChangeCustomAttributes GenericAddFieldToExistingType GenericAddMethodToExistingType GenericUpdateMethod NewTypeDefinition UpdateParameters."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2129.7478,"Text":"dotnet watch : [PurityHost (net10.0)] Sending update batch #8"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2133.4316,"Text":"dotnet watch : [PurityHost (net10.0)] Applying updates to module d60d2b86-3097-40a7-bbb7-6888350d443a."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2133.5225,"Text":"dotnet watch : [PurityHost (net10.0)] Invoking metadata update handlers."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2133.6059,"Text":"dotnet watch : [PurityHost (net10.0)] System.Reflection.Metadata.RuntimeTypeMetadataUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2133.7192,"Text":"dotnet watch : [PurityHost (net10.0)] System.ComponentModel.ReflectionCachesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2133.7981,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2133.8898,"Text":"dotnet watch : [PurityHost (net10.0)] System.Text.Json.JsonSerializerOptionsUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2133.9764,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_41A6B48DE9398063.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2134.0716,"Text":"dotnet watch : [PurityHost (net10.0)] Microsoft.Extensions.DependencyInjection.ActivatorUtilities\u002BActivatorUtilitiesUpdateHandler.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2134.1272,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_36D8DAC9BA3E4A00.ClearCache"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2134.1863,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_81D450ADFF39A525.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2134.2585,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_41A6B48DE9398063.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2134.3219,"Text":"dotnet watch : [PurityHost (net10.0)] Akbura.Generated.HotReloadService_36D8DAC9BA3E4A00.UpdateApplication"}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2134.3859,"Text":"dotnet watch : [PurityHost (net10.0)] Updates applied."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2134.4348,"Text":"dotnet watch : [PurityHost (net10.0)] Update batch #8 completed."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2134.4669,"Text":"dotnet watch : C# and Razor changes applied in 2117ms."}
+{"Kind":"watch-log","Scenario":"Sidebar","Ms":2158.0813,"Text":"PROBE_VALUE 10 pid=17776 same_control=True same_owner=True sidebar_checks=True"}
+{"Kind":"watch","Scenario":"Sidebar","Index":9,"Warmup":false,"TotalMs":2158.1117,"ApplicationPid":"17776","SourceDetectionLogMs":1.2757,"PostDeltaClearCacheCallbackMs":null,"PostDeltaApplicationCallbackMs":null,"GeneratorProcessingMs":null,"DeltaSubmissionMs":null}

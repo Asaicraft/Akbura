@@ -1,0 +1,24 @@
+2026-10-22T05:21:25.5234569Z START mode=natural variant=baseline observer=True revisions=100 ownedPid=19120
+2026-10-22T05:21:40.7383498Z HEARTBEAT checkpoint=0 cpuSeconds=1.25
+2026-10-22T05:21:42.3252712Z CHECKPOINT 01-startup-0 paused outside UI latency
+2026-10-22T05:21:46.2027143Z RESUMED 01-startup-0 compilerWatchPid=26012 applicationPid=23560
+2026-10-22T05:21:49.2242550Z CHECKPOINT 02-warmup-0 paused outside UI latency
+2026-10-22T05:21:50.6154198Z RESUMED 02-warmup-0 compilerWatchPid=26012 applicationPid=23560
+2026-10-22T05:21:51.6867940Z CHECKPOINT 03-revision-1 paused outside UI latency
+2026-10-22T05:21:53.0749367Z RESUMED 03-revision-1 compilerWatchPid=26012 applicationPid=23560
+2026-10-22T05:21:55.7456845Z HEARTBEAT checkpoint=3 cpuSeconds=1.625
+2026-10-22T05:21:59.2819011Z CHECKPOINT 04-revision-10 paused outside UI latency
+2026-10-22T05:22:00.6395182Z RESUMED 04-revision-10 compilerWatchPid=26012 applicationPid=23560
+2026-10-22T05:22:10.7144028Z CHECKPOINT 05-revision-25 paused outside UI latency
+2026-10-22T05:22:12.0671329Z RESUMED 05-revision-25 compilerWatchPid=26012 applicationPid=23560
+2026-10-22T05:22:12.3664440Z HEARTBEAT checkpoint=5 cpuSeconds=1.75
+2026-10-22T05:22:27.5887046Z HEARTBEAT checkpoint=5 cpuSeconds=1.890625
+2026-10-22T05:22:28.7327503Z CHECKPOINT 06-revision-50 paused outside UI latency
+2026-10-22T05:22:30.0832493Z RESUMED 06-revision-50 compilerWatchPid=26012 applicationPid=23560
+2026-10-22T05:22:42.5982122Z HEARTBEAT checkpoint=6 cpuSeconds=1.9375
+2026-10-22T05:22:46.7157139Z CHECKPOINT 07-revision-75 paused outside UI latency
+2026-10-22T05:22:48.0707272Z RESUMED 07-revision-75 compilerWatchPid=26012 applicationPid=23560
+2026-10-22T05:22:57.7629092Z HEARTBEAT checkpoint=7 cpuSeconds=2.046875
+2026-10-22T05:23:04.8518275Z CHECKPOINT 08-revision-100 paused outside UI latency
+2026-10-22T05:23:06.2154410Z RESUMED 08-revision-100 compilerWatchPid=26012 applicationPid=23560
+2026-10-22T05:23:07.2129021Z COMPLETE Memory session and offline analysis finished.

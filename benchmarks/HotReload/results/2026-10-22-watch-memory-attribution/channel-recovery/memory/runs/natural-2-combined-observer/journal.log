@@ -1,0 +1,24 @@
+2026-10-22T05:19:43.1450599Z START mode=natural variant=combined observer=True revisions=100 ownedPid=7316
+2026-10-22T05:19:58.1602709Z HEARTBEAT checkpoint=0 cpuSeconds=1.359375
+2026-10-22T05:19:59.7430132Z CHECKPOINT 01-startup-0 paused outside UI latency
+2026-10-22T05:20:03.5961044Z RESUMED 01-startup-0 compilerWatchPid=31236 applicationPid=28320
+2026-10-22T05:20:06.2488070Z CHECKPOINT 02-warmup-0 paused outside UI latency
+2026-10-22T05:20:07.6123999Z RESUMED 02-warmup-0 compilerWatchPid=31236 applicationPid=28320
+2026-10-22T05:20:08.6819949Z CHECKPOINT 03-revision-1 paused outside UI latency
+2026-10-22T05:20:10.0565224Z RESUMED 03-revision-1 compilerWatchPid=31236 applicationPid=28320
+2026-10-22T05:20:13.2272211Z HEARTBEAT checkpoint=3 cpuSeconds=1.640625
+2026-10-22T05:20:16.4131399Z CHECKPOINT 04-revision-10 paused outside UI latency
+2026-10-22T05:20:17.7760972Z RESUMED 04-revision-10 compilerWatchPid=31236 applicationPid=28320
+2026-10-22T05:20:27.8290195Z CHECKPOINT 05-revision-25 paused outside UI latency
+2026-10-22T05:20:29.1746609Z RESUMED 05-revision-25 compilerWatchPid=31236 applicationPid=28320
+2026-10-22T05:20:29.4396004Z HEARTBEAT checkpoint=5 cpuSeconds=1.921875
+2026-10-22T05:20:44.5263163Z HEARTBEAT checkpoint=5 cpuSeconds=2.046875
+2026-10-22T05:20:45.8561649Z CHECKPOINT 06-revision-50 paused outside UI latency
+2026-10-22T05:20:47.2029867Z RESUMED 06-revision-50 compilerWatchPid=31236 applicationPid=28320
+2026-10-22T05:20:59.6216547Z HEARTBEAT checkpoint=6 cpuSeconds=2.234375
+2026-10-22T05:21:03.5956087Z CHECKPOINT 07-revision-75 paused outside UI latency
+2026-10-22T05:21:04.9426125Z RESUMED 07-revision-75 compilerWatchPid=31236 applicationPid=28320
+2026-10-22T05:21:14.7353075Z HEARTBEAT checkpoint=7 cpuSeconds=2.390625
+2026-10-22T05:21:21.3489410Z CHECKPOINT 08-revision-100 paused outside UI latency
+2026-10-22T05:21:22.6950274Z RESUMED 08-revision-100 compilerWatchPid=31236 applicationPid=28320
+2026-10-22T05:21:23.4920606Z COMPLETE Memory session and offline analysis finished.

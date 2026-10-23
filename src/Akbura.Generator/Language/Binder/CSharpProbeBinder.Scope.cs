@@ -70,39 +70,45 @@ internal sealed partial class CSharpProbeBinder
         using var localStatements = ImmutableArrayBuilder<CSharp.StatementSyntax>.Rent();
         var addedNames = new HashSet<string>(StringComparer.Ordinal);
         var diagnostics = BindingDiagnosticBag.GetInstance();
-
-        foreach (var name in names)
+        try
         {
-            if (name == "index" && CSharpProbeBuilder.GetContainingMarkupForeach(scope) != null)
+            foreach (var name in names)
             {
-                continue;
-            }
-            if (!addedNames.Add(name))
-            {
-                continue;
-            }
+                if (name == "index" && CSharpProbeBuilder.GetContainingMarkupForeach(scope) != null)
+                {
+                    continue;
+                }
+                if (!addedNames.Add(name))
+                {
+                    continue;
+                }
 
-            var symbol = Next?.LookupSymbol(
-                name,
-                BinderLookupOptions.None,
-                scope,
-                diagnostics).Symbol;
-            AddProbeSymbol(
-                symbol,
-                memberDeclarations,
-                localStatements);
-            if (symbol == null)
-            {
-                AddComponentMethodProbeMembers(
+                var symbol = Next?.LookupSymbol(
                     name,
-                    memberDeclarations);
+                    BinderLookupOptions.None,
+                    scope,
+                    diagnostics).Symbol;
+                AddProbeSymbol(
+                    symbol,
+                    memberDeclarations,
+                    localStatements);
+                if (symbol == null)
+                {
+                    AddComponentMethodProbeMembers(
+                        name,
+                        memberDeclarations);
+                }
             }
-        }
 
-        AddMarkupLoopProbeMembers(scope, memberDeclarations);
-        return new CSharpProbeScope(
-            memberDeclarations.ToImmutable(),
-            localStatements.ToImmutable());
+            AddMarkupLoopProbeMembers(scope, memberDeclarations);
+            return new CSharpProbeScope(
+                memberDeclarations.ToImmutable(),
+                localStatements.ToImmutable());
+        }
+        finally
+        {
+            diagnostics.Free();
+        }
     }
 
     internal CSharpProbeScope CreateCompletionProbeScope(

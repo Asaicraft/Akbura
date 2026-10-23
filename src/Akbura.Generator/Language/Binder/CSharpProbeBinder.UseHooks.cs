@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -309,8 +310,8 @@ internal sealed partial class CSharpProbeBinder
             {
                 var argument = arguments[index];
                 var parameter = argument.NameColon is { } named
-                    ? candidate.Parameters.FirstOrDefault(parameter =>
-                        parameter.Name == named.Name.Identifier.ValueText)
+                    ? candidate.Parameters.FirstOrDefault(static (parameter, named) =>
+                        parameter.Name == named.Name.Identifier.ValueText, named)
                     : index < candidate.Parameters.Length
                         ? candidate.Parameters[index]
                         : null;

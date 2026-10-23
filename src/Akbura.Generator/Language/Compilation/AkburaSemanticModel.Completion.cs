@@ -765,10 +765,10 @@ internal partial class AkburaSemanticModel
         foreach (var segment in namespaceName.Split('.'))
         {
             current = current.GetNamespaceMembers()
-                .FirstOrDefault(candidate => string.Equals(
+                .FirstOrDefault(static (candidate, segment) => string.Equals(
                     candidate.Name,
                     segment,
-                    StringComparison.Ordinal));
+                    StringComparison.Ordinal), segment);
             if (current == null)
             {
                 return null;

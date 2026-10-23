@@ -223,9 +223,10 @@ internal sealed class ExpressionBindingDependencyAnalyzer
             ExpressionBindingDependency? dependency = null;
             if (deduplicate)
             {
-                dependency = _dependencies.FirstOrDefault(existing => existing.Kind == kind &&
-                    ReferenceEquals(existing.Receiver, receiver) && SymbolEqualityComparer.Default.Equals(existing.Member, member) &&
-                    SymbolEqualityComparer.Default.Equals(existing.ResultType, operation.Type) && SameConditions(existing.Conditions, conditions));
+                dependency = _dependencies.FirstOrDefault(static (existing, state) => existing.Kind == state.kind &&
+                    ReferenceEquals(existing.Receiver, state.receiver) && SymbolEqualityComparer.Default.Equals(existing.Member, state.member) &&
+                    SymbolEqualityComparer.Default.Equals(existing.ResultType, state.operation.Type) && SameConditions(existing.Conditions, state.conditions),
+                    (kind, receiver, member, operation, conditions));
             }
             if (dependency == null)
             {

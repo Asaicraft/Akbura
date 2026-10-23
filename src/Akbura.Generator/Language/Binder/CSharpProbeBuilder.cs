@@ -231,9 +231,8 @@ internal sealed partial class CSharpProbeBuilder
         var annotation = new SyntaxAnnotation(
             CompletionAnnotationKind);
         var hostOffset = command.Parameters.Parameters.FullSpan.Start;
-        var parametersWithOrigins = parameters.ReplaceNodes(
-            parameters.Parameters,
-            (original, _) => original.WithAdditionalAnnotations(
+        using var lease = PooledDelegates.GetPooledFunction(
+            static (original, _, hostOffset) => original.WithAdditionalAnnotations(
                 new SyntaxAnnotation(
                     CSharpProbeBinder.ProjectedSymbolAnnotationKind,
                     new CSharpProbeSymbolOrigin(
@@ -243,7 +242,9 @@ internal sealed partial class CSharpProbeBuilder
                         new TextSpan(
                             hostOffset + original.Identifier.Span.Start,
                             original.Identifier.Span.Length))
-                    .Serialize())));
+                    .Serialize())), hostOffset,
+            out Func<CSharp.ParameterSyntax, CSharp.ParameterSyntax, CSharp.ParameterSyntax> annotate);
+        var parametersWithOrigins = parameters.ReplaceNodes(parameters.Parameters, annotate);
         var annotatedParameters = parametersWithOrigins
             .WithAdditionalAnnotations(annotation);
         CSharp.TypeSyntax returnType;
@@ -669,8 +670,8 @@ internal sealed partial class CSharpProbeBuilder
             var hostOffset = statement.Tokens.FullSpan.Start;
             var declarations = declarationStatement.DescendantNodes()
                 .Where(static node => node is CSharp.VariableDeclaratorSyntax or CSharp.SingleVariableDesignationSyntax);
-            builder.Add(declarationStatement.ReplaceNodes(declarations,
-                (original, rewritten) => rewritten.WithAdditionalAnnotations(
+            using var lease = PooledDelegates.GetPooledFunction(
+                static (original, rewritten, hostOffset) => rewritten.WithAdditionalAnnotations(
                     new SyntaxAnnotation(
                         CSharpProbeBinder.ProjectedSymbolAnnotationKind,
                         new CSharpProbeSymbolOrigin(
@@ -680,7 +681,9 @@ internal sealed partial class CSharpProbeBuilder
                             new TextSpan(
                                 hostOffset + GetCSharpDeclarationIdentifier(original).Span.Start,
                                 GetCSharpDeclarationIdentifier(original).Span.Length))
-                        .Serialize()))));
+                        .Serialize())), hostOffset,
+                out Func<SyntaxNode, SyntaxNode, SyntaxNode> annotate);
+            builder.Add(declarationStatement.ReplaceNodes(declarations, annotate));
         }
     }
 
@@ -688,9 +691,8 @@ internal sealed partial class CSharpProbeBuilder
     {
         var hostOffset = owner.Tokens.FullSpan.Start - localFunction.FullSpan.Start;
         var parameters = localFunction.ParameterList.Parameters;
-        localFunction = localFunction.ReplaceNodes(
-            parameters,
-            (original, rewritten) => rewritten.WithAdditionalAnnotations(
+        using var lease = PooledDelegates.GetPooledFunction(
+            static (original, rewritten, hostOffset) => rewritten.WithAdditionalAnnotations(
                 new SyntaxAnnotation(
                     CSharpProbeBinder.ProjectedSymbolAnnotationKind,
                     new CSharpProbeSymbolOrigin(
@@ -700,7 +702,9 @@ internal sealed partial class CSharpProbeBuilder
                         new TextSpan(
                             hostOffset + original.Identifier.Span.Start,
                             original.Identifier.Span.Length))
-                    .Serialize())));
+                    .Serialize())), hostOffset,
+            out Func<CSharp.ParameterSyntax, CSharp.ParameterSyntax, CSharp.ParameterSyntax> annotate);
+        localFunction = localFunction.ReplaceNodes(parameters, annotate);
         return localFunction
             .WithBody(body)
             .WithExpressionBody(null)

@@ -253,15 +253,16 @@ internal sealed partial class CSharpProbeBinder
             }
 
             var hostOffset = statement.Tokens.FullSpan.Start;
-            parsedMethod = parsedMethod.ReplaceNodes(
-                parsedMethod.ParameterList.Parameters,
-                (original, _) => original.WithAdditionalAnnotations(
+            using var lease = PooledDelegates.GetPooledFunction(
+                static (original, _, hostOffset) => original.WithAdditionalAnnotations(
                     CreateProjectedSymbolAnnotation(
                         AkburaSymbolKind.CSharpSymbol,
                         original.Identifier.ValueText,
                         new TextSpan(
                             hostOffset + original.Identifier.Span.Start,
-                            original.Identifier.Span.Length))));
+                            original.Identifier.Span.Length))), hostOffset,
+                out Func<CSharp.ParameterSyntax, CSharp.ParameterSyntax, CSharp.ParameterSyntax> annotate);
+            parsedMethod = parsedMethod.ReplaceNodes(parsedMethod.ParameterList.Parameters, annotate);
             method = parsedMethod.WithAdditionalAnnotations(
                 CreateProjectedSymbolAnnotation(
                     AkburaSymbolKind.CSharpSymbol,

@@ -43,7 +43,7 @@ internal sealed partial class CSharpProbeBuilder
         var hostOffset = owner.Tokens.FullSpan.Start - header.FullSpan.Start;
         var declarations = header.DescendantNodesAndSelf()
             .Where(node => node is CSharp.SingleVariableDesignationSyntax or CSharp.VariableDeclaratorSyntax);
-        header = header.ReplaceNodes(declarations, (original, rewritten) =>
+        using var lease = PooledDelegates.GetPooledFunction(static (original, rewritten, hostOffset) =>
         {
             var identifier = GetCSharpDeclarationIdentifier(original);
             return rewritten.WithAdditionalAnnotations(new SyntaxAnnotation(
@@ -51,7 +51,8 @@ internal sealed partial class CSharpProbeBuilder
                 new CSharpProbeSymbolOrigin(Guid.NewGuid().ToString("N"),
                     Akbura.Language.Symbols.SymbolKind.CSharpSymbol, identifier.ValueText,
                     new TextSpan(hostOffset + identifier.Span.Start, identifier.Span.Length)).Serialize()));
-        });
+        }, hostOffset, out Func<SyntaxNode, SyntaxNode, SyntaxNode> annotate);
+        header = header.ReplaceNodes(declarations, annotate);
         if (header is CSharp.ForEachStatementSyntax forEach)
         {
             header = forEach.WithAdditionalAnnotations(new SyntaxAnnotation(

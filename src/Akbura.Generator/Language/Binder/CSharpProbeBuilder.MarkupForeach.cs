@@ -1,5 +1,6 @@
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Globalization;
@@ -180,11 +181,16 @@ internal sealed partial class CSharpProbeBuilder
         {
             return null;
         }
-        return local.ReplaceNodes(local.Declaration.Variables, (original, _) =>
-            original.WithAdditionalAnnotations(new SyntaxAnnotation(CSharpProbeBinder.ProjectedSymbolAnnotationKind,
+        using var lease = PooledDelegates.GetPooledFunction(
+            static (original, _, syntax) => original.WithAdditionalAnnotations(new SyntaxAnnotation(CSharpProbeBinder.ProjectedSymbolAnnotationKind,
                 new CSharpProbeSymbolOrigin(Guid.NewGuid().ToString("N"), SymbolKind.CSharpSymbol,
                     original.Identifier.ValueText,
-                    syntax.GetAbsoluteCSharpSpan(original.Identifier.Span)).Serialize())));
+                    syntax.GetAbsoluteCSharpSpan(original.Identifier.Span)).Serialize())), syntax,
+            out Func<
+                CSharp.VariableDeclaratorSyntax,
+                CSharp.VariableDeclaratorSyntax,
+                CSharp.VariableDeclaratorSyntax> annotate);
+        return local.ReplaceNodes(local.Declaration.Variables, annotate);
     }
 
     private sealed class MarkupLoopIndexRewriter(string generatedName) : Microsoft.CodeAnalysis.CSharp.CSharpSyntaxRewriter

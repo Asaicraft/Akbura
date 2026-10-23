@@ -76,6 +76,33 @@ public sealed class AkburaDiagnosticCoreTests
     }
 
     [Fact]
+    public void Deduplicate_PreservesMergedSnapshotAcrossReuseAndEnumerationFailure()
+    {
+        var first = CreateRecord() with { Provenance = DiagnosticProvenance.BlackSilenceGenerator, DocumentVersion = 2 };
+        var second = first with { Message = "Second error" };
+        var snapshot = AkburaDiagnosticCollection.Deduplicate(
+            [first, second, first with { Provenance = DiagnosticProvenance.Workspaces, DocumentVersion = 9 }],
+            static _ => 0);
+        var failure = new InvalidOperationException("Enumeration failed");
+
+        IEnumerable<AkburaDiagnosticRecord> FailingInput()
+        {
+            yield return first;
+            throw failure;
+        }
+
+        Assert.Same(failure, Assert.Throws<InvalidOperationException>(() =>
+            AkburaDiagnosticCollection.Deduplicate(FailingInput())));
+        Assert.Empty(AkburaDiagnosticCollection.Deduplicate([]));
+        Assert.Equal(second, Assert.Single(AkburaDiagnosticCollection.Deduplicate([second])));
+
+        Assert.Equal<string>([first.Message, second.Message], snapshot.Select(static diagnostic => diagnostic.Message));
+        Assert.Equal(DiagnosticProvenance.BlackSilenceGenerator | DiagnosticProvenance.Workspaces, snapshot[0].Provenance);
+        Assert.Equal(9, snapshot[0].DocumentVersion);
+        Assert.Equal(2, snapshot[1].DocumentVersion);
+    }
+
+    [Fact]
     public void FileIdentity_UsesHostPathCaseSensitivity()
     {
         var first = CreateRecord() with { FilePath = "Views/Page.akbura" };

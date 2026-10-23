@@ -1,4 +1,5 @@
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using Microsoft.CodeAnalysis.Text;
@@ -40,196 +41,203 @@ internal sealed class ExpressionBindingDependencyAnalyzer
     private ExpressionBindingEvaluation Visit(RoslynOperation operation,
         ImmutableArray<ExpressionBindingCondition> conditions, ExpressionBindingEvaluation? conditionalReceiver)
     {
-        var children = ImmutableArray.CreateBuilder<ExpressionBindingEvaluation>();
-        ExpressionBindingEvaluation Read(RoslynOperation child, ImmutableArray<ExpressionBindingCondition>? path = null)
+        var children = ArrayBuilder<ExpressionBindingEvaluation>.GetInstance();
+        try
         {
-            var result = Visit(child, path ?? conditions, conditionalReceiver);
-            children.Add(result);
-            return result;
-        }
-        ImmutableArray<ExpressionBindingCondition> Branch(RoslynOperation test, ExpressionBindingBranch branch, int arm = -1) =>
-            conditions.Add(new ExpressionBindingCondition(test, branch, arm));
+            ExpressionBindingEvaluation Read(RoslynOperation child, ImmutableArray<ExpressionBindingCondition>? path = null)
+            {
+                var result = Visit(child, path ?? conditions, conditionalReceiver);
+                children.Add(result);
+                return result;
+            }
+            ImmutableArray<ExpressionBindingCondition> Branch(RoslynOperation test, ExpressionBindingBranch branch, int arm = -1) =>
+                conditions.Add(new ExpressionBindingCondition(test, branch, arm));
 
-        ExpressionBindingDependency? receiver = null;
-        ISymbol? member = null;
-        AkburaSymbol? source = null;
-        ITypeSymbol? receiverType = null;
-        var kind = ExpressionBindingDependencyKind.Computed;
-        var observation = ExpressionBindingObservation.None;
-        var classification = operation.ConstantValue.HasValue
-            ? ExpressionBindingValueClassification.Constant : ExpressionBindingValueClassification.Computed;
-        var indices = ImmutableArray<ExpressionBindingEvaluation>.Empty;
-        ISymbol? notification = null;
-        var deduplicate = false;
+            ExpressionBindingDependency? receiver = null;
+            ISymbol? member = null;
+            AkburaSymbol? source = null;
+            ITypeSymbol? receiverType = null;
+            var kind = ExpressionBindingDependencyKind.Computed;
+            var observation = ExpressionBindingObservation.None;
+            var classification = operation.ConstantValue.HasValue
+                ? ExpressionBindingValueClassification.Constant : ExpressionBindingValueClassification.Computed;
+            var indices = ImmutableArray<ExpressionBindingEvaluation>.Empty;
+            ISymbol? notification = null;
+            var deduplicate = false;
 
-        switch (operation)
-        {
-            case IConditionalAccessInstanceOperation:
-                return new ExpressionBindingEvaluation(operation, conditionalReceiver?.Dependency, conditions, children.ToImmutable());
-            case IConditionalAccessOperation access:
-                var accessReceiver = Read(access.Operation);
-                children.Add(Visit(access.WhenNotNull,
-                    Branch(access.Operation, ExpressionBindingBranch.WhenNotNull), accessReceiver));
-                break;
-            case IConditionalOperation conditional:
-                Read(conditional.Condition);
-                Read(conditional.WhenTrue, Branch(conditional.Condition, ExpressionBindingBranch.WhenTrue));
-                if (conditional.WhenFalse != null)
-                    Read(conditional.WhenFalse, Branch(conditional.Condition, ExpressionBindingBranch.WhenFalse));
-                break;
-            case IBinaryOperation binary when binary.OperatorKind is BinaryOperatorKind.ConditionalAnd or BinaryOperatorKind.ConditionalOr:
-                Read(binary.LeftOperand);
-                Read(binary.RightOperand, Branch(binary.LeftOperand,
-                    binary.OperatorKind == BinaryOperatorKind.ConditionalAnd ? ExpressionBindingBranch.WhenTrue : ExpressionBindingBranch.WhenFalse));
-                if (binary.OperatorMethod != null) Unsupported(operation, "user-defined short-circuit operators");
-                break;
-            case ICoalesceOperation coalesce:
-                Read(coalesce.Value);
-                Read(coalesce.WhenNull, Branch(coalesce.Value, ExpressionBindingBranch.WhenNull));
-                break;
-            case ISwitchExpressionOperation switchExpression:
-                Read(switchExpression.Value);
-                for (var i = 0; i < switchExpression.Arms.Length; i++)
-                    Read(switchExpression.Arms[i], Branch(switchExpression.Value, ExpressionBindingBranch.SwitchArm, i));
-                break;
-            case ISwitchExpressionArmOperation arm:
-                Read(arm.Pattern);
-                var matched = Branch(arm.Pattern, ExpressionBindingBranch.WhenPatternMatches);
-                if (arm.Guard != null)
-                {
-                    Read(arm.Guard, matched);
-                    matched = matched.Add(new ExpressionBindingCondition(arm.Guard, ExpressionBindingBranch.WhenGuardTrue));
-                }
-                Read(arm.Value, matched);
-                break;
-            case IPropertyReferenceOperation property:
-                receiver = property.Instance == null ? null : Read(property.Instance).Dependency;
-                receiverType = property.Instance?.Type;
-                member = property.Property;
-                kind = property.Property.IsIndexer ? ExpressionBindingDependencyKind.Indexer : ExpressionBindingDependencyKind.Property;
-                indices = property.Arguments.Select(argument => Read(argument)).ToImmutableArray();
-                observation = PropertyObservation(property.Property, receiverType, out notification);
-                if (property.Property.IsIndexer && Implements(receiverType, "System.Collections.Specialized.INotifyCollectionChanged"))
-                    observation |= ExpressionBindingObservation.CollectionChanged;
-                if (observation != ExpressionBindingObservation.None && receiverType?.IsValueType == true)
-                    Unsupported(operation, "observable value-type receivers would require copying or boxing the receiver");
-                classification = observation != ExpressionBindingObservation.None ? ExpressionBindingValueClassification.Observable :
-                    receiverType?.SpecialType == SpecialType.System_String ? ExpressionBindingValueClassification.Stable : ExpressionBindingValueClassification.Unobservable;
-                deduplicate = !property.Property.IsIndexer;
-                break;
-            case IFieldReferenceOperation field:
-                receiver = field.Instance == null ? null : Read(field.Instance).Dependency;
-                receiverType = field.Instance?.Type;
-                member = field.Field;
-                // Only projected root fields can represent Akbura declarations;
-                // an unrelated nested CLR field with the same name cannot.
-                source = field.Instance is IInstanceReferenceOperation ? MapSource(field.Field) : null;
-                kind = ExpressionBindingDependencyKind.Field;
-                observation = SourceObservation(source);
-                classification = field.Field.HasConstantValue ? ExpressionBindingValueClassification.Constant :
-                    observation != ExpressionBindingObservation.None ? ExpressionBindingValueClassification.Observable :
-                    field.Field.IsReadOnly ? ExpressionBindingValueClassification.Stable : ExpressionBindingValueClassification.Unobservable;
-                deduplicate = true;
-                break;
-            case ILocalReferenceOperation local:
-                member = local.Local; source = MapSource(local.Local);
-                kind = ExpressionBindingDependencyKind.Local;
-                observation = SourceObservation(source);
-                classification = local.Local.IsConst ? ExpressionBindingValueClassification.Constant :
-                    observation != ExpressionBindingObservation.None ? ExpressionBindingValueClassification.Observable : ExpressionBindingValueClassification.Unobservable;
-                deduplicate = true;
-                break;
-            case IParameterReferenceOperation parameter:
-                member = parameter.Parameter; source = MapSource(parameter.Parameter);
-                kind = ExpressionBindingDependencyKind.Parameter;
-                observation = SourceObservation(source);
-                classification = observation != ExpressionBindingObservation.None ? ExpressionBindingValueClassification.Observable : ExpressionBindingValueClassification.Unobservable;
-                deduplicate = true;
-                break;
-            case IInstanceReferenceOperation:
-                kind = ExpressionBindingDependencyKind.Instance;
-                classification = ExpressionBindingValueClassification.Stable;
-                deduplicate = true;
-                break;
-            case IArrayElementReferenceOperation array:
-                receiver = Read(array.ArrayReference).Dependency;
-                receiverType = array.ArrayReference.Type;
-                indices = array.Indices.Select(index => Read(index)).ToImmutableArray();
-                kind = ExpressionBindingDependencyKind.ArrayElement;
-                classification = ExpressionBindingValueClassification.Unobservable;
-                break;
-            case IConversionOperation conversion:
-                var operand = Read(conversion.Operand);
-                if (conversion.OperatorMethod == null)
-                    return new ExpressionBindingEvaluation(operation, operand.Dependency, conditions, children.ToImmutable());
-                HiddenCall(operation, conversion.OperatorMethod);
-                break;
-            case IInvocationOperation invocation:
-                if (invocation.Instance != null) Read(invocation.Instance);
-                foreach (var argument in invocation.Arguments) Read(argument);
-                if (!IsFormattingMethod(invocation.TargetMethod)) HiddenCall(operation, invocation.TargetMethod);
-                break;
-            case INameOfOperation:
-            case ITypeOfOperation:
-            case ISizeOfOperation:
-                // These operands are not runtime reads.
-                classification = ExpressionBindingValueClassification.Constant;
-                break;
-            case IAnonymousFunctionOperation:
-            case ILocalFunctionOperation:
-            case IAssignmentOperation:
-            case IIncrementOrDecrementOperation:
-            case IAwaitOperation:
-            case IDynamicInvocationOperation:
-            case IDynamicMemberReferenceOperation:
-            case IObjectCreationOperation:
-            case IThrowOperation:
-            case IRecursivePatternOperation:
-            case IListPatternOperation:
-            case IMethodReferenceOperation:
-            case IEventReferenceOperation:
-            case IFunctionPointerInvocationOperation:
-                // Deferred bodies, mutation, dynamic dispatch and allocation
-                // need an explicit future evaluation/observation contract.
-                kind = ExpressionBindingDependencyKind.Unsupported;
-                classification = ExpressionBindingValueClassification.Unsupported;
-                Unsupported(operation, operation.Kind.ToString());
-                break;
-            default:
-                foreach (var child in operation.ChildOperations) Read(child);
-                if (operation.Kind == OperationKind.Invalid)
-                {
-                    kind = ExpressionBindingDependencyKind.Unsupported;
-                    classification = ExpressionBindingValueClassification.Unsupported;
-                    _unknown = true;
-                }
-                else if (!IsSupportedComputedOperation(operation))
-                {
+            switch (operation)
+            {
+                case IConditionalAccessInstanceOperation:
+                    return new ExpressionBindingEvaluation(operation, conditionalReceiver?.Dependency, conditions, children.ToImmutable());
+                case IConditionalAccessOperation access:
+                    var accessReceiver = Read(access.Operation);
+                    children.Add(Visit(access.WhenNotNull,
+                        Branch(access.Operation, ExpressionBindingBranch.WhenNotNull), accessReceiver));
+                    break;
+                case IConditionalOperation conditional:
+                    Read(conditional.Condition);
+                    Read(conditional.WhenTrue, Branch(conditional.Condition, ExpressionBindingBranch.WhenTrue));
+                    if (conditional.WhenFalse != null)
+                        Read(conditional.WhenFalse, Branch(conditional.Condition, ExpressionBindingBranch.WhenFalse));
+                    break;
+                case IBinaryOperation binary when binary.OperatorKind is BinaryOperatorKind.ConditionalAnd or BinaryOperatorKind.ConditionalOr:
+                    Read(binary.LeftOperand);
+                    Read(binary.RightOperand, Branch(binary.LeftOperand,
+                        binary.OperatorKind == BinaryOperatorKind.ConditionalAnd ? ExpressionBindingBranch.WhenTrue : ExpressionBindingBranch.WhenFalse));
+                    if (binary.OperatorMethod != null) Unsupported(operation, "user-defined short-circuit operators");
+                    break;
+                case ICoalesceOperation coalesce:
+                    Read(coalesce.Value);
+                    Read(coalesce.WhenNull, Branch(coalesce.Value, ExpressionBindingBranch.WhenNull));
+                    break;
+                case ISwitchExpressionOperation switchExpression:
+                    Read(switchExpression.Value);
+                    for (var i = 0; i < switchExpression.Arms.Length; i++)
+                        Read(switchExpression.Arms[i], Branch(switchExpression.Value, ExpressionBindingBranch.SwitchArm, i));
+                    break;
+                case ISwitchExpressionArmOperation arm:
+                    Read(arm.Pattern);
+                    var matched = Branch(arm.Pattern, ExpressionBindingBranch.WhenPatternMatches);
+                    if (arm.Guard != null)
+                    {
+                        Read(arm.Guard, matched);
+                        matched = matched.Add(new ExpressionBindingCondition(arm.Guard, ExpressionBindingBranch.WhenGuardTrue));
+                    }
+                    Read(arm.Value, matched);
+                    break;
+                case IPropertyReferenceOperation property:
+                    receiver = property.Instance == null ? null : Read(property.Instance).Dependency;
+                    receiverType = property.Instance?.Type;
+                    member = property.Property;
+                    kind = property.Property.IsIndexer ? ExpressionBindingDependencyKind.Indexer : ExpressionBindingDependencyKind.Property;
+                    indices = property.Arguments.Select(argument => Read(argument)).ToImmutableArray();
+                    observation = PropertyObservation(property.Property, receiverType, out notification);
+                    if (property.Property.IsIndexer && Implements(receiverType, "System.Collections.Specialized.INotifyCollectionChanged"))
+                        observation |= ExpressionBindingObservation.CollectionChanged;
+                    if (observation != ExpressionBindingObservation.None && receiverType?.IsValueType == true)
+                        Unsupported(operation, "observable value-type receivers would require copying or boxing the receiver");
+                    classification = observation != ExpressionBindingObservation.None ? ExpressionBindingValueClassification.Observable :
+                        receiverType?.SpecialType == SpecialType.System_String ? ExpressionBindingValueClassification.Stable : ExpressionBindingValueClassification.Unobservable;
+                    deduplicate = !property.Property.IsIndexer;
+                    break;
+                case IFieldReferenceOperation field:
+                    receiver = field.Instance == null ? null : Read(field.Instance).Dependency;
+                    receiverType = field.Instance?.Type;
+                    member = field.Field;
+                    // Only projected root fields can represent Akbura declarations;
+                    // an unrelated nested CLR field with the same name cannot.
+                    source = field.Instance is IInstanceReferenceOperation ? MapSource(field.Field) : null;
+                    kind = ExpressionBindingDependencyKind.Field;
+                    observation = SourceObservation(source);
+                    classification = field.Field.HasConstantValue ? ExpressionBindingValueClassification.Constant :
+                        observation != ExpressionBindingObservation.None ? ExpressionBindingValueClassification.Observable :
+                        field.Field.IsReadOnly ? ExpressionBindingValueClassification.Stable : ExpressionBindingValueClassification.Unobservable;
+                    deduplicate = true;
+                    break;
+                case ILocalReferenceOperation local:
+                    member = local.Local; source = MapSource(local.Local);
+                    kind = ExpressionBindingDependencyKind.Local;
+                    observation = SourceObservation(source);
+                    classification = local.Local.IsConst ? ExpressionBindingValueClassification.Constant :
+                        observation != ExpressionBindingObservation.None ? ExpressionBindingValueClassification.Observable : ExpressionBindingValueClassification.Unobservable;
+                    deduplicate = true;
+                    break;
+                case IParameterReferenceOperation parameter:
+                    member = parameter.Parameter; source = MapSource(parameter.Parameter);
+                    kind = ExpressionBindingDependencyKind.Parameter;
+                    observation = SourceObservation(source);
+                    classification = observation != ExpressionBindingObservation.None ? ExpressionBindingValueClassification.Observable : ExpressionBindingValueClassification.Unobservable;
+                    deduplicate = true;
+                    break;
+                case IInstanceReferenceOperation:
+                    kind = ExpressionBindingDependencyKind.Instance;
+                    classification = ExpressionBindingValueClassification.Stable;
+                    deduplicate = true;
+                    break;
+                case IArrayElementReferenceOperation array:
+                    receiver = Read(array.ArrayReference).Dependency;
+                    receiverType = array.ArrayReference.Type;
+                    indices = array.Indices.Select(index => Read(index)).ToImmutableArray();
+                    kind = ExpressionBindingDependencyKind.ArrayElement;
+                    classification = ExpressionBindingValueClassification.Unobservable;
+                    break;
+                case IConversionOperation conversion:
+                    var operand = Read(conversion.Operand);
+                    if (conversion.OperatorMethod == null)
+                        return new ExpressionBindingEvaluation(operation, operand.Dependency, conditions, children.ToImmutable());
+                    HiddenCall(operation, conversion.OperatorMethod);
+                    break;
+                case IInvocationOperation invocation:
+                    if (invocation.Instance != null) Read(invocation.Instance);
+                    foreach (var argument in invocation.Arguments) Read(argument);
+                    if (!IsFormattingMethod(invocation.TargetMethod)) HiddenCall(operation, invocation.TargetMethod);
+                    break;
+                case INameOfOperation:
+                case ITypeOfOperation:
+                case ISizeOfOperation:
+                    // These operands are not runtime reads.
+                    classification = ExpressionBindingValueClassification.Constant;
+                    break;
+                case IAnonymousFunctionOperation:
+                case ILocalFunctionOperation:
+                case IAssignmentOperation:
+                case IIncrementOrDecrementOperation:
+                case IAwaitOperation:
+                case IDynamicInvocationOperation:
+                case IDynamicMemberReferenceOperation:
+                case IObjectCreationOperation:
+                case IThrowOperation:
+                case IRecursivePatternOperation:
+                case IListPatternOperation:
+                case IMethodReferenceOperation:
+                case IEventReferenceOperation:
+                case IFunctionPointerInvocationOperation:
+                    // Deferred bodies, mutation, dynamic dispatch and allocation
+                    // need an explicit future evaluation/observation contract.
                     kind = ExpressionBindingDependencyKind.Unsupported;
                     classification = ExpressionBindingValueClassification.Unsupported;
                     Unsupported(operation, operation.Kind.ToString());
-                }
-                if (operation is IBinaryOperation { OperatorMethod: { } binaryMethod }) HiddenCall(operation, binaryMethod);
-                if (operation is IUnaryOperation { OperatorMethod: { } unaryMethod }) HiddenCall(operation, unaryMethod);
-                break;
-        }
+                    break;
+                default:
+                    foreach (var child in operation.ChildOperations) Read(child);
+                    if (operation.Kind == OperationKind.Invalid)
+                    {
+                        kind = ExpressionBindingDependencyKind.Unsupported;
+                        classification = ExpressionBindingValueClassification.Unsupported;
+                        _unknown = true;
+                    }
+                    else if (!IsSupportedComputedOperation(operation))
+                    {
+                        kind = ExpressionBindingDependencyKind.Unsupported;
+                        classification = ExpressionBindingValueClassification.Unsupported;
+                        Unsupported(operation, operation.Kind.ToString());
+                    }
+                    if (operation is IBinaryOperation { OperatorMethod: { } binaryMethod }) HiddenCall(operation, binaryMethod);
+                    if (operation is IUnaryOperation { OperatorMethod: { } unaryMethod }) HiddenCall(operation, unaryMethod);
+                    break;
+            }
 
-        if (classification is ExpressionBindingValueClassification.Unobservable or ExpressionBindingValueClassification.Unsupported)
-            _unknown = true;
-        ExpressionBindingDependency? dependency = null;
-        if (deduplicate)
-        {
-            dependency = _dependencies.FirstOrDefault(existing => existing.Kind == kind &&
-                ReferenceEquals(existing.Receiver, receiver) && SymbolEqualityComparer.Default.Equals(existing.Member, member) &&
-                SymbolEqualityComparer.Default.Equals(existing.ResultType, operation.Type) && SameConditions(existing.Conditions, conditions));
+            if (classification is ExpressionBindingValueClassification.Unobservable or ExpressionBindingValueClassification.Unsupported)
+                _unknown = true;
+            ExpressionBindingDependency? dependency = null;
+            if (deduplicate)
+            {
+                dependency = _dependencies.FirstOrDefault(existing => existing.Kind == kind &&
+                    ReferenceEquals(existing.Receiver, receiver) && SymbolEqualityComparer.Default.Equals(existing.Member, member) &&
+                    SymbolEqualityComparer.Default.Equals(existing.ResultType, operation.Type) && SameConditions(existing.Conditions, conditions));
+            }
+            if (dependency == null)
+            {
+                dependency = new ExpressionBindingDependency(_dependencies.Count, kind, receiver, member, source,
+                    receiverType, operation.Type, observation, classification, conditions, indices, notification);
+                _dependencies.Add(dependency);
+            }
+            return new ExpressionBindingEvaluation(operation, dependency, conditions, children.ToImmutable());
         }
-        if (dependency == null)
+        finally
         {
-            dependency = new ExpressionBindingDependency(_dependencies.Count, kind, receiver, member, source,
-                receiverType, operation.Type, observation, classification, conditions, indices, notification);
-            _dependencies.Add(dependency);
+            children.Free();
         }
-        return new ExpressionBindingEvaluation(operation, dependency, conditions, children.ToImmutable());
     }
 
     private static bool SameConditions(ImmutableArray<ExpressionBindingCondition> left, ImmutableArray<ExpressionBindingCondition> right) =>

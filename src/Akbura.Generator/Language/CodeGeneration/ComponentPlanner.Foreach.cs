@@ -1,6 +1,6 @@
 using Akbura.Language.Operations;
 using Akbura.Language.Syntax;
-using System.Collections.Immutable;
+using Akbura.Pools;
 using System.Linq;
 using Akbura.Language.Symbols;
 
@@ -31,7 +31,7 @@ internal static partial class ComponentPlanner
             _foreachSyntaxIds.Add(syntax, id);
             _foreachRegions.Add(default);
 
-            var roots = ImmutableArray.CreateBuilder<ComponentForeachRootPlan>();
+            using var roots = ImmutableArrayBuilder<ComponentForeachRootPlan>.Rent();
 
             BuildForeachRoots(
                 ownerId,
@@ -49,7 +49,7 @@ internal static partial class ComponentPlanner
         }
 
         private void BuildForeachRoots(int ownerId, AkburaSyntax syntax, in TraversalContext inherited,
-            ImmutableArray<ComponentForeachRootPlan>.Builder roots)
+            ImmutableArrayBuilder<ComponentForeachRootPlan> roots)
         {
             foreach (var childNode in syntax.ChildNodesAndTokens())
             {

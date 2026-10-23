@@ -1,3 +1,4 @@
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Concurrent;
@@ -80,8 +81,8 @@ internal sealed class MarkupPropertyMetadataReader
             }
         }
 
-        var dependencies = ImmutableArray.CreateBuilder<ISymbol>();
-        var invalid = ImmutableArray.CreateBuilder<string>();
+        using var dependencies = ImmutableArrayBuilder<ISymbol>.Rent();
+        using var invalid = ImmutableArrayBuilder<string>.Rent();
         foreach (var name in names.OrderBy(static name => name, StringComparer.Ordinal))
         {
             var dependency = FindDependency(member.ContainingType, name);

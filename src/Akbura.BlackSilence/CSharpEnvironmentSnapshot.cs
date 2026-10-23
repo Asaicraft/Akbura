@@ -1,5 +1,6 @@
 using Akbura.Language;
 using Akbura.Language.CodeGeneration;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -73,7 +74,7 @@ internal sealed class CSharpEnvironmentSnapshot
         var namespaces = new HashSet<string>(StringComparer.Ordinal);
         var candidates = new Dictionary<SyntaxTree, InertTypeCandidate>();
         var parseOptions = new HashSet<ParseOptions>();
-        var retainedTrees = ImmutableArray.CreateBuilder<SyntaxTree>();
+        using var retainedTrees = ImmutableArrayBuilder<SyntaxTree>.Rent();
         var references = compilation.References.ToImmutableArray();
         var canIgnoreTrees = compilation.ScriptCompilationInfo == null;
 

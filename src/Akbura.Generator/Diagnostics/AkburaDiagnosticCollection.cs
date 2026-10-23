@@ -1,6 +1,7 @@
 #if STATS
 using Akbura.Language.CodeGeneration;
 #endif
+using Akbura.Pools;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -17,55 +18,62 @@ public static class AkburaDiagnosticCollection
         IEnumerable<AkburaDiagnosticRecord> diagnostics,
         Func<AkburaDiagnosticRecord, int> getBucketHash)
     {
-        var result = ImmutableArray.CreateBuilder<AkburaDiagnosticRecord>();
-        var buckets = new Dictionary<int, List<int>>();
-
-        foreach (var diagnostic in diagnostics)
+        var result = ArrayBuilder<AkburaDiagnosticRecord>.GetInstance();
+        try
         {
-            var hash = getBucketHash(diagnostic);
-            if (!buckets.TryGetValue(hash, out var candidates))
-            {
-                candidates = [];
-                buckets.Add(hash, candidates);
-            }
+            var buckets = new Dictionary<int, List<int>>();
 
-            var duplicate = false;
-            foreach (var index in candidates)
+            foreach (var diagnostic in diagnostics)
             {
-                var candidate = result[index];
-                if (!AkburaDiagnosticCanonicalComparer.Instance.Equals(candidate, diagnostic))
+                var hash = getBucketHash(diagnostic);
+                if (!buckets.TryGetValue(hash, out var candidates))
                 {
-                    continue;
+                    candidates = [];
+                    buckets.Add(hash, candidates);
                 }
 
-                result[index] = candidate with
+                var duplicate = false;
+                foreach (var index in candidates)
                 {
-                    Provenance = candidate.Provenance | diagnostic.Provenance,
-                    DocumentVersion = Math.Max(candidate.DocumentVersion, diagnostic.DocumentVersion),
-                };
-                duplicate = true;
+                    var candidate = result[index];
+                    if (!AkburaDiagnosticCanonicalComparer.Instance.Equals(candidate, diagnostic))
+                    {
+                        continue;
+                    }
+
+                    result[index] = candidate with
+                    {
+                        Provenance = candidate.Provenance | diagnostic.Provenance,
+                        DocumentVersion = Math.Max(candidate.DocumentVersion, diagnostic.DocumentVersion),
+                    };
+                    duplicate = true;
 #if STATS
-                GenerationStatistics.Increment(GenerationStatisticCounter.DiagnosticDeduplicated);
-                const DiagnosticProvenance workspaceOrigins = DiagnosticProvenance.Workspaces |
-                    DiagnosticProvenance.LanguageServer | DiagnosticProvenance.VisualStudio;
-                if (((candidate.Provenance & DiagnosticProvenance.BlackSilenceGenerator) != 0 &&
-                     (diagnostic.Provenance & workspaceOrigins) != 0) ||
-                    ((diagnostic.Provenance & DiagnosticProvenance.BlackSilenceGenerator) != 0 &&
-                     (candidate.Provenance & workspaceOrigins) != 0))
-                {
-                    GenerationStatistics.Increment(GenerationStatisticCounter.DiagnosticWorkspaceCollision);
-                }
+                    GenerationStatistics.Increment(GenerationStatisticCounter.DiagnosticDeduplicated);
+                    const DiagnosticProvenance workspaceOrigins = DiagnosticProvenance.Workspaces |
+                        DiagnosticProvenance.LanguageServer | DiagnosticProvenance.VisualStudio;
+                    if (((candidate.Provenance & DiagnosticProvenance.BlackSilenceGenerator) != 0 &&
+                         (diagnostic.Provenance & workspaceOrigins) != 0) ||
+                        ((diagnostic.Provenance & DiagnosticProvenance.BlackSilenceGenerator) != 0 &&
+                         (candidate.Provenance & workspaceOrigins) != 0))
+                    {
+                        GenerationStatistics.Increment(GenerationStatisticCounter.DiagnosticWorkspaceCollision);
+                    }
 #endif
-                break;
+                    break;
+                }
+
+                if (!duplicate)
+                {
+                    candidates.Add(result.Count);
+                    result.Add(diagnostic);
+                }
             }
 
-            if (!duplicate)
-            {
-                candidates.Add(result.Count);
-                result.Add(diagnostic);
-            }
+            return result.ToImmutable();
         }
-
-        return result.ToImmutable();
+        finally
+        {
+            result.Free();
+        }
     }
 }

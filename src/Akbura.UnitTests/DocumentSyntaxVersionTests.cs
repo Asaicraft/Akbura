@@ -400,6 +400,33 @@ public sealed class DocumentSyntaxVersionTests
         Assert.True(DocumentSyntaxVersion.Create(tree).CanReuse);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExtractedShapes_RemainValidAcrossLaterExtractionsAndCancellation(bool akcss)
+    {
+        var tree = Parse(akcss, akcss
+            ? "@using Demo.Shared.akcss; (Button).first { Width: 10; }"
+            : "using Avalonia.Controls; param string Title; <TextBlock Text={Title} />");
+        var version = DocumentSyntaxVersion.Create(tree);
+        var surface = version.SurfaceShape.ToArray();
+        var dependencies = version.DependencyNames.ToArray();
+        var otherTree = Parse(akcss, akcss
+            ? "@using Demo.Other.akcss; (Border).second { Height: 20; }"
+            : "using Avalonia.Controls; state int Count = 1; <Border Width={Count} />");
+
+        var other = DocumentSyntaxVersion.Create(otherTree);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Assert.ThrowsAny<OperationCanceledException>(() => DocumentSyntaxVersion.Create(otherTree, cancellation.Token));
+
+        Assert.NotEmpty(surface);
+        Assert.NotEmpty(dependencies);
+        Assert.NotEqual(version.GenerationShape, other.GenerationShape);
+        Assert.Equal<string>(surface, version.SurfaceShape);
+        Assert.Equal<DocumentDependencyName>(dependencies, version.DependencyNames);
+    }
+
     private static AkburaSyntaxTree Parse(bool akcss, string source)
     {
         return akcss

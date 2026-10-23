@@ -363,6 +363,26 @@ public sealed class CSharpEnvironmentSnapshotTests
             CSharpEnvironmentSnapshot.Create(compilation, CreateDocuments(), cancellation.Token));
     }
 
+    [Fact]
+    public void RetainedTrees_PreserveOrderAndRemainValidAcrossSnapshots()
+    {
+        var documents = CreateDocuments();
+        var compilation = CreateCompilation().AddSyntaxTrees(
+            Parse("namespace Demo; internal class Unrelated { }", "Unrelated.cs"),
+            Parse("namespace Demo; public class Retained { }", "Retained.cs"));
+
+        var snapshot = CSharpEnvironmentSnapshot.Create(compilation, documents);
+        var empty = CSharpEnvironmentSnapshot.Create(compilation.RemoveAllSyntaxTrees(), documents);
+        var reversed = CSharpEnvironmentSnapshot.Create(
+            compilation.RemoveAllSyntaxTrees().AddSyntaxTrees(compilation.SyntaxTrees.Reverse()), documents);
+
+        Assert.Empty(empty.RetainedSyntaxTrees);
+        Assert.Equal(["Retained.cs", "Marker.cs"], reversed.RetainedSyntaxTrees.Select(static tree => tree.FilePath));
+        Assert.Equal(["Marker.cs", "Retained.cs"], snapshot.RetainedSyntaxTrees.Select(static tree => tree.FilePath));
+        Assert.Equal(1, snapshot.IgnoredSyntaxTreeCount);
+        Assert.Contains("public class Retained", snapshot.RetainedSyntaxTrees[1].GetText().ToString(), StringComparison.Ordinal);
+    }
+
     private static CSharpCompilation CreateCompilation()
     {
         return CSharpCompilation.Create(

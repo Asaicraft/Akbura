@@ -29,6 +29,11 @@ internal sealed class AkburaModuleTypeResolver
             return default;
         }
 
+        if (_types.TryGetValue(typeName, out var type))
+        {
+            return type;
+        }
+
         return _types.GetOrAdd(typeName, ResolveCore);
     }
 

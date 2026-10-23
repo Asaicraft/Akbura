@@ -56,48 +56,55 @@ internal sealed class MarkupPropertyMetadataReader
     {
         var isContent = false;
         var assignBinding = false;
-        var names = new HashSet<string>(StringComparer.Ordinal);
-
-        for (var current = member; current != null; current = GetOverriddenMember(current))
+        var names = PooledHashSet<string>.GetInstance();
+        try
         {
-            foreach (var attribute in current.GetAttributes())
+
+            for (var current = member; current != null; current = GetOverriddenMember(current))
             {
-                switch (attribute.AttributeClass?.ToDisplayString())
+                foreach (var attribute in current.GetAttributes())
                 {
-                    case "Avalonia.Metadata.ContentAttribute":
-                        isContent = true;
-                        break;
-                    case "Avalonia.Data.AssignBindingAttribute":
-                        assignBinding = true;
-                        break;
-                    case "Avalonia.Metadata.DependsOnAttribute":
-                        if (attribute.ConstructorArguments.Length == 1 &&
-                            attribute.ConstructorArguments[0].Value is string name)
-                        {
-                            names.Add(name);
-                        }
-                        break;
+                    switch (attribute.AttributeClass?.ToDisplayString())
+                    {
+                        case "Avalonia.Metadata.ContentAttribute":
+                            isContent = true;
+                            break;
+                        case "Avalonia.Data.AssignBindingAttribute":
+                            assignBinding = true;
+                            break;
+                        case "Avalonia.Metadata.DependsOnAttribute":
+                            if (attribute.ConstructorArguments.Length == 1 &&
+                                attribute.ConstructorArguments[0].Value is string name)
+                            {
+                                names.Add(name);
+                            }
+                            break;
+                    }
                 }
             }
-        }
 
-        using var dependencies = ImmutableArrayBuilder<ISymbol>.Rent();
-        using var invalid = ImmutableArrayBuilder<string>.Rent();
-        foreach (var name in names.OrderBy(static name => name, StringComparer.Ordinal))
+            using var dependencies = ImmutableArrayBuilder<ISymbol>.Rent();
+            using var invalid = ImmutableArrayBuilder<string>.Rent();
+            foreach (var name in names.OrderBy(static name => name, StringComparer.Ordinal))
+            {
+                var dependency = FindDependency(member.ContainingType, name);
+                if (dependency == null)
+                {
+                    invalid.Add(name);
+                }
+                else
+                {
+                    dependencies.Add(dependency);
+                }
+            }
+
+            return new MarkupPropertyMetadata(isContent, assignBinding,
+                dependencies.ToImmutable(), invalid.ToImmutable());
+        }
+        finally
         {
-            var dependency = FindDependency(member.ContainingType, name);
-            if (dependency == null)
-            {
-                invalid.Add(name);
-            }
-            else
-            {
-                dependencies.Add(dependency);
-            }
+            names.Free();
         }
-
-        return new MarkupPropertyMetadata(isContent, assignBinding,
-            dependencies.ToImmutable(), invalid.ToImmutable());
     }
 
     private static ISymbol? GetOverriddenMember(ISymbol member) => member switch

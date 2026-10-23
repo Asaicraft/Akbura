@@ -1,3 +1,4 @@
+using Akbura.Pools;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Microsoft.CodeAnalysis;
@@ -201,52 +202,59 @@ internal readonly ref struct AkcssModuleWriter
     private bool HasReliableOperations(IAkcssSymbol symbol)
     {
         var sourceMap = _sourceMap;
-        var seen = new HashSet<IAkcssSymbol>();
-        return Visit(sourceMap.GetGenerationSymbol(symbol));
-
-        bool Visit(IAkcssSymbol current)
+        var seen = PooledHashSet<IAkcssSymbol>.GetInstance();
+        try
         {
-            if (!seen.Add(current))
-            {
-                return true;
-            }
-            if (current.IsIntercepted)
-            {
-                return false;
-            }
-            return VisitOperations(current.Operations);
-        }
+            return Visit(sourceMap.GetGenerationSymbol(symbol));
 
-        bool VisitOperations(ImmutableArray<IAkcssOperation> operations)
-        {
-            foreach (var operation in operations)
+            bool Visit(IAkcssSymbol current)
             {
-                if (operation.HasErrors)
+                if (!seen.Add(current))
+                {
+                    return true;
+                }
+                if (current.IsIntercepted)
                 {
                     return false;
                 }
-                if (operation is IAkcssIfOperation conditional &&
-                    !VisitOperations(conditional.Operations))
+                return VisitOperations(current.Operations);
+            }
+
+            bool VisitOperations(ImmutableArray<IAkcssOperation> operations)
+            {
+                foreach (var operation in operations)
                 {
-                    return false;
-                }
-                if (operation is IMetadataAkcssApplyOperation metadataApply &&
-                    !VisitOperations(metadataApply.ExpandedOperations))
-                {
-                    return false;
-                }
-                if (operation is IAkcssApplyOperation apply)
-                {
-                    foreach (var dependency in apply.AppliedSymbols)
+                    if (operation.HasErrors)
                     {
-                        if (!Visit(sourceMap.GetGenerationSymbol(dependency)))
+                        return false;
+                    }
+                    if (operation is IAkcssIfOperation conditional &&
+                        !VisitOperations(conditional.Operations))
+                    {
+                        return false;
+                    }
+                    if (operation is IMetadataAkcssApplyOperation metadataApply &&
+                        !VisitOperations(metadataApply.ExpandedOperations))
+                    {
+                        return false;
+                    }
+                    if (operation is IAkcssApplyOperation apply)
+                    {
+                        foreach (var dependency in apply.AppliedSymbols)
                         {
-                            return false;
+                            if (!Visit(sourceMap.GetGenerationSymbol(dependency)))
+                            {
+                                return false;
+                            }
                         }
                     }
                 }
+                return true;
             }
-            return true;
+        }
+        finally
+        {
+            seen.Free();
         }
     }
 

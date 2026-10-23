@@ -148,61 +148,68 @@ internal partial class AkburaSemanticModel
                     : ErrorCodes.AKBURA_SEMANTIC_MarkupDictionaryReadOnlyTarget, []));
         }
 
-        var constants = new HashSet<object>();
-        foreach (var child in children.WrittenSpan)
+        var constants = PooledHashSet<object>.GetInstance();
+        try
         {
-            if (child.Kind is MarkupChildKind.Conditional or MarkupChildKind.Foreach)
+            foreach (var child in children.WrittenSpan)
             {
-                continue;
-            }
-
-            if (child.Syntax is not MarkupElementContentSyntax childElement)
-            {
-                diagnostics.Add(new AkburaSemanticDiagnostic(child.Syntax,
-                    ErrorCodes.AKBURA_SEMANTIC_MarkupDictionaryKeyRequired, []));
-                continue;
-            }
-
-            IMarkupDictionaryKeyOperation? key = null;
-            foreach (var attribute in child.ComponentSymbol?.AttributeOperations ??
-                System.Collections.Immutable.ImmutableArray<IMarkupAttributeOperation>.Empty)
-            {
-                if (attribute is IMarkupDictionaryKeyOperation dictionaryKey)
+                if (child.Kind is MarkupChildKind.Conditional or MarkupChildKind.Foreach)
                 {
-                    key = dictionaryKey;
-                    break;
+                    continue;
                 }
-            }
 
-            var hasKeyDirective = false;
-            if (childElement.Element.StartTag is { } startTag)
-            {
-                foreach (var attribute in startTag.Attributes)
+                if (child.Syntax is not MarkupElementContentSyntax childElement)
                 {
-                    if (IsMarkupDictionaryKeyDirective(attribute))
+                    diagnostics.Add(new AkburaSemanticDiagnostic(child.Syntax,
+                        ErrorCodes.AKBURA_SEMANTIC_MarkupDictionaryKeyRequired, []));
+                    continue;
+                }
+
+                IMarkupDictionaryKeyOperation? key = null;
+                foreach (var attribute in child.ComponentSymbol?.AttributeOperations ??
+                    System.Collections.Immutable.ImmutableArray<IMarkupAttributeOperation>.Empty)
+                {
+                    if (attribute is IMarkupDictionaryKeyOperation dictionaryKey)
                     {
-                        hasKeyDirective = true;
+                        key = dictionaryKey;
                         break;
                     }
                 }
-            }
 
-            if (key == null && !hasKeyDirective)
-            {
-                diagnostics.Add(new AkburaSemanticDiagnostic(childElement.Element.StartTag ??
-                    (AkburaSyntax)childElement.Element,
-                    ErrorCodes.AKBURA_SEMANTIC_MarkupDictionaryKeyRequired, []));
+                var hasKeyDirective = false;
+                if (childElement.Element.StartTag is { } startTag)
+                {
+                    foreach (var attribute in startTag.Attributes)
+                    {
+                        if (IsMarkupDictionaryKeyDirective(attribute))
+                        {
+                            hasKeyDirective = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (key == null && !hasKeyDirective)
+                {
+                    diagnostics.Add(new AkburaSemanticDiagnostic(childElement.Element.StartTag ??
+                        (AkburaSyntax)childElement.Element,
+                        ErrorCodes.AKBURA_SEMANTIC_MarkupDictionaryKeyRequired, []));
+                }
+                else if (key != null && !key.HasErrors && key.HasConstantValue && key.ConstantValue is { } constant &&
+                    !(shape.KeyType?.IsReferenceType == true && constant.GetType().IsValueType) &&
+                    shape.KeyType?.SpecialType is not (SpecialType.System_Single or SpecialType.System_Double or
+                        SpecialType.System_Decimal) &&
+                    !constants.Add(constant))
+                {
+                    diagnostics.Add(new AkburaSemanticDiagnostic(key.Syntax,
+                        ErrorCodes.AKBURA_SEMANTIC_MarkupDictionaryDuplicateConstantKey,
+                        [constant.ToString() ?? string.Empty]));
+                }
             }
-            else if (key != null && !key.HasErrors && key.HasConstantValue && key.ConstantValue is { } constant &&
-                !(shape.KeyType?.IsReferenceType == true && constant.GetType().IsValueType) &&
-                shape.KeyType?.SpecialType is not (SpecialType.System_Single or SpecialType.System_Double or
-                    SpecialType.System_Decimal) &&
-                !constants.Add(constant))
-            {
-                diagnostics.Add(new AkburaSemanticDiagnostic(key.Syntax,
-                    ErrorCodes.AKBURA_SEMANTIC_MarkupDictionaryDuplicateConstantKey,
-                    [constant.ToString() ?? string.Empty]));
-            }
+        }
+        finally
+        {
+            constants.Free();
         }
     }
 }

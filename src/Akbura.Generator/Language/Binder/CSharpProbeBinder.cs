@@ -790,30 +790,37 @@ internal sealed partial class CSharpProbeBinder : Binder
         }
 
         using var builder = ImmutableArrayBuilder<Diagnostic>.Rent();
-        HashSet<(string Id, string Message, TextSpan Span)>? seen = null;
-        foreach (var diagnostic in diagnostics)
+        PooledHashSet<(string Id, string Message, TextSpan Span)>? seen = null;
+        try
         {
-            if (diagnostic.Severity != DiagnosticSeverity.Error)
+            foreach (var diagnostic in diagnostics)
             {
-                continue;
+                if (diagnostic.Severity != DiagnosticSeverity.Error)
+                {
+                    continue;
+                }
+
+                if (suppressTopLevelConversionDiagnostic &&
+                    diagnostic.Location.SourceSpan == syntax.Span &&
+                    diagnostic.Id is "CS0029" or "CS0266")
+                {
+                    continue;
+                }
+
+                var key = (diagnostic.Id, diagnostic.GetMessage(), diagnostic.Location.SourceSpan);
+                seen ??= PooledHashSet<(string Id, string Message, TextSpan Span)>.GetInstance();
+                if (seen.Add(key))
+                {
+                    builder.Add(diagnostic);
+                }
             }
 
-            if (suppressTopLevelConversionDiagnostic &&
-                diagnostic.Location.SourceSpan == syntax.Span &&
-                diagnostic.Id is "CS0029" or "CS0266")
-            {
-                continue;
-            }
-
-            var key = (diagnostic.Id, diagnostic.GetMessage(), diagnostic.Location.SourceSpan);
-            seen ??= new HashSet<(string Id, string Message, TextSpan Span)>();
-            if (seen.Add(key))
-            {
-                builder.Add(diagnostic);
-            }
+            return builder.ToImmutable();
         }
-
-        return builder.ToImmutable();
+        finally
+        {
+            seen?.Free();
+        }
     }
 
     private static bool ContainsErrorType(ITypeSymbol? type)

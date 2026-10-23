@@ -68,46 +68,53 @@ internal sealed partial class CSharpProbeBinder
 
         using var memberDeclarations = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
         using var localStatements = ImmutableArrayBuilder<CSharp.StatementSyntax>.Rent();
-        var addedNames = new HashSet<string>(StringComparer.Ordinal);
-        var diagnostics = BindingDiagnosticBag.GetInstance();
+        var addedNames = PooledHashSet<string>.GetInstance();
         try
         {
-            foreach (var name in names)
+            var diagnostics = BindingDiagnosticBag.GetInstance();
+            try
             {
-                if (name == "index" && CSharpProbeBuilder.GetContainingMarkupForeach(scope) != null)
+                foreach (var name in names)
                 {
-                    continue;
-                }
-                if (!addedNames.Add(name))
-                {
-                    continue;
-                }
+                    if (name == "index" && CSharpProbeBuilder.GetContainingMarkupForeach(scope) != null)
+                    {
+                        continue;
+                    }
+                    if (!addedNames.Add(name))
+                    {
+                        continue;
+                    }
 
-                var symbol = Next?.LookupSymbol(
-                    name,
-                    BinderLookupOptions.None,
-                    scope,
-                    diagnostics).Symbol;
-                AddProbeSymbol(
-                    symbol,
-                    memberDeclarations,
-                    localStatements);
-                if (symbol == null)
-                {
-                    AddComponentMethodProbeMembers(
+                    var symbol = Next?.LookupSymbol(
                         name,
-                        memberDeclarations);
+                        BinderLookupOptions.None,
+                        scope,
+                        diagnostics).Symbol;
+                    AddProbeSymbol(
+                        symbol,
+                        memberDeclarations,
+                        localStatements);
+                    if (symbol == null)
+                    {
+                        AddComponentMethodProbeMembers(
+                            name,
+                            memberDeclarations);
+                    }
                 }
-            }
 
-            AddMarkupLoopProbeMembers(scope, memberDeclarations);
-            return new CSharpProbeScope(
-                memberDeclarations.ToImmutable(),
-                localStatements.ToImmutable());
+                AddMarkupLoopProbeMembers(scope, memberDeclarations);
+                return new CSharpProbeScope(
+                    memberDeclarations.ToImmutable(),
+                    localStatements.ToImmutable());
+            }
+            finally
+            {
+                diagnostics.Free();
+            }
         }
         finally
         {
-            diagnostics.Free();
+            addedNames.Free();
         }
     }
 
@@ -126,67 +133,74 @@ internal sealed partial class CSharpProbeBinder
             ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
         using var localStatements =
             ImmutableArrayBuilder<CSharp.StatementSyntax>.Rent();
-        var addedNames = new HashSet<string>(StringComparer.Ordinal);
-        if (!excludedNames.IsDefaultOrEmpty)
-        {
-            foreach (var excludedName in excludedNames)
-            {
-                if (!string.IsNullOrWhiteSpace(excludedName))
-                {
-                    addedNames.Add(excludedName);
-                }
-            }
-        }
-        AddDeclaredIdentifierNames(csharpNode, addedNames);
-
-        var diagnostics = BindingDiagnosticBag.GetInstance();
+        var addedNames = PooledHashSet<string>.GetInstance();
         try
         {
-            for (var binder = Next; binder != null; binder = binder.Next)
+            if (!excludedNames.IsDefaultOrEmpty)
             {
-                var scopeDesignator = binder.ScopeDesignator;
-                if (scopeDesignator == null)
+                foreach (var excludedName in excludedNames)
                 {
-                    continue;
-                }
-
-                foreach (var candidate in binder.GetDeclaredSymbolsForScope(scopeDesignator))
-                {
-                    if (candidate.Name == "index" && CSharpProbeBuilder.GetContainingMarkupForeach(scope) != null)
+                    if (!string.IsNullOrWhiteSpace(excludedName))
                     {
-                        continue;
+                        addedNames.Add(excludedName);
                     }
-                    if (string.IsNullOrWhiteSpace(candidate.Name) ||
-                        candidate.Kind == AkburaSymbolKind.CSharpSymbol ||
-                        !addedNames.Add(candidate.Name))
-                    {
-                        continue;
-                    }
-
-                    var symbol = Next?.LookupSymbol(
-                        candidate.Name,
-                        BinderLookupOptions.None,
-                        scope,
-                        diagnostics).Symbol;
-                    AddProbeSymbol(
-                        symbol,
-                        memberDeclarations,
-                        localStatements);
                 }
             }
+            AddDeclaredIdentifierNames(csharpNode, addedNames);
+
+            var diagnostics = BindingDiagnosticBag.GetInstance();
+            try
+            {
+                for (var binder = Next; binder != null; binder = binder.Next)
+                {
+                    var scopeDesignator = binder.ScopeDesignator;
+                    if (scopeDesignator == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (var candidate in binder.GetDeclaredSymbolsForScope(scopeDesignator))
+                    {
+                        if (candidate.Name == "index" && CSharpProbeBuilder.GetContainingMarkupForeach(scope) != null)
+                        {
+                            continue;
+                        }
+                        if (string.IsNullOrWhiteSpace(candidate.Name) ||
+                            candidate.Kind == AkburaSymbolKind.CSharpSymbol ||
+                            !addedNames.Add(candidate.Name))
+                        {
+                            continue;
+                        }
+
+                        var symbol = Next?.LookupSymbol(
+                            candidate.Name,
+                            BinderLookupOptions.None,
+                            scope,
+                            diagnostics).Symbol;
+                        AddProbeSymbol(
+                            symbol,
+                            memberDeclarations,
+                            localStatements);
+                    }
+                }
+            }
+            finally
+            {
+                diagnostics.Free();
+            }
+
+            AddAllComponentMethodProbeMembers(
+                memberDeclarations);
+            AddMarkupLoopProbeMembers(scope, memberDeclarations);
+
+            return new CSharpProbeScope(
+                memberDeclarations.ToImmutable(),
+                localStatements.ToImmutable());
         }
         finally
         {
-            diagnostics.Free();
+            addedNames.Free();
         }
-
-        AddAllComponentMethodProbeMembers(
-            memberDeclarations);
-        AddMarkupLoopProbeMembers(scope, memberDeclarations);
-
-        return new CSharpProbeScope(
-            memberDeclarations.ToImmutable(),
-            localStatements.ToImmutable());
     }
 
     private void AddComponentMethodProbeMembers(
@@ -283,31 +297,38 @@ internal sealed partial class CSharpProbeBinder
         ImmutableArray<string> excludedNames)
     {
         using var builder = ImmutableArrayBuilder<string>.Rent();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        if (!excludedNames.IsDefaultOrEmpty)
+        var seen = PooledHashSet<string>.GetInstance();
+        try
         {
-            foreach (var excludedName in excludedNames)
+            if (!excludedNames.IsDefaultOrEmpty)
             {
-                if (!string.IsNullOrWhiteSpace(excludedName))
+                foreach (var excludedName in excludedNames)
                 {
-                    seen.Add(excludedName);
+                    if (!string.IsNullOrWhiteSpace(excludedName))
+                    {
+                        seen.Add(excludedName);
+                    }
                 }
             }
-        }
 
-        AddDeclaredIdentifierNames(node, seen);
+            AddDeclaredIdentifierNames(node, seen);
 
-        foreach (var identifier in node.DescendantNodesAndSelf().OfType<CSharp.IdentifierNameSyntax>())
-        {
-            var name = identifier.Identifier.ValueText;
-            if (!string.IsNullOrWhiteSpace(name) &&
-                seen.Add(name))
+            foreach (var identifier in node.DescendantNodesAndSelf().OfType<CSharp.IdentifierNameSyntax>())
             {
-                builder.Add(name);
+                var name = identifier.Identifier.ValueText;
+                if (!string.IsNullOrWhiteSpace(name) &&
+                    seen.Add(name))
+                {
+                    builder.Add(name);
+                }
             }
-        }
 
-        return builder.ToImmutable();
+            return builder.ToImmutable();
+        }
+        finally
+        {
+            seen.Free();
+        }
     }
 
     private static void AddDeclaredIdentifierNames(

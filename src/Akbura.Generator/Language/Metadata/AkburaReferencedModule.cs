@@ -57,44 +57,51 @@ internal sealed class AkburaReferencedModule
     internal ImmutableArray<string> GetAkcssModuleNames()
     {
         using var builder = ImmutableArrayBuilder<string>.Rent();
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var module in _akcssModules)
+        var names = PooledHashSet<string>.GetInstance();
+        try
         {
-            if (names.Add(module.MetadataName))
+            foreach (var module in _akcssModules)
             {
-                builder.Add(module.MetadataName);
-            }
-        }
-
-        if (_akcssModules.Length != 0)
-        {
-            return builder.ToImmutable();
-        }
-
-        foreach (var source in Manifest.Sources)
-        {
-            if (source.Kind != AkburaModuleSourceKind.Akcss)
-            {
-                continue;
+                if (names.Add(module.MetadataName))
+                {
+                    builder.Add(module.MetadataName);
+                }
             }
 
-            foreach (var declaration in source.Declarations)
+            if (_akcssModules.Length != 0)
             {
-                if (declaration.Kind != DeclarationKind.AkcssModule)
+                return builder.ToImmutable();
+            }
+
+            foreach (var source in Manifest.Sources)
+            {
+                if (source.Kind != AkburaModuleSourceKind.Akcss)
                 {
                     continue;
                 }
 
-                var name = declaration.MetadataName ??
-                    source.SourceCodePath;
-                if (names.Add(name))
+                foreach (var declaration in source.Declarations)
                 {
-                    builder.Add(name);
+                    if (declaration.Kind != DeclarationKind.AkcssModule)
+                    {
+                        continue;
+                    }
+
+                    var name = declaration.MetadataName ??
+                        source.SourceCodePath;
+                    if (names.Add(name))
+                    {
+                        builder.Add(name);
+                    }
                 }
             }
-        }
 
-        return builder.ToImmutable();
+            return builder.ToImmutable();
+        }
+        finally
+        {
+            names.Free();
+        }
     }
 
     internal bool IsSyntaxTreeMaterialized(string sourceCodePath)

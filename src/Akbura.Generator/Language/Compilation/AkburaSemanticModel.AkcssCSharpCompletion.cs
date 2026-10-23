@@ -189,46 +189,53 @@ internal abstract partial class AkburaSemanticModel
     {
         using var builder =
             ImmutableArrayBuilder<CSharp.UsingDirectiveSyntax>.Rent();
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        AddCSharpUsingDirectives(
-            builder,
-            names,
-            Compilation.GlobalCSharpUsingDirectives);
-
-        foreach (var usingDirective in
-                 Compilation.GlobalAkcssUsingDirectives)
+        var names = PooledHashSet<string>.GetInstance();
+        try
         {
-            if (!usingDirective.IsAkcssModuleImport)
-            {
-                AddCSharpUsingDirective(
-                    builder,
-                    names,
-                    usingDirective.ToCSharp());
-            }
-        }
+            AddCSharpUsingDirectives(
+                builder,
+                names,
+                Compilation.GlobalCSharpUsingDirectives);
 
-        foreach (var member in GetContainingAkcssTopLevelMembers(
-                     currentDirective))
+            foreach (var usingDirective in
+                     Compilation.GlobalAkcssUsingDirectives)
+            {
+                if (!usingDirective.IsAkcssModuleImport)
+                {
+                    AddCSharpUsingDirective(
+                        builder,
+                        names,
+                        usingDirective.ToCSharp());
+                }
+            }
+
+            foreach (var member in GetContainingAkcssTopLevelMembers(
+                         currentDirective))
+            {
+                if (member.Position >= currentDirective.Position)
+                {
+                    break;
+                }
+
+                if (member is AkcssUsingDirectiveSyntax usingDirective &&
+                    !usingDirective.IsAkcssModuleImport)
+                {
+                    AddCSharpUsingDirective(
+                        builder,
+                        names,
+                        usingDirective.ToCSharp());
+                }
+            }
+
+            AddAkcssImplicitUsing(builder, names, "Avalonia");
+            AddAkcssImplicitUsing(builder, names, "Avalonia.Layout");
+            AddAkcssImplicitUsing(builder, names, "Avalonia.Media");
+            AddAkcssImplicitUsing(builder, names, "Akbura");
+            return builder.ToImmutable();
+        }
+        finally
         {
-            if (member.Position >= currentDirective.Position)
-            {
-                break;
-            }
-
-            if (member is AkcssUsingDirectiveSyntax usingDirective &&
-                !usingDirective.IsAkcssModuleImport)
-            {
-                AddCSharpUsingDirective(
-                    builder,
-                    names,
-                    usingDirective.ToCSharp());
-            }
+            names.Free();
         }
-
-        AddAkcssImplicitUsing(builder, names, "Avalonia");
-        AddAkcssImplicitUsing(builder, names, "Avalonia.Layout");
-        AddAkcssImplicitUsing(builder, names, "Avalonia.Media");
-        AddAkcssImplicitUsing(builder, names, "Akbura");
-        return builder.ToImmutable();
     }
 }

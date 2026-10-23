@@ -335,51 +335,58 @@ internal partial class AkburaSemanticModel
 
     private bool TryResolveMarkupExtensionType(string name, out INamedTypeSymbol extensionType, out ImmutableArray<INamedTypeSymbol> ambiguousTypes)
     {
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        INamedTypeSymbol? fallbackType = null;
-        foreach (var candidate in GetMarkupExtensionTypeCandidates(name))
+        var seen = PooledHashSet<string>.GetInstance();
+        try
         {
-            if (!seen.Add(candidate))
+            INamedTypeSymbol? fallbackType = null;
+            foreach (var candidate in GetMarkupExtensionTypeCandidates(name))
             {
-                continue;
-            }
-
-            if (TryBindMarkupExtensionTypeCandidate(
-                    candidate,
-                    out extensionType,
-                    out ambiguousTypes))
-            {
-                // A type name without the conventional `Extension` suffix is
-                // allowed to coexist with its markup-extension counterpart
-                // (for example Avalonia.Data.RelativeSource and
-                // RelativeSourceExtension).  In markup syntax the latter is
-                // the only valid candidate, because it exposes ProvideValue.
-                if (FindMarkupExtensionProvideValueMethod(extensionType) != null)
+                if (!seen.Add(candidate))
                 {
-                    return true;
+                    continue;
                 }
 
-                fallbackType ??= extensionType;
-                extensionType = null!;
+                if (TryBindMarkupExtensionTypeCandidate(
+                        candidate,
+                        out extensionType,
+                        out ambiguousTypes))
+                {
+                    // A type name without the conventional `Extension` suffix is
+                    // allowed to coexist with its markup-extension counterpart
+                    // (for example Avalonia.Data.RelativeSource and
+                    // RelativeSourceExtension).  In markup syntax the latter is
+                    // the only valid candidate, because it exposes ProvideValue.
+                    if (FindMarkupExtensionProvideValueMethod(extensionType) != null)
+                    {
+                        return true;
+                    }
+
+                    fallbackType ??= extensionType;
+                    extensionType = null!;
+                }
+
+                if (!ambiguousTypes.IsDefaultOrEmpty)
+                {
+                    extensionType = null!;
+                    return false;
+                }
             }
 
-            if (!ambiguousTypes.IsDefaultOrEmpty)
+            if (fallbackType != null)
             {
-                extensionType = null!;
-                return false;
+                extensionType = fallbackType;
+                ambiguousTypes = ImmutableArray<INamedTypeSymbol>.Empty;
+                return true;
             }
-        }
 
-        if (fallbackType != null)
-        {
-            extensionType = fallbackType;
+            extensionType = null!;
             ambiguousTypes = ImmutableArray<INamedTypeSymbol>.Empty;
-            return true;
+            return false;
         }
-
-        extensionType = null!;
-        ambiguousTypes = ImmutableArray<INamedTypeSymbol>.Empty;
-        return false;
+        finally
+        {
+            seen.Free();
+        }
     }
 
     private static IEnumerable<string> GetMarkupExtensionTypeCandidates(string name)
@@ -4233,15 +4240,22 @@ internal partial class AkburaSemanticModel
 
     private void AddMarkupAttributeProbeMembers(ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax> membersBuilder, CSharpProbeScope probeScope)
     {
-        var addedMemberKeys = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var field in CreateMarkupAttributeProbeFields())
+        var addedMemberKeys = PooledHashSet<string>.GetInstance();
+        try
         {
-            AddMarkupAttributeProbeMember(membersBuilder, addedMemberKeys, field);
-        }
+            foreach (var field in CreateMarkupAttributeProbeFields())
+            {
+                AddMarkupAttributeProbeMember(membersBuilder, addedMemberKeys, field);
+            }
 
-        foreach (var member in probeScope.MemberDeclarations)
+            foreach (var member in probeScope.MemberDeclarations)
+            {
+                AddMarkupAttributeProbeMember(membersBuilder, addedMemberKeys, member);
+            }
+        }
+        finally
         {
-            AddMarkupAttributeProbeMember(membersBuilder, addedMemberKeys, member);
+            addedMemberKeys.Free();
         }
     }
 

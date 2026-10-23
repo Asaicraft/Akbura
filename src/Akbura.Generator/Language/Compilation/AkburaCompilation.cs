@@ -560,20 +560,34 @@ internal sealed partial class AkburaCompilation
         var builder = ImmutableArrayBuilder<string>.Rent();
         try
         {
-            var names = new HashSet<string>(StringComparer.Ordinal);
-            var compilations = new HashSet<AkburaCompilation>();
-            AddCompilation(
-                this,
-                ref builder,
-                names,
-                compilations,
-                cancellationToken);
+            var names = PooledHashSet<string>.GetInstance();
+            try
+            {
+                var compilations = PooledHashSet<AkburaCompilation>.GetInstance();
+                try
+                {
+                    AddCompilation(
+                        this,
+                        ref builder,
+                        names,
+                        compilations,
+                        cancellationToken);
 
-            var result = builder.ToImmutable();
-            ImmutableInterlocked.InterlockedInitialize(
-                ref _lazyAvailableAkcssModuleNames,
-                result);
-            return _lazyAvailableAkcssModuleNames;
+                    var result = builder.ToImmutable();
+                    ImmutableInterlocked.InterlockedInitialize(
+                        ref _lazyAvailableAkcssModuleNames,
+                        result);
+                    return _lazyAvailableAkcssModuleNames;
+                }
+                finally
+                {
+                    compilations.Free();
+                }
+            }
+            finally
+            {
+                names.Free();
+            }
         }
         finally
         {

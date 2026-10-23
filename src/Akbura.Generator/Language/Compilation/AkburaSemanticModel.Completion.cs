@@ -465,43 +465,50 @@ internal partial class AkburaSemanticModel
     {
         using var builder =
             ImmutableArrayBuilder<VisibleMarkupNamespace>.Rent();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        AddVisibleMarkupNamespace(
-            builder,
-            seen,
-            string.Empty,
-            alias: null);
-        AddVisibleMarkupNamespace(
-            builder,
-            seen,
-            GetAkburaNamespaceText(
-                SyntaxTree.GetRoot(),
-                SyntaxTree),
-            alias: null);
-
-        foreach (var directive in GetCSharpUsingDirectives())
+        var seen = PooledHashSet<string>.GetInstance();
+        try
         {
-            if (directive.StaticKeyword.RawKind != 0 ||
-                directive.Name == null)
-            {
-                continue;
-            }
-
-            var name = NormalizeGlobalName(
-                directive.Name.ToString());
-            if (name.EndsWith(".akcss", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
             AddVisibleMarkupNamespace(
                 builder,
                 seen,
-                name,
-                directive.Alias?.Name.Identifier.ValueText);
-        }
+                string.Empty,
+                alias: null);
+            AddVisibleMarkupNamespace(
+                builder,
+                seen,
+                GetAkburaNamespaceText(
+                    SyntaxTree.GetRoot(),
+                    SyntaxTree),
+                alias: null);
 
-        return builder.ToImmutable();
+            foreach (var directive in GetCSharpUsingDirectives())
+            {
+                if (directive.StaticKeyword.RawKind != 0 ||
+                    directive.Name == null)
+                {
+                    continue;
+                }
+
+                var name = NormalizeGlobalName(
+                    directive.Name.ToString());
+                if (name.EndsWith(".akcss", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                AddVisibleMarkupNamespace(
+                    builder,
+                    seen,
+                    name,
+                    directive.Alias?.Name.Identifier.ValueText);
+            }
+
+            return builder.ToImmutable();
+        }
+        finally
+        {
+            seen.Free();
+        }
     }
 
     private ImmutableArray<VisibleMarkupNamespace>
@@ -509,28 +516,35 @@ internal partial class AkburaSemanticModel
     {
         using var builder =
             ImmutableArrayBuilder<VisibleMarkupNamespace>.Rent();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-
-        foreach (var visibleNamespace in GetVisibleMarkupNamespaces())
+        var seen = PooledHashSet<string>.GetInstance();
+        try
         {
-            AddVisibleMarkupNamespace(
-                builder,
-                seen,
-                visibleNamespace.Name,
-                visibleNamespace.Alias);
-        }
 
-        foreach (var namespaceName in
-                 GetDefaultMarkupExtensionNamespaces())
+            foreach (var visibleNamespace in GetVisibleMarkupNamespaces())
+            {
+                AddVisibleMarkupNamespace(
+                    builder,
+                    seen,
+                    visibleNamespace.Name,
+                    visibleNamespace.Alias);
+            }
+
+            foreach (var namespaceName in
+                     GetDefaultMarkupExtensionNamespaces())
+            {
+                AddVisibleMarkupNamespace(
+                    builder,
+                    seen,
+                    namespaceName,
+                    alias: null);
+            }
+
+            return builder.ToImmutable();
+        }
+        finally
         {
-            AddVisibleMarkupNamespace(
-                builder,
-                seen,
-                namespaceName,
-                alias: null);
+            seen.Free();
         }
-
-        return builder.ToImmutable();
     }
 
     private void AddMarkupExtensionTypeAliasCandidates(

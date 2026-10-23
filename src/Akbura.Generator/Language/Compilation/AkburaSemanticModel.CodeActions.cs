@@ -74,94 +74,113 @@ internal abstract partial class AkburaSemanticModel
         var compilation = Compilation.CSharpProbeCompilation;
         var akburaControlType = compilation.GetTypeByMetadataName(
             "Akbura.AkburaControl");
-        var visibleNamespaces = new HashSet<string>(
-            StringComparer.Ordinal);
-        foreach (var visibleNamespace in GetVisibleMarkupNamespaces())
+        var visibleNamespaces = PooledHashSet<string>.GetInstance();
+        try
         {
-            if (visibleNamespace.Alias == null)
+            foreach (var visibleNamespace in GetVisibleMarkupNamespaces())
             {
-                visibleNamespaces.Add(visibleNamespace.Name);
-            }
-        }
-        using var candidates =
-            ImmutableArrayBuilder<MarkupComponentImportCandidate>.Rent();
-        var seenTypes = new HashSet<INamedTypeSymbol>(
-            SymbolEqualityComparer.Default);
-        var seenCandidates = new HashSet<string>(StringComparer.Ordinal);
-
-        VisitMarkupComponentImportNamespace(
-            compilation.GlobalNamespace,
-            componentName,
-            compilation,
-            akburaControlType,
-            visibleNamespaces,
-            seenTypes,
-            seenCandidates,
-            candidates,
-            cancellationToken);
-
-        foreach (var syntaxTree in Compilation.SyntaxTrees)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var semanticModel = Compilation.GetSemanticModel(syntaxTree);
-            var metadataName = semanticModel
-                .GetAkburaComponentMetadataName(syntaxTree);
-            if (!HasSimpleMetadataName(metadataName, componentName) ||
-                semanticModel.GetDeclaredSymbol(
-                    syntaxTree.GetRoot()) is not
-                    Symbols.IAkburaComponentSymbol component)
-            {
-                continue;
-            }
-
-            AddAkburaComponentImportCandidate(
-                metadataName,
-                compilation.AssemblyName ?? compilation.Assembly.Name,
-                component.ComponentType,
-                priority: 0,
-                visibleNamespaces,
-                seenCandidates,
-                candidates);
-        }
-
-        foreach (var reference in Compilation.CompilationReferences)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            foreach (var metadataName in
-                     reference.GetComponentMetadataNames(cancellationToken))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!HasSimpleMetadataName(metadataName, componentName) ||
-                    !reference.TryGetComponentSymbol(
-                        metadataName,
-                        out var component))
+                if (visibleNamespace.Alias == null)
                 {
-                    continue;
+                    visibleNamespaces.Add(visibleNamespace.Name);
                 }
+            }
+            using var candidates =
+                ImmutableArrayBuilder<MarkupComponentImportCandidate>.Rent();
+            var seenTypes = s_namedTypeSetPool.Allocate();
+            try
+            {
+                var seenCandidates = PooledHashSet<string>.GetInstance();
+                try
+                {
 
-                AddAkburaComponentImportCandidate(
-                    metadataName,
-                    reference.Compilation.CSharpProbeCompilation
-                        .AssemblyName ?? string.Empty,
-                    component.ComponentType,
-                    priority: 10,
-                    visibleNamespaces,
-                    seenCandidates,
-                    candidates);
+                    VisitMarkupComponentImportNamespace(
+                        compilation.GlobalNamespace,
+                        componentName,
+                        compilation,
+                        akburaControlType,
+                        visibleNamespaces,
+                        seenTypes,
+                        seenCandidates,
+                        candidates,
+                        cancellationToken);
+
+                    foreach (var syntaxTree in Compilation.SyntaxTrees)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var semanticModel = Compilation.GetSemanticModel(syntaxTree);
+                        var metadataName = semanticModel
+                            .GetAkburaComponentMetadataName(syntaxTree);
+                        if (!HasSimpleMetadataName(metadataName, componentName) ||
+                            semanticModel.GetDeclaredSymbol(
+                                syntaxTree.GetRoot()) is not
+                                Symbols.IAkburaComponentSymbol component)
+                        {
+                            continue;
+                        }
+
+                        AddAkburaComponentImportCandidate(
+                            metadataName,
+                            compilation.AssemblyName ?? compilation.Assembly.Name,
+                            component.ComponentType,
+                            priority: 0,
+                            visibleNamespaces,
+                            seenCandidates,
+                            candidates);
+                    }
+
+                    foreach (var reference in Compilation.CompilationReferences)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        foreach (var metadataName in
+                                 reference.GetComponentMetadataNames(cancellationToken))
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            if (!HasSimpleMetadataName(metadataName, componentName) ||
+                                !reference.TryGetComponentSymbol(
+                                    metadataName,
+                                    out var component))
+                            {
+                                continue;
+                            }
+
+                            AddAkburaComponentImportCandidate(
+                                metadataName,
+                                reference.Compilation.CSharpProbeCompilation
+                                    .AssemblyName ?? string.Empty,
+                                component.ComponentType,
+                                priority: 10,
+                                visibleNamespaces,
+                                seenCandidates,
+                                candidates);
+                        }
+                    }
+
+                    return candidates.AsEnumerable()
+                        .GroupBy(
+                            static candidate => candidate.NamespaceName,
+                            StringComparer.Ordinal)
+                        .Where(static group => group.Count() == 1)
+                        .Select(static group => group.First())
+                        .OrderBy(static candidate => candidate.Priority)
+                        .ThenBy(
+                            static candidate => candidate.NamespaceName,
+                            StringComparer.Ordinal)
+                        .ToImmutableArray();
+                }
+                finally
+                {
+                    seenCandidates.Free();
+                }
+            }
+            finally
+            {
+                seenTypes.Free();
             }
         }
-
-        return candidates.AsEnumerable()
-            .GroupBy(
-                static candidate => candidate.NamespaceName,
-                StringComparer.Ordinal)
-            .Where(static group => group.Count() == 1)
-            .Select(static group => group.First())
-            .OrderBy(static candidate => candidate.Priority)
-            .ThenBy(
-                static candidate => candidate.NamespaceName,
-                StringComparer.Ordinal)
-            .ToImmutableArray();
+        finally
+        {
+            visibleNamespaces.Free();
+        }
     }
 
     private static void VisitMarkupComponentImportNamespace(

@@ -16,6 +16,11 @@ namespace Akbura.Language.Binder;
 
 internal sealed class UseHookBinder : Binder
 {
+    private static readonly ObjectPool<PooledHashSet<IMethodSymbol>> s_methodSetPool =
+        PooledHashSet<IMethodSymbol>.CreatePool(SymbolEqualityComparer.Default);
+    private static readonly ObjectPool<PooledHashSet<INamedTypeSymbol>> s_hookTypeSetPool =
+        PooledHashSet<INamedTypeSymbol>.CreatePool(SymbolEqualityComparer.Default);
+
     private const string UseHookAttributeMetadataName =
         "Akbura.CompilerAnotations.UseHookAttribute";
     private const string SelfAttributeMetadataName =
@@ -124,55 +129,69 @@ internal sealed class UseHookBinder : Binder
         CancellationToken cancellationToken)
     {
         using var builder = ImmutableArrayBuilder<UseHookCompletionCandidate>.Rent();
-        var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
-        foreach (var hookType in GetVisibleHookTypes(namePrefix, exactName: false))
+        var seen = s_methodSetPool.Allocate();
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            foreach (var member in hookType.GetMembers())
+            foreach (var hookType in GetVisibleHookTypes(namePrefix, exactName: false))
             {
-                if (member is not IMethodSymbol method ||
-                    !method.Name.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase) ||
-                    !HasAttribute(method, UseHookAttributeMetadataName) ||
-                    !TryValidateHookMethod(method, out var selfParameter, out _) ||
-                    !TryValidateContext(method, UseHookContext.StateInitializer, out _) ||
-                    !seen.Add(method))
+                cancellationToken.ThrowIfCancellationRequested();
+                foreach (var member in hookType.GetMembers())
                 {
-                    continue;
+                    if (member is not IMethodSymbol method ||
+                        !method.Name.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase) ||
+                        !HasAttribute(method, UseHookAttributeMetadataName) ||
+                        !TryValidateHookMethod(method, out var selfParameter, out _) ||
+                        !TryValidateContext(method, UseHookContext.StateInitializer, out _) ||
+                        !seen.Add(method))
+                    {
+                        continue;
+                    }
+
+                    builder.Add(new UseHookCompletionCandidate(method, selfParameter));
                 }
-
-                builder.Add(new UseHookCompletionCandidate(method, selfParameter));
             }
-        }
 
-        return builder.ToImmutable();
+            return builder.ToImmutable();
+        }
+        finally
+        {
+            seen.Free();
+        }
     }
 
     internal ImmutableArray<UseHookCompletionCandidate> GetVisibleRenderHookMethods(string namePrefix, CancellationToken cancellationToken)
     {
         using var builder = ImmutableArrayBuilder<UseHookCompletionCandidate>.Rent();
-        var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
-        foreach (var hookType in GetVisibleHookTypes(namePrefix, exactName: false))
+        var seen = s_methodSetPool.Allocate();
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            foreach (var member in hookType.GetMembers())
+            foreach (var hookType in GetVisibleHookTypes(namePrefix, exactName: false))
             {
-                if (member is not IMethodSymbol method ||
-                    !method.Name.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase) ||
-                    method.Name == "useEffect" ||
-                    method.Name == "useEventListener" ||
-                    !HasAttribute(method, UseHookAttributeMetadataName) ||
-                    !TryValidateHookMethod(method, out var selfParameter, out _) ||
-                    !TryValidateContext(method, UseHookContext.Render, out _) ||
-                    !seen.Add(method))
+                cancellationToken.ThrowIfCancellationRequested();
+                foreach (var member in hookType.GetMembers())
                 {
-                    continue;
+                    if (member is not IMethodSymbol method ||
+                        !method.Name.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase) ||
+                        method.Name == "useEffect" ||
+                        method.Name == "useEventListener" ||
+                        !HasAttribute(method, UseHookAttributeMetadataName) ||
+                        !TryValidateHookMethod(method, out var selfParameter, out _) ||
+                        !TryValidateContext(method, UseHookContext.Render, out _) ||
+                        !seen.Add(method))
+                    {
+                        continue;
+                    }
+
+                    builder.Add(new UseHookCompletionCandidate(method, selfParameter));
                 }
-
-                builder.Add(new UseHookCompletionCandidate(method, selfParameter));
             }
-        }
 
-        return builder.ToImmutable();
+            return builder.ToImmutable();
+        }
+        finally
+        {
+            seen.Free();
+        }
     }
 
     internal bool TryCreateRenderHookCompletionProjection(CSharpStatementSyntax syntax, CSharp.StatementSyntax statement, int relativePosition, out CSharpProbeProjection projection)
@@ -464,30 +483,37 @@ internal sealed class UseHookBinder : Binder
         bool exactName)
     {
         using var builder = ImmutableArrayBuilder<INamedTypeSymbol>.Rent();
-        var seen = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
-
-        var currentNamespace = SemanticModel.GetAkburaNamespaceText(
-            SemanticModel.SyntaxTree.GetRoot(),
-            SemanticModel.SyntaxTree);
-        AddNamespaceHookTypes(currentNamespace, methodName, exactName, seen, builder);
-
-        foreach (var usingDirective in SemanticModel.GetCSharpUsingDirectives())
+        var seen = s_hookTypeSetPool.Allocate();
+        try
         {
-            AddUsingHookTypes(usingDirective, methodName, exactName, seen, builder);
-        }
 
-        foreach (var syntaxTree in Compilation.CSharpCompilation.SyntaxTrees)
-        {
-            foreach (var usingDirective in syntaxTree.GetCompilationUnitRoot().Usings)
+            var currentNamespace = SemanticModel.GetAkburaNamespaceText(
+                SemanticModel.SyntaxTree.GetRoot(),
+                SemanticModel.SyntaxTree);
+            AddNamespaceHookTypes(currentNamespace, methodName, exactName, seen, builder);
+
+            foreach (var usingDirective in SemanticModel.GetCSharpUsingDirectives())
             {
-                if (usingDirective.GlobalKeyword.RawKind != 0)
+                AddUsingHookTypes(usingDirective, methodName, exactName, seen, builder);
+            }
+
+            foreach (var syntaxTree in Compilation.CSharpCompilation.SyntaxTrees)
+            {
+                foreach (var usingDirective in syntaxTree.GetCompilationUnitRoot().Usings)
                 {
-                    AddUsingHookTypes(usingDirective, methodName, exactName, seen, builder);
+                    if (usingDirective.GlobalKeyword.RawKind != 0)
+                    {
+                        AddUsingHookTypes(usingDirective, methodName, exactName, seen, builder);
+                    }
                 }
             }
-        }
 
-        return builder.ToImmutable();
+            return builder.ToImmutable();
+        }
+        finally
+        {
+            seen.Free();
+        }
     }
 
     private void AddUsingHookTypes(

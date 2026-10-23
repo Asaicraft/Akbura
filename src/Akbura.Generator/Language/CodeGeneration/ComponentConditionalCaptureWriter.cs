@@ -1,3 +1,4 @@
+using Akbura.Pools;
 using System.Collections.Generic;
 
 namespace Akbura.Language.CodeGeneration;
@@ -27,19 +28,26 @@ internal readonly ref struct ComponentConditionalCaptureWriter
     public void WriteClearsInactiveBranches(in ComponentPlan plan, in ComponentConditionalRegionPlan region,
         int selectedBranch)
     {
-        var retained = new HashSet<string>();
-        var removed = new HashSet<string>();
-        for (var branchId = 0; branchId < region.Branches.Length; branchId++)
+        var retained = PooledHashSet<string>.GetInstance();
+        try
         {
-            CollectCaptureKeys(plan, region, branchId, branchId == selectedBranch ? retained : removed);
-        }
-
-        foreach (var key in removed)
-        {
-            if (!retained.Contains(key))
+            var removed = new HashSet<string>();
+            for (var branchId = 0; branchId < region.Branches.Length; branchId++)
             {
-                _writer.Write("__akburaRenderState.RemoveRenderCapture(").WriteStringLiteral(key).WriteLine(");");
+                CollectCaptureKeys(plan, region, branchId, branchId == selectedBranch ? retained : removed);
             }
+
+            foreach (var key in removed)
+            {
+                if (!retained.Contains(key))
+                {
+                    _writer.Write("__akburaRenderState.RemoveRenderCapture(").WriteStringLiteral(key).WriteLine(");");
+                }
+            }
+        }
+        finally
+        {
+            retained.Free();
         }
     }
 
@@ -67,33 +75,40 @@ internal readonly ref struct ComponentConditionalCaptureWriter
     public void WriteReads(in ComponentPlan plan, int scopeId)
     {
         var values = new CSharpValueWriter(_writer);
-        var keys = new HashSet<string>();
-        foreach (var region in plan.ConditionalRegions)
+        var keys = PooledHashSet<string>.GetInstance();
+        try
         {
-            foreach (var branch in region.Branches)
+            foreach (var region in plan.ConditionalRegions)
             {
-                foreach (var capture in branch.Captures)
+                foreach (var branch in region.Branches)
                 {
-                    if (!capture.IsReadByScope(scopeId) || !keys.Add(capture.Key))
+                    foreach (var capture in branch.Captures)
                     {
-                        continue;
-                    }
+                        if (!capture.IsReadByScope(scopeId) || !keys.Add(capture.Key))
+                        {
+                            continue;
+                        }
 
-                    values.WriteTypeNameWithNullableAnnotation(capture.Type);
-                    _writer.Write(" ");
-                    values.WriteIdentifier(capture.Name);
-                    _writer.Write(" = __parentRenderState.GetRenderCapture<");
-                    values.WriteTypeNameWithNullableAnnotation(capture.Type);
-                    _writer.Write(">(").WriteStringLiteral(capture.Key).Write(")");
-                    if (capture.Type.NullableAnnotation == Microsoft.CodeAnalysis.NullableAnnotation.Annotated &&
-                        capture.IsKnownNonNullByScope(scopeId))
-                    {
-                        _writer.Write("!");
-                    }
+                        values.WriteTypeNameWithNullableAnnotation(capture.Type);
+                        _writer.Write(" ");
+                        values.WriteIdentifier(capture.Name);
+                        _writer.Write(" = __parentRenderState.GetRenderCapture<");
+                        values.WriteTypeNameWithNullableAnnotation(capture.Type);
+                        _writer.Write(">(").WriteStringLiteral(capture.Key).Write(")");
+                        if (capture.Type.NullableAnnotation == Microsoft.CodeAnalysis.NullableAnnotation.Annotated &&
+                            capture.IsKnownNonNullByScope(scopeId))
+                        {
+                            _writer.Write("!");
+                        }
 
-                    _writer.WriteLine(";");
+                        _writer.WriteLine(";");
+                    }
                 }
             }
+        }
+        finally
+        {
+            keys.Free();
         }
     }
 }

@@ -12,6 +12,9 @@ namespace Akbura.Language;
 
 internal abstract partial class AkburaSemanticModel
 {
+    private static readonly ObjectPool<PooledHashSet<ILocalSymbol>> s_localSymbolSetPool =
+        PooledHashSet<ILocalSymbol>.CreatePool(SymbolEqualityComparer.Default);
+
     /// <summary>
     /// Returns the locals declared by this statement through the existing bound tree.
     /// </summary>
@@ -20,28 +23,35 @@ internal abstract partial class AkburaSemanticModel
         ValidateSyntaxTreeOwnership(syntax);
         var statement = BindingSession.BindSemanticSyntax(syntax);
         using var locals = ImmutableArrayBuilder<CSharpLocalSymbol>.Rent();
-        var seen = new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default);
-        if (statement is BoundLocalDeclarationStatement declaration)
+        var seen = s_localSymbolSetPool.Allocate();
+        try
         {
-            foreach (var local in declaration.Locals)
+            if (statement is BoundLocalDeclarationStatement declaration)
             {
-                locals.Add(new CSharpLocalSymbol(local, syntax));
-                seen.Add(local);
+                foreach (var local in declaration.Locals)
+                {
+                    locals.Add(new CSharpLocalSymbol(local, syntax));
+                    seen.Add(local);
+                }
             }
-        }
 
-        var operation = statement switch
-        {
-            BoundLocalDeclarationStatement local => local.BindingResult.OperationDefinition.Operation,
-            BoundCSharpStatement other => other.BindingResult.OperationDefinition.Operation,
-            _ => null,
-        };
-        if (operation?.SemanticModel is { } semanticModel)
-        {
-            CollectCSharpStatementDeclaredLocals(operation, operation, semanticModel, syntax, seen, locals);
-        }
+            var operation = statement switch
+            {
+                BoundLocalDeclarationStatement local => local.BindingResult.OperationDefinition.Operation,
+                BoundCSharpStatement other => other.BindingResult.OperationDefinition.Operation,
+                _ => null,
+            };
+            if (operation?.SemanticModel is { } semanticModel)
+            {
+                CollectCSharpStatementDeclaredLocals(operation, operation, semanticModel, syntax, seen, locals);
+            }
 
-        return locals.ToImmutable();
+            return locals.ToImmutable();
+        }
+        finally
+        {
+            seen.Free();
+        }
     }
 
     /// <summary>
@@ -66,9 +76,16 @@ internal abstract partial class AkburaSemanticModel
             if (ReferenceEquals(branch.ConditionSyntax, syntax) && branch.Condition.Operation is { } condition)
             {
                 using var locals = ImmutableArrayBuilder<CSharpLocalSymbol>.Rent();
-                var seen = new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default);
-                CollectCSharpConditionDeclaredLocals(condition, syntax, seen, locals);
-                return locals.ToImmutable();
+                var seen = s_localSymbolSetPool.Allocate();
+                try
+                {
+                    CollectCSharpConditionDeclaredLocals(condition, syntax, seen, locals);
+                    return locals.ToImmutable();
+                }
+                finally
+                {
+                    seen.Free();
+                }
             }
         }
 

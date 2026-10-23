@@ -548,34 +548,40 @@ internal partial class AkburaSemanticModel
                 CSharpSymbolReference>.Rent();
 
         var seenReferences =
-            new HashSet<string>(
-                StringComparer.Ordinal);
-
-        foreach (var target in targets)
+            PooledHashSet<string>.GetInstance();
+        try
         {
-            foreach (var name in target.ProbeNode.DescendantNodesAndSelf().OfType<CSharp.SimpleNameSyntax>())
+
+            foreach (var target in targets)
             {
-                if (IsVarTypeName(name))
+                foreach (var name in target.ProbeNode.DescendantNodesAndSelf().OfType<CSharp.SimpleNameSyntax>())
                 {
-                    continue;
+                    if (IsVarTypeName(name))
+                    {
+                        continue;
+                    }
+
+                    var symbolInfo = GetReferenceSymbolInfo(semanticModel, name);
+
+                    AddCSharpSymbolReference(
+                        semanticModel,
+                        references,
+                        seenReferences,
+                        name,
+                        target.MapToSource(
+                            name.Identifier.Span),
+                        symbolInfo,
+                        akburaSymbolsByName,
+                        akburaSymbolsByCommandTypeName);
                 }
-
-                var symbolInfo = GetReferenceSymbolInfo(semanticModel, name);
-
-                AddCSharpSymbolReference(
-                    semanticModel,
-                    references,
-                    seenReferences,
-                    name,
-                    target.MapToSource(
-                        name.Identifier.Span),
-                    symbolInfo,
-                    akburaSymbolsByName,
-                    akburaSymbolsByCommandTypeName);
             }
-        }
 
-        return references.ToImmutable();
+            return references.ToImmutable();
+        }
+        finally
+        {
+            seenReferences.Free();
+        }
     }
 
     private static CSharpReferenceSymbolInfo GetReferenceSymbolInfo(SemanticModel semanticModel, CSharp.SimpleNameSyntax name)
@@ -950,31 +956,38 @@ internal partial class AkburaSemanticModel
         }
 
         var scope = GetMarkupBindingScope(scopeSyntax);
-        var mappedMarkupNames = new HashSet<string>(StringComparer.Ordinal);
-        for (var binder = BindingSession.GetSemanticBinder(scope); binder != null; binder = binder.Next)
+        var mappedMarkupNames = PooledHashSet<string>.GetInstance();
+        try
         {
-            if (binder is MarkupBinder markupBinder)
+            for (var binder = BindingSession.GetSemanticBinder(scope); binder != null; binder = binder.Next)
             {
-                if (markupBinder.GetDeclaredItemSymbol() is { } itemSymbol &&
-                    mappedMarkupNames.Add(itemSymbol.Name))
+                if (binder is MarkupBinder markupBinder)
                 {
-                    akburaSymbolsByName[itemSymbol.Name] = itemSymbol;
+                    if (markupBinder.GetDeclaredItemSymbol() is { } itemSymbol &&
+                        mappedMarkupNames.Add(itemSymbol.Name))
+                    {
+                        akburaSymbolsByName[itemSymbol.Name] = itemSymbol;
+                    }
+
+                    AddMarkupNameSymbolMappings(
+                        markupBinder.GetDeclaredNameSymbols(scope),
+                        akburaSymbolsByName,
+                        mappedMarkupNames);
+                    continue;
                 }
 
-                AddMarkupNameSymbolMappings(
-                    markupBinder.GetDeclaredNameSymbols(scope),
-                    akburaSymbolsByName,
-                    mappedMarkupNames);
-                continue;
+                if (binder is ComponentBinder componentBinder)
+                {
+                    AddMarkupNameSymbolMappings(
+                        componentBinder.GetDeclaredMarkupNameSymbols(),
+                        akburaSymbolsByName,
+                        mappedMarkupNames);
+                }
             }
-
-            if (binder is ComponentBinder componentBinder)
-            {
-                AddMarkupNameSymbolMappings(
-                    componentBinder.GetDeclaredMarkupNameSymbols(),
-                    akburaSymbolsByName,
-                    mappedMarkupNames);
-            }
+        }
+        finally
+        {
+            mappedMarkupNames.Free();
         }
     }
 

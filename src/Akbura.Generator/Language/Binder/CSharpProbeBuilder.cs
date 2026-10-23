@@ -558,7 +558,7 @@ internal sealed partial class CSharpProbeBuilder
     private static ImmutableArray<string> GetStateNames(CSharp.CompilationUnitSyntax root)
     {
         ArrayBuilder<string>? names = null;
-        HashSet<string>? seen = null;
+        PooledHashSet<string>? seen = null;
         try
         {
             foreach (var node in root.GetAnnotatedNodes(CSharpProbeBinder.StateCompletionAnnotationKind))
@@ -567,7 +567,7 @@ internal sealed partial class CSharpProbeBuilder
                 {
                     var name = declarator.Identifier.ValueText;
                     if (!string.IsNullOrWhiteSpace(name) &&
-                        (seen ??= new HashSet<string>(StringComparer.Ordinal)).Add(name))
+                        (seen ??= PooledHashSet<string>.GetInstance()).Add(name))
                     {
                         (names ??= ArrayBuilder<string>.GetInstance()).Add(name);
                     }
@@ -578,6 +578,7 @@ internal sealed partial class CSharpProbeBuilder
         }
         finally
         {
+            seen?.Free();
             names?.Free();
         }
     }

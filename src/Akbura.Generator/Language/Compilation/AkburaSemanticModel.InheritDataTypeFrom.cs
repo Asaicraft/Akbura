@@ -109,40 +109,47 @@ internal partial class AkburaSemanticModel
         using var items =
             ImmutableArrayBuilder<MarkupInheritedAvaloniaPropertyCompletionCandidate>
                 .Rent();
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        for (var current = targetType; current != null; current = current.BaseType)
+        var names = PooledHashSet<string>.GetInstance();
+        try
         {
-            foreach (var field in current.GetMembers().OfType<IFieldSymbol>())
+            for (var current = targetType; current != null; current = current.BaseType)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!field.IsStatic ||
-                    field.DeclaredAccessibility != Accessibility.Public ||
-                    !field.Name.EndsWith("Property", StringComparison.Ordinal) ||
-                    field.Name.Length == "Property".Length ||
-                    !IsAvaloniaPropertyType(field.Type))
+                foreach (var field in current.GetMembers().OfType<IFieldSymbol>())
                 {
-                    continue;
-                }
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!field.IsStatic ||
+                        field.DeclaredAccessibility != Accessibility.Public ||
+                        !field.Name.EndsWith("Property", StringComparison.Ordinal) ||
+                        field.Name.Length == "Property".Length ||
+                        !IsAvaloniaPropertyType(field.Type))
+                    {
+                        continue;
+                    }
 
-                var name = field.Name[..^"Property".Length];
-                if (!names.Add(name))
-                {
-                    continue;
-                }
+                    var name = field.Name[..^"Property".Length];
+                    if (!names.Add(name))
+                    {
+                        continue;
+                    }
 
-                if (!TryGetAvaloniaPropertyValueType(field.Type, out var valueType))
-                {
-                    continue;
-                }
+                    if (!TryGetAvaloniaPropertyValueType(field.Type, out var valueType))
+                    {
+                        continue;
+                    }
 
-                items.Add(new MarkupInheritedAvaloniaPropertyCompletionCandidate(
-                    name,
-                    field,
-                    valueType));
+                    items.Add(new MarkupInheritedAvaloniaPropertyCompletionCandidate(
+                        name,
+                        field,
+                        valueType));
+                }
             }
-        }
 
-        return items.ToImmutable();
+            return items.ToImmutable();
+        }
+        finally
+        {
+            names.Free();
+        }
     }
 
     internal bool TryGetMarkupExtensionArgumentTargetMember(

@@ -251,38 +251,46 @@ internal sealed partial class CSharpProbeBinder
 
         // Component state is a member. A lambda parameter may legally shadow it;
         // projecting state as a local would both hide the source and cause CS0136.
-        var names = new HashSet<string>(excludedNames, StringComparer.Ordinal);
-        var diagnostics = BindingDiagnosticBag.GetInstance();
+        var names = PooledHashSet<string>.GetInstance();
         try
         {
-            foreach (var identifier in analyzedBlock.DescendantNodes()
-                         .OfType<CSharp.IdentifierNameSyntax>())
+            names.UnionWith(excludedNames);
+            var diagnostics = BindingDiagnosticBag.GetInstance();
+            try
             {
-                if (!names.Add(identifier.Identifier.ValueText) ||
-                    Next?.LookupSymbol(
-                        identifier.Identifier.ValueText,
-                        BinderLookupOptions.None,
-                        syntax,
-                        diagnostics).Symbol is not IStateSymbol state ||
-                    state.Type.Symbol is not ITypeSymbol type)
+                foreach (var identifier in analyzedBlock.DescendantNodes()
+                             .OfType<CSharp.IdentifierNameSyntax>())
                 {
-                    continue;
-                }
+                    if (!names.Add(identifier.Identifier.ValueText) ||
+                        Next?.LookupSymbol(
+                            identifier.Identifier.ValueText,
+                            BinderLookupOptions.None,
+                            syntax,
+                            diagnostics).Symbol is not IStateSymbol state ||
+                        state.Type.Symbol is not ITypeSymbol type)
+                    {
+                        continue;
+                    }
 
-                members.Add(CreateProbeField(
-                    CSharpSyntaxFactory.ParseTypeName(type.ToDisplayString(
-                        s_stateTypeDisplayFormat)),
-                    state.Name,
-                    state,
-                    state.IsReadOnly));
+                    members.Add(CreateProbeField(
+                        CSharpSyntaxFactory.ParseTypeName(type.ToDisplayString(
+                            s_stateTypeDisplayFormat)),
+                        state.Name,
+                        state,
+                        state.IsReadOnly));
+                }
             }
+            finally
+            {
+                diagnostics.Free();
+            }
+
+            return new CSharpProbeScope(members.ToImmutable(), locals.ToImmutable());
         }
         finally
         {
-            diagnostics.Free();
+            names.Free();
         }
-
-        return new CSharpProbeScope(members.ToImmutable(), locals.ToImmutable());
     }
 
     private void TryBindStateArguments(
@@ -299,101 +307,108 @@ internal sealed partial class CSharpProbeBinder
         stateArguments = ImmutableArray<UseHookStateArgument>.Empty;
         var originalProbe = probe;
         var hasValidCandidate = false;
-        var seenArgumentSets = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var candidate in originalProbe.SemanticModel
-                     .GetMemberGroup(originalProbe.Invocation.Expression)
-                     .OfType<IMethodSymbol>())
+        var seenArgumentSets = PooledHashSet<string>.GetInstance();
+        try
         {
-            using var substitutions = ImmutableArrayBuilder<UseHookStateArgument>.Rent();
-            var arguments = originalProbe.Invocation.ArgumentList.Arguments;
-            for (var index = 0; index < arguments.Count; index++)
+            foreach (var candidate in originalProbe.SemanticModel
+                         .GetMemberGroup(originalProbe.Invocation.Expression)
+                         .OfType<IMethodSymbol>())
             {
-                var argument = arguments[index];
-                var parameter = argument.NameColon is { } named
-                    ? candidate.Parameters.FirstOrDefault(static (parameter, named) =>
-                        parameter.Name == named.Name.Identifier.ValueText, named)
-                    : index < candidate.Parameters.Length
-                        ? candidate.Parameters[index]
-                        : null;
-                if (parameter is { RefKind: RefKind.None } &&
-                    argument.RefKindKeyword.RawKind == 0 &&
-                    parameter.Type is INamedTypeSymbol
+                using var substitutions = ImmutableArrayBuilder<UseHookStateArgument>.Rent();
+                var arguments = originalProbe.Invocation.ArgumentList.Arguments;
+                for (var index = 0; index < arguments.Count; index++)
+                {
+                    var argument = arguments[index];
+                    var parameter = argument.NameColon is { } named
+                        ? candidate.Parameters.FirstOrDefault(static (parameter, named) =>
+                            parameter.Name == named.Name.Identifier.ValueText, named)
+                        : index < candidate.Parameters.Length
+                            ? candidate.Parameters[index]
+                            : null;
+                    if (parameter is { RefKind: RefKind.None } &&
+                        argument.RefKindKeyword.RawKind == 0 &&
+                        parameter.Type is INamedTypeSymbol
+                        {
+                            Name: "State",
+                            Arity: 1,
+                        } parameterType &&
+                        parameterType.ContainingNamespace.ToDisplayString() ==
+                            "Akbura.ComponentTree" &&
+                         TryGetStateArgument(
+                             originalProbe.SemanticModel,
+                             argument.Expression,
+                             out var state) &&
+                         !state.IsReadOnly)
                     {
-                        Name: "State",
-                        Arity: 1,
-                    } parameterType &&
-                    parameterType.ContainingNamespace.ToDisplayString() ==
-                        "Akbura.ComponentTree" &&
-                     TryGetStateArgument(
-                         originalProbe.SemanticModel,
-                         argument.Expression,
-                         out var state) &&
-                     !state.IsReadOnly)
-                {
-                    substitutions.Add(new UseHookStateArgument(index, state));
-                }
-            }
-
-            var candidateArguments = substitutions.ToImmutable();
-            if (candidateArguments.IsEmpty ||
-                !seenArgumentSets.Add(string.Join(",", candidateArguments.Select(
-                    static argument => argument.ArgumentIndex))))
-            {
-                continue;
-            }
-
-            var candidateProbe = CreateUseHookProbe(
-                syntax,
-                invocation,
-                hookTypes,
-                candidateArguments);
-            var candidateBinding = BindExpression(
-                candidateProbe.SemanticModel,
-                candidateProbe.Invocation,
-                isBindingPath: false);
-            if (candidateBinding.Symbol is not IMethodSymbol)
-            {
-                if (!hasValidCandidate &&
-                    candidateBinding.CandidateSymbols.Length != 0)
-                {
-                    probe = candidateProbe;
-                    bindingResult = candidateBinding;
-                    stateArguments = candidateArguments;
+                        substitutions.Add(new UseHookStateArgument(index, state));
+                    }
                 }
 
-                continue;
-            }
-
-            if (!candidateBinding.Diagnostics.IsEmpty)
-            {
-                if (!hasValidCandidate)
+                var candidateArguments = substitutions.ToImmutable();
+                if (candidateArguments.IsEmpty ||
+                    !seenArgumentSets.Add(string.Join(",", candidateArguments.Select(
+                        static argument => argument.ArgumentIndex))))
                 {
-                    probe = candidateProbe;
-                    bindingResult = candidateBinding;
-                    stateArguments = candidateArguments;
+                    continue;
                 }
 
-                continue;
-            }
+                var candidateProbe = CreateUseHookProbe(
+                    syntax,
+                    invocation,
+                    hookTypes,
+                    candidateArguments);
+                var candidateBinding = BindExpression(
+                    candidateProbe.SemanticModel,
+                    candidateProbe.Invocation,
+                    isBindingPath: false);
+                if (candidateBinding.Symbol is not IMethodSymbol)
+                {
+                    if (!hasValidCandidate &&
+                        candidateBinding.CandidateSymbols.Length != 0)
+                    {
+                        probe = candidateProbe;
+                        bindingResult = candidateBinding;
+                        stateArguments = candidateArguments;
+                    }
 
-            if (hasValidCandidate)
-            {
-                bindingResult = new CSharpBindingResult(
-                    typeSymbol: null,
-                    symbol: null,
-                    receiverType: null,
-                    isBindingPath: false,
-                    [bindingResult.Symbol!, candidateBinding.Symbol],
-                    Symbols.CandidateReason.Ambiguous,
-                    operationDefinition: default);
-                stateArguments = ImmutableArray<UseHookStateArgument>.Empty;
-                return;
-            }
+                    continue;
+                }
 
-            probe = candidateProbe;
-            bindingResult = candidateBinding;
-            stateArguments = candidateArguments;
-            hasValidCandidate = true;
+                if (!candidateBinding.Diagnostics.IsEmpty)
+                {
+                    if (!hasValidCandidate)
+                    {
+                        probe = candidateProbe;
+                        bindingResult = candidateBinding;
+                        stateArguments = candidateArguments;
+                    }
+
+                    continue;
+                }
+
+                if (hasValidCandidate)
+                {
+                    bindingResult = new CSharpBindingResult(
+                        typeSymbol: null,
+                        symbol: null,
+                        receiverType: null,
+                        isBindingPath: false,
+                        [bindingResult.Symbol!, candidateBinding.Symbol],
+                        Symbols.CandidateReason.Ambiguous,
+                        operationDefinition: default);
+                    stateArguments = ImmutableArray<UseHookStateArgument>.Empty;
+                    return;
+                }
+
+                probe = candidateProbe;
+                bindingResult = candidateBinding;
+                stateArguments = candidateArguments;
+                hasValidCandidate = true;
+            }
+        }
+        finally
+        {
+            seenArgumentSets.Free();
         }
     }
 

@@ -35,6 +35,9 @@ namespace Akbura.Language;
 
 internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 {
+    private static readonly ObjectPool<PooledHashSet<RoslynSymbol>> s_markupSymbolSetPool =
+        PooledHashSet<RoslynSymbol>.CreatePool(SymbolEqualityComparer.Default);
+
     private readonly SemanticBindingCache _bindingCache;
     private readonly BindingSession _bindingSession;
     private readonly IOperationFactory _operationFactory;
@@ -3324,26 +3327,33 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     private ImmutableArray<string> GetAkburaUsingNamespaces()
     {
         using var builder = ImmutableArrayBuilder<string>.Rent();
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var usingDirective in GetCSharpUsingDirectives())
+        var names = PooledHashSet<string>.GetInstance();
+        try
         {
-            if (usingDirective.Alias != null ||
-                usingDirective.StaticKeyword.RawKind != 0 ||
-                usingDirective.Name == null)
+            foreach (var usingDirective in GetCSharpUsingDirectives())
             {
-                continue;
+                if (usingDirective.Alias != null ||
+                    usingDirective.StaticKeyword.RawKind != 0 ||
+                    usingDirective.Name == null)
+                {
+                    continue;
+                }
+
+                var namespaceText = usingDirective.Name.ToString();
+                if (namespaceText.Length > 0 &&
+                    !namespaceText.EndsWith(".akcss", StringComparison.Ordinal) &&
+                    names.Add(namespaceText))
+                {
+                    builder.Add(namespaceText);
+                }
             }
 
-            var namespaceText = usingDirective.Name.ToString();
-            if (namespaceText.Length > 0 &&
-                !namespaceText.EndsWith(".akcss", StringComparison.Ordinal) &&
-                names.Add(namespaceText))
-            {
-                builder.Add(namespaceText);
-            }
+            return builder.ToImmutable();
         }
-
-        return builder.ToImmutable();
+        finally
+        {
+            names.Free();
+        }
     }
 
     private ImmutableArray<IParamSymbol> CreateAkburaComponentParameters(AkburaSyntaxTree syntaxTree)
@@ -5776,19 +5786,26 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             return;
         }
 
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        AddAkcssTargetCompletionMembers(
-            members,
-            names,
-            targetType,
-            includeBaseTypes: true);
-        foreach (var @interface in targetType.AllInterfaces)
+        var names = PooledHashSet<string>.GetInstance();
+        try
         {
             AddAkcssTargetCompletionMembers(
                 members,
                 names,
-                @interface,
-                includeBaseTypes: false);
+                targetType,
+                includeBaseTypes: true);
+            foreach (var @interface in targetType.AllInterfaces)
+            {
+                AddAkcssTargetCompletionMembers(
+                    members,
+                    names,
+                    @interface,
+                    includeBaseTypes: false);
+            }
+        }
+        finally
+        {
+            names.Free();
         }
     }
 
@@ -5847,50 +5864,57 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             return expression;
         }
 
-        var shadowedNames = new HashSet<string>(StringComparer.Ordinal);
-        if (containingSymbol is ITailwindUtilitySymbol utility)
+        var shadowedNames = PooledHashSet<string>.GetInstance();
+        try
         {
-            foreach (var parameter in utility.Parameters)
+            if (containingSymbol is ITailwindUtilitySymbol utility)
             {
-                shadowedNames.Add(parameter.CSharpParameter?.Name ?? parameter.Name);
+                foreach (var parameter in utility.Parameters)
+                {
+                    shadowedNames.Add(parameter.CSharpParameter?.Name ?? parameter.Name);
+                }
             }
-        }
 
-        foreach (var node in expression.DescendantNodesAndSelf())
+            foreach (var node in expression.DescendantNodesAndSelf())
+            {
+                switch (node)
+                {
+                    case CSharp.ParameterSyntax parameter:
+                        shadowedNames.Add(parameter.Identifier.ValueText);
+                        break;
+                    case CSharp.VariableDeclaratorSyntax variable:
+                        shadowedNames.Add(variable.Identifier.ValueText);
+                        break;
+                    case CSharp.SingleVariableDesignationSyntax designation:
+                        shadowedNames.Add(designation.Identifier.ValueText);
+                        break;
+                    case CSharp.FromClauseSyntax fromClause:
+                        shadowedNames.Add(fromClause.Identifier.ValueText);
+                        break;
+                    case CSharp.LetClauseSyntax letClause:
+                        shadowedNames.Add(letClause.Identifier.ValueText);
+                        break;
+                    case CSharp.JoinClauseSyntax joinClause:
+                        shadowedNames.Add(joinClause.Identifier.ValueText);
+                        break;
+                    case CSharp.QueryContinuationSyntax continuation:
+                        shadowedNames.Add(continuation.Identifier.ValueText);
+                        break;
+                }
+            }
+
+            return (CSharp.ExpressionSyntax)new AkcssTargetMemberAccessRewriter(
+                this,
+                containingSymbol,
+                targetType,
+                targetParameterName,
+                usingDirectives,
+                shadowedNames).Visit(expression)!;
+        }
+        finally
         {
-            switch (node)
-            {
-                case CSharp.ParameterSyntax parameter:
-                    shadowedNames.Add(parameter.Identifier.ValueText);
-                    break;
-                case CSharp.VariableDeclaratorSyntax variable:
-                    shadowedNames.Add(variable.Identifier.ValueText);
-                    break;
-                case CSharp.SingleVariableDesignationSyntax designation:
-                    shadowedNames.Add(designation.Identifier.ValueText);
-                    break;
-                case CSharp.FromClauseSyntax fromClause:
-                    shadowedNames.Add(fromClause.Identifier.ValueText);
-                    break;
-                case CSharp.LetClauseSyntax letClause:
-                    shadowedNames.Add(letClause.Identifier.ValueText);
-                    break;
-                case CSharp.JoinClauseSyntax joinClause:
-                    shadowedNames.Add(joinClause.Identifier.ValueText);
-                    break;
-                case CSharp.QueryContinuationSyntax continuation:
-                    shadowedNames.Add(continuation.Identifier.ValueText);
-                    break;
-            }
+            shadowedNames.Free();
         }
-
-        return (CSharp.ExpressionSyntax)new AkcssTargetMemberAccessRewriter(
-            this,
-            containingSymbol,
-            targetType,
-            targetParameterName,
-            usingDirectives,
-            shadowedNames).Visit(expression)!;
     }
 
     private bool TryCreateAkcssAttachedPropertyRead(
@@ -6334,32 +6358,39 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         using var builder = ImmutableArrayBuilder<CSharp.UsingDirectiveSyntax>.Rent();
-        var directives = new HashSet<string>(StringComparer.Ordinal);
-        AddCSharpUsingDirectives(
-            builder,
-            directives,
-            Compilation.GlobalCSharpUsingDirectives);
-        AddAkburaCSharpUsingDirectives(
-            builder,
-            directives,
-            Compilation.GlobalAkburaUsingDirectives);
-
-        foreach (var member in SyntaxTree.GetRoot().Members)
+        var directives = PooledHashSet<string>.GetInstance();
+        try
         {
-            if (member is not UsingDirectiveSyntax usingDirective ||
-                usingDirective.GlobalKeyword.RawKind != 0 ||
-                IsAkcssUsingDirective(usingDirective))
-            {
-                continue;
-            }
-
-            AddCSharpUsingDirective(
+            AddCSharpUsingDirectives(
                 builder,
                 directives,
-                usingDirective.ToCSharp());
-        }
+                Compilation.GlobalCSharpUsingDirectives);
+            AddAkburaCSharpUsingDirectives(
+                builder,
+                directives,
+                Compilation.GlobalAkburaUsingDirectives);
 
-        return builder.ToImmutable();
+            foreach (var member in SyntaxTree.GetRoot().Members)
+            {
+                if (member is not UsingDirectiveSyntax usingDirective ||
+                    usingDirective.GlobalKeyword.RawKind != 0 ||
+                    IsAkcssUsingDirective(usingDirective))
+                {
+                    continue;
+                }
+
+                AddCSharpUsingDirective(
+                    builder,
+                    directives,
+                    usingDirective.ToCSharp());
+            }
+
+            return builder.ToImmutable();
+        }
+        finally
+        {
+            directives.Free();
+        }
     }
 
     internal ImmutableArray<CSharp.UsingDirectiveSyntax>
@@ -6374,46 +6405,53 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         ValidateSyntaxTreeOwnership(currentDirective);
         using var builder =
             ImmutableArrayBuilder<CSharp.UsingDirectiveSyntax>.Rent();
-        var directives = new HashSet<string>(StringComparer.Ordinal);
-        AddCSharpUsingDirectives(
-            builder,
-            directives,
-            Compilation.GlobalCSharpUsingDirectives);
-
-        foreach (var usingDirective in
-                 Compilation.GlobalAkburaUsingDirectives)
+        var directives = PooledHashSet<string>.GetInstance();
+        try
         {
-            if (IsSameSyntax(usingDirective, currentDirective) ||
-                IsAkcssUsingDirective(usingDirective))
-            {
-                continue;
-            }
-
-            AddCSharpUsingDirective(
+            AddCSharpUsingDirectives(
                 builder,
                 directives,
-                usingDirective.ToCSharp());
-        }
+                Compilation.GlobalCSharpUsingDirectives);
 
-        foreach (var member in SyntaxTree.GetRoot().Members)
-        {
-            if (member.Position >= currentDirective.Position)
+            foreach (var usingDirective in
+                     Compilation.GlobalAkburaUsingDirectives)
             {
-                break;
-            }
+                if (IsSameSyntax(usingDirective, currentDirective) ||
+                    IsAkcssUsingDirective(usingDirective))
+                {
+                    continue;
+                }
 
-            if (member is UsingDirectiveSyntax usingDirective &&
-                usingDirective.GlobalKeyword.RawKind == 0 &&
-                !IsAkcssUsingDirective(usingDirective))
-            {
                 AddCSharpUsingDirective(
                     builder,
                     directives,
                     usingDirective.ToCSharp());
             }
-        }
 
-        return builder.ToImmutable();
+            foreach (var member in SyntaxTree.GetRoot().Members)
+            {
+                if (member.Position >= currentDirective.Position)
+                {
+                    break;
+                }
+
+                if (member is UsingDirectiveSyntax usingDirective &&
+                    usingDirective.GlobalKeyword.RawKind == 0 &&
+                    !IsAkcssUsingDirective(usingDirective))
+                {
+                    AddCSharpUsingDirective(
+                        builder,
+                        directives,
+                        usingDirective.ToCSharp());
+                }
+            }
+
+            return builder.ToImmutable();
+        }
+        finally
+        {
+            directives.Free();
+        }
     }
 
     private static bool IsSameSyntax(
@@ -6427,25 +6465,32 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     internal ImmutableArray<UsingDirectiveSyntax> GetAkburaUsingDirectives()
     {
         using var builder = ImmutableArrayBuilder<UsingDirectiveSyntax>.Rent();
-        var directives = new HashSet<string>(StringComparer.Ordinal);
-        AddAkburaUsingDirectives(
-            builder,
-            directives,
-            Compilation.GlobalAkburaUsingDirectives);
-
-        foreach (var member in SyntaxTree.GetRoot().Members)
+        var directives = PooledHashSet<string>.GetInstance();
+        try
         {
-            if (member is UsingDirectiveSyntax usingDirective &&
-                usingDirective.GlobalKeyword.RawKind == 0)
-            {
-                AddAkburaUsingDirective(
-                    builder,
-                    directives,
-                    usingDirective);
-            }
-        }
+            AddAkburaUsingDirectives(
+                builder,
+                directives,
+                Compilation.GlobalAkburaUsingDirectives);
 
-        return builder.ToImmutable();
+            foreach (var member in SyntaxTree.GetRoot().Members)
+            {
+                if (member is UsingDirectiveSyntax usingDirective &&
+                    usingDirective.GlobalKeyword.RawKind == 0)
+                {
+                    AddAkburaUsingDirective(
+                        builder,
+                        directives,
+                        usingDirective);
+                }
+            }
+
+            return builder.ToImmutable();
+        }
+        finally
+        {
+            directives.Free();
+        }
     }
 
     internal ImmutableArray<CSharp.UsingDirectiveSyntax> GetAkcssCSharpUsingDirectives(IAkcssSymbol containingSymbol)
@@ -6457,66 +6502,80 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     private ImmutableArray<CSharp.UsingDirectiveSyntax> GetAkcssCSharpUsingDirectives(AkburaSyntax? akcssSyntax)
     {
         using var builder = ImmutableArrayBuilder<CSharp.UsingDirectiveSyntax>.Rent();
-        var directives = new HashSet<string>(StringComparer.Ordinal);
-        var componentUsingsApply =
-            akcssSyntax == null ||
-            GetContainingAkcssDocument(akcssSyntax) == null;
-        AddCSharpUsingDirectives(
-            builder,
-            directives,
-            componentUsingsApply
-                ? GetCSharpUsingDirectives()
-                : GetGlobalCSharpUsingDirectives());
-
-        if (akcssSyntax != null)
+        var directives = PooledHashSet<string>.GetInstance();
+        try
         {
-            foreach (var usingDirective in GetAkcssUsingDirectives(akcssSyntax))
-            {
-                if (usingDirective.IsAkcssModuleImport)
-                {
-                    continue;
-                }
+            var componentUsingsApply =
+                akcssSyntax == null ||
+                GetContainingAkcssDocument(akcssSyntax) == null;
+            AddCSharpUsingDirectives(
+                builder,
+                directives,
+                componentUsingsApply
+                    ? GetCSharpUsingDirectives()
+                    : GetGlobalCSharpUsingDirectives());
 
-                if (!string.IsNullOrWhiteSpace(
-                        usingDirective.Name.ToFullString()))
+            if (akcssSyntax != null)
+            {
+                foreach (var usingDirective in GetAkcssUsingDirectives(akcssSyntax))
                 {
-                    AddCSharpUsingDirective(
-                        builder,
-                        directives,
-                        usingDirective.ToCSharp());
+                    if (usingDirective.IsAkcssModuleImport)
+                    {
+                        continue;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(
+                            usingDirective.Name.ToFullString()))
+                    {
+                        AddCSharpUsingDirective(
+                            builder,
+                            directives,
+                            usingDirective.ToCSharp());
+                    }
                 }
             }
-        }
 
-        AddAkcssImplicitUsing(builder, directives, "Avalonia");
-        AddAkcssImplicitUsing(builder, directives, "Avalonia.Layout");
-        AddAkcssImplicitUsing(builder, directives, "Avalonia.Media");
-        AddAkcssImplicitUsing(builder, directives, "Akbura");
-        return builder.ToImmutable();
+            AddAkcssImplicitUsing(builder, directives, "Avalonia");
+            AddAkcssImplicitUsing(builder, directives, "Avalonia.Layout");
+            AddAkcssImplicitUsing(builder, directives, "Avalonia.Media");
+            AddAkcssImplicitUsing(builder, directives, "Akbura");
+            return builder.ToImmutable();
+        }
+        finally
+        {
+            directives.Free();
+        }
     }
 
     private ImmutableArray<AkcssUsingDirectiveSyntax> GetAkcssUsingDirectives(AkburaSyntax syntax)
     {
         var members = GetContainingAkcssTopLevelMembers(syntax);
         using var builder = ImmutableArrayBuilder<AkcssUsingDirectiveSyntax>.Rent();
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        AddAkcssUsingDirectives(
-            builder,
-            names,
-            Compilation.GlobalAkcssUsingDirectives);
-
-        foreach (var member in members)
+        var names = PooledHashSet<string>.GetInstance();
+        try
         {
-            if (member is AkcssUsingDirectiveSyntax usingDirective)
-            {
-                AddAkcssUsingDirective(
-                    builder,
-                    names,
-                    usingDirective);
-            }
-        }
+            AddAkcssUsingDirectives(
+                builder,
+                names,
+                Compilation.GlobalAkcssUsingDirectives);
 
-        return builder.ToImmutable();
+            foreach (var member in members)
+            {
+                if (member is AkcssUsingDirectiveSyntax usingDirective)
+                {
+                    AddAkcssUsingDirective(
+                        builder,
+                        names,
+                        usingDirective);
+                }
+            }
+
+            return builder.ToImmutable();
+        }
+        finally
+        {
+            names.Free();
+        }
     }
 
     private Akbura.Language.Syntax.SyntaxList<AkcssTopLevelMemberSyntax> GetContainingAkcssTopLevelMembers(AkburaSyntax syntax)
@@ -6610,12 +6669,19 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     private ImmutableArray<CSharp.UsingDirectiveSyntax> GetGlobalCSharpUsingDirectives()
     {
         using var builder = ImmutableArrayBuilder<CSharp.UsingDirectiveSyntax>.Rent();
-        var directives = new HashSet<string>(StringComparer.Ordinal);
-        AddCSharpUsingDirectives(
-            builder,
-            directives,
-            Compilation.GlobalCSharpUsingDirectives);
-        return builder.ToImmutable();
+        var directives = PooledHashSet<string>.GetInstance();
+        try
+        {
+            AddCSharpUsingDirectives(
+                builder,
+                directives,
+                Compilation.GlobalCSharpUsingDirectives);
+            return builder.ToImmutable();
+        }
+        finally
+        {
+            directives.Free();
+        }
     }
 
     private static void AddAkburaCSharpUsingDirectives(
@@ -6736,24 +6802,31 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     internal ImmutableArray<CSharp.ExternAliasDirectiveSyntax> GetCSharpExternAliases()
     {
         using var builder = ImmutableArrayBuilder<CSharp.ExternAliasDirectiveSyntax>.Rent();
-        var seenAliases = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var reference in Compilation.CSharpCompilation.References)
+        var seenAliases = PooledHashSet<string>.GetInstance();
+        try
         {
-            foreach (var alias in reference.Properties.Aliases)
+            foreach (var reference in Compilation.CSharpCompilation.References)
             {
-                if (string.IsNullOrWhiteSpace(alias) ||
-                    alias == "global" ||
-                    !seenAliases.Add(alias))
+                foreach (var alias in reference.Properties.Aliases)
                 {
-                    continue;
+                    if (string.IsNullOrWhiteSpace(alias) ||
+                        alias == "global" ||
+                        !seenAliases.Add(alias))
+                    {
+                        continue;
+                    }
+
+                    builder.Add(CSharpSyntaxFactory.ExternAliasDirective(
+                        CSharpSyntaxFactory.Identifier(alias)));
                 }
-
-                builder.Add(CSharpSyntaxFactory.ExternAliasDirective(
-                    CSharpSyntaxFactory.Identifier(alias)));
             }
-        }
 
-        return builder.ToImmutable();
+            return builder.ToImmutable();
+        }
+        finally
+        {
+            seenAliases.Free();
+        }
     }
 
     private CSharp.FileScopedNamespaceDeclarationSyntax? GetCSharpNamespaceDeclaration()
@@ -6871,23 +6944,30 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         }
 
         using var builder = ImmutableArrayBuilder<AkburaSymbol>.Rent();
-        var seenSymbols = new HashSet<RoslynSymbol>(SymbolEqualityComparer.Default);
-        foreach (var candidate in csharpCandidates)
+        var seenSymbols = s_markupSymbolSetPool.Allocate();
+        try
         {
-            if (candidate is not INamedTypeSymbol namedType ||
-                namedType.TypeKind == TypeKind.Error ||
-                namedType.IsStatic ||
-                !seenSymbols.Add(namedType))
+            foreach (var candidate in csharpCandidates)
             {
-                continue;
+                if (candidate is not INamedTypeSymbol namedType ||
+                    namedType.TypeKind == TypeKind.Error ||
+                    namedType.IsStatic ||
+                    !seenSymbols.Add(namedType))
+                {
+                    continue;
+                }
+
+                builder.Add(new MarkupComponentSymbol(
+                    componentName,
+                    new CSharpSymbolDefinition(namedType)));
             }
 
-            builder.Add(new MarkupComponentSymbol(
-                componentName,
-                new CSharpSymbolDefinition(namedType)));
+            return builder.ToImmutable();
         }
-
-        return builder.ToImmutable();
+        finally
+        {
+            seenSymbols.Free();
+        }
     }
 
     private static bool TryGetMarkupComponentType(

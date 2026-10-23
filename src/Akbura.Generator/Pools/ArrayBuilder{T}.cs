@@ -611,19 +611,23 @@ internal sealed partial class ArrayBuilder<T>(int size) : IReadOnlyCollection<T>
     public void RemoveDuplicates()
     {
         var set = PooledHashSet<T>.GetInstance();
-
-        var j = 0;
-        for (var i = 0; i < Count; i++)
+        try
         {
-            if (set.Add(this[i]))
+            var j = 0;
+            for (var i = 0; i < Count; i++)
             {
-                this[j] = this[i];
-                j++;
+                if (set.Add(this[i]))
+                {
+                    this[j] = this[i];
+                    j++;
+                }
             }
+            Clip(j);
         }
-
-        Clip(j);
-        set.Free();
+        finally
+        {
+            set.Free();
+        }
     }
 
     public void SortAndRemoveDuplicates(IComparer<T> comparer)
@@ -651,18 +655,29 @@ internal sealed partial class ArrayBuilder<T>(int size) : IReadOnlyCollection<T>
     public ImmutableArray<S> SelectDistinct<S>(Func<T, S> selector)
     {
         var result = ArrayBuilder<S>.GetInstance(Count);
-        var set = PooledHashSet<S>.GetInstance();
-
-        foreach (var item in this)
+        try
         {
-            var selected = selector(item);
-            if (set.Add(selected))
+            var set = PooledHashSet<S>.GetInstance();
+            try
             {
-                result.Add(selected);
+                foreach (var item in this)
+                {
+                    var selected = selector(item);
+                    if (set.Add(selected))
+                    {
+                        result.Add(selected);
+                    }
+                }
+                return result.ToImmutable();
+            }
+            finally
+            {
+                set.Free();
             }
         }
-
-        set.Free();
-        return result.ToImmutableAndFree();
+        finally
+        {
+            result.Free();
+        }
     }
 }

@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
@@ -104,7 +105,7 @@ internal abstract partial class AkburaSemanticModel
                     assignments[cycle[0]].Syntax,
                     ErrorCodes.AKBURA_SEMANTIC_MarkupPropertyDependencyCycle, [path])];
                 // Keep the errorful tree inspectable. A cycle is not an arbitrary emission order.
-                return assignments.Select(static assignment => assignment.Syntax).ToImmutableArray();
+                return assignments.SelectAsArray(static assignment => assignment.Syntax);
             }
 
             emitted[next] = true;

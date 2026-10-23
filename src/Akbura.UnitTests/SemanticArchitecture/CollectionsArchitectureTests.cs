@@ -221,6 +221,154 @@ public sealed class CollectionsArchitectureTests : SemanticArchitectureTestBase
     }
 
 
+    [Theory]
+    [InlineData(new int[] { })]
+    [InlineData(new int[] { 7 })]
+    [InlineData(new int[] { 1, 2, 3, 4 })]
+    [InlineData(new int[] { 4, 3, 2, 1 })]
+    [InlineData(new int[] { 3, 1, 3, 2, 1, 2 })]
+    public void ToSortedImmutableArray_MatchesLinqForKnownSizeCollections(int[] values)
+    {
+        foreach (var comparer in new[] { Comparer<int>.Default, Comparer<int>.Create(static (x, y) => y.CompareTo(x)) })
+        {
+            var expected = values.OrderBy(static value => value, comparer).ToImmutableArray();
+            foreach (var source in new ICollection<int>[] { values, values.ToList() })
+            {
+                var result = source.ToSortedImmutableArray(comparer);
+                Assert.False(result.IsDefault);
+                Assert.Equal<int>(expected, result);
+                Assert.Equal<int>(result, source.ToSortedImmutableArray(comparer));
+            }
+
+            var set = new HashSet<int>(values);
+            Assert.Equal<int>(set.OrderBy(static value => value, comparer), set.ToSortedImmutableArray(comparer));
+        }
+    }
+
+    [Fact]
+    public void ToSortedImmutableArray_UsesTheSuppliedStringComparer()
+    {
+        string[] values = ["\u00e9", "beta", "Alpha", "alpha", "BETA", "Alpha"];
+        Assert.Equal<string>(values.OrderBy(static value => value, StringComparer.Ordinal),
+            values.ToSortedImmutableArray(StringComparer.Ordinal));
+
+        // Ignore-case ties in this input are identical values, so their relative order is immaterial.
+        string[] interchangeable = ["beta", "Alpha", "\u00e9", "Alpha", "beta"];
+        Assert.Equal<string>(interchangeable.OrderBy(static value => value, StringComparer.OrdinalIgnoreCase),
+            interchangeable.ToSortedImmutableArray(StringComparer.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ToSortedImmutableArray_DoesNotPromiseStableOrderForDistinctElementsWithEqualKeys()
+    {
+        var source = Enumerable.Range(0, 64).Select(index => (Key: index % 3, Id: index)).ToArray();
+        var byKey = Comparer<(int Key, int Id)>.Create(static (x, y) => x.Key.CompareTo(y.Key));
+        var result = source.ToSortedImmutableArray(byKey);
+        var stable = source.OrderBy(static value => value.Key).ToImmutableArray();
+
+        Assert.Equal<int>(stable.Select(static value => value.Key), result.Select(static value => value.Key));
+        Assert.Equal<(int Key, int Id)>(source, result.OrderBy(static value => value.Id));
+        Assert.Equal<int>(source.Where(static value => value.Key == 0).Select(static value => value.Id),
+            stable.Where(static value => value.Key == 0).Select(static value => value.Id));
+        // Only LINQ promises the Id order above. Callers needing it must keep a stable sort
+        // or include an explicit tie-breaker in the comparer.
+        var byKeyAndId = Comparer<(int Key, int Id)>.Create(static (x, y) =>
+            x.Key != y.Key ? x.Key.CompareTo(y.Key) : x.Id.CompareTo(y.Id));
+        Assert.Equal<(int Key, int Id)>(stable, source.ToSortedImmutableArray(byKeyAndId));
+    }
+
+    [Fact]
+    public void ToSortedImmutableArray_OwnsItsResultAndDoesNotReorderTheSource()
+    {
+        int[] source = [3, 1, 2];
+        var list = source.ToList();
+        var fromArray = source.ToSortedImmutableArray(Comparer<int>.Default);
+        var fromList = list.ToSortedImmutableArray(Comparer<int>.Default);
+        Assert.Equal<int>([3, 1, 2], source);
+        Assert.Equal<int>(source, list);
+        source[0] = 99;
+        list.Clear();
+        Assert.Equal<int>([1, 2, 3], fromArray);
+        Assert.Equal<int>(fromArray, fromList);
+    }
+
+    [Fact]
+    public void ToSortedImmutableArray_ValidatesArgumentsEvenForEmptyCollections()
+    {
+        Assert.Equal("source", Assert.Throws<ArgumentNullException>(() =>
+            Akbura.Collections.EnumerableExtensions.ToSortedImmutableArray<int>(null!, Comparer<int>.Default)).ParamName);
+        Assert.Equal("comparer", Assert.Throws<ArgumentNullException>(() =>
+            Array.Empty<int>().ToSortedImmutableArray(null!)).ParamName);
+        Assert.Equal(ImmutableArray<int>.Empty, Array.Empty<int>().ToSortedImmutableArray(Comparer<int>.Default));
+    }
+
+    [Fact]
+    public void ToSortedImmutableArray_ComparerFailureDoesNotMutateTheSource()
+    {
+        int[] source = [3, 1, 2];
+        var failure = new InvalidOperationException("Comparer failed.");
+        var comparer = Comparer<int>.Create((_, _) => throw failure);
+        var exception = Assert.Throws<InvalidOperationException>(() => source.ToSortedImmutableArray(comparer));
+        Assert.Same(failure, exception.InnerException);
+        Assert.Equal<int>([3, 1, 2], source);
+        Assert.Equal<int>([1, 2, 3], source.ToSortedImmutableArray(Comparer<int>.Default));
+    }
+
+    [Theory]
+    [InlineData(new int[] { })]
+    [InlineData(new int[] { 1 })]
+    [InlineData(new int[] { 3, 1, 2, 1, 4, 5 })]
+    public void ImmutableArrayMappingAndFiltering_MatchLinqOrderAndEmptyBehavior(int[] values)
+    {
+        var source = values.ToImmutableArray();
+        Assert.Equal<string>(source.Select(static value => value.ToString()),
+            source.SelectAsArray(static value => value.ToString()));
+        Assert.Equal<int>(source.Select(static value => value + 10),
+            source.SelectAsArray(static (value, offset) => value + offset, 10));
+        foreach (var minimum in new[] { 0, 2, 10 })
+        {
+            Assert.Equal<int>(source.Where(value => value >= minimum),
+                source.WhereAsArray(static (value, threshold) => value >= threshold, minimum));
+        }
+    }
+
+    [Fact]
+    public void ImmutableArrayMappingAndFiltering_PreserveDefaultAndCallbackFailures()
+    {
+        var source = default(ImmutableArray<int>);
+        Assert.Equal(Record.Exception(() => source.Select(static value => value).ToImmutableArray())!.GetType(),
+            Record.Exception(() => source.SelectAsArray(static value => value))!.GetType());
+        Assert.Equal(Record.Exception(() => source.Where(static value => value > 0).ToImmutableArray())!.GetType(),
+            Record.Exception(() => source.WhereAsArray(static (value, threshold) => value > threshold, 0))!.GetType());
+
+        source = [3, 1, 2, 4];
+        var failure = new InvalidOperationException("Callback failed.");
+        var visits = new List<int>();
+        int Map(int value)
+        {
+            visits.Add(value);
+            return value == 2 ? throw failure : value * 2;
+        }
+
+        Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => source.Select(Map).ToImmutableArray()));
+        var expectedVisits = visits.ToArray();
+        visits.Clear();
+        Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => source.SelectAsArray(Map)));
+        Assert.Equal<int>(expectedVisits, visits);
+        visits.Clear();
+        bool Filter(int value)
+        {
+            visits.Add(value);
+            return value == 2 ? throw failure : value > 1;
+        }
+
+        Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => source.Where(Filter).ToImmutableArray()));
+        expectedVisits = visits.ToArray();
+        visits.Clear();
+        Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => source.WhereAsArray(Filter)));
+        Assert.Equal<int>(expectedVisits, visits);
+    }
+
     private sealed class ConstantHashComparer : IEqualityComparer<string>
     {
         public bool Equals(string? x, string? y)

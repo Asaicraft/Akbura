@@ -278,6 +278,87 @@ public sealed class CSharpProbeOptimizationTests
         return [new WeakReference(model), new WeakReference(model.Compilation), new WeakReference(model.Compilation.CSharpCompilation)];
     }
 
+    [Fact]
+    public void ProjectionStateNames_PreserveOrdinalFirstOccurrenceOrderAndIndependentSnapshots()
+    {
+        var stateAnnotation = new SyntaxAnnotation(CSharpProbeBinder.StateCompletionAnnotationKind);
+        var activeAnnotation = new SyntaxAnnotation("ActiveProjection");
+        var root = SyntaxFactory.ParseCompilationUnit(
+            "class C { int beta, alpha, Alpha, @alpha; void M() { } }");
+        root = root.ReplaceNodes(root.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.VariableDeclaratorSyntax>(),
+            (node, _) => node.WithAdditionalAnnotations(stateAnnotation));
+        var method = root.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().Single();
+        root = root.ReplaceNode(method, method.WithAdditionalAnnotations(activeAnnotation, stateAnnotation));
+        method = root.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().Single();
+        var projection = CSharpProbeBuilder.CreateProjection(root, method, activeAnnotation, 0);
+        var expected = projection.Root.GetAnnotatedNodes(CSharpProbeBinder.StateCompletionAnnotationKind)
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.VariableDeclaratorSyntax>()
+            .Select(static node => node.Identifier.ValueText)
+            .Where(static name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.Ordinal).ToImmutableArray();
+
+        Assert.Equal<string>(["beta", "alpha", "Alpha"], projection.StateNames);
+        Assert.Equal<string>(expected, projection.StateNames);
+        for (var index = 0; index < 10; index++)
+        {
+            var emptyRoot = SyntaxFactory.ParseCompilationUnit("class Empty { void M() { } }");
+            var emptyMethod = emptyRoot.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().Single();
+            emptyRoot = emptyRoot.ReplaceNode(emptyMethod, emptyMethod.WithAdditionalAnnotations(activeAnnotation));
+            emptyMethod = emptyRoot.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().Single();
+            Assert.Empty(CSharpProbeBuilder.CreateProjection(emptyRoot, emptyMethod, activeAnnotation, 0).StateNames);
+            Assert.Equal<string>(expected, CSharpProbeBuilder.CreateProjection(root, method, activeAnnotation, 0).StateNames);
+        }
+
+        Assert.Equal<string>(expected, projection.StateNames);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("\t")]
+    public void ProjectionStateNames_FilterMissingAndWhitespaceIdentifiers(string name)
+    {
+        var root = SyntaxFactory.ParseCompilationUnit("class C { int ignored; void M() { } }");
+        var declaration = root.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.VariableDeclaratorSyntax>().Single();
+        root = root.ReplaceNode(declaration, declaration.WithIdentifier(SyntaxFactory.Identifier(name))
+            .WithAdditionalAnnotations(new SyntaxAnnotation(CSharpProbeBinder.StateCompletionAnnotationKind)));
+        var method = root.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().Single();
+        var active = new SyntaxAnnotation("ActiveProjection");
+        root = root.ReplaceNode(method, method.WithAdditionalAnnotations(active));
+        method = root.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>().Single();
+        Assert.Empty(CSharpProbeBuilder.CreateProjection(root, method, active, 0).StateNames);
+    }
+
+    [Fact]
+    public void CompletionCatalogs_PreserveOrdinalOrderPrioritiesAndCachedSnapshots()
+    {
+        var model = CreateModel("using Catalog;", """
+            namespace Catalog
+            {
+                public class Zebra : Avalonia.Controls.Control { }
+                public class alpha : Avalonia.Controls.Control { }
+                public class Alpha : Avalonia.Controls.Control { }
+                public class TwinExtension { public object ProvideValue() => new object(); }
+                public class Twin { public object ProvideValue() => new object(); }
+                public class zebraExtension { public object ProvideValue() => new object(); }
+            }
+            """);
+        var components = model.LookupMarkupComponents();
+        var extensions = model.LookupMarkupExtensions();
+        var componentNames = components.Select(static candidate => candidate.DisplayName).ToArray();
+        var extensionNames = extensions.Select(static candidate => candidate.DisplayName).ToArray();
+        Assert.Equal<string>(componentNames.OrderBy(static name => name, StringComparer.Ordinal), componentNames);
+        Assert.Equal<string>(extensionNames.OrderBy(static name => name, StringComparer.Ordinal), extensionNames);
+        Assert.Contains("Alpha", componentNames);
+        Assert.Contains("alpha", componentNames);
+        Assert.Contains("Zebra", componentNames);
+        Assert.Equal("Catalog.Twin", Assert.Single(extensions, static candidate => candidate.DisplayName == "Twin").MetadataName);
+        Assert.Equal(componentNames.Length, componentNames.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(extensionNames.Length, extensionNames.Distinct(StringComparer.Ordinal).Count());
+        Assert.True(components == model.LookupMarkupComponents());
+        Assert.True(extensions == model.LookupMarkupExtensions());
+    }
+
     private static AkburaSemanticModel CreateModel(string source, string? csharp = null)
     {
         var tree = AkburaSyntaxTree.ParseText(source, "Probe.akbura");

@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language.Binder;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Operations;
@@ -3689,8 +3690,7 @@ internal partial class AkburaSemanticModel
         }
 
         var parameterTypes = callable.Parameters
-            .Select(static parameter => new CSharpSymbolDefinition(parameter.Type))
-            .ToImmutableArray();
+            .SelectAsArray(static parameter => new CSharpSymbolDefinition(parameter.Type));
         GetICommandHandlerResult(callable.ReturnType, out var resultMode, out var resultType);
         return new MarkupCommandHandlerAnalysis(
             MarkupCommandHandlerKind.DirectReference,
@@ -3839,7 +3839,7 @@ internal partial class AkburaSemanticModel
         return AnalyzeMarkupCommandLambda(
             markupAttribute,
             parameterNames,
-            command.Parameters.Select(static parameter => parameter.Type).ToImmutableArray(),
+            command.Parameters.SelectAsArray(static parameter => parameter.Type),
             isAsync,
             body,
             unwrapAwaitableResult: false,

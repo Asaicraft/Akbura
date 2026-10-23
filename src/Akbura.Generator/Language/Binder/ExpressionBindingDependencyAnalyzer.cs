@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
@@ -110,7 +111,7 @@ internal sealed class ExpressionBindingDependencyAnalyzer
                     receiverType = property.Instance?.Type;
                     member = property.Property;
                     kind = property.Property.IsIndexer ? ExpressionBindingDependencyKind.Indexer : ExpressionBindingDependencyKind.Property;
-                    indices = property.Arguments.Select(argument => Read(argument)).ToImmutableArray();
+                    indices = property.Arguments.SelectAsArray(argument => Read(argument));
                     observation = PropertyObservation(property.Property, receiverType, out notification);
                     if (property.Property.IsIndexer && Implements(receiverType, "System.Collections.Specialized.INotifyCollectionChanged"))
                         observation |= ExpressionBindingObservation.CollectionChanged;
@@ -157,7 +158,7 @@ internal sealed class ExpressionBindingDependencyAnalyzer
                 case IArrayElementReferenceOperation array:
                     receiver = Read(array.ArrayReference).Dependency;
                     receiverType = array.ArrayReference.Type;
-                    indices = array.Indices.Select(index => Read(index)).ToImmutableArray();
+                    indices = array.Indices.SelectAsArray(index => Read(index));
                     kind = ExpressionBindingDependencyKind.ArrayElement;
                     classification = ExpressionBindingValueClassification.Unobservable;
                     break;

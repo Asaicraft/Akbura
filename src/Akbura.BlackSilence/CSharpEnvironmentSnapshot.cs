@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language;
 using Akbura.Language.CodeGeneration;
 using Akbura.Pools;
@@ -172,7 +173,7 @@ internal sealed class CSharpEnvironmentSnapshot
             retainedTrees.ToImmutable(),
             references,
             parseOptions.ToImmutableArray(),
-            namespaces.OrderBy(static name => name, StringComparer.Ordinal).ToImmutableArray(),
+            namespaces.ToSortedImmutableArray(StringComparer.Ordinal),
             ignoredCount);
     }
 

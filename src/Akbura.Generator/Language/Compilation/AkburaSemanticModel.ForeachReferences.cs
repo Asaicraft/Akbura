@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language.Binder;
 using Akbura.Language.Syntax;
 using Akbura.Language.Symbols;
@@ -31,7 +32,7 @@ internal abstract partial class AkburaSemanticModel
         var references = CollectCSharpSymbolReferences(semanticModel,
             [new CSharpReferenceTarget(source, projected, hostSpan.Start - sourcePrefixLength)],
             symbolsByName, symbolsByCommandTypeName);
-        references = references.Where(reference => hostSpan.Contains(reference.SourceSpan)).ToImmutableArray();
+        references = references.WhereAsArray(static (reference, span) => span.Contains(reference.SourceSpan), hostSpan);
         if (syntax is MarkupForeachHeaderSyntax header && projected is
                 Microsoft.CodeAnalysis.CSharp.Syntax.ForEachStatementSyntax projectedLoop &&
             semanticModel.GetDeclaredSymbol(projectedLoop) is { } item && header.GetRawCSharpForeach() is { } rawLoop)

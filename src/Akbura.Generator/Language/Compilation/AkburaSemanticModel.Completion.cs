@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Pools;
@@ -12,6 +13,14 @@ namespace Akbura.Language;
 
 internal partial class AkburaSemanticModel
 {
+    // Candidates are keyed by their ordinal display name, so equal sort keys cannot occur.
+    private static readonly IComparer<MarkupComponentLookupCandidate> s_componentCompletionComparer =
+        Comparer<MarkupComponentLookupCandidate>.Create(static (left, right) =>
+            StringComparer.Ordinal.Compare(left.DisplayName, right.DisplayName));
+    private static readonly IComparer<MarkupExtensionLookupCandidate> s_extensionCompletionComparer =
+        Comparer<MarkupExtensionLookupCandidate>.Create(static (left, right) =>
+            StringComparer.Ordinal.Compare(left.DisplayName, right.DisplayName));
+
     private CompletionComponentCatalog? _completionComponentCatalog;
     private CompletionMarkupExtensionCatalog? _completionMarkupExtensionCatalog;
 
@@ -183,11 +192,7 @@ internal partial class AkburaSemanticModel
             csharpCompilation,
             cancellationToken);
 
-        var result = candidates.Values
-            .OrderBy(
-                static candidate => candidate.DisplayName,
-                StringComparer.Ordinal)
-            .ToImmutableArray();
+        var result = candidates.Values.ToSortedImmutableArray(s_extensionCompletionComparer);
         AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
             "Markup extension catalog",
             timer.Elapsed);
@@ -278,11 +283,7 @@ internal partial class AkburaSemanticModel
             }
         }
 
-        var result = candidates.Values
-            .OrderBy(
-                static candidate => candidate.DisplayName,
-                StringComparer.Ordinal)
-            .ToImmutableArray();
+        var result = candidates.Values.ToSortedImmutableArray(s_componentCompletionComparer);
         AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
             "Component catalog namespace members",
             timer.Elapsed);

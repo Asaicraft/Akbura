@@ -529,16 +529,7 @@ internal sealed partial class CSharpProbeBuilder
 
     private static CSharpProbeProjection CreateProjectionResult(CSharp.CompilationUnitSyntax root, SyntaxNode projectedNode, SyntaxAnnotation annotation, int relativePosition)
     {
-        var stateNames = root
-            .GetAnnotatedNodes(
-                CSharpProbeBinder.StateCompletionAnnotationKind)
-            .OfType<CSharp.VariableDeclaratorSyntax>()
-            .Select(static declarator =>
-                declarator.Identifier.ValueText)
-            .Where(static name =>
-                !string.IsNullOrWhiteSpace(name))
-            .Distinct(StringComparer.Ordinal)
-            .ToImmutableArray();
+        var stateNames = GetStateNames(root);
         using var symbolOrigins =
             ImmutableArrayBuilder<CSharpProbeSymbolOrigin>.Rent();
         foreach (var node in root.GetAnnotatedNodes(CSharpProbeBinder.ProjectedSymbolAnnotationKind))
@@ -561,6 +552,33 @@ internal sealed partial class CSharpProbeBuilder
             stateNames,
             annotation,
             symbolOrigins.ToImmutable());
+    }
+
+    private static ImmutableArray<string> GetStateNames(CSharp.CompilationUnitSyntax root)
+    {
+        ArrayBuilder<string>? names = null;
+        HashSet<string>? seen = null;
+        try
+        {
+            foreach (var node in root.GetAnnotatedNodes(CSharpProbeBinder.StateCompletionAnnotationKind))
+            {
+                if (node is CSharp.VariableDeclaratorSyntax declarator)
+                {
+                    var name = declarator.Identifier.ValueText;
+                    if (!string.IsNullOrWhiteSpace(name) &&
+                        (seen ??= new HashSet<string>(StringComparer.Ordinal)).Add(name))
+                    {
+                        (names ??= ArrayBuilder<string>.GetInstance()).Add(name);
+                    }
+                }
+            }
+
+            return names?.ToImmutable() ?? [];
+        }
+        finally
+        {
+            names?.Free();
+        }
     }
 
     private CSharp.MethodDeclarationSyntax? GetContainingComponentMethodProbe(AkburaSyntax scope)

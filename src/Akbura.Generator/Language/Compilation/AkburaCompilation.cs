@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
@@ -496,8 +497,7 @@ internal sealed partial class AkburaCompilation
         string logicalName)
     {
         return AkcssSyntaxTrees
-            .Where(tree => string.Equals(tree.LogicalName, logicalName, StringComparison.Ordinal))
-            .ToImmutableArray();
+            .WhereAsArray(static (tree, name) => string.Equals(tree.LogicalName, name, StringComparison.Ordinal), logicalName);
     }
 
     internal ImmutableArray<IAkcssModuleSymbol> GetAkcssModuleSymbolsByLogicalName(

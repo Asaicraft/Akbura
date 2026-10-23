@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -719,7 +720,7 @@ internal partial class AkburaSemanticModel
         if (attributeSymbol is Symbols.IPropertySymbol { Command: { } command })
         {
             return CreateCommandHandlerProbeParameterList(
-                command.Parameters.Select(static parameter => parameter.Type).ToImmutableArray(),
+                command.Parameters.SelectAsArray(static parameter => parameter.Type),
                 parameterNames);
         }
 

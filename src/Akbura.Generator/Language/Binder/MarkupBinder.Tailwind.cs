@@ -289,14 +289,15 @@ internal sealed partial class MarkupBinder
     private static string GetTailwindCompletionSignatureKey(
         TailwindUtilityLookupCandidate candidate)
     {
-        var builder = new StringBuilder(candidate.Name);
+        var pooledBuilder = PooledStringBuilder.GetInstance();
+        var builder = pooledBuilder.Builder.Append(candidate.Name);
         foreach (var parameter in candidate.Parameters)
         {
             builder.Append('\0');
             builder.Append(parameter.TypeDisplay);
         }
 
-        return builder.ToString();
+        return pooledBuilder.ToStringAndFree();
     }
 
     internal BoundNode CreateBoundTailwindUtilityAttribute(TailwindAttributeSyntax attribute)
@@ -820,14 +821,15 @@ internal sealed partial class MarkupBinder
         }
 
         var fullAttribute = Unsafe.As<TailwindFullAttributeSyntax>(attribute);
-        var builder = new StringBuilder(utilityName);
+        var pooledBuilder = PooledStringBuilder.GetInstance();
+        var builder = pooledBuilder.Builder.Append(utilityName);
         for (var index = 0; index < consumedSegmentCount; index++)
         {
             builder.Append('-');
             builder.Append(fullAttribute.Segments[index].ToFullString().Trim());
         }
 
-        return builder.ToString();
+        return pooledBuilder.ToStringAndFree();
     }
 
     private static ImmutableArray<BoundTailwindUtilityArgument> GetTailwindUtilityArgumentSuffix(

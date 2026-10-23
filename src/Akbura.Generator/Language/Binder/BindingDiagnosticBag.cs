@@ -342,7 +342,8 @@ internal abstract class BindingDiagnosticBag
             return "<no diagnostics>";
         }
 
-        var builder = new StringBuilder();
+        var pooledBuilder = PooledStringBuilder.GetInstance();
+        var builder = pooledBuilder.Builder;
         foreach (var diagnostic in AsSemanticEnumerable())
         {
             builder.AppendLine(diagnostic.ToString());
@@ -353,7 +354,7 @@ internal abstract class BindingDiagnosticBag
             builder.AppendLine(diagnostic.ToString());
         }
 
-        return builder.ToString();
+        return pooledBuilder.ToStringAndFree();
     }
 
     private bool IsSemanticEmpty

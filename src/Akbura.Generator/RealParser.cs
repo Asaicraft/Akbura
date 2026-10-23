@@ -1,5 +1,6 @@
 // This file is ported and adopted from roslyn
 
+using Akbura.Pools;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -314,7 +315,8 @@ internal static class RealParser
         /// </param>
         public static DecimalFloatingPointString FromSource(string source)
         {
-            var mantissaBuilder = new StringBuilder();
+            var pooledMantissaBuilder = PooledStringBuilder.GetInstance();
+            var mantissaBuilder = pooledMantissaBuilder.Builder;
             var exponent = 0;
             var i = 0;
             while (i < source.Length && source[i] == '0')
@@ -357,7 +359,7 @@ internal static class RealParser
                 }
             }
             var result = default(DecimalFloatingPointString);
-            result.Mantissa = mantissaBuilder.ToString();
+            result.Mantissa = pooledMantissaBuilder.ToStringAndFree();
             if (i < source.Length && (source[i] == 'e' || source[i] == 'E'))
             {
                 const int MAX_EXP = (1 << 30); // even playing ground

@@ -2918,7 +2918,8 @@ internal partial class AkburaSemanticModel
 
     private static string GetMarkupExtensionTypeName(MarkupExtensionTypeSyntax typeSyntax)
     {
-        var builder = new StringBuilder();
+        var pooledBuilder = PooledStringBuilder.GetInstance();
+        var builder = pooledBuilder.Builder;
         if (typeSyntax.AliasQualifier != null)
         {
             builder.Append(typeSyntax.AliasQualifier.Alias.Identifier.ValueText);
@@ -2935,7 +2936,7 @@ internal partial class AkburaSemanticModel
             AppendMarkupExtensionNameSegment(builder, typeSyntax.Name.Segments[index]);
         }
 
-        return builder.ToString();
+        return pooledBuilder.ToStringAndFree();
     }
 
     private static void AppendMarkupExtensionNameSegment(StringBuilder builder, MarkupNameSegmentSyntax segment)
@@ -4579,7 +4580,9 @@ internal partial class AkburaSemanticModel
             return "_";
         }
 
-        var builder = new StringBuilder(value.Length);
+        var pooledBuilder = PooledStringBuilder.GetInstance();
+        var builder = pooledBuilder.Builder;
+        builder.EnsureCapacity(value.Length);
         for (var index = 0; index < value.Length; index++)
         {
             var ch = value[index];
@@ -4588,7 +4591,7 @@ internal partial class AkburaSemanticModel
                 : Microsoft.CodeAnalysis.CSharp.SyntaxFacts.IsIdentifierPartCharacter(ch) ? ch : '_');
         }
 
-        return builder.ToString();
+        return pooledBuilder.ToStringAndFree();
     }
 
     private static CSharp.FieldDeclarationSyntax CreateProbeField(CSharp.TypeSyntax type, string name)

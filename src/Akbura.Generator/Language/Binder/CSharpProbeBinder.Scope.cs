@@ -911,7 +911,9 @@ internal sealed partial class CSharpProbeBinder
             return "_";
         }
 
-        var builder = new StringBuilder(value.Length);
+        var pooledBuilder = PooledStringBuilder.GetInstance();
+        var builder = pooledBuilder.Builder;
+        builder.EnsureCapacity(value.Length);
         for (var index = 0; index < value.Length; index++)
         {
             var ch = value[index];
@@ -920,7 +922,7 @@ internal sealed partial class CSharpProbeBinder
                 : CSharpSyntaxFacts.IsIdentifierPartCharacter(ch) ? ch : '_');
         }
 
-        return builder.ToString();
+        return pooledBuilder.ToStringAndFree();
     }
 
 }

@@ -1,3 +1,4 @@
+using Akbura.Pools;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Text;
@@ -39,7 +40,8 @@ internal sealed partial class Lexer
 
     private string ScanMarkupCodeFragment(bool header)
     {
-        var text = new StringBuilder();
+        var pooledText = PooledStringBuilder.GetInstance();
+        var text = pooledText.Builder;
         var parens = 0;
         var brackets = 0;
         var braces = 0;
@@ -98,7 +100,7 @@ internal sealed partial class Lexer
             }
         }
 
-        return text.ToString();
+        return pooledText.ToStringAndFree();
     }
 
     private bool ForeachHeaderBraceStartsBody(StringBuilder text)

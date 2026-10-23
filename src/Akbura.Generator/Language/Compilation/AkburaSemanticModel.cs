@@ -4924,7 +4924,9 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             return text;
         }
 
-        var builder = new System.Text.StringBuilder(text.Length);
+        var pooledBuilder = PooledStringBuilder.GetInstance();
+        var builder = pooledBuilder.Builder;
+        builder.EnsureCapacity(text.Length);
         var hasPendingWhitespace = false;
 
         foreach (var character in text)
@@ -4955,7 +4957,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             builder.Append(' ');
         }
 
-        return builder.ToString();
+        return pooledBuilder.ToStringAndFree();
     }
 
     private static bool IsMarkupWhitespace(char character)

@@ -1,3 +1,4 @@
+using Akbura.Pools;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Globalization;
 using System.Security.Cryptography;
@@ -15,7 +16,8 @@ internal static class AkcssHotReloadIdentity
     {
         var syntax = CSharpSyntaxTree.ParseText(generatedCode,
             CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview)).GetRoot();
-        var builder = new StringBuilder();
+        var pooled = PooledStringBuilder.GetInstance();
+        var builder = pooled.Builder;
         foreach (var token in syntax.DescendantTokens(descendIntoTrivia: false))
         {
             builder.Append(token.RawKind.ToString(CultureInfo.InvariantCulture));
@@ -33,6 +35,6 @@ internal static class AkcssHotReloadIdentity
         {
             builder.Append(value.ToString("X2", CultureInfo.InvariantCulture));
         }
-        return builder.ToString();
+        return pooled.ToStringAndFree();
     }
 }

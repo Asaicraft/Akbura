@@ -151,33 +151,6 @@ public sealed class ConcurrentCacheAllocationTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void MeasureTemplateCacheSizes()
-    {
-        var tree = AkburaSyntaxTree.ParseText("using Avalonia.Controls; void Method() {} <Border />", "Sizes.akbura");
-        var styles = AkcssSyntaxTree.ParseText(".seed { }", "Styles.akcss");
-        var compilation = new AkburaCompilation(CreateCompilation(), [tree], [styles]);
-        var model = compilation.GetSemanticModel(tree);
-        var context = model.BindingSession.ProbeContext;
-        var binder = model.BindingSession.GetCSharpProbeBinder(tree.GetRoot().Members[0]);
-        var templateField = typeof(CSharpProbeContext).GetField("_componentTemplates", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        foreach (var workingSet in new[] { 1, 4, 16, 32 })
-        {
-            var sizes = new[] { 16, 32, 64, 128, 256 };
-            var templates = sizes.Select(size => new ConcurrentCache<string, CSharp.CompilationUnitSyntax>(size, StringComparer.Ordinal)).ToArray();
-            var keys = Enumerable.Range(0, 256).Select(index => index % workingSet == 0
-                ? styles.LogicalName : "missing-" + index % workingSet).ToArray();
-            Measure(sizes.Select(size => $"template-profile-ws{workingSet}-size{size}").ToArray(),
-                sizes.Select((size, index) => (Func<int>)(() =>
-                {
-                    templateField.SetValue(context, templates[index]);
-                    var sum = 0;
-                    foreach (var key in keys) sum += context.CreateComponentCompilationUnit(binder, [], key, default).FullSpan.Length;
-                    return sum;
-                })).ToArray(), null, 16, keys.Length);
-        }
-    }
-
-    [Fact]
     public void MeasureColdRetentionAndParallelThroughput()
     {
         foreach (var size in new[] { 0, 16, 32, 64, 128, 256 })

@@ -83,20 +83,22 @@ public sealed class ConcurrentCacheRegressionTests
     }
 
     [Fact]
-    public void ComponentTemplates_EvictionPreservesMembersImportsTriviaAndDiagnostics()
+    public void ComponentTemplates_CollidingNamesPreserveMembersImportsTriviaAndDiagnostics()
     {
         var (model, binder) = CreateModel();
         var context = model.BindingSession.ProbeContext;
-        var cache = ReplaceCache<string, CSharp.CompilationUnitSyntax>(context, "_componentTemplates", StringComparer.Ordinal);
+        var cache = ReplaceDictionary<string, CSharp.CompilationUnitSyntax>(context, "_componentTemplates", StringComparer.Ordinal);
         var members = ImmutableArray.Create<CSharp.MemberDeclarationSyntax>(SyntaxFactory.ParseMemberDeclaration("void First() { } // first\r\n")!);
         var imports = ImmutableArray.Create(SyntaxFactory.UsingDirective(SyntaxFactory.ParseName("System")));
         var first = context.CreateComponentCompilationUnit(binder, members, "First", imports);
         var expected = Snapshot(first);
+        Assert.True(cache.TryGetValue("First", out var template));
         for (var repeat = 0; repeat < 32; repeat++)
         {
             context.CreateComponentCompilationUnit(binder,
                 [SyntaxFactory.ParseMemberDeclaration("int Different = 42;")!], "Other", []);
-            Assert.False(cache.TryGetValue("First", out _));
+            Assert.True(cache.TryGetValue("First", out var retained));
+            Assert.Same(template, retained);
             Assert.Equal(expected, Snapshot(context.CreateComponentCompilationUnit(binder, members, "First", imports)));
             Assert.Equal(expected, Snapshot(first));
         }
@@ -109,7 +111,7 @@ public sealed class ConcurrentCacheRegressionTests
     {
         var (model, binder) = CreateModel();
         var context = model.BindingSession.ProbeContext;
-        ReplaceCache<string, CSharp.CompilationUnitSyntax>(context, "_componentTemplates", StringComparer.Ordinal);
+        ReplaceDictionary<string, CSharp.CompilationUnitSyntax>(context, "_componentTemplates", StringComparer.Ordinal);
         Parallel.For(0, 256, index =>
         {
             var member = SyntaxFactory.ParseMemberDeclaration($"int Value{index} = {index};")!;
@@ -120,6 +122,55 @@ public sealed class ConcurrentCacheRegressionTests
                 Assert.Equal(expected, Snapshot(context.CreateComponentCompilationUnit(binder, [member], "Host" + index, imports)));
             Assert.Contains("Value" + index, first.ToFullString());
         });
+    }
+
+    [Fact]
+    public void ComponentTemplates_ParallelSameNameKeepsOneEmptyTemplateAndIndependentResults()
+    {
+        var (model, binder) = CreateModel();
+        var context = model.BindingSession.ProbeContext;
+        var cache = ReplaceDictionary<string, CSharp.CompilationUnitSyntax>(context, "_componentTemplates", StringComparer.Ordinal);
+        var results = new CSharp.CompilationUnitSyntax[256];
+        Parallel.For(0, results.Length, index =>
+        {
+            var member = SyntaxFactory.ParseMemberDeclaration($"int Value{index} = {index};")!;
+            var import = SyntaxFactory.UsingDirective(SyntaxFactory.ParseName("System"))
+                .WithAlias(SyntaxFactory.NameEquals(SyntaxFactory.IdentifierName("Alias" + index)));
+            results[index] = context.CreateComponentCompilationUnit(binder, [member], "Shared", [import]);
+        });
+        var template = Assert.Single(cache).Value;
+        Assert.Empty(template.Usings);
+        Assert.Empty(Assert.Single(template.DescendantNodes().OfType<CSharp.ClassDeclarationSyntax>()).Members);
+        for (var index = 0; index < results.Length; index++)
+        {
+            Assert.Equal("Alias" + index, Assert.Single(results[index].Usings).Alias!.Name.Identifier.ValueText);
+            var type = Assert.Single(results[index].DescendantNodes().OfType<CSharp.ClassDeclarationSyntax>());
+            var field = Assert.IsType<CSharp.FieldDeclarationSyntax>(Assert.Single(type.Members));
+            Assert.Equal("Value" + index, Assert.Single(field.Declaration.Variables).Identifier.ValueText);
+        }
+    }
+
+    [Fact]
+    public void BoundedComponentTemplates_EvictionRebuildsEquivalentImmutableSyntax()
+    {
+        var (_, binder) = CreateModel();
+        var cache = new ConcurrentCache<string, CSharp.CompilationUnitSyntax>(16,
+            new ConcurrentCacheTests.ConstantHashComparer<string>(StringComparer.Ordinal));
+        var members = ImmutableArray.Create<CSharp.MemberDeclarationSyntax>(SyntaxFactory.ParseMemberDeclaration("void First() { } // first\r\n")!);
+        var imports = ImmutableArray.Create(SyntaxFactory.UsingDirective(SyntaxFactory.ParseName("System")));
+        var first = binder.CreateComponentProbeCompilationUnitCore(members, "First", imports);
+        var expected = Snapshot(first);
+        Assert.True(cache.TryAdd("First", first));
+        for (var repeat = 0; repeat < 32; repeat++)
+        {
+            Assert.True(cache.TryAdd("Other", binder.CreateComponentProbeCompilationUnitCore(
+                [SyntaxFactory.ParseMemberDeclaration("int Different = 42;")!], "Other", [])));
+            Assert.False(cache.TryGetValue("First", out _));
+            var rebuilt = binder.CreateComponentProbeCompilationUnitCore(members, "First", imports);
+            Assert.Equal(expected, Snapshot(rebuilt));
+            Assert.Equal(expected, Snapshot(first));
+            Assert.True(cache.TryAdd("First", rebuilt));
+        }
     }
 
     [Theory]
@@ -180,10 +231,10 @@ public sealed class ConcurrentCacheRegressionTests
         (ConcurrentDictionary<string, ImmutableArray<Akbura.Language.Symbols.IAkcssModuleSymbol>>)typeof(AkburaCompilation)
             .GetField("_akcssModuleLookup", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!;
 
-    private static ConcurrentCache<TKey, TValue> ReplaceCache<TKey, TValue>(object owner, string field, IEqualityComparer<TKey> comparer)
+    private static ConcurrentDictionary<TKey, TValue> ReplaceDictionary<TKey, TValue>(object owner, string field, IEqualityComparer<TKey> comparer)
         where TKey : notnull
     {
-        var cache = new ConcurrentCache<TKey, TValue>(16, new ConcurrentCacheTests.ConstantHashComparer<TKey>(comparer));
+        var cache = new ConcurrentDictionary<TKey, TValue>(new ConcurrentCacheTests.ConstantHashComparer<TKey>(comparer));
         owner.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(owner, cache);
         return cache;
     }

@@ -64,6 +64,23 @@ internal sealed class FeatureGalleryBenchmarkProject
 
     public string AkcssEditFile => _sourceFiles[_akcssEditIndex].RelativePath;
 
+    internal object[] ExportComparisonInputs() =>
+    [
+        Compilation, ParseOptions, RootNamespace, ProjectDirectory,
+        _sourceFiles.Select(static file => file.RelativePath).ToArray(),
+        _sourceFiles.Select(static file => file.SourceText).ToArray(),
+        _componentEditIndex, _akcssEditIndex,
+    ];
+
+    internal static FeatureGalleryBenchmarkProject ImportComparisonInputs(object[] inputs)
+    {
+        var paths = (string[])inputs[4];
+        var texts = (SourceText[])inputs[5];
+        return new FeatureGalleryBenchmarkProject((CSharpCompilation)inputs[0], (CSharpParseOptions)inputs[1],
+            (string)inputs[2], (string)inputs[3], paths.Select((path, index) => new FeatureGallerySourceFile(path, texts[index])).ToImmutableArray(),
+            (int)inputs[6], (int)inputs[7]);
+    }
+
     public static FeatureGalleryBenchmarkProject Load()
     {
         RegisterMSBuild();

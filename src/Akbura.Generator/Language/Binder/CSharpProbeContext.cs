@@ -22,7 +22,7 @@ namespace Akbura.Language.Binder;
 internal sealed class CSharpProbeContext(AkburaSemanticModel semanticModel)
 {
     private readonly ConcurrentDictionary<TypeProbeKey, CSharpBindingResult> _types = new();
-    private readonly ConcurrentCache<string, CSharp.CompilationUnitSyntax> _componentTemplates = new(16, StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, CSharp.CompilationUnitSyntax> _componentTemplates = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<Symbols.ISymbol, CSharpProbeScope> _symbols = new(SymbolReferenceComparer.Instance);
     private readonly ConditionalWeakTable<SemanticModel, CSharpProbeDiagnostics> _diagnostics = new();
     private readonly ConcurrentDictionary<CSharpStatementSyntax, MethodSyntax> _methodSignatures = new();
@@ -87,7 +87,7 @@ internal sealed class CSharpProbeContext(AkburaSemanticModel semanticModel)
         {
             template = binder.CreateComponentProbeCompilationUnitCore(
                 ImmutableArray<CSharp.MemberDeclarationSyntax>.Empty, fallbackTypeName, ImmutableArray<CSharp.UsingDirectiveSyntax>.Empty);
-            _componentTemplates.TryAdd(fallbackTypeName, template);
+            template = _componentTemplates.GetOrAdd(fallbackTypeName, template);
         }
         else
         {

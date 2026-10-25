@@ -12,6 +12,11 @@ internal static class Program
 {
     public static void Main(string[] args)
     {
+        if (FeatureGallerySmallDictionaryComparison.TryRun(args))
+        {
+            return;
+        }
+
         if (FeatureGalleryComponentProbeComparison.TryRun(args))
         {
             return;

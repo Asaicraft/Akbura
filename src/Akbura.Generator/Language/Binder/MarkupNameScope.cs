@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
@@ -267,7 +268,7 @@ internal sealed class MarkupNameScope
 
         public List<MarkupNameDeclaration> Declarations { get; } = [];
 
-        public Dictionary<string, MarkupNameDeclaration> DeclarationsByName { get; } =
+        public SmallDictionary<string, MarkupNameDeclaration> DeclarationsByName { get; } =
             new(StringComparer.Ordinal);
 
         public Scope ToScope()

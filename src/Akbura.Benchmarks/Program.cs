@@ -12,6 +12,11 @@ internal static class Program
 {
     public static void Main(string[] args)
     {
+        if (FeatureGalleryColdAllocationAudit.TryRun(args))
+        {
+            return;
+        }
+
         if (FeatureGallerySmallDictionaryComparison.TryRun(args))
         {
             return;

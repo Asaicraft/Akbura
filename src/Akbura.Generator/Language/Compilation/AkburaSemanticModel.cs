@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language.Binder;
 using Akbura.Language.BoundTree;
 #if STATS
@@ -5640,8 +5641,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     private static bool IsSameType(ITypeSymbol left, ITypeSymbol right)
     {
         return SymbolEqualityComparer.Default.Equals(left, right) ||
-            left.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) ==
-            right.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            CachedSymbolDisplay.GetFullyQualifiedName(left) ==
+            CachedSymbolDisplay.GetFullyQualifiedName(right);
     }
 
     internal CSharpBindingResult BindCSharpType(

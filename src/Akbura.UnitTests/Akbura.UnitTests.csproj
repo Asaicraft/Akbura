@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <ItemGroup>
+    <Compile Include="..\Akbura.TestUtilities\MetadataAkcssLookupFixture.cs" Link="MetadataAkcssLookupFixture.cs" />
+  </ItemGroup>
+
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>

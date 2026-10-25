@@ -1,3 +1,4 @@
+using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
@@ -433,6 +434,7 @@ internal sealed class AkburaReferencedModule
         }
 
         var availableSymbols = symbols.ToImmutable();
+        var lookupContext = new MetadataAkcssLookupContext(availableSymbols);
         foreach (var referencedModule in referencedModules)
         {
             foreach (var module in referencedModule._akcssModules)
@@ -441,7 +443,7 @@ internal sealed class AkburaReferencedModule
                 {
                     metadataModule.InitializeOperations(
                         compilation,
-                        availableSymbols);
+                        lookupContext);
                 }
             }
         }

@@ -14,7 +14,7 @@ internal static class MetadataAkcssOperationFactory
     public static ImmutableArray<IAkcssOperation> CreateOperations(
         IMetadataAkcssSymbol containingSymbol,
         CSharpCompilation compilation,
-        ImmutableArray<IAkcssSymbol> availableSymbols)
+        MetadataAkcssLookupContext lookupContext)
     {
         var data = new List<MetadataAkcssOperationData>(
             containingSymbol.OperationAttributes.Length);
@@ -28,7 +28,6 @@ internal static class MetadataAkcssOperationFactory
 
         data.Sort(static (left, right) => left.Order.CompareTo(right.Order));
 
-        var symbolsByMetadataName = CreateSymbolLookup(availableSymbols);
         var operationsByOrder = new Dictionary<int, MetadataAkcssOperation>();
         foreach (var operationData in data)
         {
@@ -43,7 +42,7 @@ internal static class MetadataAkcssOperationFactory
                     containingSymbol,
                     operationData,
                     compilation,
-                    symbolsByMetadataName));
+                    lookupContext));
         }
 
         var childrenByOrder = new Dictionary<int, List<IAkcssOperation>>();
@@ -94,7 +93,7 @@ internal static class MetadataAkcssOperationFactory
         IMetadataAkcssSymbol containingSymbol,
         MetadataAkcssOperationData data,
         CSharpCompilation compilation,
-        IReadOnlyDictionary<string, ImmutableArray<IAkcssSymbol>> symbolsByMetadataName)
+        MetadataAkcssLookupContext lookupContext)
     {
         return data.Kind switch
         {
@@ -117,7 +116,7 @@ internal static class MetadataAkcssOperationFactory
                     ResolveAppliedSymbols(
                         containingSymbol,
                         data,
-                        symbolsByMetadataName)),
+                        lookupContext)),
 
             MetadataAkcssOperationKind.Intercept =>
                 new MetadataAkcssInterceptOperation(containingSymbol, data),
@@ -127,42 +126,16 @@ internal static class MetadataAkcssOperationFactory
         };
     }
 
-    private static IReadOnlyDictionary<string, ImmutableArray<IAkcssSymbol>> CreateSymbolLookup(
-        ImmutableArray<IAkcssSymbol> symbols)
-    {
-        var grouped = new Dictionary<string, List<IAkcssSymbol>>(StringComparer.Ordinal);
-        foreach (var symbol in symbols)
-        {
-            if (!grouped.TryGetValue(symbol.MetadataName, out var candidates))
-            {
-                candidates = [];
-                grouped.Add(symbol.MetadataName, candidates);
-            }
-
-            candidates.Add(symbol);
-        }
-
-        var result = new Dictionary<string, ImmutableArray<IAkcssSymbol>>(
-            grouped.Count,
-            StringComparer.Ordinal);
-        foreach (var pair in grouped)
-        {
-            result.Add(pair.Key, ImmutableArray.CreateRange(pair.Value));
-        }
-
-        return result;
-    }
-
     private static ImmutableArray<IAkcssSymbol> ResolveAppliedSymbols(
         IMetadataAkcssSymbol containingSymbol,
         MetadataAkcssOperationData data,
-        IReadOnlyDictionary<string, ImmutableArray<IAkcssSymbol>> symbolsByMetadataName)
+        MetadataAkcssLookupContext lookupContext)
     {
         using var result = ImmutableArrayBuilder<IAkcssSymbol>.Rent(
             data.AppliedSymbols.Length);
         foreach (var metadataName in data.AppliedSymbols)
         {
-            if (!symbolsByMetadataName.TryGetValue(metadataName, out var candidates))
+            if (!lookupContext.TryGetCandidates(metadataName, out var candidates))
             {
                 continue;
             }

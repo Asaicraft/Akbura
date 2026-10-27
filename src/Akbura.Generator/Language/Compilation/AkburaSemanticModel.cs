@@ -3403,6 +3403,18 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
     internal string GetAkburaComponentMetadataName(AkburaSyntaxTree syntaxTree)
     {
+        if (Compilation.TryGetComponentMetadataName(syntaxTree, out var metadataName))
+        {
+            return metadataName;
+        }
+
+        return Compilation.CacheComponentMetadataName(
+            syntaxTree,
+            ComputeAkburaComponentMetadataName(syntaxTree));
+    }
+
+    private string ComputeAkburaComponentMetadataName(AkburaSyntaxTree syntaxTree)
+    {
         if (syntaxTree.Kind != SyntaxTreeKind.Component)
         {
             return string.Empty;

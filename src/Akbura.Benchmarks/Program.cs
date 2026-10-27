@@ -12,6 +12,11 @@ internal static class Program
 {
     public static void Main(string[] args)
     {
+        if (FeatureGalleryComponentMetadataNameComparison.TryRun(args))
+        {
+            return;
+        }
+
         if (FeatureGalleryMetadataLookupComparison.TryRun(args))
         {
             return;

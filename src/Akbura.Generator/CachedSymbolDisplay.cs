@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 using System;
 using System.Runtime.CompilerServices;
 
-namespace Akbura.Collections;
+namespace Akbura;
 
 /// <summary>
 /// Reuses fully qualified names without extending the lifetime of type symbols.
@@ -10,6 +10,16 @@ namespace Akbura.Collections;
 internal static class CachedSymbolDisplay
 {
     private static readonly ConditionalWeakTable<ITypeSymbol, string> s_fullyQualifiedNames = new();
+
+    public static bool TryGetFullyQualifiedName(ITypeSymbol symbol, out string fullyQualifiedName)
+    {
+        if (symbol is null)
+        {
+            throw new ArgumentNullException(nameof(symbol));
+        }
+
+        return s_fullyQualifiedNames.TryGetValue(symbol, out fullyQualifiedName!);
+    }
 
     public static string GetFullyQualifiedName(ITypeSymbol symbol)
     {

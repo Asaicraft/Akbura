@@ -196,7 +196,7 @@ internal static class FeatureGallerySymbolDisplayComparison
         if (Hooks != null) throw new InvalidOperationException("Profiling assembly used for timing.");
         var symbols = (ITypeSymbol[])sharedPairs[0]; var left = (int[])sharedPairs[1]; var right = (int[])sharedPairs[2]; var expected = (bool[])sharedPairs[3];
         var compare = typeof(AkburaSemanticModel).GetMethod("IsSameType", BindingFlags.Static | BindingFlags.NonPublic)!.CreateDelegate<Func<ITypeSymbol, ITypeSymbol, bool>>();
-        var helper = typeof(AkburaSemanticModel).Assembly.GetType("Akbura.Collections.CachedSymbolDisplay");
+        var helper = typeof(AkburaSemanticModel).Assembly.GetType("Akbura.CachedSymbolDisplay");
         var cache = (ConditionalWeakTable<ITypeSymbol, string>?)helper?.GetField("s_fullyQualifiedNames", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null);
         var display = helper?.GetMethod("GetFullyQualifiedName")!.CreateDelegate<Func<ITypeSymbol, string>>() ?? (type => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
         for (var i = 0; i < left.Length; i++)

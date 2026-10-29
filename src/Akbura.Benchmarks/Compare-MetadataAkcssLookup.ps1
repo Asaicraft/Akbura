@@ -138,7 +138,7 @@ try {
         'src/Akbura.Benchmarks/FeatureGalleryMetadataLookupComparison.cs','src/Akbura.Benchmarks/Compare-MetadataAkcssLookup.ps1',
         'src/Akbura.Benchmarks/FeatureGallerySymbolDisplayComparison.cs','src/Akbura.Benchmarks/Program.cs','src/Akbura.Benchmarks/Akbura.Benchmarks.csproj',
         'src/Akbura.UnitTests/MetadataAkcssLookupContextTests.cs','src/Akbura.UnitTests/Akbura.UnitTests.csproj',
-        'src/Akbura.TestUtilities/MetadataAkcssLookupFixture.cs','src/Akbura.Generator/Collections/CachedSymbolDisplay.cs')
+        'src/Akbura.TestUtilities/MetadataAkcssLookupFixture.cs','src/Akbura.Generator/CachedSymbolDisplay.cs')
     $manifest = @($files | ForEach-Object { [ordered]@{ Path = $_; Sha256 = (Get-FileHash -LiteralPath (Join-Path $repo $_)).Hash } })
     Save-Json (Join-Path $runRoot 'sources.json') $manifest
     Save-Json (Join-Path $runRoot 'baseline.json') @{ Commit=$Baseline; CurrentHead=(& git -C $repo rev-parse HEAD) }

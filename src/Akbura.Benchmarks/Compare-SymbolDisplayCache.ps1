@@ -131,7 +131,7 @@ try {
     $env:DOTNET_TieredCompilation = '0'
     $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
     $env:DOTNET_NOLOGO = '1'
-    $files = @('src/Akbura.Generator/Collections/CachedSymbolDisplay.cs', 'src/Akbura.Generator/Language/Compilation/AkburaSemanticModel.cs',
+    $files = @('src/Akbura.Generator/CachedSymbolDisplay.cs', 'src/Akbura.Generator/Language/Compilation/AkburaSemanticModel.cs',
         'src/Akbura.UnitTests/CachedSymbolDisplayTests.cs', 'src/Akbura.Benchmarks/FeatureGallerySymbolDisplayComparison.cs',
         'src/Akbura.Benchmarks/Program.cs', 'src/Akbura.Benchmarks/Compare-SymbolDisplayCache.ps1')
     $manifest = @($files | ForEach-Object { [ordered]@{ Path = $_; Sha256 = (Get-FileHash -LiteralPath (Join-Path $repo $_)).Hash } })
@@ -140,7 +140,7 @@ try {
     $projects = @{}
     foreach ($name in @('Generator','BlackSilence','Benchmarks','UnitTests')) { $projects[$name] = Join-Path $repo "src/Akbura.$name/Akbura.$name.csproj" }
     $cachedModel = [IO.File]::ReadAllText((Join-Path $repo 'src/Akbura.Generator/Language/Compilation/AkburaSemanticModel.cs'))
-    $cachedHelper = [IO.File]::ReadAllText((Join-Path $repo 'src/Akbura.Generator/Collections/CachedSymbolDisplay.cs'))
+    $cachedHelper = [IO.File]::ReadAllText((Join-Path $repo 'src/Akbura.Generator/CachedSymbolDisplay.cs'))
     $cachedExpression = @'
             CachedSymbolDisplay.GetFullyQualifiedName(left) ==
             CachedSymbolDisplay.GetFullyQualifiedName(right);
@@ -195,7 +195,7 @@ internal static class SymbolDisplayTrace
         $targetPath = Join-Path $directory 'Variant.targets'
         [IO.File]::WriteAllText($targetPath, @"
 <Project><Target Name="SymbolDisplayVariant" BeforeTargets="CoreCompile"><ItemGroup>
-<Compile Remove="Language\Compilation\AkburaSemanticModel.cs;Collections\CachedSymbolDisplay.cs" />
+<Compile Remove="Language\Compilation\AkburaSemanticModel.cs;CachedSymbolDisplay.cs" />
 <Compile Include="$escaped\AkburaSemanticModel.cs$includeHelper" />
 </ItemGroup></Target></Project>
 "@, $encoding)

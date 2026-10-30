@@ -179,10 +179,9 @@ internal sealed partial class MarkupBinder : Binder
     {
         for (var current = ScopeDesignator; current != null; current = current.Parent)
         {
-            if (current.Kind == AkburaSyntaxKind.MarkupRootSyntax)
+            if (current is MarkupRootSyntax markupRoot)
             {
-                return SemanticModel.BindingSession.GetMarkupNameScope(
-                    Unsafe.As<MarkupRootSyntax>(current));
+                return SemanticModel.BindingSession.GetMarkupNameScope(markupRoot);
             }
         }
 
@@ -927,9 +926,8 @@ internal sealed partial class MarkupBinder : Binder
         object? convertedValue = null;
         var appliedAkcssSymbols = ImmutableArray<IAkcssSymbol>.Empty;
 
-        if (valueSyntax?.Kind == AkburaSyntaxKind.MarkupLiteralAttributeValueSyntax)
+        if (valueSyntax is MarkupLiteralAttributeValueSyntax literalValueSyntax)
         {
-            var literalValueSyntax = Unsafe.As<MarkupLiteralAttributeValueSyntax>(valueSyntax);
             valueKind = MarkupAttributeValueKind.Literal;
             literalValue = AkburaSemanticModel.GetMarkupLiteralAttributeValueText(literalValueSyntax);
             valueBinding = SemanticModel.BindMarkupAttributeExpression(
@@ -1007,9 +1005,8 @@ internal sealed partial class MarkupBinder : Binder
                 }
             }
         }
-        else if (valueSyntax?.Kind == AkburaSyntaxKind.MarkupDynamicAttributeValueSyntax)
+        else if (valueSyntax is MarkupDynamicAttributeValueSyntax dynamicValueSyntax)
         {
-            var dynamicValueSyntax = Unsafe.As<MarkupDynamicAttributeValueSyntax>(valueSyntax);
             var expression = AkburaSemanticModel.ParseInlineExpression(dynamicValueSyntax.Expression);
             if (expression == null)
             {
@@ -1034,9 +1031,8 @@ internal sealed partial class MarkupBinder : Binder
                 valueConversion = valueBinding.Conversion;
             }
         }
-        else if (valueSyntax?.Kind == AkburaSyntaxKind.MarkupExtensionAttributeValueSyntax)
+        else if (valueSyntax is MarkupExtensionAttributeValueSyntax markupExtensionValueSyntax)
         {
-            var markupExtensionValueSyntax = Unsafe.As<MarkupExtensionAttributeValueSyntax>(valueSyntax);
             valueKind = MarkupAttributeValueKind.MarkupExtension;
             markupExtensionBinding = SemanticModel.BindMarkupExtensionAttributeValue(
                 markupAttribute,

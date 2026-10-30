@@ -94,12 +94,10 @@ internal sealed class BlockBinder : Binder
         var builder = ArrayBuilder<ISymbol>.GetInstance();
         foreach (var member in BlockSyntax.Tokens)
         {
-            if (member.Kind != AkburaSyntaxKind.CSharpStatementSyntax)
+            if (member is not CSharpStatementSyntax statement)
             {
                 continue;
             }
-
-            var statement = Unsafe.As<CSharpStatementSyntax>(member);
             AddLocalSymbols(builder, statement);
         }
 

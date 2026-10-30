@@ -10,7 +10,6 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
-using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 
 namespace Akbura.Language.Binder;
 
@@ -51,7 +50,7 @@ internal sealed class UseHookBinder : Binder
                 Expression: CSharp.InvocationExpressionSyntax invocation,
             })
         {
-            if (syntax.Parent?.Kind == AkburaSyntaxKind.CSharpBlockSyntax &&
+            if (syntax.Parent is CSharpBlockSyntax &&
                 IsUseHookInvocation(syntax, invocation, out var nestedInvocationName))
             {
                 return ReplaceDiagnostics(

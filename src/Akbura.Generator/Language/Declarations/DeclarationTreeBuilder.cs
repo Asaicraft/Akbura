@@ -166,7 +166,7 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
         var children = ArrayBuilder<SingleTypeDeclaration>.GetInstance();
         foreach (var member in root.Members)
         {
-            if (member.Kind == AkburaSyntaxKind.InlineAkcssBlockSyntax)
+            if (member is InlineAkcssBlockSyntax)
             {
                 children.Add((SingleTypeDeclaration)Visit(member)!);
             }
@@ -194,13 +194,13 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
         var children = ArrayBuilder<SingleTypeDeclaration>.GetInstance();
         foreach (var member in members)
         {
-            if (member.Kind == AkburaSyntaxKind.AkcssStyleRuleSyntax)
+            if (member is AkcssStyleRuleSyntax styleRule)
             {
-                children.Add((SingleTypeDeclaration)Visit(member)!);
+                children.Add((SingleTypeDeclaration)Visit(styleRule)!);
             }
-            else if (member.Kind == AkburaSyntaxKind.AkcssUtilitiesSectionSyntax)
+            else if (member is AkcssUtilitiesSectionSyntax utilitiesSection)
             {
-                foreach (var utility in ((AkcssUtilitiesSectionSyntax)member).Utilities)
+                foreach (var utility in utilitiesSection.Utilities)
                 {
                     children.Add((SingleTypeDeclaration)Visit(utility)!);
                 }
@@ -277,9 +277,9 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
     {
         foreach (var member in root.Members)
         {
-            if (member.Kind == AkburaSyntaxKind.NamespaceDeclarationSyntax)
+            if (member is NamespaceDeclarationSyntax namespaceDeclaration)
             {
-                return ((NamespaceDeclarationSyntax)member).Name.ToFullString().Trim();
+                return namespaceDeclaration.Name.ToFullString().Trim();
             }
         }
 
@@ -290,7 +290,7 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
     {
         foreach (var member in root.Members)
         {
-            if (member.Kind == AkburaSyntaxKind.UsingDirectiveSyntax)
+            if (member is UsingDirectiveSyntax)
             {
                 return true;
             }
@@ -303,8 +303,8 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
     {
         foreach (var member in root.Members)
         {
-            if (member.Kind == AkburaSyntaxKind.UsingDirectiveSyntax &&
-                ((UsingDirectiveSyntax)member).GlobalKeyword.RawKind != 0)
+            if (member is UsingDirectiveSyntax usingDirective &&
+                usingDirective.GlobalKeyword.RawKind != 0)
             {
                 return true;
             }
@@ -317,7 +317,7 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
     {
         foreach (var member in root.Members)
         {
-            if (member.Kind == AkburaSyntaxKind.AkcssUsingDirectiveSyntax)
+            if (member is AkcssUsingDirectiveSyntax)
             {
                 return true;
             }
@@ -363,15 +363,15 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
             {
                 foreach (var member in members)
                 {
-                    if (member.Kind == AkburaSyntaxKind.AkcssStyleRuleSyntax)
+                    if (member is AkcssStyleRuleSyntax styleRule)
                     {
                         AddMemberName(
                             builder,
-                            ((AkcssStyleRuleSyntax)member).Selector.ToFullString().Trim());
+                            styleRule.Selector.ToFullString().Trim());
                     }
-                    else if (member.Kind == AkburaSyntaxKind.AkcssUtilitiesSectionSyntax)
+                    else if (member is AkcssUtilitiesSectionSyntax utilitiesSection)
                     {
-                        foreach (var utility in ((AkcssUtilitiesSectionSyntax)member).Utilities)
+                        foreach (var utility in utilitiesSection.Utilities)
                         {
                             AddMemberName(
                                 builder,

@@ -239,34 +239,22 @@ internal partial class AkburaSemanticModel
 
         ValidateSyntaxTreeOwnership(markupAttribute);
 
-        if (markupAttribute.Kind ==
-            AkburaSyntaxKind.TailwindFullAttributeSyntax)
+        if (markupAttribute is TailwindFullAttributeSyntax tailwindAttribute)
         {
-            var tailwindAttribute =
-                Unsafe.As<TailwindFullAttributeSyntax>(markupAttribute);
             using var builder =
                 ImmutableArrayBuilder<CSharpSymbolReference>.Rent();
 
-            if (tailwindAttribute.Prefix?.Kind ==
-                AkburaSyntaxKind.ExpressionConditionalPrefixSyntax)
+            if (tailwindAttribute.Prefix is ExpressionConditionalPrefixSyntax expressionPrefix)
             {
-                builder.AddRange(GetCSharpSymbolReferences(
-                    Unsafe.As<ExpressionConditionalPrefixSyntax>(
-                            tailwindAttribute.Prefix)
-                        .Expression));
+                builder.AddRange(GetCSharpSymbolReferences(expressionPrefix.Expression));
             }
             else if (tailwindAttribute.Prefix is TailwindExpressionBindingConditionalPrefixSyntax reactive)
             {
                 builder.AddRange(GetCSharpSymbolReferences(reactive.Binding.Expression));
             }
-            else if (tailwindAttribute.Prefix?.Kind ==
-                AkburaSyntaxKind.MarkupExtensionConditionalPrefixSyntax)
+            else if (tailwindAttribute.Prefix is MarkupExtensionConditionalPrefixSyntax extensionPrefix)
             {
-                AddMarkupExtensionCSharpSymbolReferences(
-                    Unsafe.As<MarkupExtensionConditionalPrefixSyntax>(
-                            tailwindAttribute.Prefix)
-                        .Extension,
-                    builder);
+                AddMarkupExtensionCSharpSymbolReferences(extensionPrefix.Extension, builder);
             }
 
             foreach (var segment in tailwindAttribute.Segments)
@@ -299,9 +287,8 @@ internal partial class AkburaSemanticModel
             return [];
         }
 
-        if (value.Kind == AkburaSyntaxKind.MarkupDynamicAttributeValueSyntax)
+        if (value is MarkupDynamicAttributeValueSyntax dynamicValue)
         {
-            var dynamicValue = Unsafe.As<MarkupDynamicAttributeValueSyntax>(value);
             return GetCSharpSymbolReferences(dynamicValue.Expression);
         }
 
@@ -310,9 +297,8 @@ internal partial class AkburaSemanticModel
             return GetCSharpSymbolReferences(expressionBinding.Expression);
         }
 
-        if (value.Kind == AkburaSyntaxKind.MarkupExtensionAttributeValueSyntax)
+        if (value is MarkupExtensionAttributeValueSyntax extensionValue)
         {
-            var extensionValue = Unsafe.As<MarkupExtensionAttributeValueSyntax>(value);
             using var builder = ImmutableArrayBuilder<CSharpSymbolReference>.Rent();
             AddMarkupExtensionCSharpSymbolReferences(extensionValue.Extension, builder);
             return builder.ToImmutable();

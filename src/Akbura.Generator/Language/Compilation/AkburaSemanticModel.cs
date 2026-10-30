@@ -3136,9 +3136,9 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     {
         for (var parent = markupElement.Parent; parent != null; parent = parent.Parent)
         {
-            if (parent.Kind == AkburaSyntaxKind.MarkupElementSyntax)
+            if (parent is MarkupElementSyntax parentElement)
             {
-                return Unsafe.As<MarkupElementSyntax>(parent);
+                return parentElement;
             }
         }
 
@@ -3364,12 +3364,11 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         foreach (var member in syntaxTree.GetRoot().Members)
         {
-            if (member.Kind != AkburaSyntaxKind.ParamDeclarationSyntax)
+            if (member is not ParamDeclarationSyntax paramDeclaration)
             {
                 continue;
             }
 
-            var paramDeclaration = Unsafe.As<ParamDeclarationSyntax>(member);
             if (semanticModel.GetSymbolInfo(paramDeclaration).Symbol is IParamSymbol paramSymbol)
             {
                 builder.Add(paramSymbol);
@@ -3386,12 +3385,11 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         foreach (var member in syntaxTree.GetRoot().Members)
         {
-            if (member.Kind != AkburaSyntaxKind.CommandDeclarationSyntax)
+            if (member is not CommandDeclarationSyntax commandDeclaration)
             {
                 continue;
             }
 
-            var commandDeclaration = Unsafe.As<CommandDeclarationSyntax>(member);
             if (semanticModel.GetSymbolInfo(commandDeclaration).Symbol is ICommandSymbol commandSymbol)
             {
                 builder.Add(commandSymbol);
@@ -3444,9 +3442,9 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     {
         foreach (var member in root.Members)
         {
-            if (member.Kind == AkburaSyntaxKind.NamespaceDeclarationSyntax)
+            if (member is NamespaceDeclarationSyntax namespaceDeclaration)
             {
-                return Unsafe.As<NamespaceDeclarationSyntax>(member).Name.ToFullString().Trim();
+                return namespaceDeclaration.Name.ToFullString().Trim();
             }
         }
 
@@ -3655,10 +3653,9 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         var componentType =
             componentSymbol.ComponentType ??
             componentSymbol.AkburaComponent?.BaseType.NamedType;
-        if (markupAttribute.Kind == AkburaSyntaxKind.MarkupAttachedPropertyAttributeSyntax &&
+        if (markupAttribute is MarkupAttachedPropertyAttributeSyntax attachedAttribute &&
             componentType != null)
         {
-            var attachedAttribute = Unsafe.As<MarkupAttachedPropertyAttributeSyntax>(markupAttribute);
             if (TryResolveMarkupAttachedProperty(
                     attachedAttribute,
                     componentType,
@@ -4039,9 +4036,9 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
     {
         for (var node = markupAttribute.Parent; node != null; node = node.Parent)
         {
-            if (node.Kind == AkburaSyntaxKind.MarkupElementSyntax)
+            if (node is MarkupElementSyntax element)
             {
-                return Unsafe.As<MarkupElementSyntax>(node);
+                return element;
             }
         }
 
@@ -6281,12 +6278,11 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                 break;
             }
 
-            if (member.Kind != AkburaSyntaxKind.StateDeclarationSyntax)
+            if (member is not StateDeclarationSyntax stateDeclaration)
             {
                 continue;
             }
 
-            var stateDeclaration = Unsafe.As<StateDeclarationSyntax>(member);
             if (TryCreateStateProbeField(stateDeclaration, out var field))
             {
                 builder.Add(field);
@@ -6850,9 +6846,9 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         {
             foreach (var member in root.Members)
             {
-                if (member.Kind == AkburaSyntaxKind.NamespaceDeclarationSyntax)
+                if (member is NamespaceDeclarationSyntax namespaceDeclaration)
                 {
-                    return Unsafe.As<NamespaceDeclarationSyntax>(member).ToCSharp();
+                    return namespaceDeclaration.ToCSharp();
                 }
             }
         }

@@ -1646,13 +1646,12 @@ internal partial class AkburaSemanticModel
     {
         for (var current = markupAttribute.Parent; current != null; current = current.Parent)
         {
-            if (current.Kind != AkburaSyntaxKind.MarkupRootSyntax)
+            if (current is not MarkupRootSyntax markupRoot)
             {
                 continue;
             }
 
-            var nameScope = BindingSession.GetMarkupNameScope(
-                Unsafe.As<MarkupRootSyntax>(current));
+            var nameScope = BindingSession.GetMarkupNameScope(markupRoot);
 
             if (nameScope.TryGetVisibleDeclaredSymbol(
                     this,
@@ -3268,9 +3267,9 @@ internal partial class AkburaSemanticModel
     {
         for (var node = markupAttribute.Parent; node != null; node = node.Parent)
         {
-            if (node.Kind == AkburaSyntaxKind.MarkupStartTagSyntax)
+            if (node is MarkupStartTagSyntax startTag)
             {
-                return Unsafe.As<MarkupStartTagSyntax>(node);
+                return startTag;
             }
         }
 
@@ -4023,12 +4022,11 @@ internal partial class AkburaSemanticModel
         var commandName = receiver.Identifier.ValueText;
         foreach (var member in SyntaxTree.GetRoot().Members)
         {
-            if (member.Kind != AkburaSyntaxKind.CommandDeclarationSyntax)
+            if (member is not CommandDeclarationSyntax commandDeclaration)
             {
                 continue;
             }
 
-            var commandDeclaration = Unsafe.As<CommandDeclarationSyntax>(member);
             if (commandDeclaration.Name.Identifier.ValueText != commandName ||
                 GetSymbolInfo(commandDeclaration).Symbol is not ICommandSymbol command ||
                 command.ResultType.IsDefault)
@@ -4434,9 +4432,9 @@ internal partial class AkburaSemanticModel
                     return Unsafe.As<MarkupRootSyntax>(node);
                 case AkburaSyntaxKind.MarkupElementSyntax:
                     var markupElement = Unsafe.As<MarkupElementSyntax>(node);
-                    if (markupElement.Parent?.Kind == AkburaSyntaxKind.MarkupRootSyntax)
+                    if (markupElement.Parent is MarkupRootSyntax markupRoot)
                     {
-                        return Unsafe.As<MarkupRootSyntax>(markupElement.Parent);
+                        return markupRoot;
                     }
 
                     return markupElement;
@@ -4815,10 +4813,8 @@ internal partial class AkburaSemanticModel
                 return true;
             }
 
-            if (value?.Kind ==
-                    AkburaSyntaxKind.MarkupExtensionNestedValueSyntax &&
-                IsUpdateDependentMarkupExtension(
-                    Unsafe.As<MarkupExtensionNestedValueSyntax>(value).Extension))
+            if (value is MarkupExtensionNestedValueSyntax nestedValue &&
+                IsUpdateDependentMarkupExtension(nestedValue.Extension))
             {
                 return true;
             }

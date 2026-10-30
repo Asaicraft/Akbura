@@ -429,9 +429,8 @@ internal sealed partial class MarkupBinder
             }
         }
 
-        if (fullAttribute.Prefix?.Kind == AkburaSyntaxKind.ExpressionConditionalPrefixSyntax)
+        if (fullAttribute.Prefix is ExpressionConditionalPrefixSyntax expressionPrefix)
         {
-            var expressionPrefix = Unsafe.As<ExpressionConditionalPrefixSyntax>(fullAttribute.Prefix);
             var expression = AkburaSemanticModel.ParseInlineExpression(expressionPrefix.Expression);
             if (expression != null)
             {
@@ -535,9 +534,8 @@ internal sealed partial class MarkupBinder
                 expressionBinding.Expression, null, new TailwindUtilityVariant(isPrefixed: true));
         }
 
-        if (prefix.Kind == AkburaSyntaxKind.SimpleConditionalPrefixSyntax)
+        if (prefix is SimpleConditionalPrefixSyntax simplePrefix)
         {
-            var simplePrefix = Unsafe.As<SimpleConditionalPrefixSyntax>(prefix);
             var prefixName = simplePrefix.Name.Identifier.ValueText;
             diagnosticsBuilder.Add(
                 AkburaSemanticModel.CreateTailwindLegacyPrefixDiagnostic(
@@ -552,11 +550,8 @@ internal sealed partial class MarkupBinder
                 new TailwindUtilityVariant(isPrefixed: true));
         }
 
-        if (prefix.Kind ==
-            AkburaSyntaxKind.MarkupExtensionConditionalPrefixSyntax)
+        if (prefix is MarkupExtensionConditionalPrefixSyntax extensionPrefix)
         {
-            var extensionPrefix =
-                Unsafe.As<MarkupExtensionConditionalPrefixSyntax>(prefix);
             var extensionBinding =
                 SemanticModel.BindTailwindMarkupExtension(
                     attribute,
@@ -582,14 +577,11 @@ internal sealed partial class MarkupBinder
                 CreateTailwindUtilityVariant(extensionBinding.Value));
         }
 
-        if (prefix.Kind !=
-            AkburaSyntaxKind.ExpressionConditionalPrefixSyntax)
+        if (prefix is not ExpressionConditionalPrefixSyntax expressionPrefix)
         {
             return (false, null, default, default, null, default);
         }
 
-        var expressionPrefix =
-            Unsafe.As<ExpressionConditionalPrefixSyntax>(prefix);
         var expression = AkburaSemanticModel.ParseInlineExpression(expressionPrefix.Expression);
         if (expression == null)
         {

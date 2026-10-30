@@ -1,6 +1,5 @@
 using Akbura.Language.Syntax;
 using System;
-using System.Runtime.CompilerServices;
 using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 
 namespace Akbura.Language;
@@ -44,9 +43,9 @@ internal sealed class MemberSemanticModelFactory
     {
         for (var node = syntax; node != null; node = node.Parent)
         {
-            if (node.Kind == AkburaSyntaxKind.AkburaDocumentSyntax)
+            if (node is AkburaDocumentSyntax document)
             {
-                return Unsafe.As<AkburaDocumentSyntax>(node);
+                return document;
             }
         }
 
@@ -139,10 +138,8 @@ internal sealed class MemberSemanticModelFactory
 
     private static bool IsParamDefaultValue(AkburaSyntax syntax)
     {
-        return syntax.Parent?.Kind == AkburaSyntaxKind.ParamDeclarationSyntax &&
-               SemanticSyntaxIdentity.Equals(
-                   Unsafe.As<ParamDeclarationSyntax>(syntax.Parent).DefaultValue,
-                   syntax);
+        return syntax.Parent is ParamDeclarationSyntax parameter &&
+               SemanticSyntaxIdentity.Equals(parameter.DefaultValue, syntax);
     }
 
     private static bool IsModelRoot(

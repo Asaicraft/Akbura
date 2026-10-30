@@ -12,6 +12,36 @@ internal static class Program
 {
     public static void Main(string[] args)
     {
+        if (FeatureGalleryComponentMetadataNameComparison.TryRun(args))
+        {
+            return;
+        }
+
+        if (FeatureGalleryMetadataLookupComparison.TryRun(args))
+        {
+            return;
+        }
+
+        if (FeatureGallerySymbolDisplayComparison.TryRun(args))
+        {
+            return;
+        }
+
+        if (FeatureGalleryColdAllocationAudit.TryRun(args))
+        {
+            return;
+        }
+
+        if (FeatureGallerySmallDictionaryComparison.TryRun(args))
+        {
+            return;
+        }
+
+        if (FeatureGalleryComponentProbeComparison.TryRun(args))
+        {
+            return;
+        }
+
         if (FeatureGalleryComponentValueProfile.TryRun(args))
         {
             return;

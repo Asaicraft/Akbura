@@ -1,6 +1,7 @@
 using Akbura.Language;
 using Akbura.Language.CodeGeneration;
 using Akbura.Diagnostics;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System;
@@ -190,7 +191,7 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
 
         // Infrastructure failures must remain visible even with semantic
         // diagnostics disabled or delegated to an editor host.
-        var failures = ImmutableArray.CreateBuilder<AkburaDiagnosticRecord>();
+        var failures = ArrayBuilder<AkburaDiagnosticRecord>.GetInstance();
         foreach (var diagnostic in diagnostics)
         {
             if (diagnostic.Kind == AkburaDiagnosticKind.Infrastructure)
@@ -199,7 +200,7 @@ public sealed class AkburaBlackSilenceGenerator : IIncrementalGenerator
             }
         }
 
-        return failures.ToImmutable();
+        return failures.ToImmutableAndFree();
     }
 
     private static AkburaSourceText? ReadSourceText(

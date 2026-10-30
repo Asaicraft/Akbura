@@ -83,32 +83,39 @@ internal sealed partial class AkburaCompilation
                 return ImmutableArray<AkburaCompilationReference>.Empty;
             }
 
-            var seen = new HashSet<AkburaCompilation>();
-            foreach (var reference in references)
+            var seen = PooledHashSet<AkburaCompilation>.GetInstance();
+            try
             {
-                if (reference == null)
+                foreach (var reference in references)
                 {
-                    throw new ArgumentException(
-                        "Akbura compilation references cannot contain null.",
-                        nameof(references));
+                    if (reference == null)
+                    {
+                        throw new ArgumentException(
+                            "Akbura compilation references cannot contain null.",
+                            nameof(references));
+                    }
+
+                    if (ReferenceEquals(reference.Compilation.CSharpCompilation, compilation))
+                    {
+                        throw new ArgumentException(
+                            "An Akbura compilation cannot reference itself.",
+                            nameof(references));
+                    }
+
+                    if (!seen.Add(reference.Compilation))
+                    {
+                        throw new ArgumentException(
+                            "Duplicate Akbura compilation reference.",
+                            nameof(references));
+                    }
                 }
 
-                if (ReferenceEquals(reference.Compilation.CSharpCompilation, compilation))
-                {
-                    throw new ArgumentException(
-                        "An Akbura compilation cannot reference itself.",
-                        nameof(references));
-                }
-
-                if (!seen.Add(reference.Compilation))
-                {
-                    throw new ArgumentException(
-                        "Duplicate Akbura compilation reference.",
-                        nameof(references));
-                }
+                return references;
             }
-
-            return references;
+            finally
+            {
+                seen.Free();
+            }
         }
 
         private static bool HaveSameReferences(
@@ -255,78 +262,92 @@ internal sealed partial class AkburaCompilation
         public ImmutableArray<AkcssSyntaxTree> GetAkcssSyntaxTreesByLogicalName(string logicalName)
         {
             using var builder = ImmutableArrayBuilder<AkcssSyntaxTree>.Rent();
-            var seen = new HashSet<AkcssSyntaxTree>();
-            foreach (var reference in _compilationReferences)
+            var seen = PooledHashSet<AkcssSyntaxTree>.GetInstance();
+            try
             {
-                foreach (var syntaxTree in
-                         reference.GetAkcssSyntaxTreesByLogicalName(logicalName))
+                foreach (var reference in _compilationReferences)
                 {
-                    if (seen.Add(syntaxTree))
+                    foreach (var syntaxTree in
+                             reference.GetAkcssSyntaxTreesByLogicalName(logicalName))
                     {
-                        builder.Add(syntaxTree);
+                        if (seen.Add(syntaxTree))
+                        {
+                            builder.Add(syntaxTree);
+                        }
                     }
                 }
-            }
 
-            var referencedCompilations = builder.ToImmutable();
-            if (referencedCompilations.Length > 0)
-            {
-                return referencedCompilations;
-            }
-
-            foreach (var module in Modules)
-            {
-                foreach (var syntaxTree in
-                         module.GetAkcssSyntaxTreesByLogicalName(logicalName))
+                var referencedCompilations = builder.ToImmutable();
+                if (referencedCompilations.Length > 0)
                 {
-                    if (seen.Add(syntaxTree))
+                    return referencedCompilations;
+                }
+
+                foreach (var module in Modules)
+                {
+                    foreach (var syntaxTree in
+                             module.GetAkcssSyntaxTreesByLogicalName(logicalName))
                     {
-                        builder.Add(syntaxTree);
+                        if (seen.Add(syntaxTree))
+                        {
+                            builder.Add(syntaxTree);
+                        }
                     }
                 }
-            }
 
-            return builder.ToImmutable();
+                return builder.ToImmutable();
+            }
+            finally
+            {
+                seen.Free();
+            }
         }
 
         public ImmutableArray<IAkcssModuleSymbol> GetAkcssModuleSymbolsByLogicalName(
             string logicalName)
         {
             using var builder = ImmutableArrayBuilder<IAkcssModuleSymbol>.Rent();
-            var seen = new HashSet<IAkcssModuleSymbol>();
-            foreach (var reference in _compilationReferences)
+            var seen = PooledHashSet<IAkcssModuleSymbol>.GetInstance();
+            try
             {
-                foreach (var module in
-                         reference.GetAkcssModuleSymbolsByLogicalName(logicalName))
+                foreach (var reference in _compilationReferences)
                 {
-                    if (seen.Add(module))
+                    foreach (var module in
+                             reference.GetAkcssModuleSymbolsByLogicalName(logicalName))
                     {
-                        builder.Add(module);
+                        if (seen.Add(module))
+                        {
+                            builder.Add(module);
+                        }
                     }
                 }
-            }
 
-            var referencedCompilations = builder.ToImmutable();
-            if (referencedCompilations.Length > 0)
-            {
-                return referencedCompilations;
-            }
-
-            using var metadataModules = ImmutableArrayBuilder<IAkcssModuleSymbol>.Rent();
-            seen.Clear();
-            foreach (var module in Modules)
-            {
-                foreach (var symbol in
-                         module.GetAkcssModuleSymbolsByLogicalName(logicalName))
+                var referencedCompilations = builder.ToImmutable();
+                if (referencedCompilations.Length > 0)
                 {
-                    if (seen.Add(symbol))
+                    return referencedCompilations;
+                }
+
+                using var metadataModules = ImmutableArrayBuilder<IAkcssModuleSymbol>.Rent();
+                seen.Clear();
+                foreach (var module in Modules)
+                {
+                    foreach (var symbol in
+                             module.GetAkcssModuleSymbolsByLogicalName(logicalName))
                     {
-                        metadataModules.Add(symbol);
+                        if (seen.Add(symbol))
+                        {
+                            metadataModules.Add(symbol);
+                        }
                     }
                 }
-            }
 
-            return metadataModules.ToImmutable();
+                return metadataModules.ToImmutable();
+            }
+            finally
+            {
+                seen.Free();
+            }
         }
 
         public bool TryGetComponentDeclaration(

@@ -1,3 +1,4 @@
+using Akbura.Pools;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Text;
@@ -11,7 +12,8 @@ internal sealed partial class Lexer
 {
     private TokenInfo ParseMarkupCondition(bool stopAtMarkupSibling = false)
     {
-        var text = new StringBuilder();
+        var pooledText = PooledStringBuilder.GetInstance();
+        var text = pooledText.Builder;
         var parenDepth = 0;
         var bracketDepth = 0;
         var braceDepth = 0;
@@ -77,7 +79,7 @@ internal sealed partial class Lexer
             TextWindow.AdvanceChar();
         }
 
-        var rawText = text.ToString();
+        var rawText = pooledText.ToStringAndFree();
         var expression = CSharpFactory.ParseExpression(rawText, consumeFullText: true);
         return new TokenInfo
         {

@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language.Binder;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
@@ -250,7 +251,7 @@ internal sealed class BoundMarkupCommandBinding : BoundMarkupAttribute
         Command = command;
         TargetKind = targetKind;
         ParameterTypes = parameterTypes.IsDefault
-            ? command?.Parameters.Select(static parameter => parameter.Type).ToImmutableArray() ?? []
+            ? command?.Parameters.SelectAsArray(static parameter => parameter.Type) ?? []
             : parameterTypes;
         ReturnType = returnType.IsDefault && command != null ? command.ReturnType : returnType;
         ResultType = resultType.IsDefault && command != null ? command.ResultType : resultType;

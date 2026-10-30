@@ -80,6 +80,53 @@ public sealed class MarkupPropertyAssignmentTests
     }
 
     [Fact]
+    public void MetadataReader_PreservesOrderedSnapshotsAcrossReads()
+    {
+        var fixture = AkcssActivatorPlannerTests.CreateFixture("<object />",
+            """
+            namespace Demo;
+            public class Assignment
+            {
+                public object? Alpha { get; set; }
+                public object? Zeta { get; set; }
+                [Avalonia.Metadata.DependsOn("Zeta"), Avalonia.Metadata.DependsOn("MissingZeta"),
+                 Avalonia.Metadata.DependsOn("Alpha"), Avalonia.Metadata.DependsOn("MissingAlpha"),
+                 Avalonia.Metadata.DependsOn("Alpha")]
+                public object? Payload { get; set; }
+            }
+            """);
+        var type = fixture.CSharpCompilation.GetTypeByMetadataName("Demo.Assignment")!;
+        var property = Assert.Single(type.GetMembers("Payload"));
+        var reader = new MarkupPropertyMetadataReader();
+
+        var metadata = reader.GetMetadata(property);
+        var empty = reader.GetMetadata(Assert.Single(type.GetMembers("Alpha")));
+
+        Assert.Empty(empty.Dependencies);
+        Assert.Empty(empty.InvalidDependencies);
+        Assert.Equal(["Alpha", "Zeta"], metadata.Dependencies.Select(static dependency => dependency.Name));
+        Assert.Equal<string>(["MissingAlpha", "MissingZeta"], metadata.InvalidDependencies);
+        Assert.Equal(metadata.Dependencies, reader.GetMetadata(property).Dependencies);
+    }
+
+    [Theory]
+    [InlineData("Button, Button.primary", "Button")]
+    [InlineData("Button, Border, Button", "^, ^:active")]
+    public void SelectorContext_DeduplicatesTargetsInFirstOccurrenceOrder(string parent, string nested)
+    {
+        var fixture = AkcssActivatorPlannerTests.CreateFixture(
+            $"using Avalonia.Controls; using Avalonia.Styling; <Style Selector=\"{parent}\"><Style Selector=\"{nested}\"><Setter Property=\"Opacity\" Value=\"0.5\" /></Style></Style>");
+        var style = fixture.GetChildElements().Single();
+        var setter = style.Body.OfType<MarkupElementContentSyntax>().Single().Element;
+
+        var context = fixture.SemanticModel.GetMarkupStyleTargetContext(setter);
+
+        Assert.False(context.IsUnknown);
+        Assert.Equal(parent.Contains("Border", StringComparison.Ordinal) ? ["Button", "Border"] : ["Button"],
+            context.Types.Select(static type => type.Name));
+    }
+
+    [Fact]
     public void Reference_PreservesOwnerAndPropertySpansAndInheritedDeclaringType()
     {
         var fixture = CreateAssignmentFixture("Target=\"Button.Background\" Payload=\"Red\"");

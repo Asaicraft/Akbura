@@ -6,7 +6,6 @@ using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Immutable;
-using System.Runtime.CompilerServices;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 
@@ -385,9 +384,9 @@ internal sealed class BindingSession
         var builder = ArrayBuilder<CSharpBlockSyntax>.GetInstance();
         for (var node = syntax; node != null; node = node.Parent)
         {
-            if (node.Kind == AkburaSyntaxKind.CSharpBlockSyntax)
+            if (node is CSharpBlockSyntax block)
             {
-                builder.Add(Unsafe.As<CSharpBlockSyntax>(node));
+                builder.Add(block);
             }
         }
 
@@ -403,10 +402,10 @@ internal sealed class BindingSession
         foreach (var node in syntax.DescendantNodesAndSelf(
                      candidate => ContainsPosition(candidate, position)))
         {
-            if (node.Kind == AkburaSyntaxKind.CSharpBlockSyntax &&
-                ContainsPosition(node, position))
+            if (node is CSharpBlockSyntax block &&
+                ContainsPosition(block, position))
             {
-                builder.Add(Unsafe.As<CSharpBlockSyntax>(node));
+                builder.Add(block);
             }
         }
 

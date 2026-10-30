@@ -708,7 +708,8 @@ partial class Parser
 
     private GreenCSharpTypeSyntax ParseAkcssCSharpTypeUntil(SyntaxKind terminator)
     {
-        var rawText = new StringBuilder();
+        var pooledRawText = PooledStringBuilder.GetInstance();
+        var rawText = pooledRawText.Builder;
         while (CurrentToken.Kind is not SyntaxKind.EndOfFileToken &&
                CurrentToken.Kind != terminator)
         {
@@ -721,7 +722,7 @@ partial class Parser
             rawText.Append(EatToken().ToFullString());
         }
 
-        return CreateAkcssCSharpTypeSyntax(rawText.ToString());
+        return CreateAkcssCSharpTypeSyntax(pooledRawText.ToStringAndFree());
     }
 
     private static GreenCSharpTypeSyntax CreateAkcssCSharpTypeSyntax(string rawText)
@@ -750,6 +751,7 @@ partial class Parser
             return GreenSyntaxFactory.IdentifierName(first);
         }
 
+        PooledStringBuilder? pooledText = null;
         StringBuilder? text = null;
         var last = first;
         while (CurrentToken.Kind == SyntaxKind.MinusToken &&
@@ -760,7 +762,12 @@ partial class Parser
             AreAdjacent(last, CurrentToken) &&
             AreAdjacent(CurrentToken, PeekToken(1)))
         {
-            text ??= new StringBuilder(first.Text);
+            if (text == null)
+            {
+                pooledText = PooledStringBuilder.GetInstance();
+                text = pooledText.Builder;
+                text.Append(first.Text);
+            }
             text.Append(EatToken(SyntaxKind.MinusToken).Text);
 
             last = EatToken();
@@ -779,7 +786,7 @@ partial class Parser
             return GreenSyntaxFactory.IdentifierName(first);
         }
 
-        var value = text.ToString();
+        var value = pooledText!.ToStringAndFree();
         return GreenSyntaxFactory.IdentifierName(GreenSyntaxToken.Identifier(
             SyntaxKind.IdentifierToken,
             first.LeadingTrivia.Node,
@@ -815,7 +822,8 @@ partial class Parser
         SyntaxKind firstTerminator,
         SyntaxKind? secondTerminator = null)
     {
-        var rawText = new StringBuilder();
+        var pooledRawText = PooledStringBuilder.GetInstance();
+        var rawText = pooledRawText.Builder;
         var parenDepth = 0;
         var bracketDepth = 0;
         var braceDepth = 0;
@@ -860,7 +868,7 @@ partial class Parser
         }
 
         var expression = CSharpFactory.ParseExpression(
-            rawText.ToString(),
+            pooledRawText.ToStringAndFree(),
             offset: 0,
             options: null,
             consumeFullText: true);
@@ -926,7 +934,8 @@ partial class Parser
     private GreenCSharpTypeSyntax ParseRequiredCSharpTypeSyntax(
         bool stopAtTopLevelMemberAfterNewLine = false)
     {
-        var rawText = new StringBuilder();
+        var pooledRawText = PooledStringBuilder.GetInstance();
+        var rawText = pooledRawText.Builder;
 
         while (CurrentToken.Kind is not (SyntaxKind.SemicolonToken or SyntaxKind.EndOfFileToken) &&
                (!stopAtTopLevelMemberAfterNewLine ||
@@ -936,7 +945,7 @@ partial class Parser
         }
 
         return GreenSyntaxFactory.CSharpTypeSyntax(
-            GreenSyntaxFactory.CSharpRawToken(CSharpFactory.ParseTypeName(rawText.ToString())));
+            GreenSyntaxFactory.CSharpRawToken(CSharpFactory.ParseTypeName(pooledRawText.ToStringAndFree())));
     }
 
     private bool IsAtTopLevelMemberAfterNewLine()
@@ -1111,7 +1120,8 @@ partial class Parser
     private static bool IsCompleteCSharpExpressionStatement(
         GreenSyntaxListBuilder<GreenSyntaxToken> tokens)
     {
-        var text = new StringBuilder();
+        var pooledText = PooledStringBuilder.GetInstance();
+        var text = pooledText.Builder;
 
         for (var index = 0; index < tokens.Count; index++)
         {
@@ -1121,7 +1131,7 @@ partial class Parser
         text.Append(';');
 
         var statement =
-            CSharpFactory.ParseStatement(text.ToString());
+            CSharpFactory.ParseStatement(pooledText.ToStringAndFree());
 
         return statement is
             CSharp.ExpressionStatementSyntax &&
@@ -1136,14 +1146,15 @@ partial class Parser
             return false;
         }
 
-        var text = new StringBuilder();
+        var pooledText = PooledStringBuilder.GetInstance();
+        var text = pooledText.Builder;
         for (var index = 0; index < tokens.Count; index++)
         {
             text.Append(tokens[index].ToFullString());
         }
 
         text.Append("{}");
-        return CSharpFactory.ParseStatement(text.ToString()) is
+        return CSharpFactory.ParseStatement(pooledText.ToStringAndFree()) is
             CSharp.LocalFunctionStatementSyntax;
     }
 
@@ -1593,48 +1604,58 @@ partial class Parser
 
     private GreenMarkupTextLiteralSyntax ParseMarkupTextLiteralSyntax(bool inConditionalBlock = false)
     {
-        var rawText = new StringBuilder();
+        var pooledRawText = PooledStringBuilder.GetInstance();
+        var rawText = pooledRawText.Builder;
+        string literalText;
         var hasUnsupportedControlFlowDirective = false;
-
-        while (CurrentToken.Kind is not (SyntaxKind.EndOfFileToken or
-               SyntaxKind.LessThanToken or
-               SyntaxKind.LessSlashToken or
-               SyntaxKind.OpenBraceToken))
+        try
         {
-            _cancellationToken.ThrowIfCancellationRequested();
-
-            if (IsMarkupConditionalDirectiveStart(incremental: false) || IsMarkupForeachDirectiveStart(incremental: false) ||
-                inConditionalBlock && CurrentToken.Kind == SyntaxKind.CloseBraceToken)
+            while (CurrentToken.Kind is not (SyntaxKind.EndOfFileToken or
+                   SyntaxKind.LessThanToken or
+                   SyntaxKind.LessSlashToken or
+                   SyntaxKind.OpenBraceToken))
             {
-                break;
+                _cancellationToken.ThrowIfCancellationRequested();
+
+                if (IsMarkupConditionalDirectiveStart(incremental: false) || IsMarkupForeachDirectiveStart(incremental: false) ||
+                    inConditionalBlock && CurrentToken.Kind == SyntaxKind.CloseBraceToken)
+                {
+                    break;
+                }
+
+                if (IsUnsupportedMarkupControlFlowDirectiveStart())
+                {
+                    hasUnsupportedControlFlowDirective = true;
+                    AppendUnsupportedMarkupControlFlowDirectiveText(rawText);
+                    continue;
+                }
+
+                if (CurrentToken.Kind == SyntaxKind.DollarToken && PeekToken(1) is { } partialKeyword &&
+                    partialKeyword.Kind == SyntaxKind.IdentifierToken && AreAdjacent(CurrentToken, partialKeyword) &&
+                    partialKeyword.ValueText is { Length: > 0 } partialName &&
+                    "foreach".StartsWith(partialName, StringComparison.Ordinal))
+                {
+                    hasUnsupportedControlFlowDirective = true;
+                }
+
+                rawText.Append(EatToken().ToFullString());
             }
 
-            if (IsUnsupportedMarkupControlFlowDirectiveStart())
+            if (rawText.Length == 0 && CurrentToken.Kind != SyntaxKind.EndOfFileToken)
             {
-                hasUnsupportedControlFlowDirective = true;
-                AppendUnsupportedMarkupControlFlowDirectiveText(rawText);
-                continue;
+                rawText.Append(EatToken().ToFullString());
             }
 
-            if (CurrentToken.Kind == SyntaxKind.DollarToken && PeekToken(1) is { } partialKeyword &&
-                partialKeyword.Kind == SyntaxKind.IdentifierToken && AreAdjacent(CurrentToken, partialKeyword) &&
-                partialKeyword.ValueText is { Length: > 0 } partialName &&
-                "foreach".StartsWith(partialName, StringComparison.Ordinal))
-            {
-                hasUnsupportedControlFlowDirective = true;
-            }
-
-            rawText.Append(EatToken().ToFullString());
+            literalText = rawText.ToString();
         }
-
-        if (rawText.Length == 0 && CurrentToken.Kind != SyntaxKind.EndOfFileToken)
+        finally
         {
-            rawText.Append(EatToken().ToFullString());
+            pooledRawText.Free();
         }
 
         var textToken = (GreenSyntaxToken)GreenSyntaxFactory.AkTextLiteralToken(
-            rawText.ToString(),
-            rawText.ToString())!;
+            literalText,
+            literalText)!;
 
         var tokens = _pool.Allocate<GreenSyntaxToken>();
         try
@@ -2055,8 +2076,10 @@ partial class Parser
         var quoteKind = CurrentToken.Kind;
         AkburaDebug.Assert(quoteKind is SyntaxKind.DoubleQuoteToken or SyntaxKind.SingleQuoteToken, "Expected quote token.");
 
-        var rawText = new StringBuilder();
-        var valueText = new StringBuilder();
+        var pooledRawText = PooledStringBuilder.GetInstance();
+        var rawText = pooledRawText.Builder;
+        var pooledValueText = PooledStringBuilder.GetInstance();
+        var valueText = pooledValueText.Builder;
 
         var openQuote = EatToken();
         rawText.Append(openQuote.ToFullString());
@@ -2083,7 +2106,9 @@ partial class Parser
         var closeQuote = EatToken(quoteKind);
         rawText.Append(closeQuote.ToFullString());
 
-        return CreateMarkupTextLiteralSyntax(rawText.ToString(), valueText.ToString());
+        var raw = pooledRawText.ToStringAndFree();
+        var value = pooledValueText.ToStringAndFree();
+        return CreateMarkupTextLiteralSyntax(raw, value);
     }
 
     private GreenMarkupExtensionSyntax ParseMarkupExtensionSyntax()
@@ -2197,7 +2222,8 @@ partial class Parser
 
     private GreenMarkupTextLiteralSyntax ParseMarkupExtensionLiteralValueSyntax()
     {
-        var rawText = new StringBuilder();
+        var pooledRawText = PooledStringBuilder.GetInstance();
+        var rawText = pooledRawText.Builder;
         var parenDepth = 0;
         var bracketDepth = 0;
         var braceDepth = 0;
@@ -2239,7 +2265,7 @@ partial class Parser
             }
         }
 
-        var raw = rawText.ToString();
+        var raw = pooledRawText.ToStringAndFree();
         return CreateMarkupTextLiteralSyntax(raw, raw.Trim());
     }
 
@@ -2381,7 +2407,8 @@ partial class Parser
             return GreenSyntaxFactory.TailwindNumericSegmentSyntax(first);
         }
 
-        var text = new StringBuilder(first.Text);
+        var pooledText = PooledStringBuilder.GetInstance();
+        var text = pooledText.Builder.Append(first.Text);
         var last = first;
         do
         {
@@ -2392,7 +2419,7 @@ partial class Parser
             !CurrentToken.ContainsDiagnostics &&
             AreAdjacent(last, CurrentToken));
 
-        var value = text.ToString();
+        var value = pooledText.ToStringAndFree();
         var identifier = GreenSyntaxToken.Identifier(
             SyntaxKind.IdentifierToken,
             first.LeadingTrivia.Node,
@@ -2560,7 +2587,8 @@ partial class Parser
 
     private GreenCSharpTypeSyntax ParseMarkupGenericArgumentType()
     {
-        var rawText = new StringBuilder();
+        var pooledRawText = PooledStringBuilder.GetInstance();
+        var rawText = pooledRawText.Builder;
         var angleDepth = 0;
         var parenDepth = 0;
         var bracketDepth = 0;
@@ -2603,7 +2631,7 @@ partial class Parser
         }
 
         return GreenSyntaxFactory.CSharpTypeSyntax(
-            GreenSyntaxFactory.CSharpRawToken(CSharpFactory.ParseTypeName(rawText.ToString())));
+            GreenSyntaxFactory.CSharpRawToken(CSharpFactory.ParseTypeName(pooledRawText.ToStringAndFree())));
     }
 
     private GreenIdentifierNameSyntax ParseMarkupSimpleName()

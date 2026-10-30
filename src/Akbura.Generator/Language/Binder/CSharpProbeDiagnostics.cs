@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Generic;
@@ -34,9 +35,11 @@ internal sealed class CSharpProbeDiagnostics(SemanticModel model)
                 GenerationStatistics.Increment(GenerationStatisticCounter.ProbeDiagnosticsReused);
 #endif
                 return region.Span == span ? region.Diagnostics : region.Diagnostics
-                    .Where(diagnostic => Intersects(diagnostic.Location, model.SyntaxTree, span) ||
-                        diagnostic.AdditionalLocations.Any(location => Intersects(location, model.SyntaxTree, span)))
-                    .ToImmutableArray();
+                    .WhereAsArray(static (diagnostic, context) =>
+                        Intersects(diagnostic.Location, context.Tree, context.Span) ||
+                        diagnostic.AdditionalLocations.Any(static (location, context) =>
+                            Intersects(location, context.Tree, context.Span), context),
+                        (Tree: model.SyntaxTree, Span: span));
             }
 
 #if STATS

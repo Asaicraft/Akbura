@@ -177,36 +177,43 @@ internal partial class AkburaSemanticModel
 
         using var candidates =
             ImmutableArrayBuilder<AkcssExpectedValueLookupCandidate>.Rent();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var name in names.WrittenSpan)
+        var seen = PooledHashSet<string>.GetInstance();
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!seen.Add(name))
+            foreach (var name in names.WrittenSpan)
             {
-                continue;
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!seen.Add(name))
+                {
+                    continue;
+                }
+
+                var expression = Microsoft.CodeAnalysis.CSharp.SyntaxFactory
+                    .IdentifierName(name);
+                if (!TryBindExpectedTypeStaticMember(
+                        expression,
+                        expectedType,
+                        info.ContainingSymbol,
+                        out var binding) ||
+                    binding.Symbol == null)
+                {
+                    continue;
+                }
+
+                candidates.Add(new AkcssExpectedValueLookupCandidate(
+                    name,
+                    name,
+                    expectedType.ToDisplayString(
+                        SymbolDisplayFormat.MinimallyQualifiedFormat),
+                    binding.Symbol));
             }
 
-            var expression = Microsoft.CodeAnalysis.CSharp.SyntaxFactory
-                .IdentifierName(name);
-            if (!TryBindExpectedTypeStaticMember(
-                    expression,
-                    expectedType,
-                    info.ContainingSymbol,
-                    out var binding) ||
-                binding.Symbol == null)
-            {
-                continue;
-            }
-
-            candidates.Add(new AkcssExpectedValueLookupCandidate(
-                name,
-                name,
-                expectedType.ToDisplayString(
-                    SymbolDisplayFormat.MinimallyQualifiedFormat),
-                binding.Symbol));
+            return candidates.ToImmutable();
         }
-
-        return candidates.ToImmutable();
+        finally
+        {
+            seen.Free();
+        }
     }
 
     internal ImmutableArray<AkcssExpectedValueLookupCandidate>
@@ -314,61 +321,68 @@ internal partial class AkburaSemanticModel
             appliedTargetType = defaultTargetType;
         }
 
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        AddAkcssCompletionPropertyNames(ownerType, names);
-
-        using var candidates =
-            ImmutableArrayBuilder<AkcssPropertyLookupCandidate>.Rent();
-        foreach (var name in names.OrderBy(
-                     static name => name,
-                     StringComparer.Ordinal))
+        var names = PooledHashSet<string>.GetInstance();
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!TryCreateAkcssCompletionProperty(
-                    ownerType,
-                    name,
-                    appliedTargetType,
-                    containingSymbol,
-                    qualifier.Length > 0,
-                    out var property) ||
-                !(requireReadable
-                    ? property.CanRead
-                    : property.CanWrite))
+            AddAkcssCompletionPropertyNames(ownerType, names);
+
+            using var candidates =
+                ImmutableArrayBuilder<AkcssPropertyLookupCandidate>.Rent();
+            foreach (var name in names.OrderBy(
+                         static name => name,
+                         StringComparer.Ordinal))
             {
-                continue;
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!TryCreateAkcssCompletionProperty(
+                        ownerType,
+                        name,
+                        appliedTargetType,
+                        containingSymbol,
+                        qualifier.Length > 0,
+                        out var property) ||
+                    !(requireReadable
+                        ? property.CanRead
+                        : property.CanWrite))
+                {
+                    continue;
+                }
+
+                var definitionOwner = property.WriteDefinition.Symbol
+                        ?.ContainingType ??
+                    property.ReadDefinition.Symbol?.ContainingType ??
+                    ownerType;
+                var ownerDisplay = definitionOwner.ToDisplayString(
+                    SymbolDisplayFormat.MinimallyQualifiedFormat);
+                var displayName = qualifier.Length == 0
+                    ? name
+                    : qualifier + "." + name;
+                candidates.Add(new AkcssPropertyLookupCandidate(
+                    displayName,
+                    name,
+                    ownerDisplay,
+                    property.Type.ToDisplayString(
+                        SymbolDisplayFormat.MinimallyQualifiedFormat),
+                    property,
+                    property.IsAttachedProperty));
             }
 
-            var definitionOwner = property.WriteDefinition.Symbol
-                    ?.ContainingType ??
-                property.ReadDefinition.Symbol?.ContainingType ??
-                ownerType;
-            var ownerDisplay = definitionOwner.ToDisplayString(
-                SymbolDisplayFormat.MinimallyQualifiedFormat);
-            var displayName = qualifier.Length == 0
-                ? name
-                : qualifier + "." + name;
-            candidates.Add(new AkcssPropertyLookupCandidate(
-                displayName,
-                name,
-                ownerDisplay,
-                property.Type.ToDisplayString(
-                    SymbolDisplayFormat.MinimallyQualifiedFormat),
-                property,
-                property.IsAttachedProperty));
-        }
+            if (qualifier.Length == 0)
+            {
+                AddVisibleAttachedPropertiesForCompletion(
+                    candidates,
+                    declaration,
+                    containingSymbol,
+                    appliedTargetType,
+                    requireReadable,
+                    cancellationToken);
+            }
 
-        if (qualifier.Length == 0)
+            return candidates.ToImmutable();
+        }
+        finally
         {
-            AddVisibleAttachedPropertiesForCompletion(
-                candidates,
-                declaration,
-                containingSymbol,
-                appliedTargetType,
-                requireReadable,
-                cancellationToken);
+            names.Free();
         }
-
-        return candidates.ToImmutable();
     }
 
     private void AddVisibleAttachedPropertiesForCompletion(
@@ -381,120 +395,140 @@ internal partial class AkburaSemanticModel
     {
         var compilation = Compilation.CSharpCompilation;
         var usingDirectives = GetAkcssCSharpUsingDirectives(declaration);
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        var visibleOwners = new Dictionary<
-            string,
-            INamedTypeSymbol?>(StringComparer.Ordinal);
-
-        foreach (var usingDirective in usingDirectives)
+        var seen = PooledHashSet<string>.GetInstance();
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (usingDirective.StaticKeyword.RawKind != 0 ||
-                usingDirective.Name == null)
-            {
-                continue;
-            }
+            var visibleOwners = new Dictionary<
+                string,
+                INamedTypeSymbol?>(StringComparer.Ordinal);
 
-            var namespaceName = NormalizeGlobalName(
-                usingDirective.Name.ToString());
-            var namespaceSymbol = GetNamespaceSymbol(
-                compilation.GlobalNamespace,
-                namespaceName);
-            if (namespaceSymbol == null)
-            {
-                continue;
-            }
-
-            var alias = usingDirective.Alias?.Name.Identifier.ValueText;
-            foreach (var ownerType in namespaceSymbol.GetTypeMembers())
+            foreach (var usingDirective in usingDirectives)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!compilation.IsSymbolAccessibleWithin(
-                        ownerType,
-                        compilation.Assembly))
+                if (usingDirective.StaticKeyword.RawKind != 0 ||
+                    usingDirective.Name == null)
                 {
                     continue;
                 }
 
-                var ownerReference = alias == null
-                    ? ownerType.Name
-                    : alias + "::" + ownerType.Name;
-                var attachedNames = new HashSet<string>(
-                    StringComparer.Ordinal);
-                AddAkcssAttachedPropertyNames(
-                    ownerType,
-                    attachedNames);
-                if (attachedNames.Count == 0)
+                var namespaceName = NormalizeGlobalName(
+                    usingDirective.Name.ToString());
+                var namespaceSymbol = GetNamespaceSymbol(
+                    compilation.GlobalNamespace,
+                    namespaceName);
+                if (namespaceSymbol == null)
                 {
                     continue;
                 }
 
-                if (!visibleOwners.TryGetValue(
-                        ownerReference,
-                        out var existingOwner))
+                var alias = usingDirective.Alias?.Name.Identifier.ValueText;
+                foreach (var ownerType in namespaceSymbol.GetTypeMembers())
                 {
-                    visibleOwners.Add(ownerReference, ownerType);
-                }
-                else if (existingOwner != null &&
-                    !IsSameType(existingOwner, ownerType))
-                {
-                    visibleOwners[ownerReference] = null;
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!compilation.IsSymbolAccessibleWithin(
+                            ownerType,
+                            compilation.Assembly))
+                    {
+                        continue;
+                    }
+
+                    var ownerReference = alias == null
+                        ? ownerType.Name
+                        : alias + "::" + ownerType.Name;
+                    var attachedNames = PooledHashSet<string>.GetInstance();
+                    try
+                    {
+                        AddAkcssAttachedPropertyNames(
+                            ownerType,
+                            attachedNames);
+                        if (attachedNames.Count == 0)
+                        {
+                            continue;
+                        }
+
+                        if (!visibleOwners.TryGetValue(
+                                ownerReference,
+                                out var existingOwner))
+                        {
+                            visibleOwners.Add(ownerReference, ownerType);
+                        }
+                        else if (existingOwner != null &&
+                            !IsSameType(existingOwner, ownerType))
+                        {
+                            visibleOwners[ownerReference] = null;
+                        }
+                    }
+                    finally
+                    {
+                        attachedNames.Free();
+                    }
                 }
             }
-        }
 
-        foreach (var pair in visibleOwners.OrderBy(
-                     static pair => pair.Key,
-                     StringComparer.Ordinal))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var ownerType = pair.Value;
-            if (ownerType == null)
-            {
-                continue;
-            }
-
-            var names = new HashSet<string>(StringComparer.Ordinal);
-            AddAkcssAttachedPropertyNames(ownerType, names);
-            foreach (var name in names.OrderBy(
-                         static name => name,
+            foreach (var pair in visibleOwners.OrderBy(
+                         static pair => pair.Key,
                          StringComparer.Ordinal))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!TryCreateAkcssCompletionProperty(
-                        ownerType,
-                        name,
-                        appliedTargetType,
-                        containingSymbol,
-                        preferAttached: true,
-                        out var property) ||
-                    !(requireReadable
-                        ? property.CanRead
-                        : property.CanWrite))
+                var ownerType = pair.Value;
+                if (ownerType == null)
                 {
                     continue;
                 }
 
-                var fullName = pair.Key + "." + name;
-                if (!seen.Add(fullName))
+                var names = PooledHashSet<string>.GetInstance();
+                try
                 {
-                    continue;
-                }
+                    AddAkcssAttachedPropertyNames(ownerType, names);
+                    foreach (var name in names.OrderBy(
+                                 static name => name,
+                                 StringComparer.Ordinal))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (!TryCreateAkcssCompletionProperty(
+                                ownerType,
+                                name,
+                                appliedTargetType,
+                                containingSymbol,
+                                preferAttached: true,
+                                out var property) ||
+                            !(requireReadable
+                                ? property.CanRead
+                                : property.CanWrite))
+                        {
+                            continue;
+                        }
 
-                var definitionOwner = property.WriteDefinition.Symbol
-                        ?.ContainingType ??
-                    property.ReadDefinition.Symbol?.ContainingType ??
-                    ownerType;
-                candidates.Add(new AkcssPropertyLookupCandidate(
-                    fullName,
-                    fullName,
-                    definitionOwner.ToDisplayString(
-                        SymbolDisplayFormat.MinimallyQualifiedFormat),
-                    property.Type.ToDisplayString(
-                        SymbolDisplayFormat.MinimallyQualifiedFormat),
-                    property,
-                    isAttached: true));
+                        var fullName = pair.Key + "." + name;
+                        if (!seen.Add(fullName))
+                        {
+                            continue;
+                        }
+
+                        var definitionOwner = property.WriteDefinition.Symbol
+                                ?.ContainingType ??
+                            property.ReadDefinition.Symbol?.ContainingType ??
+                            ownerType;
+                        candidates.Add(new AkcssPropertyLookupCandidate(
+                            fullName,
+                            fullName,
+                            definitionOwner.ToDisplayString(
+                                SymbolDisplayFormat.MinimallyQualifiedFormat),
+                            property.Type.ToDisplayString(
+                                SymbolDisplayFormat.MinimallyQualifiedFormat),
+                            property,
+                            isAttached: true));
+                    }
+                }
+                finally
+                {
+                    names.Free();
+                }
             }
+        }
+        finally
+        {
+            seen.Free();
         }
     }
 

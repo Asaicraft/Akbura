@@ -110,7 +110,7 @@ internal sealed class MetadataAkcssModuleSymbol : Symbol, IMetadataAkcssModuleSy
 
     internal void InitializeOperations(
         CSharpCompilation compilation,
-        ImmutableArray<IAkcssSymbol> availableSymbols)
+        MetadataAkcssLookupContext lookupContext)
     {
         foreach (var symbol in _akcssSymbols)
         {
@@ -120,7 +120,7 @@ internal sealed class MetadataAkcssModuleSymbol : Symbol, IMetadataAkcssModuleSy
                     MetadataAkcssOperationFactory.CreateOperations(
                         metadataSymbol,
                         compilation,
-                        availableSymbols));
+                        lookupContext));
             }
         }
     }

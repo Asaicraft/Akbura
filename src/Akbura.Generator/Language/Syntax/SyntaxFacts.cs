@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -36,6 +37,19 @@ public static partial class SyntaxFacts
     public static partial bool IsContextualKeyword(SyntaxKind kind);
 
     public static partial bool IsReservedKeyword(SyntaxKind kind);
+
+    /// <summary>
+    /// Determines whether the kind identifies a concrete AKCSS body member.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsAkcssBodyMember(SyntaxKind kind)
+    {
+        return kind == SyntaxKind.AkcssAssignmentSyntax ||
+            kind == SyntaxKind.AkcssApplyDirectiveSyntax ||
+            kind == SyntaxKind.AkcssInterceptDirectiveSyntax ||
+            kind == SyntaxKind.AkcssIfDirectiveSyntax ||
+            kind == SyntaxKind.AkcssPseudoBlockSyntax;
+    }
 
     public static bool IsHexDigit(char c)
     {

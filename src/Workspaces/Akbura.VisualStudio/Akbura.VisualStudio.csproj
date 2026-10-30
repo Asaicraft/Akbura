@@ -12,12 +12,27 @@
 		<PackageReference Include="Microsoft.VisualStudio.SDK" />
 		<PackageReference Include="Microsoft.VisualStudio.Text.Logic" />
 		<PackageReference Include="Microsoft.VisualStudio.Text.UI.Wpf" />
-		<PackageReference Include="Microsoft.CodeAnalysis.EditorFeatures.Text" />
-		<PackageReference Include="Microsoft.VisualStudio.LanguageServices" PrivateAssets="all" ExcludeAssets="runtime" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\Akbura.Workspaces\Akbura.Workspaces.csproj" />
 	</ItemGroup>
 
+	<!--
+		The public VS adapter packages stop at Roslyn 4.14 and pin that compiler.
+		Use their assemblies only as compile-time references; Visual Studio supplies the runtime
+		adapters and the project graph resolves the current Roslyn packages.
+	-->
+	<ItemGroup>
+		<PackageDownload Include="Microsoft.CodeAnalysis.EditorFeatures.Text" Version="[$(AkburaRoslynEditorReferenceVersion)]" />
+		<PackageDownload Include="Microsoft.VisualStudio.LanguageServices" Version="[$(AkburaRoslynEditorReferenceVersion)]" />
+		<Reference Include="Microsoft.CodeAnalysis.EditorFeatures.Text">
+			<HintPath>$(NuGetPackageRoot)microsoft.codeanalysis.editorfeatures.text/$(AkburaRoslynEditorReferenceVersion)/lib/netstandard2.0/Microsoft.CodeAnalysis.EditorFeatures.Text.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Microsoft.VisualStudio.LanguageServices">
+			<HintPath>$(NuGetPackageRoot)microsoft.visualstudio.languageservices/$(AkburaRoslynEditorReferenceVersion)/lib/net472/Microsoft.VisualStudio.LanguageServices.dll</HintPath>
+			<Private>false</Private>
+		</Reference>
+	</ItemGroup>
 </Project>

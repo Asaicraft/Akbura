@@ -1,3 +1,4 @@
+using Akbura.Pools;
 using Akbura.Language.Syntax;
 using StateBindingKind = Akbura.Language.Symbols.StateBindingKind;
 using Microsoft.CodeAnalysis;
@@ -53,7 +54,8 @@ internal static class ComponentHotReloadIdentity
         ITypeSymbol resultType,
         ReadOnlySpan<ComponentCommandParameterPlan> parameters)
     {
-        var builder = new StringBuilder("command:");
+        var pooledBuilder = PooledStringBuilder.GetInstance();
+        var builder = pooledBuilder.Builder.Append("command:");
         builder.Append(name);
 
         for (var i = 0; i < parameters.Length; i++)
@@ -64,7 +66,7 @@ internal static class ComponentHotReloadIdentity
 
         builder.Append(':');
         builder.Append(GetTypeIdentity(resultType));
-        return builder.ToString();
+        return pooledBuilder.ToStringAndFree();
     }
 
     public static string CreateStateKey(
@@ -92,7 +94,8 @@ internal static class ComponentHotReloadIdentity
             return identity;
         }
 
-        var builder = new StringBuilder(identity);
+        var pooledBuilder = PooledStringBuilder.GetInstance();
+        var builder = pooledBuilder.Builder.Append(identity);
         builder.Append(":root:");
         builder.Append(bindingRootKind);
         builder.Append(':');
@@ -116,7 +119,7 @@ internal static class ComponentHotReloadIdentity
             builder.Append(bindingPropertyDependencies[index].HotReloadIdentity);
         }
 
-        return builder.ToString();
+        return pooledBuilder.ToStringAndFree();
     }
 
     public static string CreateAvaloniaPropertyKey(ISymbol property)
@@ -136,7 +139,9 @@ internal static class ComponentHotReloadIdentity
 
     public static string CreateGeneratedName(string name, string identity)
     {
-        var builder = new StringBuilder(name.Length + 17);
+        var pooledBuilder = PooledStringBuilder.GetInstance();
+        var builder = pooledBuilder.Builder;
+        builder.EnsureCapacity(name.Length + 17);
 
         for (var i = 0; i < name.Length; i++)
         {
@@ -153,7 +158,7 @@ internal static class ComponentHotReloadIdentity
 
         builder.Append('_');
         builder.Append(ComputeHash(identity).ToString("x16", CultureInfo.InvariantCulture));
-        return builder.ToString();
+        return pooledBuilder.ToStringAndFree();
     }
 
     public static string CreateDescriptorFingerprint(in ComponentMemberPlan plan)
@@ -342,7 +347,8 @@ internal static class ComponentHotReloadIdentity
             throw new ArgumentNullException(nameof(syntax));
         }
 
-        var builder = new StringBuilder();
+        var pooledBuilder = PooledStringBuilder.GetInstance();
+        var builder = pooledBuilder.Builder;
         AppendRenderTokens(builder, syntax.StartTag);
 
         for (var i = 0; i < syntax.Body.Count; i++)
@@ -356,7 +362,7 @@ internal static class ComponentHotReloadIdentity
             AppendRenderTokens(builder, content);
         }
 
-        return ComputeRenderSyntaxHash(builder.ToString());
+        return ComputeRenderSyntaxHash(pooledBuilder.ToStringAndFree());
     }
 
     public static string CreateOperationSyntaxIdentity(AkburaSyntax syntax)
@@ -366,9 +372,10 @@ internal static class ComponentHotReloadIdentity
             throw new ArgumentNullException(nameof(syntax));
         }
 
-        var builder = new StringBuilder();
+        var pooledBuilder = PooledStringBuilder.GetInstance();
+        var builder = pooledBuilder.Builder;
         AppendRenderTokens(builder, syntax);
-        return ComputeRenderSyntaxHash(builder.ToString());
+        return ComputeRenderSyntaxHash(pooledBuilder.ToStringAndFree());
     }
 
     public static string CreateContentSyntaxIdentity(AkburaSyntax syntax)
@@ -378,7 +385,8 @@ internal static class ComponentHotReloadIdentity
             throw new ArgumentNullException(nameof(syntax));
         }
 
-        var builder = new StringBuilder();
+        var pooledBuilder = PooledStringBuilder.GetInstance();
+        var builder = pooledBuilder.Builder;
         if (syntax is MarkupElementSyntax element)
         {
             for (var i = 0; i < element.Body.Count; i++)
@@ -391,7 +399,7 @@ internal static class ComponentHotReloadIdentity
             AppendRenderTokens(builder, syntax);
         }
 
-        return ComputeRenderSyntaxHash(builder.ToString());
+        return ComputeRenderSyntaxHash(pooledBuilder.ToStringAndFree());
     }
 
     internal static string CreateForeachTemplateRevision(IMarkupForeachOperation operation)
@@ -436,7 +444,8 @@ internal static class ComponentHotReloadIdentity
         using var algorithm = SHA256.Create();
         var bytes = Encoding.UTF8.GetBytes(normalizedSyntax);
         var digest = algorithm.ComputeHash(bytes);
-        var builder = new StringBuilder(digest.Length * 2);
+        var pooledBuilder = PooledStringBuilder.GetInstance();
+        var builder = pooledBuilder.Builder;
 
         for (var i = 0; i < digest.Length; i++)
         {
@@ -445,7 +454,7 @@ internal static class ComponentHotReloadIdentity
                 CultureInfo.InvariantCulture));
         }
 
-        return builder.ToString();
+        return pooledBuilder.ToStringAndFree();
     }
 
     private static void AppendRenderTokens(

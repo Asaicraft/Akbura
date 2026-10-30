@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language.Binder;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Operations;
@@ -334,51 +335,58 @@ internal partial class AkburaSemanticModel
 
     private bool TryResolveMarkupExtensionType(string name, out INamedTypeSymbol extensionType, out ImmutableArray<INamedTypeSymbol> ambiguousTypes)
     {
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        INamedTypeSymbol? fallbackType = null;
-        foreach (var candidate in GetMarkupExtensionTypeCandidates(name))
+        var seen = PooledHashSet<string>.GetInstance();
+        try
         {
-            if (!seen.Add(candidate))
+            INamedTypeSymbol? fallbackType = null;
+            foreach (var candidate in GetMarkupExtensionTypeCandidates(name))
             {
-                continue;
-            }
-
-            if (TryBindMarkupExtensionTypeCandidate(
-                    candidate,
-                    out extensionType,
-                    out ambiguousTypes))
-            {
-                // A type name without the conventional `Extension` suffix is
-                // allowed to coexist with its markup-extension counterpart
-                // (for example Avalonia.Data.RelativeSource and
-                // RelativeSourceExtension).  In markup syntax the latter is
-                // the only valid candidate, because it exposes ProvideValue.
-                if (FindMarkupExtensionProvideValueMethod(extensionType) != null)
+                if (!seen.Add(candidate))
                 {
-                    return true;
+                    continue;
                 }
 
-                fallbackType ??= extensionType;
-                extensionType = null!;
+                if (TryBindMarkupExtensionTypeCandidate(
+                        candidate,
+                        out extensionType,
+                        out ambiguousTypes))
+                {
+                    // A type name without the conventional `Extension` suffix is
+                    // allowed to coexist with its markup-extension counterpart
+                    // (for example Avalonia.Data.RelativeSource and
+                    // RelativeSourceExtension).  In markup syntax the latter is
+                    // the only valid candidate, because it exposes ProvideValue.
+                    if (FindMarkupExtensionProvideValueMethod(extensionType) != null)
+                    {
+                        return true;
+                    }
+
+                    fallbackType ??= extensionType;
+                    extensionType = null!;
+                }
+
+                if (!ambiguousTypes.IsDefaultOrEmpty)
+                {
+                    extensionType = null!;
+                    return false;
+                }
             }
 
-            if (!ambiguousTypes.IsDefaultOrEmpty)
+            if (fallbackType != null)
             {
-                extensionType = null!;
-                return false;
+                extensionType = fallbackType;
+                ambiguousTypes = ImmutableArray<INamedTypeSymbol>.Empty;
+                return true;
             }
-        }
 
-        if (fallbackType != null)
-        {
-            extensionType = fallbackType;
+            extensionType = null!;
             ambiguousTypes = ImmutableArray<INamedTypeSymbol>.Empty;
-            return true;
+            return false;
         }
-
-        extensionType = null!;
-        ambiguousTypes = ImmutableArray<INamedTypeSymbol>.Empty;
-        return false;
+        finally
+        {
+            seen.Free();
+        }
     }
 
     private static IEnumerable<string> GetMarkupExtensionTypeCandidates(string name)
@@ -1638,13 +1646,12 @@ internal partial class AkburaSemanticModel
     {
         for (var current = markupAttribute.Parent; current != null; current = current.Parent)
         {
-            if (current.Kind != AkburaSyntaxKind.MarkupRootSyntax)
+            if (current is not MarkupRootSyntax markupRoot)
             {
                 continue;
             }
 
-            var nameScope = BindingSession.GetMarkupNameScope(
-                Unsafe.As<MarkupRootSyntax>(current));
+            var nameScope = BindingSession.GetMarkupNameScope(markupRoot);
 
             if (nameScope.TryGetVisibleDeclaredSymbol(
                     this,
@@ -2910,7 +2917,8 @@ internal partial class AkburaSemanticModel
 
     private static string GetMarkupExtensionTypeName(MarkupExtensionTypeSyntax typeSyntax)
     {
-        var builder = new StringBuilder();
+        var pooledBuilder = PooledStringBuilder.GetInstance();
+        var builder = pooledBuilder.Builder;
         if (typeSyntax.AliasQualifier != null)
         {
             builder.Append(typeSyntax.AliasQualifier.Alias.Identifier.ValueText);
@@ -2927,7 +2935,7 @@ internal partial class AkburaSemanticModel
             AppendMarkupExtensionNameSegment(builder, typeSyntax.Name.Segments[index]);
         }
 
-        return builder.ToString();
+        return pooledBuilder.ToStringAndFree();
     }
 
     private static void AppendMarkupExtensionNameSegment(StringBuilder builder, MarkupNameSegmentSyntax segment)
@@ -3259,9 +3267,9 @@ internal partial class AkburaSemanticModel
     {
         for (var node = markupAttribute.Parent; node != null; node = node.Parent)
         {
-            if (node.Kind == AkburaSyntaxKind.MarkupStartTagSyntax)
+            if (node is MarkupStartTagSyntax startTag)
             {
-                return Unsafe.As<MarkupStartTagSyntax>(node);
+                return startTag;
             }
         }
 
@@ -3689,8 +3697,7 @@ internal partial class AkburaSemanticModel
         }
 
         var parameterTypes = callable.Parameters
-            .Select(static parameter => new CSharpSymbolDefinition(parameter.Type))
-            .ToImmutableArray();
+            .SelectAsArray(static parameter => new CSharpSymbolDefinition(parameter.Type));
         GetICommandHandlerResult(callable.ReturnType, out var resultMode, out var resultType);
         return new MarkupCommandHandlerAnalysis(
             MarkupCommandHandlerKind.DirectReference,
@@ -3839,7 +3846,7 @@ internal partial class AkburaSemanticModel
         return AnalyzeMarkupCommandLambda(
             markupAttribute,
             parameterNames,
-            command.Parameters.Select(static parameter => parameter.Type).ToImmutableArray(),
+            command.Parameters.SelectAsArray(static parameter => parameter.Type),
             isAsync,
             body,
             unwrapAwaitableResult: false,
@@ -4015,12 +4022,11 @@ internal partial class AkburaSemanticModel
         var commandName = receiver.Identifier.ValueText;
         foreach (var member in SyntaxTree.GetRoot().Members)
         {
-            if (member.Kind != AkburaSyntaxKind.CommandDeclarationSyntax)
+            if (member is not CommandDeclarationSyntax commandDeclaration)
             {
                 continue;
             }
 
-            var commandDeclaration = Unsafe.As<CommandDeclarationSyntax>(member);
             if (commandDeclaration.Name.Identifier.ValueText != commandName ||
                 GetSymbolInfo(commandDeclaration).Symbol is not ICommandSymbol command ||
                 command.ResultType.IsDefault)
@@ -4233,15 +4239,22 @@ internal partial class AkburaSemanticModel
 
     private void AddMarkupAttributeProbeMembers(ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax> membersBuilder, CSharpProbeScope probeScope)
     {
-        var addedMemberKeys = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var field in CreateMarkupAttributeProbeFields())
+        var addedMemberKeys = PooledHashSet<string>.GetInstance();
+        try
         {
-            AddMarkupAttributeProbeMember(membersBuilder, addedMemberKeys, field);
-        }
+            foreach (var field in CreateMarkupAttributeProbeFields())
+            {
+                AddMarkupAttributeProbeMember(membersBuilder, addedMemberKeys, field);
+            }
 
-        foreach (var member in probeScope.MemberDeclarations)
+            foreach (var member in probeScope.MemberDeclarations)
+            {
+                AddMarkupAttributeProbeMember(membersBuilder, addedMemberKeys, member);
+            }
+        }
+        finally
         {
-            AddMarkupAttributeProbeMember(membersBuilder, addedMemberKeys, member);
+            addedMemberKeys.Free();
         }
     }
 
@@ -4419,9 +4432,9 @@ internal partial class AkburaSemanticModel
                     return Unsafe.As<MarkupRootSyntax>(node);
                 case AkburaSyntaxKind.MarkupElementSyntax:
                     var markupElement = Unsafe.As<MarkupElementSyntax>(node);
-                    if (markupElement.Parent?.Kind == AkburaSyntaxKind.MarkupRootSyntax)
+                    if (markupElement.Parent is MarkupRootSyntax markupRoot)
                     {
-                        return Unsafe.As<MarkupRootSyntax>(markupElement.Parent);
+                        return markupRoot;
                     }
 
                     return markupElement;
@@ -4565,7 +4578,9 @@ internal partial class AkburaSemanticModel
             return "_";
         }
 
-        var builder = new StringBuilder(value.Length);
+        var pooledBuilder = PooledStringBuilder.GetInstance();
+        var builder = pooledBuilder.Builder;
+        builder.EnsureCapacity(value.Length);
         for (var index = 0; index < value.Length; index++)
         {
             var ch = value[index];
@@ -4574,7 +4589,7 @@ internal partial class AkburaSemanticModel
                 : Microsoft.CodeAnalysis.CSharp.SyntaxFacts.IsIdentifierPartCharacter(ch) ? ch : '_');
         }
 
-        return builder.ToString();
+        return pooledBuilder.ToStringAndFree();
     }
 
     private static CSharp.FieldDeclarationSyntax CreateProbeField(CSharp.TypeSyntax type, string name)
@@ -4798,10 +4813,8 @@ internal partial class AkburaSemanticModel
                 return true;
             }
 
-            if (value?.Kind ==
-                    AkburaSyntaxKind.MarkupExtensionNestedValueSyntax &&
-                IsUpdateDependentMarkupExtension(
-                    Unsafe.As<MarkupExtensionNestedValueSyntax>(value).Extension))
+            if (value is MarkupExtensionNestedValueSyntax nestedValue &&
+                IsUpdateDependentMarkupExtension(nestedValue.Extension))
             {
                 return true;
             }

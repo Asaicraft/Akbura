@@ -8,8 +8,12 @@ namespace Akbura.Workspaces.UnitTests;
 
 public sealed class WorkspaceControlEventHookTests
 {
-    [Fact]
-    public async Task Completion_OffersRuntimeEventHookAndKeyEventArgsMembers()
+    [Theory]
+    [InlineData("args")]
+    [InlineData("(sender, args)")]
+    [InlineData("action: args")]
+    [InlineData("listener: (sender, args)")]
+    public async Task Completion_OffersRuntimeEventHookAndKeyEventArgsMembers(string lambdaParameters)
     {
         const string hookSourceWithCaret = "namespace Gallery;\r\nusing Akbura.Hooks;\r\nusing Avalonia.Controls;\r\n\r\nuseKe|\r\n\r\n<Border/>";
         using var workspace = CreateWorkspace();
@@ -34,11 +38,11 @@ public sealed class WorkspaceControlEventHookTests
         Assert.Contains("KeyEventArgs", hook.Suffix, StringComparison.Ordinal);
         Assert.Contains("key down routed event", hook.Description, StringComparison.OrdinalIgnoreCase);
 
-        const string argsSourceWithCaret =
+        var argsSourceWithCaret =
             "namespace Gallery;\r\n" +
             "using Akbura.Hooks;\r\n" +
             "using Avalonia.Controls;\r\n\r\n" +
-            "useKeyDown(args =>\r\n" +
+            "useKeyDown(" + lambdaParameters + " =>\r\n" +
             "{\r\n" +
             "    args.Ha|\r\n" +
             "});\r\n\r\n" +
@@ -62,7 +66,7 @@ public sealed class WorkspaceControlEventHookTests
         var projectedArgumentType = projectionModel.GetTypeInfo(incompleteAccess.Expression).Type?.ToDisplayString();
         Assert.True(
             projectedArgumentType == "Avalonia.Input.KeyEventArgs",
-            projection.Root.ToFullString() + Environment.NewLine +
+            "Projected argument type: " + projectedArgumentType + Environment.NewLine + projection.Root.ToFullString() + Environment.NewLine +
             string.Join(Environment.NewLine, projectionCompilation.GetDiagnostics()));
         var argsCompletion = await workspace.LanguageServices.ProjectedCSharp.GetCompletionsAsync(
             argsDocument,

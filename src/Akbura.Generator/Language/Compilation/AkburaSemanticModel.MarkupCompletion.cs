@@ -83,31 +83,37 @@ internal partial class AkburaSemanticModel
                     continue;
                 }
 
-                var attachedNames = new HashSet<string>(
-                    StringComparer.Ordinal);
-                AddMarkupAttachedPropertyNames(
-                    ownerType,
-                    attachedNames);
-                if (attachedNames.Count == 0)
+                var attachedNames = PooledHashSet<string>.GetInstance();
+                try
                 {
-                    continue;
-                }
+                    AddMarkupAttachedPropertyNames(
+                        ownerType,
+                        attachedNames);
+                    if (attachedNames.Count == 0)
+                    {
+                        continue;
+                    }
 
-                var ownerReference = visibleNamespace.Alias == null
-                    ? ownerType.Name
-                    : visibleNamespace.Alias + "::" + ownerType.Name;
-                if (!visibleOwners.TryGetValue(
-                        ownerReference,
-                        out var existingOwner))
-                {
-                    visibleOwners.Add(ownerReference, ownerType);
+                    var ownerReference = visibleNamespace.Alias == null
+                        ? ownerType.Name
+                        : visibleNamespace.Alias + "::" + ownerType.Name;
+                    if (!visibleOwners.TryGetValue(
+                            ownerReference,
+                            out var existingOwner))
+                    {
+                        visibleOwners.Add(ownerReference, ownerType);
+                    }
+                    else if (existingOwner != null &&
+                        !SymbolEqualityComparer.Default.Equals(
+                            existingOwner,
+                            ownerType))
+                    {
+                        visibleOwners[ownerReference] = null;
+                    }
                 }
-                else if (existingOwner != null &&
-                    !SymbolEqualityComparer.Default.Equals(
-                        existingOwner,
-                        ownerType))
+                finally
                 {
-                    visibleOwners[ownerReference] = null;
+                    attachedNames.Free();
                 }
             }
         }
@@ -115,61 +121,74 @@ internal partial class AkburaSemanticModel
         using var candidates =
             ImmutableArrayBuilder<
                 MarkupAttachedPropertyLookupCandidate>.Rent();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-
-        foreach (var pair in visibleOwners.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
+        var seen = PooledHashSet<string>.GetInstance();
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var ownerType = pair.Value;
-            if (ownerType == null)
-            {
-                continue;
-            }
 
-            var attachedNames = new HashSet<string>(
-                StringComparer.Ordinal);
-            AddMarkupAttachedPropertyNames(ownerType, attachedNames);
-
-            foreach (var propertyName in attachedNames.OrderBy(static name => name, StringComparer.Ordinal))
+            foreach (var pair in visibleOwners.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!TryCreateAttachedPropertySymbol(
-                        ownerType,
-                        propertyName,
-                        target.ComponentType,
-                        SymbolLanguage.Markup,
-                        target,
-                        out var property) ||
-                    !property.CanRead &&
-                    !property.CanWrite)
+                var ownerType = pair.Value;
+                if (ownerType == null)
                 {
                     continue;
                 }
 
-                var displayName = pair.Key + "." + propertyName;
-                if (!seen.Add(displayName))
+                var attachedNames = PooledHashSet<string>.GetInstance();
+                try
                 {
-                    continue;
-                }
+                    AddMarkupAttachedPropertyNames(ownerType, attachedNames);
 
-                var definitionOwner = property.WriteDefinition.Symbol
-                        ?.ContainingType ??
-                    property.ReadDefinition.Symbol?.ContainingType ??
-                    ownerType;
-                candidates.Add(
-                    new MarkupAttachedPropertyLookupCandidate(
-                        displayName,
-                        definitionOwner.ToDisplayString(
-                            SymbolDisplayFormat
-                                .MinimallyQualifiedFormat),
-                        property.Type.ToDisplayString(
-                            SymbolDisplayFormat
-                                .MinimallyQualifiedFormat),
-                        property));
+                    foreach (var propertyName in attachedNames.OrderBy(static name => name, StringComparer.Ordinal))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (!TryCreateAttachedPropertySymbol(
+                                ownerType,
+                                propertyName,
+                                target.ComponentType,
+                                SymbolLanguage.Markup,
+                                target,
+                                out var property) ||
+                            !property.CanRead &&
+                            !property.CanWrite)
+                        {
+                            continue;
+                        }
+
+                        var displayName = pair.Key + "." + propertyName;
+                        if (!seen.Add(displayName))
+                        {
+                            continue;
+                        }
+
+                        var definitionOwner = property.WriteDefinition.Symbol
+                                ?.ContainingType ??
+                            property.ReadDefinition.Symbol?.ContainingType ??
+                            ownerType;
+                        candidates.Add(
+                            new MarkupAttachedPropertyLookupCandidate(
+                                displayName,
+                                definitionOwner.ToDisplayString(
+                                    SymbolDisplayFormat
+                                        .MinimallyQualifiedFormat),
+                                property.Type.ToDisplayString(
+                                    SymbolDisplayFormat
+                                        .MinimallyQualifiedFormat),
+                                property));
+                    }
+                }
+                finally
+                {
+                    attachedNames.Free();
+                }
             }
-        }
 
-        return candidates.ToImmutable();
+            return candidates.ToImmutable();
+        }
+        finally
+        {
+            seen.Free();
+        }
     }
 
     private void AddMarkupAttachedPropertyNames(INamedTypeSymbol ownerType, HashSet<string> names)
@@ -211,45 +230,52 @@ internal partial class AkburaSemanticModel
         using var items =
             ImmutableArrayBuilder<MarkupBindingPathCompletionCandidate>
                 .Rent();
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var type in EnumerateBindingMemberTypes(receiverType))
+        var names = PooledHashSet<string>.GetInstance();
+        try
         {
-            foreach (var member in type.GetMembers())
+            foreach (var type in EnumerateBindingMemberTypes(receiverType))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                switch (member)
+                foreach (var member in type.GetMembers())
                 {
-                    case Microsoft.CodeAnalysis.IPropertySymbol property
-                        when !property.IsStatic &&
-                             !property.IsIndexer &&
-                             property.DeclaredAccessibility ==
-                                 Accessibility.Public &&
-                             property.GetMethod?.DeclaredAccessibility ==
-                                 Accessibility.Public &&
-                             names.Add(property.Name):
-                        items.Add(
-                            new MarkupBindingPathCompletionCandidate(
-                                property.Name,
-                                property,
-                                property.Type));
-                        break;
+                    cancellationToken.ThrowIfCancellationRequested();
+                    switch (member)
+                    {
+                        case Microsoft.CodeAnalysis.IPropertySymbol property
+                            when !property.IsStatic &&
+                                 !property.IsIndexer &&
+                                 property.DeclaredAccessibility ==
+                                     Accessibility.Public &&
+                                 property.GetMethod?.DeclaredAccessibility ==
+                                     Accessibility.Public &&
+                                 names.Add(property.Name):
+                            items.Add(
+                                new MarkupBindingPathCompletionCandidate(
+                                    property.Name,
+                                    property,
+                                    property.Type));
+                            break;
 
-                    case IFieldSymbol field
-                        when !field.IsStatic &&
-                             field.DeclaredAccessibility ==
-                                 Accessibility.Public &&
-                             names.Add(field.Name):
-                        items.Add(
-                            new MarkupBindingPathCompletionCandidate(
-                                field.Name,
-                                field,
-                                field.Type));
-                        break;
+                        case IFieldSymbol field
+                            when !field.IsStatic &&
+                                 field.DeclaredAccessibility ==
+                                     Accessibility.Public &&
+                                 names.Add(field.Name):
+                            items.Add(
+                                new MarkupBindingPathCompletionCandidate(
+                                    field.Name,
+                                    field,
+                                    field.Type));
+                            break;
+                    }
                 }
             }
-        }
 
-        return items.ToImmutable();
+            return items.ToImmutable();
+        }
+        finally
+        {
+            names.Free();
+        }
     }
 
     internal ImmutableArray<MarkupBindingPathRootCompletionCandidate> LookupMarkupBindingPathRootsForCompletion(MarkupAttributeSyntax attribute, CancellationToken cancellationToken = default)
@@ -280,27 +306,34 @@ internal partial class AkburaSemanticModel
         }
 
         var scope = BindingSession.GetMarkupNameScope(root);
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var declaration in scope.Declarations)
+        var names = PooledHashSet<string>.GetInstance();
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!declaration.IsValid ||
-                !names.Add(declaration.Name) ||
-                !scope.TryGetVisibleDeclaredSymbol(
-                    this,
-                    attribute,
-                    declaration.Name,
-                    out var symbol))
+            foreach (var declaration in scope.Declarations)
             {
-                continue;
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!declaration.IsValid ||
+                    !names.Add(declaration.Name) ||
+                    !scope.TryGetVisibleDeclaredSymbol(
+                        this,
+                        attribute,
+                        declaration.Name,
+                        out var symbol))
+                {
+                    continue;
+                }
+
+                items.Add(new MarkupBindingPathRootCompletionCandidate(
+                    "#" + symbol.Name,
+                    symbol.Type.Symbol as ITypeSymbol));
             }
 
-            items.Add(new MarkupBindingPathRootCompletionCandidate(
-                "#" + symbol.Name,
-                symbol.Type.Symbol as ITypeSymbol));
+            return items.ToImmutable();
         }
-
-        return items.ToImmutable();
+        finally
+        {
+            names.Free();
+        }
     }
 
     internal ImmutableArray<MarkupExtensionArgumentCompletionCandidate> LookupMarkupExtensionArgumentsForCompletion(MarkupExtensionSyntax extension, CancellationToken cancellationToken = default)
@@ -319,72 +352,86 @@ internal partial class AkburaSemanticModel
             return [];
         }
 
-        var existing = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var argument in extension.Arguments)
+        var existing = PooledHashSet<string>.GetInstance();
+        try
         {
-            if (argument is MarkupExtensionPropertyArgumentSyntax property)
+            foreach (var argument in extension.Arguments)
             {
-                existing.Add(property.Name.Identifier.ValueText);
-            }
-        }
-
-        using var items =
-            ImmutableArrayBuilder<MarkupExtensionArgumentCompletionCandidate>
-                .Rent();
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        for (var current = extensionType; current != null; current = current.BaseType)
-        {
-            foreach (var property in current.GetMembers().OfType<Microsoft.CodeAnalysis.IPropertySymbol>())
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (property.IsStatic ||
-                    property.IsIndexer ||
-                    property.DeclaredAccessibility !=
-                        Accessibility.Public ||
-                    property.SetMethod?.DeclaredAccessibility !=
-                        Accessibility.Public ||
-                    existing.Contains(property.Name) ||
-                    !names.Add(property.Name))
+                if (argument is MarkupExtensionPropertyArgumentSyntax property)
                 {
-                    continue;
-                }
-
-                items.Add(
-                    new MarkupExtensionArgumentCompletionCandidate(
-                        property.Name,
-                        property.Type,
-                        property));
-            }
-        }
-
-        if (bindingKind != null)
-        {
-            var stringType = Compilation.CSharpCompilation
-                .GetSpecialType(SpecialType.System_String);
-            if (!existing.Contains("Path") && names.Add("Path"))
-            {
-                items.Add(
-                    new MarkupExtensionArgumentCompletionCandidate(
-                        "Path",
-                        stringType,
-                        symbol: null));
-            }
-
-            if (bindingKind == MarkupBindingKind.Compiled)
-            {
-                if (!existing.Contains("ElementName") &&
-                    names.Add("ElementName"))
-                {
-                    items.Add(
-                        new MarkupExtensionArgumentCompletionCandidate(
-                            "ElementName",
-                            stringType,
-                            symbol: null));
+                    existing.Add(property.Name.Identifier.ValueText);
                 }
             }
-        }
 
-        return items.ToImmutable();
+            using var items =
+                ImmutableArrayBuilder<MarkupExtensionArgumentCompletionCandidate>
+                    .Rent();
+            var names = PooledHashSet<string>.GetInstance();
+            try
+            {
+                for (var current = extensionType; current != null; current = current.BaseType)
+                {
+                    foreach (var property in current.GetMembers().OfType<Microsoft.CodeAnalysis.IPropertySymbol>())
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (property.IsStatic ||
+                            property.IsIndexer ||
+                            property.DeclaredAccessibility !=
+                                Accessibility.Public ||
+                            property.SetMethod?.DeclaredAccessibility !=
+                                Accessibility.Public ||
+                            existing.Contains(property.Name) ||
+                            !names.Add(property.Name))
+                        {
+                            continue;
+                        }
+
+                        items.Add(
+                            new MarkupExtensionArgumentCompletionCandidate(
+                                property.Name,
+                                property.Type,
+                                property));
+                    }
+                }
+
+                if (bindingKind != null)
+                {
+                    var stringType = Compilation.CSharpCompilation
+                        .GetSpecialType(SpecialType.System_String);
+                    if (!existing.Contains("Path") && names.Add("Path"))
+                    {
+                        items.Add(
+                            new MarkupExtensionArgumentCompletionCandidate(
+                                "Path",
+                                stringType,
+                                symbol: null));
+                    }
+
+                    if (bindingKind == MarkupBindingKind.Compiled)
+                    {
+                        if (!existing.Contains("ElementName") &&
+                            names.Add("ElementName"))
+                        {
+                            items.Add(
+                                new MarkupExtensionArgumentCompletionCandidate(
+                                    "ElementName",
+                                    stringType,
+                                    symbol: null));
+                        }
+                    }
+                }
+
+                return items.ToImmutable();
+            }
+            finally
+            {
+                names.Free();
+            }
+        }
+        finally
+        {
+            existing.Free();
+        }
     }
 
     internal ITypeSymbol? GetMarkupExtensionArgumentValueTypeForCompletion(MarkupExtensionSyntax extension, string argumentName, CancellationToken cancellationToken = default)

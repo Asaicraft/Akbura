@@ -314,7 +314,7 @@ Assert-Exact ($actualTargetIds -join ',') ($expectedTargetIds -join ',') `
     'Visual Studio installation targets'
 
 foreach ($target in $targets) {
-    Assert-Exact $target.GetAttribute('Version') '[17.14,)' `
+    Assert-Exact $target.GetAttribute('Version') '[18.9,)' `
         "version range for $($target.GetAttribute('Id'))"
 
     $architecture = $target.SelectSingleNode(
@@ -337,7 +337,7 @@ if ($prerequisites.Count -ne 1) {
 }
 Assert-Exact $prerequisites[0].GetAttribute('Id') `
     'Microsoft.VisualStudio.Component.CoreEditor' 'prerequisite ID'
-Assert-Exact $prerequisites[0].GetAttribute('Version') '[17.14,)' `
+Assert-Exact $prerequisites[0].GetAttribute('Version') '[18.9,)' `
     'prerequisite version'
 
 if (-not [string]::IsNullOrWhiteSpace($PublishManifestPath)) {

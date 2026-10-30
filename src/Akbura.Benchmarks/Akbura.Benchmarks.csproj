@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <ItemGroup>
+    <Compile Include="..\Akbura.TestUtilities\MetadataAkcssLookupFixture.cs" Link="MetadataAkcssLookupFixture.cs" />
+  </ItemGroup>
+
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
 		<TargetFramework>net10.0</TargetFramework>
@@ -26,16 +30,16 @@
 
 		<PackageReference Include="Microsoft.Build.Locator" Version="1.11.2" />
 		<!-- FeatureGallery uses C# 14 extension blocks. -->
-		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
-		<PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" />
-		<PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.0.0" />
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="$(AkburaRoslynVersion)" />
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="$(AkburaRoslynVersion)" />
+		<PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="$(AkburaRoslynVersion)" />
 
-		<PackageReference Include="Microsoft.Build" Version="17.11.48" ExcludeAssets="runtime" PrivateAssets="all" />
-		<PackageReference Include="Microsoft.Build.Framework" Version="17.11.48" ExcludeAssets="runtime" PrivateAssets="all" />
-		<PackageReference Include="Microsoft.Build.Tasks.Core" Version="17.11.48" ExcludeAssets="runtime" PrivateAssets="all" />
-		<PackageReference Include="Microsoft.Build.Utilities.Core" Version="17.11.48" ExcludeAssets="runtime" PrivateAssets="all" />
-		<PackageReference Include="Microsoft.NET.StringTools" Version="17.11.48" ExcludeAssets="runtime" PrivateAssets="all" />
-		<PackageReference Include="System.Security.Cryptography.Xml" Version="8.0.4" />
+		<PackageReference Include="Microsoft.Build" Version="18.0.2" ExcludeAssets="runtime" PrivateAssets="all" />
+		<PackageReference Include="Microsoft.Build.Framework" Version="18.0.2" ExcludeAssets="runtime" PrivateAssets="all" />
+		<PackageReference Include="Microsoft.Build.Tasks.Core" Version="18.0.2" ExcludeAssets="runtime" PrivateAssets="all" />
+		<PackageReference Include="Microsoft.Build.Utilities.Core" Version="18.0.2" ExcludeAssets="runtime" PrivateAssets="all" />
+		<PackageReference Include="Microsoft.NET.StringTools" Version="18.0.2" ExcludeAssets="runtime" PrivateAssets="all" />
+		<PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.14" />
 	</ItemGroup>
 
 	<ItemDefinitionGroup>

@@ -74,12 +74,11 @@ internal sealed class AkburaOperationFactory : IOperationFactory
         using var interceptOperationsBuilder = ImmutableArrayBuilder<IAkcssOperation>.Rent();
         foreach (var member in members)
         {
-            if (member.Kind != AkburaSyntaxKind.AkcssInterceptDirectiveSyntax)
+            if (member is not AkcssInterceptDirectiveSyntax interceptDirective)
             {
                 continue;
             }
 
-            var interceptDirective = Unsafe.As<AkcssInterceptDirectiveSyntax>(member);
             if (!context.TryGetCachedOperation(interceptDirective, out var cachedInterceptOperation) ||
                 cachedInterceptOperation is not IAkcssInterceptOperation interceptOperation)
             {
@@ -101,7 +100,7 @@ internal sealed class AkburaOperationFactory : IOperationFactory
         {
             foreach (var member in members)
             {
-                if (member.Kind != AkburaSyntaxKind.AkcssInterceptDirectiveSyntax)
+                if (member is not AkcssInterceptDirectiveSyntax)
                 {
                     context.SetAkcssInterceptIgnoredDiagnostics(member, containingSymbol);
                 }

@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -238,34 +239,22 @@ internal partial class AkburaSemanticModel
 
         ValidateSyntaxTreeOwnership(markupAttribute);
 
-        if (markupAttribute.Kind ==
-            AkburaSyntaxKind.TailwindFullAttributeSyntax)
+        if (markupAttribute is TailwindFullAttributeSyntax tailwindAttribute)
         {
-            var tailwindAttribute =
-                Unsafe.As<TailwindFullAttributeSyntax>(markupAttribute);
             using var builder =
                 ImmutableArrayBuilder<CSharpSymbolReference>.Rent();
 
-            if (tailwindAttribute.Prefix?.Kind ==
-                AkburaSyntaxKind.ExpressionConditionalPrefixSyntax)
+            if (tailwindAttribute.Prefix is ExpressionConditionalPrefixSyntax expressionPrefix)
             {
-                builder.AddRange(GetCSharpSymbolReferences(
-                    Unsafe.As<ExpressionConditionalPrefixSyntax>(
-                            tailwindAttribute.Prefix)
-                        .Expression));
+                builder.AddRange(GetCSharpSymbolReferences(expressionPrefix.Expression));
             }
             else if (tailwindAttribute.Prefix is TailwindExpressionBindingConditionalPrefixSyntax reactive)
             {
                 builder.AddRange(GetCSharpSymbolReferences(reactive.Binding.Expression));
             }
-            else if (tailwindAttribute.Prefix?.Kind ==
-                AkburaSyntaxKind.MarkupExtensionConditionalPrefixSyntax)
+            else if (tailwindAttribute.Prefix is MarkupExtensionConditionalPrefixSyntax extensionPrefix)
             {
-                AddMarkupExtensionCSharpSymbolReferences(
-                    Unsafe.As<MarkupExtensionConditionalPrefixSyntax>(
-                            tailwindAttribute.Prefix)
-                        .Extension,
-                    builder);
+                AddMarkupExtensionCSharpSymbolReferences(extensionPrefix.Extension, builder);
             }
 
             foreach (var segment in tailwindAttribute.Segments)
@@ -298,9 +287,8 @@ internal partial class AkburaSemanticModel
             return [];
         }
 
-        if (value.Kind == AkburaSyntaxKind.MarkupDynamicAttributeValueSyntax)
+        if (value is MarkupDynamicAttributeValueSyntax dynamicValue)
         {
-            var dynamicValue = Unsafe.As<MarkupDynamicAttributeValueSyntax>(value);
             return GetCSharpSymbolReferences(dynamicValue.Expression);
         }
 
@@ -309,9 +297,8 @@ internal partial class AkburaSemanticModel
             return GetCSharpSymbolReferences(expressionBinding.Expression);
         }
 
-        if (value.Kind == AkburaSyntaxKind.MarkupExtensionAttributeValueSyntax)
+        if (value is MarkupExtensionAttributeValueSyntax extensionValue)
         {
-            var extensionValue = Unsafe.As<MarkupExtensionAttributeValueSyntax>(value);
             using var builder = ImmutableArrayBuilder<CSharpSymbolReference>.Rent();
             AddMarkupExtensionCSharpSymbolReferences(extensionValue.Extension, builder);
             return builder.ToImmutable();
@@ -547,34 +534,40 @@ internal partial class AkburaSemanticModel
                 CSharpSymbolReference>.Rent();
 
         var seenReferences =
-            new HashSet<string>(
-                StringComparer.Ordinal);
-
-        foreach (var target in targets)
+            PooledHashSet<string>.GetInstance();
+        try
         {
-            foreach (var name in target.ProbeNode.DescendantNodesAndSelf().OfType<CSharp.SimpleNameSyntax>())
+
+            foreach (var target in targets)
             {
-                if (IsVarTypeName(name))
+                foreach (var name in target.ProbeNode.DescendantNodesAndSelf().OfType<CSharp.SimpleNameSyntax>())
                 {
-                    continue;
+                    if (IsVarTypeName(name))
+                    {
+                        continue;
+                    }
+
+                    var symbolInfo = GetReferenceSymbolInfo(semanticModel, name);
+
+                    AddCSharpSymbolReference(
+                        semanticModel,
+                        references,
+                        seenReferences,
+                        name,
+                        target.MapToSource(
+                            name.Identifier.Span),
+                        symbolInfo,
+                        akburaSymbolsByName,
+                        akburaSymbolsByCommandTypeName);
                 }
-
-                var symbolInfo = GetReferenceSymbolInfo(semanticModel, name);
-
-                AddCSharpSymbolReference(
-                    semanticModel,
-                    references,
-                    seenReferences,
-                    name,
-                    target.MapToSource(
-                        name.Identifier.Span),
-                    symbolInfo,
-                    akburaSymbolsByName,
-                    akburaSymbolsByCommandTypeName);
             }
-        }
 
-        return references.ToImmutable();
+            return references.ToImmutable();
+        }
+        finally
+        {
+            seenReferences.Free();
+        }
     }
 
     private static CSharpReferenceSymbolInfo GetReferenceSymbolInfo(SemanticModel semanticModel, CSharp.SimpleNameSyntax name)
@@ -719,7 +712,7 @@ internal partial class AkburaSemanticModel
         if (attributeSymbol is Symbols.IPropertySymbol { Command: { } command })
         {
             return CreateCommandHandlerProbeParameterList(
-                command.Parameters.Select(static parameter => parameter.Type).ToImmutableArray(),
+                command.Parameters.SelectAsArray(static parameter => parameter.Type),
                 parameterNames);
         }
 
@@ -949,31 +942,38 @@ internal partial class AkburaSemanticModel
         }
 
         var scope = GetMarkupBindingScope(scopeSyntax);
-        var mappedMarkupNames = new HashSet<string>(StringComparer.Ordinal);
-        for (var binder = BindingSession.GetSemanticBinder(scope); binder != null; binder = binder.Next)
+        var mappedMarkupNames = PooledHashSet<string>.GetInstance();
+        try
         {
-            if (binder is MarkupBinder markupBinder)
+            for (var binder = BindingSession.GetSemanticBinder(scope); binder != null; binder = binder.Next)
             {
-                if (markupBinder.GetDeclaredItemSymbol() is { } itemSymbol &&
-                    mappedMarkupNames.Add(itemSymbol.Name))
+                if (binder is MarkupBinder markupBinder)
                 {
-                    akburaSymbolsByName[itemSymbol.Name] = itemSymbol;
+                    if (markupBinder.GetDeclaredItemSymbol() is { } itemSymbol &&
+                        mappedMarkupNames.Add(itemSymbol.Name))
+                    {
+                        akburaSymbolsByName[itemSymbol.Name] = itemSymbol;
+                    }
+
+                    AddMarkupNameSymbolMappings(
+                        markupBinder.GetDeclaredNameSymbols(scope),
+                        akburaSymbolsByName,
+                        mappedMarkupNames);
+                    continue;
                 }
 
-                AddMarkupNameSymbolMappings(
-                    markupBinder.GetDeclaredNameSymbols(scope),
-                    akburaSymbolsByName,
-                    mappedMarkupNames);
-                continue;
+                if (binder is ComponentBinder componentBinder)
+                {
+                    AddMarkupNameSymbolMappings(
+                        componentBinder.GetDeclaredMarkupNameSymbols(),
+                        akburaSymbolsByName,
+                        mappedMarkupNames);
+                }
             }
-
-            if (binder is ComponentBinder componentBinder)
-            {
-                AddMarkupNameSymbolMappings(
-                    componentBinder.GetDeclaredMarkupNameSymbols(),
-                    akburaSymbolsByName,
-                    mappedMarkupNames);
-            }
+        }
+        finally
+        {
+            mappedMarkupNames.Free();
         }
     }
 

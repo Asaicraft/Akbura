@@ -1130,19 +1130,21 @@ public static class ImmutableArrayExtensions
 
             default:
                 var set = PooledHashSet<T>.GetInstance();
-                var foundDuplicate = false;
-
-                foreach (var element in array)
+                try
                 {
-                    if (!set.Add(element))
+                    foreach (var element in array)
                     {
-                        foundDuplicate = true;
-                        break;
+                        if (!set.Add(element))
+                        {
+                            return true;
+                        }
                     }
+                    return false;
                 }
-
-                set.Free();
-                return foundDuplicate;
+                finally
+                {
+                    set.Free();
+                }
         }
     }
 
@@ -1460,21 +1462,25 @@ public static class ImmutableArrayExtensions
         }
 
         var set = PooledHashSet<TElement>.GetInstance();
-        foreach (var item in other)
+        try
         {
-            set.Add(item);
-        }
-
-        foreach (var item in array)
-        {
-            if (!set.Contains(item))
+            foreach (var item in other)
             {
-                set.Free();
-                return false;
+                set.Add(item);
             }
-        }
 
-        set.Free();
-        return true;
+            foreach (var item in array)
+            {
+                if (!set.Contains(item))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        finally
+        {
+            set.Free();
+        }
     }
 }

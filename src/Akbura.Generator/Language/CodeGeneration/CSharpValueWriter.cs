@@ -64,9 +64,14 @@ internal readonly ref struct CSharpValueWriter
             return;
         }
 
-        // Roslyn does not expose a streaming SymbolDisplay API, so this
-        // currently creates one temporary string.
-        _writer.Write(type.ToDisplayString(format));
+        if (ReferenceEquals(format, s_typeDisplayFormat))
+        {
+            _writer.WriteFullyQualifiedName(type);
+        }
+        else
+        {
+            _writer.Write(type.ToDisplayString(format));
+        }
     }
 
     public void WriteStaticMemberReference(ISymbol symbol)

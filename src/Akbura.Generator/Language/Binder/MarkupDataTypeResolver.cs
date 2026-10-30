@@ -3,7 +3,6 @@ using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Runtime.CompilerServices;
-using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 
 namespace Akbura.Language.Binder;
 
@@ -34,12 +33,10 @@ internal sealed class MarkupDataTypeResolver
         failureMessage = null;
         for (var node = anchor.Parent; node != null; node = node.Parent)
         {
-            if (node.Kind != AkburaSyntaxKind.MarkupElementSyntax)
+            if (node is not MarkupElementSyntax markupElement)
             {
                 continue;
             }
-
-            var markupElement = Unsafe.As<MarkupElementSyntax>(node);
             if (TryGetExplicitDataType(markupElement, out dataType) ||
                 TryGetInheritedDataType(
                     markupElement,
@@ -322,9 +319,9 @@ internal sealed class MarkupDataTypeResolver
     {
         for (var node = element.Parent; node != null; node = node.Parent)
         {
-            if (node.Kind == AkburaSyntaxKind.MarkupElementSyntax)
+            if (node is MarkupElementSyntax markupElement)
             {
-                return Unsafe.As<MarkupElementSyntax>(node);
+                return markupElement;
             }
         }
 
@@ -366,9 +363,8 @@ internal sealed class MarkupDataTypeResolver
             return false;
         }
 
-        if (value.Kind == AkburaSyntaxKind.MarkupDynamicAttributeValueSyntax)
+        if (value is MarkupDynamicAttributeValueSyntax dynamicValue)
         {
-            var dynamicValue = Unsafe.As<MarkupDynamicAttributeValueSyntax>(value);
             var expression = AkburaSemanticModel.ParseInlineExpression(dynamicValue.Expression);
             if (expression == null)
             {
@@ -382,9 +378,8 @@ internal sealed class MarkupDataTypeResolver
             return sourceType != null && sourceType.TypeKind != TypeKind.Error;
         }
 
-        if (value.Kind == AkburaSyntaxKind.MarkupExtensionAttributeValueSyntax)
+        if (value is MarkupExtensionAttributeValueSyntax extension)
         {
-            var extension = Unsafe.As<MarkupExtensionAttributeValueSyntax>(value);
             var property = _semanticModel.GetSymbolInfo(attribute).Symbol as Symbols.IPropertySymbol;
             var binding = _semanticModel.BindMarkupExtensionAttributeValue(
                 attribute,

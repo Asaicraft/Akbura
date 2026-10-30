@@ -1017,22 +1017,29 @@ internal sealed class ComponentMemberSemanticModel : MemberSemanticModel
                 return;
             }
 
-            var seen = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var parameter in csharpParameters.Parameters)
+            var seen = PooledHashSet<string>.GetInstance();
+            try
             {
-                var name = parameter.Identifier.ValueText;
-                if (string.IsNullOrWhiteSpace(name))
+                foreach (var parameter in csharpParameters.Parameters)
                 {
-                    continue;
-                }
+                    var name = parameter.Identifier.ValueText;
+                    if (string.IsNullOrWhiteSpace(name))
+                    {
+                        continue;
+                    }
 
-                if (!seen.Add(name))
-                {
-                    diagnosticsBuilder.Add(new AkburaSemanticDiagnostic(
-                        commandDeclaration,
-                        ErrorCodes.AKBURA_SEMANTIC_DuplicateCommandParameter,
-                        [name]));
+                    if (!seen.Add(name))
+                    {
+                        diagnosticsBuilder.Add(new AkburaSemanticDiagnostic(
+                            commandDeclaration,
+                            ErrorCodes.AKBURA_SEMANTIC_DuplicateCommandParameter,
+                            [name]));
+                    }
                 }
+            }
+            finally
+            {
+                seen.Free();
             }
         }
 }

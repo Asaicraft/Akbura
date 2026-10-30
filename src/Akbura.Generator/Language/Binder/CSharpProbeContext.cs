@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
 using System;
@@ -53,14 +54,14 @@ internal sealed class CSharpProbeContext(AkburaSemanticModel semanticModel)
             if (_defaultImportKeys.IsDefault)
             {
                 ImmutableInterlocked.InterlockedInitialize(ref _defaultImportKeys,
-                    effectiveUsings.Select(static directive => new ImportKey(directive, directive.ToFullString())).ToImmutableArray());
+                    effectiveUsings.SelectAsArray(static directive => new ImportKey(directive, directive.ToFullString())));
             }
 
             imports = _defaultImportKeys;
         }
         else
         {
-            imports = effectiveUsings.Select(static directive => new ImportKey(directive, directive.ToFullString())).ToImmutableArray();
+            imports = effectiveUsings.SelectAsArray(static directive => new ImportKey(directive, directive.ToFullString()));
         }
 
         var key = new TypeProbeKey(type, type.ToFullString(), imports);

@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language.Binder;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
@@ -312,8 +313,7 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
         var handlerResultType = VisitCSharpSymbolDefinition(node.HandlerResultType);
         var handlerOperation = VisitCSharpOperationDefinition(node.HandlerOperation);
         var parameterTypes = node.ParameterTypes
-            .Select(VisitCSharpSymbolDefinition)
-            .ToImmutableArray();
+            .SelectAsArray(static (type, rewriter) => rewriter.VisitCSharpSymbolDefinition(type), this);
         var returnType = VisitCSharpSymbolDefinition(node.ReturnType);
         var resultType = VisitCSharpSymbolDefinition(node.ResultType);
 

@@ -9,6 +9,46 @@ namespace Akbura.Workspaces.UnitTests;
 
 public sealed class ProjectContextTests
 {
+    [Fact]
+    public async Task FactoryBindsCSharp14ExtensionProperty()
+    {
+        const string source = """
+            public static class TextExtensions
+            {
+                extension(string text)
+                {
+                    public int TwiceLength => text.Length * 2;
+                }
+            }
+
+            public sealed class Consumer
+            {
+                public int Read() => "test".TwiceLength;
+            }
+            """;
+        using var workspace = new AdhocWorkspace();
+        var project = workspace.AddProject("ExtensionProperties", LanguageNames.CSharp)
+            .WithParseOptions(new CSharpParseOptions(LanguageVersion.CSharp14))
+            .WithCompilationOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddMetadataReference(MetadataReference.CreateFromFile(typeof(object).Assembly.Location))
+            .AddDocument("Extensions.cs", SourceText.From(source))
+            .Project;
+        var compilation = Assert.IsType<CSharpCompilation>(await project.GetCompilationAsync());
+
+        var context = new RoslynProjectContextFactory().Create(project, compilation);
+        var tree = Assert.Single(context.CSharpCompilation.SyntaxTrees);
+        var access = tree.GetRoot().DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MemberAccessExpressionSyntax>()
+            .Single(static node => node.Name.Identifier.ValueText == "TwiceLength");
+        var symbol = Assert.IsAssignableFrom<IPropertySymbol>(
+            context.CSharpCompilation.GetSemanticModel(tree).GetSymbolInfo(access).Symbol);
+
+        Assert.Equal("TwiceLength", symbol.Name);
+        Assert.Equal(SpecialType.System_Int32, symbol.Type.SpecialType);
+        Assert.DoesNotContain(context.CSharpCompilation.GetDiagnostics(),
+            static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
     [Theory]
     [InlineData("Auto", AkburaDiagnosticPublisher.Auto)]
     [InlineData("Generator", AkburaDiagnosticPublisher.Generator)]

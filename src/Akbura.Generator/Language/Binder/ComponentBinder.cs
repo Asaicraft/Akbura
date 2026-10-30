@@ -3,7 +3,6 @@ using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
 using System.Collections.Immutable;
-using System.Runtime.CompilerServices;
 using AkburaSyntaxKind = Akbura.Language.Syntax.SyntaxKind;
 
 namespace Akbura.Language.Binder;
@@ -153,7 +152,7 @@ internal sealed class ComponentBinder : Binder
             return _lazyMarkupNameSymbols;
         }
 
-        if (ScopeDesignator?.Kind != AkburaSyntaxKind.AkburaDocumentSyntax)
+        if (ScopeDesignator is not AkburaDocumentSyntax document)
         {
             ImmutableInterlocked.InterlockedInitialize(
                 ref _lazyMarkupNameSymbols,
@@ -161,17 +160,15 @@ internal sealed class ComponentBinder : Binder
             return _lazyMarkupNameSymbols;
         }
 
-        var document = Unsafe.As<AkburaDocumentSyntax>(ScopeDesignator);
         using var builder = ImmutableArrayBuilder<ISymbol>.Rent();
         foreach (var member in document.Members)
         {
-            if (member.Kind != AkburaSyntaxKind.MarkupRootSyntax)
+            if (member is not MarkupRootSyntax markupRoot)
             {
                 continue;
             }
 
-            var scope = SemanticModel.BindingSession.GetMarkupNameScope(
-                Unsafe.As<MarkupRootSyntax>(member));
+            var scope = SemanticModel.BindingSession.GetMarkupNameScope(markupRoot);
             foreach (var symbol in scope.GetDeclaredSymbols(SemanticModel))
             {
                 builder.Add(symbol);

@@ -96,32 +96,39 @@ internal static class AkburaComponentProbeCompilationBuilder
         }
 
         using var generatedTrees = ImmutableArrayBuilder<SyntaxTree>.Rent();
-        var seenGeneratedTrees = new HashSet<SyntaxTree>();
-        for (var index = 0; index < currentMetadataNames.Length; index++)
+        var seenGeneratedTrees = PooledHashSet<SyntaxTree>.GetInstance();
+        try
         {
-            var componentType = compilation.GetTypeByMetadataName(currentMetadataNames[index]);
-            if (componentType == null)
+            for (var index = 0; index < currentMetadataNames.Length; index++)
             {
-                continue;
-            }
-
-            foreach (var syntaxReference in componentType.DeclaringSyntaxReferences)
-            {
-                var syntaxTree = syntaxReference.SyntaxTree;
-                if (IsAkburaGeneratedComponentTree(
-                        syntaxTree,
-                        currentGeneratedHintNames[index]) &&
-                    seenGeneratedTrees.Add(syntaxTree))
+                var componentType = compilation.GetTypeByMetadataName(currentMetadataNames[index]);
+                if (componentType == null)
                 {
-                    generatedTrees.Add(syntaxTree);
+                    continue;
+                }
+
+                foreach (var syntaxReference in componentType.DeclaringSyntaxReferences)
+                {
+                    var syntaxTree = syntaxReference.SyntaxTree;
+                    if (IsAkburaGeneratedComponentTree(
+                            syntaxTree,
+                            currentGeneratedHintNames[index]) &&
+                        seenGeneratedTrees.Add(syntaxTree))
+                    {
+                        generatedTrees.Add(syntaxTree);
+                    }
                 }
             }
-        }
 
-        var treesToRemove = generatedTrees.ToImmutable();
-        return treesToRemove.IsDefaultOrEmpty
-            ? compilation
-            : compilation.RemoveSyntaxTrees(treesToRemove);
+            var treesToRemove = generatedTrees.ToImmutable();
+            return treesToRemove.IsDefaultOrEmpty
+                ? compilation
+                : compilation.RemoveSyntaxTrees(treesToRemove);
+        }
+        finally
+        {
+            seenGeneratedTrees.Free();
+        }
     }
 
     private static bool IsAkburaGeneratedComponentTree(SyntaxTree syntaxTree, string expectedHintName)
@@ -367,32 +374,38 @@ internal static class AkburaComponentProbeCompilationBuilder
         using var builder =
             ImmutableArrayBuilder<
                 CSharp.UsingDirectiveSyntax>.Rent();
-        var seen = new HashSet<string>(
-            StringComparer.Ordinal);
-
-        foreach (var syntaxTree in syntaxTrees)
+        var seen = PooledHashSet<string>.GetInstance();
+        try
         {
-            var isGlobalUsingsFile =
-                GlobalUsings.IsComponentFile(syntaxTree);
-            foreach (var usingDirective in syntaxTree
-                         .GetRoot()
-                         .Members
-                         .OfType<UsingDirectiveSyntax>())
+
+            foreach (var syntaxTree in syntaxTrees)
             {
-                if (!isGlobalUsingsFile &&
-                    usingDirective.GlobalKeyword.RawKind == 0)
+                var isGlobalUsingsFile =
+                    GlobalUsings.IsComponentFile(syntaxTree);
+                foreach (var usingDirective in syntaxTree
+                             .GetRoot()
+                             .Members
+                             .OfType<UsingDirectiveSyntax>())
                 {
-                    continue;
+                    if (!isGlobalUsingsFile &&
+                        usingDirective.GlobalKeyword.RawKind == 0)
+                    {
+                        continue;
+                    }
+
+                    AddUsingDirective(
+                        builder,
+                        seen,
+                        usingDirective);
                 }
-
-                AddUsingDirective(
-                    builder,
-                    seen,
-                    usingDirective);
             }
-        }
 
-        return builder.ToImmutable();
+            return builder.ToImmutable();
+        }
+        finally
+        {
+            seen.Free();
+        }
     }
 
     private static ImmutableArray<
@@ -405,32 +418,38 @@ internal static class AkburaComponentProbeCompilationBuilder
         using var builder =
             ImmutableArrayBuilder<
                 CSharp.UsingDirectiveSyntax>.Rent();
-        var seen = new HashSet<string>(
-            StringComparer.Ordinal);
-
-        foreach (var usingDirective in globalUsings)
+        var seen = PooledHashSet<string>.GetInstance();
+        try
         {
-            AddUsingDirective(
-                builder,
-                seen,
-                usingDirective);
-        }
 
-        foreach (var usingDirective in syntaxTree
-                     .GetRoot()
-                     .Members
-                     .OfType<UsingDirectiveSyntax>())
-        {
-            if (usingDirective.GlobalKeyword.RawKind == 0)
+            foreach (var usingDirective in globalUsings)
             {
                 AddUsingDirective(
                     builder,
                     seen,
                     usingDirective);
             }
-        }
 
-        return builder.ToImmutable();
+            foreach (var usingDirective in syntaxTree
+                         .GetRoot()
+                         .Members
+                         .OfType<UsingDirectiveSyntax>())
+            {
+                if (usingDirective.GlobalKeyword.RawKind == 0)
+                {
+                    AddUsingDirective(
+                        builder,
+                        seen,
+                        usingDirective);
+                }
+            }
+
+            return builder.ToImmutable();
+        }
+        finally
+        {
+            seen.Free();
+        }
     }
 
     private static void AddUsingDirective(

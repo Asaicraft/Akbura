@@ -15,6 +15,8 @@ The `Akbura` package includes BlackSilence, the production incremental compiler.
 
 ## Getting started
 
+Use .NET SDK 10.0.400 or later (Roslyn 5.9 or later).
+
 Install the current Akbura templates from NuGet:
 
 ```bash

@@ -22,21 +22,24 @@ namespace Akbura.Language.Binder;
 internal abstract class BindingDiagnosticBag
 {
     private static readonly ObjectPool<BindingDiagnosticBag> s_poolWithDiagnostics =
-        new ObjectPool<BindingDiagnosticBag>(
+        new(
             pool => new PooledBindingDiagnosticBag(pool, new DiagnosticBag(), accumulatesSemanticDiagnostics: true),
             size: 128);
 
     private static readonly ObjectPool<BindingDiagnosticBag> s_poolWithConcurrentDiagnostics =
-        new ObjectPool<BindingDiagnosticBag>(
+        new(
             pool => new PooledBindingDiagnosticBag(pool, new DiagnosticBag(), accumulatesSemanticDiagnostics: true),
             size: 128);
 
     public static readonly BindingDiagnosticBag Discarded =
         new PooledBindingDiagnosticBag(pool: null, diagnosticBag: null, accumulatesSemanticDiagnostics: false);
 
+    private static readonly ObjectPool<PooledConcurrentDictionary<string, byte>> s_seenPool =
+        PooledConcurrentDictionary<string, byte>.CreatePool(StringComparer.Ordinal);
+
     private readonly bool _accumulatesSemanticDiagnostics;
     private ConcurrentQueue<AkburaSemanticDiagnostic>? _semanticDiagnostics;
-    private ConcurrentDictionary<string, byte>? _seen;
+    private PooledConcurrentDictionary<string, byte>? _seen;
 
     protected BindingDiagnosticBag(
         DiagnosticBag? diagnosticBag,
@@ -284,17 +287,21 @@ internal abstract class BindingDiagnosticBag
         return DiagnosticBag?.AsEnumerable() ?? [];
     }
 
+    /// <summary>
+    /// The owner must join all writers before clearing or freeing the bag.
+    /// Concurrent additions are supported only during the active rental.
+    /// </summary>
     public void Clear()
     {
         _semanticDiagnostics = null;
-        _seen = null;
+        FreeSeen();
         DiagnosticBag?.Clear();
     }
 
     internal virtual void Free()
     {
         _semanticDiagnostics = null;
-        _seen = null;
+        FreeSeen();
         DiagnosticBag?.Free();
     }
 
@@ -335,7 +342,8 @@ internal abstract class BindingDiagnosticBag
             return "<no diagnostics>";
         }
 
-        var builder = new StringBuilder();
+        var pooledBuilder = PooledStringBuilder.GetInstance();
+        var builder = pooledBuilder.Builder;
         foreach (var diagnostic in AsSemanticEnumerable())
         {
             builder.AppendLine(diagnostic.ToString());
@@ -346,7 +354,7 @@ internal abstract class BindingDiagnosticBag
             builder.AppendLine(diagnostic.ToString());
         }
 
-        return builder.ToString();
+        return pooledBuilder.ToStringAndFree();
     }
 
     private bool IsSemanticEmpty
@@ -373,18 +381,15 @@ internal abstract class BindingDiagnosticBag
         }
     }
 
-    private ConcurrentDictionary<string, byte> Seen
-    {
-        get
-        {
-            var seen = _seen;
-            if (seen != null)
-            {
-                return seen;
-            }
+    private PooledConcurrentDictionary<string, byte> Seen =>
+        PooledConcurrentDictionary<string, byte>.GetOrCreate(ref _seen, s_seenPool);
 
-            var newSeen = new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
-            return Interlocked.CompareExchange(ref _seen, newSeen, null) ?? newSeen;
+    private void FreeSeen()
+    {
+        // Empty bags never rented a dictionary and need no ownership exchange.
+        if (_seen != null)
+        {
+            Interlocked.Exchange(ref _seen, null)?.Free();
         }
     }
 

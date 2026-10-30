@@ -107,38 +107,45 @@ internal sealed class AkburaCompilationReference
         }
 
         using var names = ImmutableArrayBuilder<string>.Rent();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var syntaxTree in Compilation.SyntaxTrees)
+        var seen = PooledHashSet<string>.GetInstance();
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var semanticModel = Compilation.GetSemanticModel(syntaxTree);
-            var metadataName = semanticModel
-                .GetAkburaComponentMetadataName(syntaxTree);
-            if (metadataName.Length > 0 && seen.Add(metadataName))
+            foreach (var syntaxTree in Compilation.SyntaxTrees)
             {
-                names.Add(metadataName);
-            }
-        }
-
-        foreach (var reference in Compilation.CompilationReferences)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            foreach (var metadataName in
-                     reference.GetComponentMetadataNames(
-                         cancellationToken))
-            {
-                if (seen.Add(metadataName))
+                cancellationToken.ThrowIfCancellationRequested();
+                var semanticModel = Compilation.GetSemanticModel(syntaxTree);
+                var metadataName = semanticModel
+                    .GetAkburaComponentMetadataName(syntaxTree);
+                if (metadataName.Length > 0 && seen.Add(metadataName))
                 {
                     names.Add(metadataName);
                 }
             }
-        }
 
-        var result = names.ToImmutable();
-        ImmutableInterlocked.InterlockedInitialize(
-            ref _componentMetadataNames,
-            result);
-        return _componentMetadataNames;
+            foreach (var reference in Compilation.CompilationReferences)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                foreach (var metadataName in
+                         reference.GetComponentMetadataNames(
+                             cancellationToken))
+                {
+                    if (seen.Add(metadataName))
+                    {
+                        names.Add(metadataName);
+                    }
+                }
+            }
+
+            var result = names.ToImmutable();
+            ImmutableInterlocked.InterlockedInitialize(
+                ref _componentMetadataNames,
+                result);
+            return _componentMetadataNames;
+        }
+        finally
+        {
+            seen.Free();
+        }
     }
 
     internal IEnumerable<IAkburaComponentSymbol> GetComponentSymbols()

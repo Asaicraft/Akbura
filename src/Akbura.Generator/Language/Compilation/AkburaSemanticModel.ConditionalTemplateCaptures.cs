@@ -52,40 +52,47 @@ internal abstract partial class AkburaSemanticModel
             }
         }
 
-        var reported = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var node in boundary.DescendantNodes())
+        var reported = PooledHashSet<string>.GetInstance();
+        try
         {
-            if (!ReferenceEquals(GetConditionalTemplateCaptureBoundary(node), boundary))
+            foreach (var node in boundary.DescendantNodes())
             {
-                continue;
-            }
-
-            var references = node switch
-            {
-                MarkupAttributeSyntax attribute => GetCSharpSymbolReferences(attribute),
-                InlineExpressionSyntax expression => GetCSharpSymbolReferences(expression),
-                CSharpExpressionSyntax expression => GetCSharpSymbolReferences(expression),
-                _ => ImmutableArray<CSharpSymbolReference>.Empty,
-            };
-            foreach (var reference in references)
-            {
-                if (reference.CSharpDefinition.Symbol is not ILocalSymbol local)
+                if (!ReferenceEquals(GetConditionalTemplateCaptureBoundary(node), boundary))
                 {
                     continue;
                 }
 
-                var invalid = unsupported.TryGetValue(local.Name, out var reason);
-                if (!invalid && IsProjectedLocalDeclaredOutsideBoundary(local, boundary))
+                var references = node switch
                 {
-                    invalid = TryGetUnsupportedConditionalCaptureType(local.Type, out reason);
-                }
+                    MarkupAttributeSyntax attribute => GetCSharpSymbolReferences(attribute),
+                    InlineExpressionSyntax expression => GetCSharpSymbolReferences(expression),
+                    CSharpExpressionSyntax expression => GetCSharpSymbolReferences(expression),
+                    _ => ImmutableArray<CSharpSymbolReference>.Empty,
+                };
+                foreach (var reference in references)
+                {
+                    if (reference.CSharpDefinition.Symbol is not ILocalSymbol local)
+                    {
+                        continue;
+                    }
 
-                if (invalid && reported.Add(local.Name))
-                {
-                    diagnostics.Add(new AkburaSemanticDiagnostic(node,
-                        ErrorCodes.AKBURA_SEMANTIC_UnsupportedConditionalTemplateCapture, [local.Name, reason]));
+                    var invalid = unsupported.TryGetValue(local.Name, out var reason);
+                    if (!invalid && IsProjectedLocalDeclaredOutsideBoundary(local, boundary))
+                    {
+                        invalid = TryGetUnsupportedConditionalCaptureType(local.Type, out reason);
+                    }
+
+                    if (invalid && reported.Add(local.Name))
+                    {
+                        diagnostics.Add(new AkburaSemanticDiagnostic(node,
+                            ErrorCodes.AKBURA_SEMANTIC_UnsupportedConditionalTemplateCapture, [local.Name, reason]));
+                    }
                 }
             }
+        }
+        finally
+        {
+            reported.Free();
         }
     }
 

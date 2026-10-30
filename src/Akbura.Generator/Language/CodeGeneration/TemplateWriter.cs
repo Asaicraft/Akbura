@@ -1,3 +1,4 @@
+using Akbura.Pools;
 using System.Collections.Generic;
 using System.Diagnostics;
 
@@ -287,25 +288,32 @@ internal readonly ref struct TemplateWriter
         string? excludedItemName = null)
     {
         var ancestors = new List<ComponentTemplatePlan>();
-        var names = new HashSet<string>();
-        if (excludedItemName != null)
+        var names = PooledHashSet<string>.GetInstance();
+        try
         {
-            names.Add(excludedItemName);
-        }
-
-        for (var ancestorScopeId = plan.Scopes.ItemRef(scopeId).ParentScopeId; ancestorScopeId > 0;
-            ancestorScopeId = plan.Scopes.ItemRef(ancestorScopeId).ParentScopeId)
-        {
-            foreach (var candidate in plan.Templates)
+            if (excludedItemName != null)
             {
-                if (candidate.ScopeId == ancestorScopeId && names.Add(candidate.ItemName))
+                names.Add(excludedItemName);
+            }
+
+            for (var ancestorScopeId = plan.Scopes.ItemRef(scopeId).ParentScopeId; ancestorScopeId > 0;
+                ancestorScopeId = plan.Scopes.ItemRef(ancestorScopeId).ParentScopeId)
+            {
+                foreach (var candidate in plan.Templates)
                 {
-                    ancestors.Add(candidate);
+                    if (candidate.ScopeId == ancestorScopeId && names.Add(candidate.ItemName))
+                    {
+                        ancestors.Add(candidate);
+                    }
                 }
             }
-        }
 
-        return ancestors;
+            return ancestors;
+        }
+        finally
+        {
+            names.Free();
+        }
     }
 
 }

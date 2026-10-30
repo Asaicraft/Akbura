@@ -1,11 +1,11 @@
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Immutable;
-using System.Linq;
 
 namespace Akbura.Language;
 
@@ -188,7 +188,7 @@ internal abstract partial class AkburaSemanticModel
     private MarkupStyleTargetContext GetSelectorTargetContext(
         MarkupSelectorValue selector, MarkupStyleTargetContext inherited)
     {
-        var types = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
+        using var types = ImmutableArrayBuilder<INamedTypeSymbol>.Rent();
         var unknown = false;
         foreach (var branch in selector.Branches)
         {
@@ -216,7 +216,17 @@ internal abstract partial class AkburaSemanticModel
 
             if (target != null)
             {
-                if (!types.Any(type => SymbolEqualityComparer.Default.Equals(type, target)))
+                var containsTarget = false;
+                foreach (var type in types.WrittenSpan)
+                {
+                    if (SymbolEqualityComparer.Default.Equals(type, target))
+                    {
+                        containsTarget = true;
+                        break;
+                    }
+                }
+
+                if (!containsTarget)
                 {
                     types.Add(target);
                 }
@@ -225,7 +235,17 @@ internal abstract partial class AkburaSemanticModel
             {
                 foreach (var type in inherited.Types)
                 {
-                    if (!types.Any(existing => SymbolEqualityComparer.Default.Equals(existing, type)))
+                    var containsType = false;
+                    foreach (var existing in types.WrittenSpan)
+                    {
+                        if (SymbolEqualityComparer.Default.Equals(existing, type))
+                        {
+                            containsType = true;
+                            break;
+                        }
+                    }
+
+                    if (!containsType)
                     {
                         types.Add(type);
                     }

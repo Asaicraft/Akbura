@@ -31,49 +31,61 @@ internal sealed partial class MarkupBinder
             ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
         using var resultBuilder =
             ImmutableArrayBuilder<TailwindUtilityLookupCandidate>.Rent();
-        var claimedSelectors = new HashSet<string>(
-            StringComparer.Ordinal);
-        var visibleSignatures = new HashSet<string>(
-            StringComparer.Ordinal);
-        var targetTypeCache = new Dictionary<
-            AkburaSyntax,
-            Dictionary<string, CSharpSymbolDefinition>>();
-
-        AddTailwindUtilityCompletionLayer(
-            GetLocalAkcssUtilityDeclarations(diagnosticsBuilder),
-            containingComponent,
-            claimedSelectors,
-            visibleSignatures,
-            targetTypeCache,
-            resultBuilder,
-            cancellationToken);
-
-        foreach (var layer in GetImportedAkcssUtilitySymbolLayers())
+        var claimedSelectors = PooledHashSet<string>.GetInstance();
+        try
         {
-            AddTailwindUtilityCompletionLayer(
-                layer,
-                containingComponent,
-                claimedSelectors,
-                visibleSignatures,
-                resultBuilder,
-                cancellationToken);
-        }
+            var visibleSignatures = PooledHashSet<string>.GetInstance();
+            try
+            {
+                var targetTypeCache = new Dictionary<
+                    AkburaSyntax,
+                    Dictionary<string, CSharpSymbolDefinition>>();
 
-        foreach (var layer in
-                 GetImportedAkcssUtilityDeclarationLayers(
-                     diagnosticsBuilder))
+                AddTailwindUtilityCompletionLayer(
+                    GetLocalAkcssUtilityDeclarations(diagnosticsBuilder),
+                    containingComponent,
+                    claimedSelectors,
+                    visibleSignatures,
+                    targetTypeCache,
+                    resultBuilder,
+                    cancellationToken);
+
+                foreach (var layer in GetImportedAkcssUtilitySymbolLayers())
+                {
+                    AddTailwindUtilityCompletionLayer(
+                        layer,
+                        containingComponent,
+                        claimedSelectors,
+                        visibleSignatures,
+                        resultBuilder,
+                        cancellationToken);
+                }
+
+                foreach (var layer in
+                         GetImportedAkcssUtilityDeclarationLayers(
+                             diagnosticsBuilder))
+                {
+                    AddTailwindUtilityCompletionLayer(
+                        layer,
+                        containingComponent,
+                        claimedSelectors,
+                        visibleSignatures,
+                        targetTypeCache,
+                        resultBuilder,
+                        cancellationToken);
+                }
+
+                return resultBuilder.ToImmutable();
+            }
+            finally
+            {
+                visibleSignatures.Free();
+            }
+        }
+        finally
         {
-            AddTailwindUtilityCompletionLayer(
-                layer,
-                containingComponent,
-                claimedSelectors,
-                visibleSignatures,
-                targetTypeCache,
-                resultBuilder,
-                cancellationToken);
+            claimedSelectors.Free();
         }
-
-        return resultBuilder.ToImmutable();
     }
 
     private void AddTailwindUtilityCompletionLayer(
@@ -86,40 +98,46 @@ internal sealed partial class MarkupBinder
         ImmutableArrayBuilder<TailwindUtilityLookupCandidate> resultBuilder,
         CancellationToken cancellationToken)
     {
-        var layerSelectors = new HashSet<string>(
-            StringComparer.Ordinal);
-        foreach (var declaration in declarations)
+        var layerSelectors = PooledHashSet<string>.GetInstance();
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var selector = declaration.Selector;
-            var name = selector.Name.Identifier.ValueText;
-            if (string.IsNullOrWhiteSpace(name))
+            foreach (var declaration in declarations)
             {
-                continue;
+                cancellationToken.ThrowIfCancellationRequested();
+                var selector = declaration.Selector;
+                var name = selector.Name.Identifier.ValueText;
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    continue;
+                }
+
+                var selectorKey = GetTailwindCompletionSelectorKey(
+                    name,
+                    selector.Parameters.Count);
+                if (claimedSelectors.Contains(selectorKey) ||
+                    !TryCreateTailwindUtilityLookupCandidate(
+                        declaration,
+                        containingComponent,
+                        targetTypeCache,
+                        out var candidate))
+                {
+                    continue;
+                }
+
+                layerSelectors.Add(selectorKey);
+                if (visibleSignatures.Add(
+                        GetTailwindCompletionSignatureKey(candidate)))
+                {
+                    resultBuilder.Add(candidate);
+                }
             }
 
-            var selectorKey = GetTailwindCompletionSelectorKey(
-                name,
-                selector.Parameters.Count);
-            if (claimedSelectors.Contains(selectorKey) ||
-                !TryCreateTailwindUtilityLookupCandidate(
-                    declaration,
-                    containingComponent,
-                    targetTypeCache,
-                    out var candidate))
-            {
-                continue;
-            }
-
-            layerSelectors.Add(selectorKey);
-            if (visibleSignatures.Add(
-                    GetTailwindCompletionSignatureKey(candidate)))
-            {
-                resultBuilder.Add(candidate);
-            }
+            claimedSelectors.UnionWith(layerSelectors);
         }
-
-        claimedSelectors.UnionWith(layerSelectors);
+        finally
+        {
+            layerSelectors.Free();
+        }
     }
 
     private void AddTailwindUtilityCompletionLayer(
@@ -130,33 +148,39 @@ internal sealed partial class MarkupBinder
         ImmutableArrayBuilder<TailwindUtilityLookupCandidate> resultBuilder,
         CancellationToken cancellationToken)
     {
-        var layerSelectors = new HashSet<string>(
-            StringComparer.Ordinal);
-        foreach (var utility in utilities)
+        var layerSelectors = PooledHashSet<string>.GetInstance();
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var selectorKey = GetTailwindCompletionSelectorKey(
-                utility.Name,
-                utility.Parameters.Length);
-            if (claimedSelectors.Contains(selectorKey) ||
-                !IsAkcssTargetCompatible(
-                    utility,
-                    containingComponent))
+            foreach (var utility in utilities)
             {
-                continue;
+                cancellationToken.ThrowIfCancellationRequested();
+                var selectorKey = GetTailwindCompletionSelectorKey(
+                    utility.Name,
+                    utility.Parameters.Length);
+                if (claimedSelectors.Contains(selectorKey) ||
+                    !IsAkcssTargetCompatible(
+                        utility,
+                        containingComponent))
+                {
+                    continue;
+                }
+
+                layerSelectors.Add(selectorKey);
+                var candidate = CreateTailwindUtilityLookupCandidate(
+                    utility);
+                if (visibleSignatures.Add(
+                        GetTailwindCompletionSignatureKey(candidate)))
+                {
+                    resultBuilder.Add(candidate);
+                }
             }
 
-            layerSelectors.Add(selectorKey);
-            var candidate = CreateTailwindUtilityLookupCandidate(
-                utility);
-            if (visibleSignatures.Add(
-                    GetTailwindCompletionSignatureKey(candidate)))
-            {
-                resultBuilder.Add(candidate);
-            }
+            claimedSelectors.UnionWith(layerSelectors);
         }
-
-        claimedSelectors.UnionWith(layerSelectors);
+        finally
+        {
+            layerSelectors.Free();
+        }
     }
 
     private bool TryCreateTailwindUtilityLookupCandidate(
@@ -265,14 +289,15 @@ internal sealed partial class MarkupBinder
     private static string GetTailwindCompletionSignatureKey(
         TailwindUtilityLookupCandidate candidate)
     {
-        var builder = new StringBuilder(candidate.Name);
+        var pooledBuilder = PooledStringBuilder.GetInstance();
+        var builder = pooledBuilder.Builder.Append(candidate.Name);
         foreach (var parameter in candidate.Parameters)
         {
             builder.Append('\0');
             builder.Append(parameter.TypeDisplay);
         }
 
-        return builder.ToString();
+        return pooledBuilder.ToStringAndFree();
     }
 
     internal BoundNode CreateBoundTailwindUtilityAttribute(TailwindAttributeSyntax attribute)
@@ -404,9 +429,8 @@ internal sealed partial class MarkupBinder
             }
         }
 
-        if (fullAttribute.Prefix?.Kind == AkburaSyntaxKind.ExpressionConditionalPrefixSyntax)
+        if (fullAttribute.Prefix is ExpressionConditionalPrefixSyntax expressionPrefix)
         {
-            var expressionPrefix = Unsafe.As<ExpressionConditionalPrefixSyntax>(fullAttribute.Prefix);
             var expression = AkburaSemanticModel.ParseInlineExpression(expressionPrefix.Expression);
             if (expression != null)
             {
@@ -510,9 +534,8 @@ internal sealed partial class MarkupBinder
                 expressionBinding.Expression, null, new TailwindUtilityVariant(isPrefixed: true));
         }
 
-        if (prefix.Kind == AkburaSyntaxKind.SimpleConditionalPrefixSyntax)
+        if (prefix is SimpleConditionalPrefixSyntax simplePrefix)
         {
-            var simplePrefix = Unsafe.As<SimpleConditionalPrefixSyntax>(prefix);
             var prefixName = simplePrefix.Name.Identifier.ValueText;
             diagnosticsBuilder.Add(
                 AkburaSemanticModel.CreateTailwindLegacyPrefixDiagnostic(
@@ -527,11 +550,8 @@ internal sealed partial class MarkupBinder
                 new TailwindUtilityVariant(isPrefixed: true));
         }
 
-        if (prefix.Kind ==
-            AkburaSyntaxKind.MarkupExtensionConditionalPrefixSyntax)
+        if (prefix is MarkupExtensionConditionalPrefixSyntax extensionPrefix)
         {
-            var extensionPrefix =
-                Unsafe.As<MarkupExtensionConditionalPrefixSyntax>(prefix);
             var extensionBinding =
                 SemanticModel.BindTailwindMarkupExtension(
                     attribute,
@@ -557,14 +577,11 @@ internal sealed partial class MarkupBinder
                 CreateTailwindUtilityVariant(extensionBinding.Value));
         }
 
-        if (prefix.Kind !=
-            AkburaSyntaxKind.ExpressionConditionalPrefixSyntax)
+        if (prefix is not ExpressionConditionalPrefixSyntax expressionPrefix)
         {
             return (false, null, default, default, null, default);
         }
 
-        var expressionPrefix =
-            Unsafe.As<ExpressionConditionalPrefixSyntax>(prefix);
         var expression = AkburaSemanticModel.ParseInlineExpression(expressionPrefix.Expression);
         if (expression == null)
         {
@@ -796,14 +813,15 @@ internal sealed partial class MarkupBinder
         }
 
         var fullAttribute = Unsafe.As<TailwindFullAttributeSyntax>(attribute);
-        var builder = new StringBuilder(utilityName);
+        var pooledBuilder = PooledStringBuilder.GetInstance();
+        var builder = pooledBuilder.Builder.Append(utilityName);
         for (var index = 0; index < consumedSegmentCount; index++)
         {
             builder.Append('-');
             builder.Append(fullAttribute.Segments[index].ToFullString().Trim());
         }
 
-        return builder.ToString();
+        return pooledBuilder.ToStringAndFree();
     }
 
     private static ImmutableArray<BoundTailwindUtilityArgument> GetTailwindUtilityArgumentSuffix(
@@ -1430,14 +1448,21 @@ internal sealed partial class MarkupBinder
         ImmutableArray<ITailwindUtilitySymbol> utilities,
         ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
-        var visitedSymbols = new HashSet<IAkcssSymbol>();
-        foreach (var utility in utilities)
+        var visitedSymbols = PooledHashSet<IAkcssSymbol>.GetInstance();
+        try
         {
-            ValidateUtilityBindingPriorityOperations(
-                syntax,
-                utility,
-                visitedSymbols,
-                diagnosticsBuilder);
+            foreach (var utility in utilities)
+            {
+                ValidateUtilityBindingPriorityOperations(
+                    syntax,
+                    utility,
+                    visitedSymbols,
+                    diagnosticsBuilder);
+            }
+        }
+        finally
+        {
+            visitedSymbols.Free();
         }
     }
 

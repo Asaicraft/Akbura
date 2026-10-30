@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Pools;
@@ -12,6 +13,14 @@ namespace Akbura.Language;
 
 internal partial class AkburaSemanticModel
 {
+    // Candidates are keyed by their ordinal display name, so equal sort keys cannot occur.
+    private static readonly IComparer<MarkupComponentLookupCandidate> s_componentCompletionComparer =
+        Comparer<MarkupComponentLookupCandidate>.Create(static (left, right) =>
+            StringComparer.Ordinal.Compare(left.DisplayName, right.DisplayName));
+    private static readonly IComparer<MarkupExtensionLookupCandidate> s_extensionCompletionComparer =
+        Comparer<MarkupExtensionLookupCandidate>.Create(static (left, right) =>
+            StringComparer.Ordinal.Compare(left.DisplayName, right.DisplayName));
+
     private CompletionComponentCatalog? _completionComponentCatalog;
     private CompletionMarkupExtensionCatalog? _completionMarkupExtensionCatalog;
 
@@ -183,11 +192,7 @@ internal partial class AkburaSemanticModel
             csharpCompilation,
             cancellationToken);
 
-        var result = candidates.Values
-            .OrderBy(
-                static candidate => candidate.DisplayName,
-                StringComparer.Ordinal)
-            .ToImmutableArray();
+        var result = candidates.Values.ToSortedImmutableArray(s_extensionCompletionComparer);
         AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
             "Markup extension catalog",
             timer.Elapsed);
@@ -278,11 +283,7 @@ internal partial class AkburaSemanticModel
             }
         }
 
-        var result = candidates.Values
-            .OrderBy(
-                static candidate => candidate.DisplayName,
-                StringComparer.Ordinal)
-            .ToImmutableArray();
+        var result = candidates.Values.ToSortedImmutableArray(s_componentCompletionComparer);
         AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
             "Component catalog namespace members",
             timer.Elapsed);
@@ -464,43 +465,50 @@ internal partial class AkburaSemanticModel
     {
         using var builder =
             ImmutableArrayBuilder<VisibleMarkupNamespace>.Rent();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        AddVisibleMarkupNamespace(
-            builder,
-            seen,
-            string.Empty,
-            alias: null);
-        AddVisibleMarkupNamespace(
-            builder,
-            seen,
-            GetAkburaNamespaceText(
-                SyntaxTree.GetRoot(),
-                SyntaxTree),
-            alias: null);
-
-        foreach (var directive in GetCSharpUsingDirectives())
+        var seen = PooledHashSet<string>.GetInstance();
+        try
         {
-            if (directive.StaticKeyword.RawKind != 0 ||
-                directive.Name == null)
-            {
-                continue;
-            }
-
-            var name = NormalizeGlobalName(
-                directive.Name.ToString());
-            if (name.EndsWith(".akcss", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
             AddVisibleMarkupNamespace(
                 builder,
                 seen,
-                name,
-                directive.Alias?.Name.Identifier.ValueText);
-        }
+                string.Empty,
+                alias: null);
+            AddVisibleMarkupNamespace(
+                builder,
+                seen,
+                GetAkburaNamespaceText(
+                    SyntaxTree.GetRoot(),
+                    SyntaxTree),
+                alias: null);
 
-        return builder.ToImmutable();
+            foreach (var directive in GetCSharpUsingDirectives())
+            {
+                if (directive.StaticKeyword.RawKind != 0 ||
+                    directive.Name == null)
+                {
+                    continue;
+                }
+
+                var name = NormalizeGlobalName(
+                    directive.Name.ToString());
+                if (name.EndsWith(".akcss", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                AddVisibleMarkupNamespace(
+                    builder,
+                    seen,
+                    name,
+                    directive.Alias?.Name.Identifier.ValueText);
+            }
+
+            return builder.ToImmutable();
+        }
+        finally
+        {
+            seen.Free();
+        }
     }
 
     private ImmutableArray<VisibleMarkupNamespace>
@@ -508,28 +516,35 @@ internal partial class AkburaSemanticModel
     {
         using var builder =
             ImmutableArrayBuilder<VisibleMarkupNamespace>.Rent();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-
-        foreach (var visibleNamespace in GetVisibleMarkupNamespaces())
+        var seen = PooledHashSet<string>.GetInstance();
+        try
         {
-            AddVisibleMarkupNamespace(
-                builder,
-                seen,
-                visibleNamespace.Name,
-                visibleNamespace.Alias);
-        }
 
-        foreach (var namespaceName in
-                 GetDefaultMarkupExtensionNamespaces())
+            foreach (var visibleNamespace in GetVisibleMarkupNamespaces())
+            {
+                AddVisibleMarkupNamespace(
+                    builder,
+                    seen,
+                    visibleNamespace.Name,
+                    visibleNamespace.Alias);
+            }
+
+            foreach (var namespaceName in
+                     GetDefaultMarkupExtensionNamespaces())
+            {
+                AddVisibleMarkupNamespace(
+                    builder,
+                    seen,
+                    namespaceName,
+                    alias: null);
+            }
+
+            return builder.ToImmutable();
+        }
+        finally
         {
-            AddVisibleMarkupNamespace(
-                builder,
-                seen,
-                namespaceName,
-                alias: null);
+            seen.Free();
         }
-
-        return builder.ToImmutable();
     }
 
     private void AddMarkupExtensionTypeAliasCandidates(
@@ -764,10 +779,10 @@ internal partial class AkburaSemanticModel
         foreach (var segment in namespaceName.Split('.'))
         {
             current = current.GetNamespaceMembers()
-                .FirstOrDefault(candidate => string.Equals(
+                .FirstOrDefault(static (candidate, segment) => string.Equals(
                     candidate.Name,
                     segment,
-                    StringComparison.Ordinal));
+                    StringComparison.Ordinal), segment);
             if (current == null)
             {
                 return null;

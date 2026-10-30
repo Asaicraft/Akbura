@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
@@ -6,7 +7,9 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 #if STATS
@@ -19,6 +22,8 @@ internal sealed partial class AkburaCompilation
 {
     private readonly ConcurrentDictionary<AkburaSyntaxTree, AkburaSemanticModel> _semanticModels = new();
     private readonly ConcurrentDictionary<AkburaSyntaxTree, SemanticModelState> _reusableSemanticStates = new();
+    private readonly ConcurrentDictionary<AkburaSyntaxTree, string> _componentMetadataNames =
+        new(SyntaxTreeReferenceComparer.Instance);
     private readonly SyntaxAndDeclarationManager _syntaxAndDeclarations;
     private readonly ReferenceManager _referenceManager;
     private ImmutableArray<UsingDirectiveSyntax> _lazyGlobalAkburaUsingDirectives;
@@ -341,6 +346,49 @@ internal sealed partial class AkburaCompilation
 
     internal bool HasCreatedSemanticModel(AkburaSyntaxTree syntaxTree) => _semanticModels.ContainsKey(syntaxTree);
 
+    internal bool TryGetComponentMetadataName(AkburaSyntaxTree syntaxTree, out string metadataName)
+    {
+        return _componentMetadataNames.TryGetValue(syntaxTree, out metadataName!);
+    }
+
+    internal string CacheComponentMetadataName(AkburaSyntaxTree syntaxTree, string metadataName)
+    {
+        // Rooted Windows paths can still be relative to the current drive or directory.
+        // Keep recomputing whenever either GetFullPath input could depend on that state.
+        if (Path.IsPathRooted(syntaxTree.FilePath) &&
+            !string.IsNullOrWhiteSpace(ProjectDirectory) &&
+            (!IsFullyQualifiedPath(syntaxTree.FilePath) || !IsFullyQualifiedPath(ProjectDirectory)))
+        {
+            return metadataName;
+        }
+
+        return _componentMetadataNames.GetOrAdd(syntaxTree, metadataName);
+    }
+
+    private static bool IsFullyQualifiedPath(string path)
+    {
+        if (Path.DirectorySeparatorChar != '\\')
+        {
+            return Path.IsPathRooted(path);
+        }
+
+        return path.Length >= 3 &&
+               ((path[0] is >= 'A' and <= 'Z' or >= 'a' and <= 'z' &&
+                 path[1] == ':' && IsDirectorySeparator(path[2])) ||
+                (IsDirectorySeparator(path[0]) && IsDirectorySeparator(path[1])));
+
+        static bool IsDirectorySeparator(char value) => value is '\\' or '/';
+    }
+
+    private sealed class SyntaxTreeReferenceComparer : IEqualityComparer<AkburaSyntaxTree>
+    {
+        internal static readonly SyntaxTreeReferenceComparer Instance = new();
+
+        public bool Equals(AkburaSyntaxTree? left, AkburaSyntaxTree? right) => ReferenceEquals(left, right);
+
+        public int GetHashCode(AkburaSyntaxTree tree) => RuntimeHelpers.GetHashCode(tree);
+    }
+
     public AkburaSemanticModel GetSemanticModel(AkburaSyntaxTree syntaxTree)
     {
         if (syntaxTree == null)
@@ -496,8 +544,7 @@ internal sealed partial class AkburaCompilation
         string logicalName)
     {
         return AkcssSyntaxTrees
-            .Where(tree => string.Equals(tree.LogicalName, logicalName, StringComparison.Ordinal))
-            .ToImmutableArray();
+            .WhereAsArray(static (tree, name) => string.Equals(tree.LogicalName, name, StringComparison.Ordinal), logicalName);
     }
 
     internal ImmutableArray<IAkcssModuleSymbol> GetAkcssModuleSymbolsByLogicalName(
@@ -560,20 +607,34 @@ internal sealed partial class AkburaCompilation
         var builder = ImmutableArrayBuilder<string>.Rent();
         try
         {
-            var names = new HashSet<string>(StringComparer.Ordinal);
-            var compilations = new HashSet<AkburaCompilation>();
-            AddCompilation(
-                this,
-                ref builder,
-                names,
-                compilations,
-                cancellationToken);
+            var names = PooledHashSet<string>.GetInstance();
+            try
+            {
+                var compilations = PooledHashSet<AkburaCompilation>.GetInstance();
+                try
+                {
+                    AddCompilation(
+                        this,
+                        ref builder,
+                        names,
+                        compilations,
+                        cancellationToken);
 
-            var result = builder.ToImmutable();
-            ImmutableInterlocked.InterlockedInitialize(
-                ref _lazyAvailableAkcssModuleNames,
-                result);
-            return _lazyAvailableAkcssModuleNames;
+                    var result = builder.ToImmutable();
+                    ImmutableInterlocked.InterlockedInitialize(
+                        ref _lazyAvailableAkcssModuleNames,
+                        result);
+                    return _lazyAvailableAkcssModuleNames;
+                }
+                finally
+                {
+                    compilations.Free();
+                }
+            }
+            finally
+            {
+                names.Free();
+            }
         }
         finally
         {

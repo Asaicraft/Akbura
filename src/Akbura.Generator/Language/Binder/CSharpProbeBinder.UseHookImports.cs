@@ -46,6 +46,13 @@ internal sealed partial class CSharpProbeBinder
                     continue;
                 }
 
+                // Roslyn may not infer a lambda's parameter types from an incomplete
+                // body when the projected overloads include incompatible delegates.
+                if (omitSelfParameter && !HasCompatibleHookLambdaParameters(invocation, method))
+                {
+                    continue;
+                }
+
                 // A using-static import does not expose extension methods as bare
                 // names. Project their signatures without `this` into the same
                 // overload group as ordinary imports, then rebind the selected
@@ -100,6 +107,63 @@ internal sealed partial class CSharpProbeBinder
         }
 
         return new UseHookImports(imports.ToImmutable(), types.ToImmutable(), methods.ToImmutable());
+    }
+
+    private static bool HasCompatibleHookLambdaParameters(
+        CSharp.InvocationExpressionSyntax invocation,
+        IMethodSymbol method)
+    {
+        for (var index = 0; index < invocation.ArgumentList.Arguments.Count; index++)
+        {
+            var argument = invocation.ArgumentList.Arguments[index];
+            int? parameterCount = argument.Expression switch
+            {
+                CSharp.SimpleLambdaExpressionSyntax lambda when lambda.Body.ContainsDiagnostics => 1,
+                CSharp.ParenthesizedLambdaExpressionSyntax lambda when lambda.Body.ContainsDiagnostics => lambda.ParameterList.Parameters.Count,
+                CSharp.AnonymousMethodExpressionSyntax { ParameterList: { } parameters } anonymous
+                    when anonymous.Block.ContainsDiagnostics => parameters.Parameters.Count,
+                _ => null,
+            };
+            if (parameterCount == null)
+            {
+                continue;
+            }
+
+            var parameterIndex = index + 1;
+            if (argument.NameColon is { } nameColon)
+            {
+                parameterIndex = 1;
+                while (parameterIndex < method.Parameters.Length &&
+                    method.Parameters[parameterIndex].Name != nameColon.Name.Identifier.ValueText)
+                {
+                    parameterIndex++;
+                }
+                if (parameterIndex == method.Parameters.Length)
+                {
+                    return false;
+                }
+            }
+            else if (parameterIndex >= method.Parameters.Length)
+            {
+                if (method.Parameters.IsDefaultOrEmpty || !method.Parameters[method.Parameters.Length - 1].IsParams)
+                {
+                    continue;
+                }
+                parameterIndex = method.Parameters.Length - 1;
+            }
+
+            var parameter = method.Parameters[parameterIndex];
+            var type = parameter.IsParams && parameter.Type is IArrayTypeSymbol array
+                ? array.ElementType
+                : parameter.Type;
+            if (type is INamedTypeSymbol { DelegateInvokeMethod: { } invoke } &&
+                invoke.Parameters.Length != parameterCount.Value)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool TryGetImportedHookInvocation(

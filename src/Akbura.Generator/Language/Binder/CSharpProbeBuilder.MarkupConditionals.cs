@@ -1,5 +1,6 @@
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using System;
@@ -134,13 +135,18 @@ internal sealed partial class CSharpProbeBuilder
         CSharp.ExpressionSyntax expression)
     {
         var hostOffset = syntax.Tokens.FullSpan.Start - expression.FullSpan.Start;
-        return expression.ReplaceNodes(expression.DescendantNodesAndSelf()
-                .OfType<CSharp.SingleVariableDesignationSyntax>(),
-            (original, _) => original.WithAdditionalAnnotations(new SyntaxAnnotation(
+        using var lease = PooledDelegates.GetPooledFunction(
+            static (original, _, hostOffset) => original.WithAdditionalAnnotations(new SyntaxAnnotation(
                 CSharpProbeBinder.ProjectedSymbolAnnotationKind,
                 new CSharpProbeSymbolOrigin(Guid.NewGuid().ToString("N"), Akbura.Language.Symbols.SymbolKind.CSharpSymbol,
                     original.Identifier.ValueText,
                     new TextSpan(hostOffset + original.Identifier.Span.Start, original.Identifier.Span.Length))
-                .Serialize())));
+                .Serialize())), hostOffset,
+            out Func<
+                CSharp.SingleVariableDesignationSyntax,
+                CSharp.SingleVariableDesignationSyntax,
+                CSharp.SingleVariableDesignationSyntax> annotate);
+        return expression.ReplaceNodes(expression.DescendantNodesAndSelf()
+            .OfType<CSharp.SingleVariableDesignationSyntax>(), annotate);
     }
 }

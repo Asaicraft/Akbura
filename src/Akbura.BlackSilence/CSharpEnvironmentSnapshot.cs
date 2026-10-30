@@ -1,5 +1,7 @@
+using Akbura.Collections;
 using Akbura.Language;
 using Akbura.Language.CodeGeneration;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -69,110 +71,138 @@ internal sealed class CSharpEnvironmentSnapshot
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var referencedNames = new HashSet<string>(StringComparer.Ordinal);
-        var namespaces = new HashSet<string>(StringComparer.Ordinal);
-        var candidates = new Dictionary<SyntaxTree, InertTypeCandidate>();
-        var parseOptions = new HashSet<ParseOptions>();
-        var retainedTrees = ImmutableArray.CreateBuilder<SyntaxTree>();
-        var references = compilation.References.ToImmutableArray();
-        var canIgnoreTrees = compilation.ScriptCompilationInfo == null;
-
-        // AKCSS carriers and component namespaces can introduce names which never
-        // occur in AdditionalFiles text. Use the same naming rules as generation.
-        AddIdentifiers(AkcssGeneratedModuleNames.GetNamespaceName(options.RootNamespace), referencedNames, cancellationToken);
-
-        foreach (var document in documents)
+        var referencedNames = PooledHashSet<string>.GetInstance();
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            canIgnoreTrees &= document.CanReuse;
-            referencedNames.Add(document.SyntaxTree.ComponentName);
-            referencedNames.Add(Path.GetFileNameWithoutExtension(document.FilePath));
-
-            if (document.SyntaxTree is ComponentSyntaxTree)
+            var namespaces = PooledHashSet<string>.GetInstance();
+            try
             {
-                var generatedNamespace = AkburaComponentProbeCompilationBuilder.GetNamespaceName(
-                    document.SyntaxTree,
-                    options.RootNamespace,
-                    options.ProjectDirectory);
-                AddIdentifiers(generatedNamespace, referencedNames, cancellationToken);
-            }
-
-            foreach (var dependency in document.DependencyNames)
-            {
-                if (dependency.Kind == DocumentDependencyKind.Identifier)
+                var candidates = new Dictionary<SyntaxTree, InertTypeCandidate>();
+                var parseOptions = PooledHashSet<ParseOptions>.GetInstance();
+                try
                 {
-                    referencedNames.Add(dependency.Name);
+                    using var retainedTrees = ImmutableArrayBuilder<SyntaxTree>.Rent();
+                    var references = compilation.References.ToImmutableArray();
+                    var canIgnoreTrees = compilation.ScriptCompilationInfo == null;
+
+                    // AKCSS carriers and component namespaces can introduce names which never
+                    // occur in AdditionalFiles text. Use the same naming rules as generation.
+                    AddIdentifiers(AkcssGeneratedModuleNames.GetNamespaceName(options.RootNamespace), referencedNames, cancellationToken);
+
+                    foreach (var document in documents)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        canIgnoreTrees &= document.CanReuse;
+                        referencedNames.Add(document.SyntaxTree.ComponentName);
+                        referencedNames.Add(Path.GetFileNameWithoutExtension(document.FilePath));
+
+                        if (document.SyntaxTree is ComponentSyntaxTree)
+                        {
+                            var generatedNamespace = AkburaComponentProbeCompilationBuilder.GetNamespaceName(
+                                document.SyntaxTree,
+                                options.RootNamespace,
+                                options.ProjectDirectory);
+                            AddIdentifiers(generatedNamespace, referencedNames, cancellationToken);
+                        }
+
+                        foreach (var dependency in document.DependencyNames)
+                        {
+                            if (dependency.Kind == DocumentDependencyKind.Identifier)
+                            {
+                                referencedNames.Add(dependency.Name);
+                            }
+                            else
+                            {
+                                AddIdentifiers(dependency.Name, referencedNames, cancellationToken);
+                            }
+                        }
+                    }
+
+                    foreach (var tree in compilation.SyntaxTrees)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        parseOptions.Add(tree.Options);
+                        var root = tree.GetRoot(cancellationToken);
+                        AddNamespaces(root, namespaces, cancellationToken);
+
+                        if (canIgnoreTrees && TryGetInertType(tree, root, out var candidate))
+                        {
+                            candidates.Add(tree, candidate);
+                        }
+                        else
+                        {
+                            AddIdentifiers(root, referencedNames, cancellationToken);
+                        }
+                    }
+
+                    foreach (var namespaceName in namespaces)
+                    {
+                        AddIdentifiers(namespaceName, referencedNames, cancellationToken);
+                    }
+
+                    var nonConflictingCandidates = PooledHashSet<SyntaxTree>.GetInstance();
+                    try
+                    {
+
+                        foreach (var pair in candidates)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+
+                            if (namespaces.Contains(pair.Value.MetadataName) ||
+                                HasReferenceCollision(compilation, references, pair.Value.MetadataName, cancellationToken))
+                            {
+                                referencedNames.Add(pair.Value.Name);
+                            }
+                            else
+                            {
+                                nonConflictingCandidates.Add(pair.Key);
+                            }
+                        }
+
+                        var ignoredCount = 0;
+
+                        foreach (var tree in compilation.SyntaxTrees)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+
+                            if (candidates.TryGetValue(tree, out var candidate) &&
+                                nonConflictingCandidates.Contains(tree) &&
+                                !IsReferencedName(candidate.Name, referencedNames))
+                            {
+                                ignoredCount++;
+                                continue;
+                            }
+
+                            retainedTrees.Add(tree);
+                        }
+
+                        return new CSharpEnvironmentSnapshot(
+                            compilation,
+                            retainedTrees.ToImmutable(),
+                            references,
+                            parseOptions.ToImmutableArray(),
+                            namespaces.ToSortedImmutableArray(StringComparer.Ordinal),
+                            ignoredCount);
+                    }
+                    finally
+                    {
+                        nonConflictingCandidates.Free();
+                    }
                 }
-                else
+                finally
                 {
-                    AddIdentifiers(dependency.Name, referencedNames, cancellationToken);
+                    parseOptions.Free();
                 }
             }
+            finally
+            {
+                namespaces.Free();
+            }
         }
-
-        foreach (var tree in compilation.SyntaxTrees)
+        finally
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            parseOptions.Add(tree.Options);
-            var root = tree.GetRoot(cancellationToken);
-            AddNamespaces(root, namespaces, cancellationToken);
-
-            if (canIgnoreTrees && TryGetInertType(tree, root, out var candidate))
-            {
-                candidates.Add(tree, candidate);
-            }
-            else
-            {
-                AddIdentifiers(root, referencedNames, cancellationToken);
-            }
+            referencedNames.Free();
         }
-
-        foreach (var namespaceName in namespaces)
-        {
-            AddIdentifiers(namespaceName, referencedNames, cancellationToken);
-        }
-
-        var nonConflictingCandidates = new HashSet<SyntaxTree>();
-
-        foreach (var pair in candidates)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (namespaces.Contains(pair.Value.MetadataName) ||
-                HasReferenceCollision(compilation, references, pair.Value.MetadataName, cancellationToken))
-            {
-                referencedNames.Add(pair.Value.Name);
-            }
-            else
-            {
-                nonConflictingCandidates.Add(pair.Key);
-            }
-        }
-
-        var ignoredCount = 0;
-
-        foreach (var tree in compilation.SyntaxTrees)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (candidates.TryGetValue(tree, out var candidate) &&
-                nonConflictingCandidates.Contains(tree) &&
-                !IsReferencedName(candidate.Name, referencedNames))
-            {
-                ignoredCount++;
-                continue;
-            }
-
-            retainedTrees.Add(tree);
-        }
-
-        return new CSharpEnvironmentSnapshot(
-            compilation,
-            retainedTrees.ToImmutable(),
-            references,
-            parseOptions.ToImmutableArray(),
-            namespaces.OrderBy(static name => name, StringComparer.Ordinal).ToImmutableArray(),
-            ignoredCount);
     }
 
     internal bool HasSameEnvironment(CSharpEnvironmentSnapshot other)
@@ -267,28 +297,35 @@ internal sealed class CSharpEnvironmentSnapshot
             return false;
         }
 
-        var modifierKinds = new HashSet<int>();
-
-        foreach (var modifier in declaration.Modifiers)
+        var modifierKinds = PooledHashSet<int>.GetInstance();
+        try
         {
-            if (modifier.Kind() is not (SyntaxKind.InternalKeyword or SyntaxKind.SealedKeyword) ||
-                !modifierKinds.Add(modifier.RawKind))
+
+            foreach (var modifier in declaration.Modifiers)
+            {
+                if (modifier.Kind() is not (SyntaxKind.InternalKeyword or SyntaxKind.SealedKeyword) ||
+                    !modifierKinds.Add(modifier.RawKind))
+                {
+                    return false;
+                }
+            }
+
+            var name = declaration.Identifier.ValueText;
+
+            // Module carrier names and the generated namespace are implicit, not necessarily
+            // written in AdditionalFiles. They are never eligible for this optimization.
+            if (name.Length == 0 || name.StartsWith("__Akbura", StringComparison.Ordinal) || name == "Generated")
             {
                 return false;
             }
+
+            candidate = new InertTypeCandidate(name, JoinName(namespaceName, name));
+            return true;
         }
-
-        var name = declaration.Identifier.ValueText;
-
-        // Module carrier names and the generated namespace are implicit, not necessarily
-        // written in AdditionalFiles. They are never eligible for this optimization.
-        if (name.Length == 0 || name.StartsWith("__Akbura", StringComparison.Ordinal) || name == "Generated")
+        finally
         {
-            return false;
+            modifierKinds.Free();
         }
-
-        candidate = new InertTypeCandidate(name, JoinName(namespaceName, name));
-        return true;
     }
 
     private static bool IsReferencedName(string name, HashSet<string> referencedNames)

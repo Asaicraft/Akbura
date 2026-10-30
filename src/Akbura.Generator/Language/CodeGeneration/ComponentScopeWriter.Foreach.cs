@@ -1,3 +1,4 @@
+using Akbura.Pools;
 using Akbura.Language.Binder;
 using Akbura.Language.Operations;
 using Akbura.Language.Syntax;
@@ -214,15 +215,22 @@ internal readonly ref partial struct ComponentScopeWriter
 
     private static string GetForeachDependencies(IMarkupForeachOperation operation)
     {
-        var flags = new HashSet<string>(StringComparer.Ordinal);
-        InspectForeachBody(operation.Body, operation.IterationVariableName,
-            operation.Source.Syntax?.ToString(), operation.IterationType.Symbol as ITypeSymbol, flags);
-        if (flags.Count == 0)
+        var flags = PooledHashSet<string>.GetInstance();
+        try
         {
-            return "global::Akbura.HotReload.AkburaForeachDependencies.ItemLocal";
+            InspectForeachBody(operation.Body, operation.IterationVariableName,
+                operation.Source.Syntax?.ToString(), operation.IterationType.Symbol as ITypeSymbol, flags);
+            if (flags.Count == 0)
+            {
+                return "global::Akbura.HotReload.AkburaForeachDependencies.ItemLocal";
+            }
+            return string.Join(" | ", flags.OrderBy(static x => x, StringComparer.Ordinal)
+                .Select(static x => "global::Akbura.HotReload.AkburaForeachDependencies." + x));
         }
-        return string.Join(" | ", flags.OrderBy(static x => x, StringComparer.Ordinal)
-            .Select(static x => "global::Akbura.HotReload.AkburaForeachDependencies." + x));
+        finally
+        {
+            flags.Free();
+        }
     }
 
     private static void InspectForeachBody(IEnumerable<MarkupForeachBodyItem> body, string itemName,

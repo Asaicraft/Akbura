@@ -1,4 +1,5 @@
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;
@@ -85,7 +86,7 @@ internal sealed class DocumentSyntaxVersion
         cancellationToken.ThrowIfCancellationRequested();
 
         var root = syntaxTree.GetRootSyntax();
-        var builder = new ShapeBuilder(syntaxTree, cancellationToken);
+        using var builder = new ShapeBuilder(syntaxTree, cancellationToken);
         var canReuse = root.FullWidth == syntaxTree.Text.Length &&
             !root.ContainsDiagnostics && !root.ContainsSkippedText && !root.ContainsAnnotations;
         var meaningfulLength = 0;
@@ -237,17 +238,23 @@ internal sealed class DocumentSyntaxVersion
         return false;
     }
 
-    private sealed class ShapeBuilder(AkburaSyntaxTree syntaxTree, CancellationToken cancellationToken)
+    private sealed class ShapeBuilder(AkburaSyntaxTree syntaxTree, CancellationToken cancellationToken) : IDisposable
     {
         private readonly HashSet<DocumentDependencyName> _dependencySet = [];
 
         public CancellationToken CancellationToken { get; } = cancellationToken;
-        public ImmutableArray<string>.Builder Surface { get; } = ImmutableArray.CreateBuilder<string>();
-        public ImmutableArray<DocumentDependencyName>.Builder Dependencies { get; } =
-            ImmutableArray.CreateBuilder<DocumentDependencyName>();
+        public ArrayBuilder<string> Surface { get; } = ArrayBuilder<string>.GetInstance();
+        public ArrayBuilder<DocumentDependencyName> Dependencies { get; } =
+            ArrayBuilder<DocumentDependencyName>.GetInstance();
         public bool RequiresConservativeDependencies { get; private set; }
         public bool HasGlobalUsings { get; private set; }
         public bool ContainsRecoverySyntax { get; private set; }
+
+        public void Dispose()
+        {
+            Dependencies.Free();
+            Surface.Free();
+        }
 
         public void Collect(AkburaSyntax root)
         {

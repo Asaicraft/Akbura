@@ -153,6 +153,24 @@ public sealed class MarkupExpressionBindingDependencyTests
         Assert.Contains(plan.Dependencies, d => d.Member?.Name is "Count" or "Enabled");
     }
 
+    [Theory]
+    [InlineData("1")]
+    [InlineData("Vm.Profile?.Name")]
+    [InlineData("Vm.Items[Vm.Count].Name")]
+    public void EvaluationSnapshots_RemainValidAcrossLaterAnalyses(string expression)
+    {
+        var plan = Plan(expression);
+        Assert.NotNull(plan.Evaluation);
+        var kinds = Evaluations(plan.Evaluation).Select(static evaluation => evaluation.Operation.Kind).ToArray();
+        var members = Evaluations(plan.Evaluation).Select(static evaluation => evaluation.Dependency?.Member?.Name).ToArray();
+
+        _ = Plan("Vm.Enabled ? Vm.Name : Vm.Profile.Name");
+        _ = Plan("nameof(Vm.Name)");
+
+        Assert.Equal(kinds, Evaluations(plan.Evaluation).Select(static evaluation => evaluation.Operation.Kind));
+        Assert.Equal(members, Evaluations(plan.Evaluation).Select(static evaluation => evaluation.Dependency?.Member?.Name));
+    }
+
     private static ExpressionBindingPlan Plan(string expression) => GetBinding(Create("Tag", expression)).Plan;
     private static IEnumerable<ExpressionBindingEvaluation> Evaluations(ExpressionBindingEvaluation evaluation)
     {

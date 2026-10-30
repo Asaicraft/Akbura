@@ -404,7 +404,7 @@ internal sealed partial class Parser
 
     private GreenAkcssBodyMemberSyntax ParseIncrementalAkcssBodyMemberSyntax()
     {
-        if (TryReadReusableIncrementalNode<GreenAkcssBodyMemberSyntax>(out var member))
+        if (TryReadReusableAkcssBodyMember(out var member))
         {
             return member;
         }
@@ -654,7 +654,8 @@ internal sealed partial class Parser
             return type;
         }
 
-        var rawText = new System.Text.StringBuilder();
+        var pooledRawText = PooledStringBuilder.GetInstance();
+        var rawText = pooledRawText.Builder;
         while (PeekIncrementalTokenKind() is not SyntaxKind.EndOfFileToken &&
                PeekIncrementalTokenKind() != terminator)
         {
@@ -667,7 +668,7 @@ internal sealed partial class Parser
             rawText.Append(ReadIncrementalToken().ToFullString());
         }
 
-        return CreateIncrementalAkcssCSharpTypeSyntax(rawText.ToString());
+        return CreateIncrementalAkcssCSharpTypeSyntax(pooledRawText.ToStringAndFree());
     }
 
     private static GreenCSharpTypeSyntax CreateIncrementalAkcssCSharpTypeSyntax(string rawText)
@@ -1115,7 +1116,8 @@ internal sealed partial class Parser
             return GreenSyntaxFactory.TailwindNumericSegmentSyntax(first);
         }
 
-        var text = new StringBuilder(first.Text);
+        var pooledText = PooledStringBuilder.GetInstance();
+        var text = pooledText.Builder.Append(first.Text);
         var last = first;
         do
         {
@@ -1127,7 +1129,7 @@ internal sealed partial class Parser
             !next.ContainsDiagnostics &&
             AreAdjacent(last, next));
 
-        var value = text.ToString();
+        var value = pooledText.ToStringAndFree();
         var identifier = GreenSyntaxToken.Identifier(
             SyntaxKind.IdentifierToken,
             first.LeadingTrivia.Node,
@@ -2060,6 +2062,34 @@ internal sealed partial class Parser
 
         var text = token.ToFullString();
         return GreenSyntaxFactory.CSharpRawToken(text, parse(text));
+    }
+
+    private bool TryReadReusableAkcssBodyMember(out GreenAkcssBodyMemberSyntax node)
+    {
+        node = null!;
+
+        if (!CanReadIncrementalNodeOrToken())
+        {
+            return false;
+        }
+
+        var savedPosition = _lexer.TextWindow.Position;
+        var blended = _blender.ReadNode(_mode);
+        var green = blended.Node?.Green;
+        if (green == null ||
+            !SyntaxFacts.IsAkcssBodyMember(green.Kind) ||
+            !CanReuseIncrementalNode(green) ||
+            !CanReuseMarkupConditionalNode(green))
+        {
+            _lexer.TextWindow.Reset(savedPosition);
+            return false;
+        }
+
+        System.Diagnostics.Debug.Assert(green is GreenAkcssBodyMemberSyntax);
+        _blender = blended.Blender;
+        _prevTokenTrailingTrivia = ((GreenSyntaxToken?)green.GetLastTerminal())?.GetTrailingTrivia();
+        node = Unsafe.As<GreenAkcssBodyMemberSyntax>(green);
+        return true;
     }
 
     private bool TryReadReusableIncrementalNode<TNode>(out TNode node) where TNode : GreenNode

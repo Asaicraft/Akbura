@@ -10,18 +10,18 @@
     <PreviewImage>Resources\Marketplace\preview-200.png</PreviewImage>
   </Metadata>
   <Installation>
-    <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.14,)">
+    <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[18.9,)">
       <ProductArchitecture>amd64</ProductArchitecture>
     </InstallationTarget>
-    <InstallationTarget Id="Microsoft.VisualStudio.Pro" Version="[17.14,)">
+    <InstallationTarget Id="Microsoft.VisualStudio.Pro" Version="[18.9,)">
       <ProductArchitecture>amd64</ProductArchitecture>
     </InstallationTarget>
-    <InstallationTarget Id="Microsoft.VisualStudio.Enterprise" Version="[17.14,)">
+    <InstallationTarget Id="Microsoft.VisualStudio.Enterprise" Version="[18.9,)">
       <ProductArchitecture>amd64</ProductArchitecture>
     </InstallationTarget>
   </Installation>
   <Prerequisites>
-    <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" DisplayName="Visual Studio core editor" Version="[17.14,)" />
+    <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" DisplayName="Visual Studio core editor" Version="[18.9,)" />
   </Prerequisites>
   <Assets>
     <Asset Type="Microsoft.VisualStudio.MefComponent" Path="|Akbura.VisualStudio;BuiltProjectOutputGroup|" d:Source="Project" d:ProjectName="Akbura.VisualStudio" />

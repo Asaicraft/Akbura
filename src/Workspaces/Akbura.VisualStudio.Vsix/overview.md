@@ -23,7 +23,7 @@ an experimental Visual Studio instance in addition to component-level tests.
 
 ## Requirements
 
-- Visual Studio 2022 version 17.14 or later;
+- Visual Studio 2026 version 18.9 or later (Roslyn 5.9 or later);
 - Community, Professional, or Enterprise edition;
 - 64-bit Visual Studio.
 

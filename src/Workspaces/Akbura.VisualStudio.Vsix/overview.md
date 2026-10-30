@@ -30,6 +30,12 @@ an experimental Visual Studio instance in addition to component-level tests.
 The extension keeps its stable VSIX identity so installed copies receive future
 updates from the same Marketplace listing.
 
+## What's new in 12.0.4.17
+
+- Reduced compiler and shared workspace allocations through pooling, symbol and metadata caches, and streaming symbol names.
+- Updated Roslyn to 5.9.0 and preserved event-hook completion for incomplete lambdas.
+- Requires Visual Studio 2026 version 18.9 or later.
+
 ## What's new in 12.0.4.6
 
 - Added completion for state hooks and improved declaration-name completion.

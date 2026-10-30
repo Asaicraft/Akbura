@@ -59,7 +59,7 @@ use `basic` mode when both extensions cannot cooperate.
 
 The bundled language server currently targets .NET 10.
 
-Install the .NET 10 SDK and make sure `dotnet` is available in PATH,
+Install .NET SDK 10.0.400 or later and make sure `dotnet` is available in PATH,
 or configure:
 
 ```json

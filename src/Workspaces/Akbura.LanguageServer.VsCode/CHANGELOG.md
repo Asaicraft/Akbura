@@ -1,5 +1,11 @@
 # Change Log
 
+## 12.0.18
+
+- Reduced compiler and shared workspace allocations through pooling, symbol and metadata caches, and streaming symbol names.
+- Updated Roslyn to 5.9.0 and preserved event-hook completion for incomplete lambdas.
+- Requires .NET SDK 10.0.400 or later.
+
 ## 12.0.7
 
 - Added completion for state hooks and improved declaration-name completion.

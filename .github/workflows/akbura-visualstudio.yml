@@ -108,6 +108,10 @@ jobs:
             -ExpectedVersion $version `
             -PublishManifestPath $env:PUBLISH_MANIFEST_PATH
 
+          & ./src/Workspaces/Akbura.VisualStudio.Vsix/scripts/test-verify-vsix.ps1 `
+            -VsixPath $env:VSIX_OUTPUT_PATH `
+            -ExpectedVersion $version
+
       - name: Upload Visual Studio VSIX
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

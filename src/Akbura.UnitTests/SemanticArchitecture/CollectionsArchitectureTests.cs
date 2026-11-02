@@ -338,8 +338,16 @@ public sealed class CollectionsArchitectureTests : SemanticArchitectureTestBase
         var source = default(ImmutableArray<int>);
         Assert.Equal(Record.Exception(() => source.Select(static value => value).ToImmutableArray())!.GetType(),
             Record.Exception(() => source.SelectAsArray(static value => value))!.GetType());
+        var filterFailure = Record.Exception(() => source.WhereAsArray(static (value, threshold) => value > threshold, 0));
+        Assert.NotNull(filterFailure);
+#if DEBUG
+        // This existing helper asserts its non-default precondition in Debug.
+        // VSTest turns that assertion into an exception before array access.
+        Assert.Equal("Microsoft.VisualStudio.TestPlatform.TestHost.DebugAssertException", filterFailure.GetType().FullName);
+#else
         Assert.Equal(Record.Exception(() => source.Where(static value => value > 0).ToImmutableArray())!.GetType(),
-            Record.Exception(() => source.WhereAsArray(static (value, threshold) => value > threshold, 0))!.GetType());
+            filterFailure.GetType());
+#endif
 
         source = [3, 1, 2, 4];
         var failure = new InvalidOperationException("Callback failed.");

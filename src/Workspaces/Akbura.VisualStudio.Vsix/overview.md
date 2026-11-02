@@ -27,8 +27,17 @@ an experimental Visual Studio instance in addition to component-level tests.
 - Community, Professional, or Enterprise edition;
 - 64-bit Visual Studio.
 
+Visual Studio 2022 is not supported: it supplies Roslyn 4.14, while Akbura
+requires host Roslyn 5.9. The manifest targets the stable VSSDK API 17.14 for
+Marketplace compatibility; its separate CoreEditor prerequisite still requires
+Visual Studio 2026 18.9 or later.
+
 The extension keeps its stable VSIX identity so installed copies receive future
 updates from the same Marketplace listing.
+
+## What's new in 12.0.4.18
+
+- Corrected the Marketplace API target while preserving the Visual Studio 2026 host requirement.
 
 ## What's new in 12.0.4.17
 
@@ -69,4 +78,3 @@ updates from the same Marketplace listing.
 
 - Aligned the extension version with Akbura and Avalonia.
 - Added Akbura artwork to the Marketplace listing and Extension Manager.
-

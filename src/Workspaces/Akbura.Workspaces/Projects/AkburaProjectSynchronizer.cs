@@ -87,6 +87,15 @@ public sealed class AkburaProjectSynchronizer
 
     public async Task<AkburaLoadedProject> SynchronizeProjectAsync(Project project, CSharpCompilation compilation, Func<Uri, SourceText?>? openTextProvider, Uri? excludedDocument, CancellationToken cancellationToken)
     {
+        var loaded = await LoadProjectAsync(project, compilation, openTextProvider, excludedDocument, cancellationToken)
+            .ConfigureAwait(false);
+        return ApplyProject(project, loaded, openTextProvider, excludedDocument, cancellationToken);
+    }
+
+    // Native hosts validate context freshness after asynchronous loading and
+    // rebase the final application on their current open text registry.
+    internal async Task<AkburaLoadedProject> LoadProjectAsync(Project project, CSharpCompilation compilation, Func<Uri, SourceText?>? openTextProvider, Uri? excludedDocument, CancellationToken cancellationToken)
+    {
         if (project == null)
         {
             throw new ArgumentNullException(nameof(project));
@@ -116,7 +125,22 @@ public sealed class AkburaProjectSynchronizer
                 cancellationToken)
             .ConfigureAwait(false);
 
-        var projectSnapshot = _workspace.AddOrUpdateProject(context);
+        return new AkburaLoadedProject(context, documents, resourceDocuments,
+            ImmutableArray<AkburaProjectLoadDiagnostic>.Empty);
+    }
+
+    internal AkburaLoadedProject ApplyProject(Project project, AkburaLoadedProject loaded, Func<Uri, SourceText?>? openTextProvider, Uri? excludedDocument, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // Loading another document may have awaited disk or Roslyn. Rebase all
+        // open inputs immediately before applying, including resource inputs.
+        var documents = loaded.Documents.Select(input => new AkburaDocumentInput(
+            input.Uri, openTextProvider?.Invoke(input.Uri) ?? input.Text)).ToImmutableArray();
+        var resourceDocuments = loaded.ResourceDocuments.Select(input =>
+            openTextProvider?.Invoke(input.Uri) is { } text && !ReferenceEquals(text, input.Text)
+                ? input.WithText(text, VersionStamp.Create())
+                : input).ToImmutableArray();
+        var projectSnapshot = _workspace.AddOrUpdateProject(loaded.Context);
         if (excludedDocument != null &&
             ContainsDocument(project, excludedDocument) &&
             projectSnapshot.TryGetDocument(excludedDocument, out var excludedSnapshot) &&
@@ -133,12 +157,7 @@ public sealed class AkburaProjectSynchronizer
             projectSnapshot.Id,
             resourceDocuments,
             cancellationToken);
-
-        return new AkburaLoadedProject(
-            context,
-            documents,
-            resourceDocuments,
-            ImmutableArray<AkburaProjectLoadDiagnostic>.Empty);
+        return new AkburaLoadedProject(loaded.Context, documents, resourceDocuments, loaded.Diagnostics);
     }
 
     private static bool ContainsDocument(Project project, Uri uri)

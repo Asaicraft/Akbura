@@ -24,6 +24,8 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <!-- Exercise the native host's production coordination without loading VS/WPF. -->
+    <Compile Include="..\Akbura.VisualStudio\Projects\AkburaProjectContextManager.cs" Link="Native\AkburaProjectContextManager.cs" />
   </ItemGroup>
 
   <Import Project="..\..\Akbura.TestUtilities\Documentation\DocumentationExamples.props" />

@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.LanguageServices;
-using System.Collections.Concurrent;
+using Akbura.VisualStudio.Projects;
 using System.Collections.Immutable;
 using System.ComponentModel.Composition;
 using System.Diagnostics;
@@ -18,11 +18,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
 {
     private readonly VisualStudioWorkspace _visualStudioWorkspace;
 
-    private readonly AkburaProjectSynchronizer _projectSynchronizer;
-
-    private readonly ConcurrentDictionary<ProjectId, ProjectSynchronizationEntry> _projectSynchronizations = new();
-
-    private readonly CancellationTokenSource _disposeCancellation = new();
+    internal AkburaProjectContextManager ProjectContexts { get; }
 
     private int _disposeState;
 
@@ -38,13 +34,13 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             OnVisualStudioWorkspaceChanged;
 
         Workspace = new AkburaWorkspace();
-        _projectSynchronizer =
-            new AkburaProjectSynchronizer(Workspace);
+        ProjectContexts = new AkburaProjectContextManager(
+            _visualStudioWorkspace, Workspace, FindContainingProject);
     }
 
     public AkburaWorkspace Workspace { get; }
 
-    internal event EventHandler? ProjectContextChanged;
+    internal event EventHandler<WorkspaceChangeEventArgs>? ProjectContextChanged;
 
     internal event EventHandler<WorkspaceChangeEventArgs>?
         ResourceProjectContextChanged;
@@ -97,9 +93,8 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
         foreach (var project in projects)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!await GetOrCreateProjectSynchronizationTaskAsync(
-                    project,
-                    activeFilePath: null)
+            if (!await ProjectContexts.SynchronizeAsync(
+                    project.Id, cancellationToken)
                 .ConfigureAwait(false))
             {
                 continue;
@@ -317,204 +312,10 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
             return null;
         }
 
-        var synchronization =
-            GetOrCreateProjectSynchronizationTaskAsync(
-                project,
-                fullPath);
-        var synchronized = await AwaitWithoutCancelingSourceAsync(
-                synchronization,
-                cancellationToken)
+        var synchronized = await ProjectContexts.SynchronizeAsync(project.Id, cancellationToken)
             .ConfigureAwait(false);
-
-        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
-            "Synchronization total",
-            totalTimer.Elapsed);
-
-        return synchronized
-            ? new AkburaProjectId(project.Id.Id)
-            : null;
-    }
-
-    private async Task<bool> GetOrCreateProjectSynchronizationTaskAsync(Project project, string? activeFilePath)
-    {
-        var cancellationToken = _disposeCancellation.Token;
-        var version = await project
-            .GetDependentVersionAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-        var entry =
-            _projectSynchronizations.GetOrAdd(
-                project.Id,
-                static _ =>
-                    new ProjectSynchronizationEntry());
-
-        var state = entry.GetOrCreateState(
-            version,
-            out var startsSynchronization);
-
-        if (startsSynchronization)
-        {
-            _ = CompleteProjectSynchronizationAsync(
-                project,
-                activeFilePath,
-                entry,
-                state);
-        }
-
-        return await state.Task.ConfigureAwait(false);
-    }
-
-    private async Task CompleteProjectSynchronizationAsync(Project project, string? activeFilePath, ProjectSynchronizationEntry entry, ProjectSynchronizationState state)
-    {
-        var cancellationToken = _disposeCancellation.Token;
-        try
-        {
-            await entry.SynchronizationGate
-                .WaitAsync(cancellationToken)
-                .ConfigureAwait(false);
-            try
-            {
-                var result = await SynchronizeProjectAndReferencesAsync(
-                        project,
-                        activeFilePath,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-
-                if (!result)
-                {
-                    /*
-                     * Visual Studio can expose a provisional project while
-                     * CPS and Roslyn are still loading it. Do not retain a
-                     * failed synchronization for the same version forever;
-                     * the next retry must be able to inspect the project
-                     * again.
-                     */
-                    entry.RemoveIfCurrent(state);
-                }
-
-                state.TrySetResult(result);
-            }
-            finally
-            {
-                entry.SynchronizationGate.Release();
-            }
-        }
-        catch (OperationCanceledException)
-            when (cancellationToken.IsCancellationRequested)
-        {
-            entry.RemoveIfCurrent(state);
-            state.TrySetCanceled();
-        }
-        catch (Exception exception)
-        {
-            entry.RemoveIfCurrent(state);
-            state.TrySetException(exception);
-        }
-    }
-
-    private async Task<bool> SynchronizeProjectAndReferencesAsync(Project project, string? activeFilePath, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (!project.Documents.Any() &&
-            !project.MetadataReferences.Any() &&
-            !project.ProjectReferences.Any())
-        {
-            AkburaWorkspaceDiagnostics.Write(
-                AkburaWorkspaceDiagnostics.Category.Workspace,
-                $"Roslyn project '{project.Name}' is still empty. " +
-                "Synchronization will be retried.");
-
-            return false;
-        }
-
-        var totalTimer = Stopwatch.StartNew();
-        var stageTimer = Stopwatch.StartNew();
-
-        foreach (var projectReference in project.ProjectReferences)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var referencedProject =
-                project.Solution.GetProject(
-                    projectReference.ProjectId);
-            if (referencedProject == null ||
-                referencedProject.Language !=
-                    LanguageNames.CSharp)
-            {
-                continue;
-            }
-
-            await GetOrCreateProjectSynchronizationTaskAsync(
-                    referencedProject,
-                    activeFilePath: null)
-                .ConfigureAwait(false);
-        }
-        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
-            "Referenced projects",
-            stageTimer.Elapsed);
-
-        stageTimer.Restart();
-        var compilation =
-            await project
-                .GetCompilationAsync(
-                    cancellationToken)
-                .ConfigureAwait(false);
-        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
-            "GetCompilationAsync",
-            stageTimer.Elapsed);
-
-        if (compilation is not
-            CSharpCompilation csharpCompilation)
-        {
-            AkburaWorkspaceDiagnostics.Write(
-                AkburaWorkspaceDiagnostics.Category.Workspace,
-                $"C# compilation was not available " +
-                $"for project '{project.Name}'.");
-
-            return false;
-        }
-
-        if (!csharpCompilation.References.Any())
-        {
-            AkburaWorkspaceDiagnostics.Write(
-                AkburaWorkspaceDiagnostics.Category.Workspace,
-                $"C# compilation for project '{project.Name}' " +
-                "is provisional and has no metadata references. " +
-                "Synchronization will be retried.");
-
-            return false;
-        }
-
-        stageTimer.Restart();
-        await _projectSynchronizer
-            .SynchronizeProjectAsync(
-                project,
-                csharpCompilation,
-                openTextProvider: null,
-                excludedDocument:
-                    string.IsNullOrWhiteSpace(activeFilePath)
-                        ? null
-                        : new Uri(Path.GetFullPath(activeFilePath)),
-                cancellationToken)
-            .ConfigureAwait(false);
-        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
-            "Shared project synchronization",
-            stageTimer.Elapsed);
-
-        AkburaWorkspaceDiagnostics.Write(
-            AkburaWorkspaceDiagnostics.Category.Workspace,
-            $"Roslyn project synchronized: " +
-            $"name={project.Name}, " +
-            $"assembly={csharpCompilation.AssemblyName}, " +
-            $"trees={csharpCompilation.SyntaxTrees.Count()}, " +
-            $"references={csharpCompilation.References.Count()}, " +
-            $"projectReferences={project.ProjectReferences.Count()}");
-
-        AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
-            "SynchronizeProjectAndReferencesAsync total",
-            totalTimer.Elapsed);
-        return true;
+        AkburaWorkspaceDiagnostics.WriteCompletionElapsed("Synchronization total", totalTimer.Elapsed);
+        return synchronized ? new AkburaProjectId(project.Id.Id) : null;
     }
 
     private Project? FindContainingProject(string filePath)
@@ -1042,9 +843,7 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
         _visualStudioWorkspace.WorkspaceChanged -=
             OnVisualStudioWorkspaceChanged;
 
-        _disposeCancellation.Cancel();
-
-        _projectSynchronizations.Clear();
+        ProjectContexts.Dispose();
 
         Workspace.Dispose();
         ProjectContextChanged = null;
@@ -1055,115 +854,9 @@ internal sealed class AkburaVisualStudioWorkspace : IDisposable
     {
         if (Volatile.Read(ref _disposeState) == 0)
         {
-            ProjectContextChanged?.Invoke(this, EventArgs.Empty);
+            ProjectContextChanged?.Invoke(this, e);
             ResourceProjectContextChanged?.Invoke(this, e);
         }
     }
 
-#pragma warning disable VSTHRD003 // The shared source task deliberately outlives the requesting editor snapshot.
-    private static async Task<T> AwaitWithoutCancelingSourceAsync<T>(Task<T> task, CancellationToken cancellationToken)
-    {
-        if (task.IsCompleted || !cancellationToken.CanBeCanceled)
-        {
-            return await task.ConfigureAwait(false);
-        }
-
-        var cancellation = new TaskCompletionSource<bool>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        using (cancellationToken.Register(
-                   () => cancellation.TrySetResult(true)))
-        {
-            if (!ReferenceEquals(
-                    await Task.WhenAny(task, cancellation.Task)
-                        .ConfigureAwait(false),
-                    task))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-            }
-
-            return await task.ConfigureAwait(false);
-        }
-    }
-#pragma warning restore VSTHRD003
-
-    private sealed class ProjectSynchronizationEntry
-    {
-        private ProjectSynchronizationState? _current;
-
-        public SemaphoreSlim SynchronizationGate { get; } =
-            new(
-                initialCount: 1,
-                maxCount: 1);
-
-        public ProjectSynchronizationState GetOrCreateState(VersionStamp version, out bool created)
-        {
-            while (true)
-            {
-                var current =
-                    Volatile.Read(ref _current);
-
-                /*
-                 * While the current synchronization is running, every
-                 * request shares its task. After successful completion,
-                 * the result is reused for the same project version.
-                 */
-                if (current != null &&
-                    (!current.Task.IsCompleted ||
-                     current.Version.Equals(version)))
-                {
-                    created = false;
-                    return current;
-                }
-
-                var replacement =
-                    new ProjectSynchronizationState(
-                        version);
-                var observed =
-                    Interlocked.CompareExchange(
-                        ref _current,
-                        replacement,
-                        current);
-
-                if (ReferenceEquals(
-                        observed,
-                        current))
-                {
-                    created = true;
-                    return replacement;
-                }
-            }
-        }
-
-        public void RemoveIfCurrent(ProjectSynchronizationState state)
-        {
-            _ = Interlocked.CompareExchange(
-                ref _current,
-                value: null,
-                comparand: state);
-        }
-    }
-
-    private sealed class ProjectSynchronizationState
-    {
-        private readonly TaskCompletionSource<bool> _completion =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public ProjectSynchronizationState(VersionStamp version)
-        {
-            Version = version;
-        }
-
-        public VersionStamp Version { get; }
-
-        public Task<bool> Task => _completion.Task;
-
-        public void TrySetResult(bool result) =>
-            _completion.TrySetResult(result);
-
-        public void TrySetCanceled() =>
-            _completion.TrySetCanceled();
-
-        public void TrySetException(Exception exception) =>
-            _completion.TrySetException(exception);
-    }
 }

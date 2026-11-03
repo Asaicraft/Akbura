@@ -35,6 +35,12 @@ Visual Studio 2026 18.9 or later.
 The extension keeps its stable VSIX identity so installed copies receive future
 updates from the same Marketplace listing.
 
+## What's new in 12.0.4.19
+
+- Open Akbura documents now refresh semantic diagnostics automatically when their project or a referenced project changes, including during project initialization and dependency restoration.
+- Preserved unsaved Akbura, AKCSS, and resource text when synchronizing project context.
+- Prevented obsolete background analysis from replacing current editor diagnostics and Error List entries.
+
 ## What's new in 12.0.4.18
 
 - Corrected the Marketplace API target while preserving the Visual Studio 2026 host requirement.

@@ -1,4 +1,5 @@
 using Akbura.Language;
+using Akbura.VisualStudio.Projects;
 using Akbura.Workspaces;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.Shell;
@@ -24,9 +25,6 @@ internal sealed class AkburaTextBufferContext : IDisposable
     private static readonly TimeSpan UpdateDelay =
         TimeSpan.FromMilliseconds(100);
 
-    private static readonly TimeSpan ProjectRetryDelay =
-        TimeSpan.FromMilliseconds(500);
-
     private readonly ITextBuffer _textBuffer;
 
     private readonly AkburaVisualStudioWorkspace _visualStudioWorkspace;
@@ -35,15 +33,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
     private readonly AkburaParserService _parserService;
 
-    private AkburaProjectId? _projectId;
-
-    private readonly object _projectInitializationGate = new();
-
-    private Task<AkburaProjectId?>? _projectInitializationTask;
-
-    private int _projectContextVersion;
-
-    private int _projectInitializationVersion = -1;
+    private readonly AkburaEditorProjectContext _projectContext;
 
     private readonly IAkburaClassificationService _classificationService;
 
@@ -94,10 +84,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
     private event Action? DocumentContextPublished;
 
-    /// <summary>
-    /// Monotonically increasing editor request version.
-    /// </summary>
-    private long _requestedVersion;
+    private int _contextRefreshPending;
 
     /// <summary>
     /// Zero means that no worker owns the processing loop.
@@ -137,9 +124,6 @@ internal sealed class AkburaTextBufferContext : IDisposable
 
         _diagnosticService = _workspace.LanguageServices.Diagnostics;
 
-        _visualStudioWorkspace.ProjectContextChanged +=
-            OnProjectContextChanged;
-
         _joinableTaskFactory = ThreadHelper.JoinableTaskFactory;
 
         if (textDocumentFactory.TryGetTextDocument(
@@ -177,8 +161,9 @@ internal sealed class AkburaTextBufferContext : IDisposable
         _textBuffer.ChangedLowPriority +=
             OnTextBufferChangedLowPriority;
 
-        _ = _joinableTaskFactory.RunAsync(
-            WarmUpProjectAsync);
+        _projectContext = _visualStudioWorkspace.ProjectContexts.OpenBuffer(
+            FilePath, _textBuffer.CurrentSnapshot.AsText());
+        _projectContext.Changed += OnProjectContextChanged;
 
         EnqueueSnapshot(
             _textBuffer.CurrentSnapshot);
@@ -405,8 +390,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
         var sourceText = snapshot.AsText();
 
         var requestVersion =
-            Interlocked.Increment(
-                ref _requestedVersion);
+            _projectContext.Request(sourceText);
 
         var request = new UpdateRequest(
             requestVersion,
@@ -429,187 +413,8 @@ internal sealed class AkburaTextBufferContext : IDisposable
         EnsureWorker();
     }
 
-    private async Task<AkburaProjectId?> GetProjectIdAsync(CancellationToken cancellationToken)
-    {
-        while (true)
-        {
-            if (_projectId is { } projectId)
-            {
-                return projectId;
-            }
-
-            var initializationTask =
-                GetOrCreateProjectInitializationTaskAsync(
-                    out var initializationVersion);
-            var synchronizedProjectId = await AwaitWithoutCancelingSourceAsync(
-                    initializationTask,
-                    cancellationToken)
-                .ConfigureAwait(false);
-
-            if (initializationVersion != Volatile.Read(
-                    ref _projectContextVersion))
-            {
-                continue;
-            }
-
-            if (synchronizedProjectId is { } result)
-            {
-                return result;
-            }
-
-            ForgetFailedProjectInitialization(
-                initializationTask,
-                initializationVersion);
-            return null;
-        }
-    }
-
-    private Task<AkburaProjectId?>
-        GetOrCreateProjectInitializationTaskAsync(
-            out int initializationVersion)
-    {
-        lock (_projectInitializationGate)
-        {
-            if (_projectId is { } projectId)
-            {
-                initializationVersion = Volatile.Read(
-                    ref _projectContextVersion);
-                return Task.FromResult<AkburaProjectId?>(
-                    projectId);
-            }
-
-            var projectContextVersion = Volatile.Read(
-                ref _projectContextVersion);
-            var current = _projectInitializationTask;
-            if (current != null &&
-                (!current.IsCompleted ||
-                 _projectInitializationVersion == projectContextVersion))
-            {
-                initializationVersion =
-                    _projectInitializationVersion;
-                return current;
-            }
-
-            _projectInitializationVersion = projectContextVersion;
-            initializationVersion = projectContextVersion;
-            return _projectInitializationTask =
-                InitializeProjectAsync(
-                    projectContextVersion,
-                    _disposeCancellation.Token);
-        }
-    }
-
-    private async Task<AkburaProjectId?> InitializeProjectAsync(
-        int projectContextVersion,
-        CancellationToken cancellationToken)
-    {
-        var filePath = _textDocument?.FilePath;
-        if (string.IsNullOrWhiteSpace(filePath))
-        {
-            return null;
-        }
-
-        var projectId = await _visualStudioWorkspace
-            .SynchronizeProjectAsync(
-                filePath!,
-                cancellationToken)
-            .ConfigureAwait(false);
-
-        if (projectId is { } result)
-        {
-            lock (_projectInitializationGate)
-            {
-                if (_projectContextVersion == projectContextVersion &&
-                    _projectInitializationVersion ==
-                        projectContextVersion)
-                {
-                    _projectId = result;
-                }
-            }
-        }
-
-        return projectId;
-    }
-
-    private void ForgetFailedProjectInitialization(
-        Task<AkburaProjectId?> initializationTask,
-        int initializationVersion)
-    {
-        lock (_projectInitializationGate)
-        {
-            if (ReferenceEquals(
-                    _projectInitializationTask,
-                    initializationTask) &&
-                _projectInitializationVersion ==
-                    initializationVersion)
-            {
-                _projectInitializationTask = null;
-                _projectInitializationVersion = -1;
-            }
-        }
-    }
-
-    private async Task WarmUpProjectAsync()
-    {
-        try
-        {
-            while (Volatile.Read(ref _disposeState) == 0)
-            {
-                var projectId = await GetProjectIdAsync(
-                        _disposeCancellation.Token)
-                    .ConfigureAwait(false);
-                if (projectId != null)
-                {
-                    EnqueueSnapshot(
-                        _textBuffer.CurrentSnapshot);
-                    return;
-                }
-
-                await Task.Delay(
-                        ProjectRetryDelay,
-                        _disposeCancellation.Token)
-                    .ConfigureAwait(false);
-            }
-        }
-        catch (OperationCanceledException)
-            when (_disposeCancellation.IsCancellationRequested)
-        {
-        }
-        catch (Exception exception)
-        {
-            AkburaWorkspaceDiagnostics.Write(
-                AkburaWorkspaceDiagnostics.Category.Workspace,
-                $"Project warm-up failed: {exception}");
-        }
-    }
-
-#pragma warning disable VSTHRD003 // The initialization task deliberately outlives an editor snapshot.
-    private static async Task<T> AwaitWithoutCancelingSourceAsync<T>(
-        Task<T> task,
-        CancellationToken cancellationToken)
-    {
-        if (task.IsCompleted || !cancellationToken.CanBeCanceled)
-        {
-            return await task.ConfigureAwait(false);
-        }
-
-        var cancellation = new TaskCompletionSource<bool>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        using (cancellationToken.Register(
-                   () => cancellation.TrySetResult(true)))
-        {
-            if (!ReferenceEquals(
-                    await Task.WhenAny(task, cancellation.Task)
-                        .ConfigureAwait(false),
-                    task))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-            }
-
-            return await task.ConfigureAwait(false);
-        }
-    }
-#pragma warning restore VSTHRD003
+    private Task<AkburaProjectId?> GetProjectIdAsync(CancellationToken cancellationToken) =>
+        _projectContext.SynchronizeAsync(cancellationToken);
 
     private void EnsureWorker()
     {
@@ -964,12 +769,16 @@ internal sealed class AkburaTextBufferContext : IDisposable
             activeStage = "OpenOrChangeDocumentContext";
             stageTimer.Restart();
 #endif
-            var context = _workspace.OpenOrChangeDocumentContext(
-                resolvedProjectId,
-                _uri,
-                request.Text,
-                changes: null,
-                cancellationToken);
+            if (!IsCurrentRequest(request.RequestVersion))
+            {
+                return null;
+            }
+            var context = await _projectContext.OpenDocumentAsync(request.RequestVersion,
+                _uri, request.Text, cancellationToken).ConfigureAwait(false);
+            if (context == null)
+            {
+                return null;
+            }
 
 #if DEBUG
             WriteSemanticStateStage(
@@ -1150,7 +959,10 @@ internal sealed class AkburaTextBufferContext : IDisposable
     }
 #endif
 
-    private void PublishSemanticState(
+    private void PublishSemanticState(AkburaParsedBufferState state) =>
+        _projectContext.TryPublishSemantic(state.RequestVersion, () => PublishSemanticStateCore(state));
+
+    private void PublishSemanticStateCore(
         AkburaParsedBufferState state)
     {
         while (true)
@@ -1181,7 +993,10 @@ internal sealed class AkburaTextBufferContext : IDisposable
         }
     }
 
-    private void PublishDocumentContext(
+    private void PublishDocumentContext(PublishedDocumentContext state) =>
+        _projectContext.TryPublishSemantic(state.RequestVersion, () => PublishDocumentContextCore(state));
+
+    private void PublishDocumentContextCore(
         PublishedDocumentContext state)
     {
         while (true)
@@ -1212,7 +1027,19 @@ internal sealed class AkburaTextBufferContext : IDisposable
         }
     }
 
-    private void PublishClassificationState(
+    private void PublishClassificationState(AkburaClassifiedBufferState state)
+    {
+        if (state.Stage == AkburaClassificationStage.Syntax)
+        {
+            _projectContext.TryPublish(state.RequestVersion, () => PublishClassificationStateCore(state));
+        }
+        else
+        {
+            _projectContext.TryPublishSemantic(state.RequestVersion, () => PublishClassificationStateCore(state));
+        }
+    }
+
+    private void PublishClassificationStateCore(
         AkburaClassifiedBufferState state)
     {
         while (true)
@@ -1294,13 +1121,16 @@ internal sealed class AkburaTextBufferContext : IDisposable
         var currentSnapshot =
             _textBuffer.CurrentSnapshot;
 
-        Changed?.Invoke(
-            this,
-            new AkburaBufferChangedEventArgs(
-                new SnapshotSpan(
-                    currentSnapshot,
-                    0,
-                    currentSnapshot.Length)));
+        void NotifyChanged() => Changed?.Invoke(this, new AkburaBufferChangedEventArgs(
+            new SnapshotSpan(currentSnapshot, 0, currentSnapshot.Length)));
+        if (state.Stage == AkburaClassificationStage.Syntax)
+        {
+            _projectContext.TryPublish(state.RequestVersion, NotifyChanged);
+        }
+        else
+        {
+            _projectContext.TryPublishSemantic(state.RequestVersion, NotifyChanged);
+        }
 
         AkburaWorkspaceDiagnostics.Write(
             AkburaWorkspaceDiagnostics.Category.Classification,
@@ -1313,7 +1143,7 @@ internal sealed class AkburaTextBufferContext : IDisposable
     private bool IsCurrentRequest(
         long requestVersion)
     {
-        return requestVersion == Volatile.Read(ref _requestedVersion)
+        return _projectContext.IsCurrent(requestVersion)
             && Volatile.Read(ref _disposeState) == 0;
     }
 
@@ -1356,21 +1186,29 @@ internal sealed class AkburaTextBufferContext : IDisposable
         }
     }
 
-    private void OnProjectContextChanged(
-        object? sender,
-        EventArgs e)
+    private void OnProjectContextChanged()
     {
-        if (Volatile.Read(ref _disposeState) != 0 ||
-            _projectId != null)
+        CancelActiveParse();
+        if (Interlocked.Exchange(ref _contextRefreshPending, 1) != 0)
         {
             return;
         }
 
-        Interlocked.Increment(
-            ref _projectContextVersion);
-
-        EnqueueSnapshot(
-            _textBuffer.CurrentSnapshot);
+        _ = _joinableTaskFactory.RunAsync(async () =>
+        {
+            try
+            {
+                await _joinableTaskFactory.SwitchToMainThreadAsync(_disposeCancellation.Token);
+                Interlocked.Exchange(ref _contextRefreshPending, 0);
+                if (Volatile.Read(ref _disposeState) == 0)
+                {
+                    EnqueueSnapshot(_textBuffer.CurrentSnapshot);
+                }
+            }
+            catch (OperationCanceledException) when (_disposeCancellation.IsCancellationRequested)
+            {
+            }
+        });
     }
 
     public void Dispose()
@@ -1385,8 +1223,8 @@ internal sealed class AkburaTextBufferContext : IDisposable
         _textBuffer.ChangedLowPriority -=
             OnTextBufferChangedLowPriority;
 
-        _visualStudioWorkspace.ProjectContextChanged -=
-            OnProjectContextChanged;
+        _projectContext.Changed -= OnProjectContextChanged;
+        _projectContext.Dispose();
 
         _subscribedDocumentFactory?.TextDocumentDisposed -=
                 OnTextDocumentDisposed;

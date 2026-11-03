@@ -109,6 +109,8 @@ internal sealed class AkburaResourceDocumentTextBufferContext : IDisposable
 
     private string _filePath;
 
+    private Projects.AkburaProjectContextManager.OpenText _openText;
+
     private UpdateRequest? _pendingRequest;
 
     private CancellationTokenSource? _activeCancellation;
@@ -129,6 +131,8 @@ internal sealed class AkburaResourceDocumentTextBufferContext : IDisposable
             throw new ArgumentNullException(nameof(workspaceHost));
         _textBuffer = document.TextBuffer;
         _filePath = Path.GetFullPath(document.FilePath);
+        _openText = _workspaceHost.ProjectContexts.RegisterOpenText(
+            _filePath, _textBuffer.CurrentSnapshot.AsText());
 
         _textBuffer.ChangedLowPriority += OnTextBufferChangedLowPriority;
         _document.FileActionOccurred += OnFileActionOccurred;
@@ -158,7 +162,10 @@ internal sealed class AkburaResourceDocumentTextBufferContext : IDisposable
         {
             var registrations = ResetRegistrations();
             _workspaceHost.RemoveResourceDocuments(registrations);
+            _openText.Dispose();
             _filePath = Path.GetFullPath(eventArgs.FilePath);
+            _openText = _workspaceHost.ProjectContexts.RegisterOpenText(
+                _filePath, _textBuffer.CurrentSnapshot.AsText());
 
             if (IsResourceDocument(_filePath))
             {
@@ -213,10 +220,12 @@ internal sealed class AkburaResourceDocumentTextBufferContext : IDisposable
             return;
         }
 
+        var text = snapshot.AsText();
+        _openText.Update(text);
         var request = new UpdateRequest(
             Interlocked.Increment(ref _requestedVersion),
             _filePath,
-            snapshot.AsText(),
+            text,
             forceRebind);
 
         Interlocked.Exchange(ref _pendingRequest, request);
@@ -428,6 +437,8 @@ internal sealed class AkburaResourceDocumentTextBufferContext : IDisposable
         _document.FileActionOccurred -= OnFileActionOccurred;
         _workspaceHost.ResourceProjectContextChanged -=
             OnProjectContextChanged;
+
+        _openText.Dispose();
 
         Interlocked.Exchange(ref _pendingRequest, null);
         CancelActiveUpdate();

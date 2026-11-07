@@ -1,0 +1,18 @@
+using Akbura.AvaloniaEdit;
+using Avalonia.Controls;
+
+namespace Akbura.AvaloniaEdit.BrowserSmoke;
+
+<DockPanel>
+    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
+        <Button Content="Complete"
+                Margin="8"
+                Click={async () => await editor.RequestCompletionAsync()} />
+        <TextBlock x.Name="status"
+                   Text="Starting in-memory editor smoke test…"
+                   Margin="8" />
+    </StackPanel>
+    <AkburaCodeEditor x.Name="editor"
+                      ShowLineNumbers="True"
+                      FontSize="16" />
+</DockPanel>

@@ -96,6 +96,21 @@
     <File Path=".github/workflows/build.yml" />
     <File Path=".github/workflows/nuget-publish.yml" />
   </Folder>
+  <Folder Name="/Playground/">
+    <Project Path="src/Playground/Akbura.AvaloniaEdit.BrowserSmoke/Akbura.AvaloniaEdit.BrowserSmoke.csproj">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+      <Build Project="false" />
+    </Project>
+    <Project Path="src/Playground/Akbura.AvaloniaEdit.UnitTests/Akbura.AvaloniaEdit.UnitTests.csproj">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+    </Project>
+    <Project Path="src/Playground/Akbura.AvaloniaEdit/Akbura.AvaloniaEdit.csproj">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+    </Project>
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path=".gitattributes" />

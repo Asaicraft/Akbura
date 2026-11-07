@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AkburaBuildTasksOutputDirectory>$(MSBuildThisFileDirectory)..\..\Akbura.Build.Tasks\bin\$(Configuration)\net10.0</AkburaBuildTasksOutputDirectory>
+    <AkburaBuildTasksAssembly>$(AkburaBuildTasksOutputDirectory)\Akbura.Build.Tasks.dll</AkburaBuildTasksAssembly>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia.AvaloniaEdit" />
+    <ProjectReference Include="../../Akbura/Akbura.csproj" />
+    <ProjectReference Include="../../Akbura.Build.Tasks/Akbura.Build.Tasks.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <ProjectReference Include="../../Akbura.BlackSilence/Akbura.BlackSilence.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" PrivateAssets="all" />
+    <ProjectReference Include="../../Workspaces/Akbura.Workspaces/Akbura.Workspaces.csproj" />
+    <InternalsVisibleTo Include="Akbura.AvaloniaEdit.UnitTests" />
+  </ItemGroup>
+  <Import Project="../../Akbura/buildTransitive/Akbura.targets" />
+</Project>

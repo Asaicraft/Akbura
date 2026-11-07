@@ -1,0 +1,9 @@
+global using Akbura.Workspaces;
+global using Akbura.Workspaces.Classification;
+global using Akbura.Workspaces.Completion;
+global using Akbura.Workspaces.Diagnostics;
+global using Akbura.Workspaces.Documents;
+global using Akbura.Workspaces.Projects;
+global using Akbura.Workspaces.Projection;
+global using Microsoft.CodeAnalysis.Text;
+global using System.Collections.Immutable;

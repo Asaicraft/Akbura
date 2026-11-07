@@ -1,0 +1,88 @@
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Styles.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="AkburaEditor.KeywordBrush" Color="#0000BF" />
+          <SolidColorBrush x:Key="AkburaEditor.NamespaceBrush" Color="#202020" />
+          <SolidColorBrush x:Key="AkburaEditor.TypeBrush" Color="#267F99" />
+          <SolidColorBrush x:Key="AkburaEditor.ComponentBrush" Color="#267F99" />
+          <SolidColorBrush x:Key="AkburaEditor.AttributeBrush" Color="#7045A0" />
+          <SolidColorBrush x:Key="AkburaEditor.IdentifierBrush" Color="#202020" />
+          <SolidColorBrush x:Key="AkburaEditor.DirectiveBrush" Color="#0000BF" />
+          <SolidColorBrush x:Key="AkburaEditor.StringBrush" Color="#A31515" />
+          <SolidColorBrush x:Key="AkburaEditor.NumberBrush" Color="#176A40" />
+          <SolidColorBrush x:Key="AkburaEditor.CommentBrush" Color="#367327" />
+          <SolidColorBrush x:Key="AkburaEditor.OperatorBrush" Color="#202020" />
+          <SolidColorBrush x:Key="AkburaEditor.PunctuationBrush" Color="#202020" />
+          <SolidColorBrush x:Key="AkburaEditor.MarkupTextBrush" Color="#A31515" />
+          <SolidColorBrush x:Key="AkburaEditor.UtilityBrush" Color="#795E26" />
+          <SolidColorBrush x:Key="AkburaEditor.UtilityModifierBrush" Color="#795E26" />
+          <SolidColorBrush x:Key="AkburaEditor.MarkupExtensionTypeBrush" Color="#267F99" />
+          <SolidColorBrush x:Key="AkburaEditor.MarkupExtensionPropertyBrush" Color="#7045A0" />
+          <SolidColorBrush x:Key="AkburaEditor.MarkupExtensionValueBrush" Color="#A31515" />
+          <SolidColorBrush x:Key="AkburaEditor.MarkupExtensionPunctuationBrush" Color="#202020" />
+          <SolidColorBrush x:Key="AkburaEditor.EmbeddedCSharpBrush" Color="#202020" />
+          <SolidColorBrush x:Key="AkburaEditor.ClassNameBrush" Color="#267F99" />
+          <SolidColorBrush x:Key="AkburaEditor.StructNameBrush" Color="#267F99" />
+          <SolidColorBrush x:Key="AkburaEditor.InterfaceNameBrush" Color="#267F99" />
+          <SolidColorBrush x:Key="AkburaEditor.EnumNameBrush" Color="#267F99" />
+          <SolidColorBrush x:Key="AkburaEditor.DelegateNameBrush" Color="#267F99" />
+          <SolidColorBrush x:Key="AkburaEditor.TypeParameterNameBrush" Color="#267F99" />
+          <SolidColorBrush x:Key="AkburaEditor.MethodNameBrush" Color="#795E26" />
+          <SolidColorBrush x:Key="AkburaEditor.ExtensionMethodNameBrush" Color="#795E26" />
+          <SolidColorBrush x:Key="AkburaEditor.PropertyNameBrush" Color="#7045A0" />
+          <SolidColorBrush x:Key="AkburaEditor.EventNameBrush" Color="#202020" />
+          <SolidColorBrush x:Key="AkburaEditor.FieldNameBrush" Color="#202020" />
+          <SolidColorBrush x:Key="AkburaEditor.EnumMemberNameBrush" Color="#202020" />
+          <SolidColorBrush x:Key="AkburaEditor.ConstantNameBrush" Color="#202020" />
+          <SolidColorBrush x:Key="AkburaEditor.LocalNameBrush" Color="#202020" />
+          <SolidColorBrush x:Key="AkburaEditor.ParameterNameBrush" Color="#202020" />
+          <SolidColorBrush x:Key="AkburaEditor.LabelNameBrush" Color="#202020" />
+          <SolidColorBrush x:Key="AkburaEditor.ErrorBrush" Color="#E04B4B" />
+          <SolidColorBrush x:Key="AkburaEditor.WarningBrush" Color="#C58A00" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="AkburaEditor.KeywordBrush" Color="#73A9E6" />
+          <SolidColorBrush x:Key="AkburaEditor.NamespaceBrush" Color="#D4D4D4" />
+          <SolidColorBrush x:Key="AkburaEditor.TypeBrush" Color="#57C9B1" />
+          <SolidColorBrush x:Key="AkburaEditor.ComponentBrush" Color="#57C9B1" />
+          <SolidColorBrush x:Key="AkburaEditor.AttributeBrush" Color="#9CDCFE" />
+          <SolidColorBrush x:Key="AkburaEditor.IdentifierBrush" Color="#D4D4D4" />
+          <SolidColorBrush x:Key="AkburaEditor.DirectiveBrush" Color="#73A9E6" />
+          <SolidColorBrush x:Key="AkburaEditor.StringBrush" Color="#D6A17B" />
+          <SolidColorBrush x:Key="AkburaEditor.NumberBrush" Color="#B5CEA8" />
+          <SolidColorBrush x:Key="AkburaEditor.CommentBrush" Color="#87B878" />
+          <SolidColorBrush x:Key="AkburaEditor.OperatorBrush" Color="#D4D4D4" />
+          <SolidColorBrush x:Key="AkburaEditor.PunctuationBrush" Color="#D4D4D4" />
+          <SolidColorBrush x:Key="AkburaEditor.MarkupTextBrush" Color="#D6A17B" />
+          <SolidColorBrush x:Key="AkburaEditor.UtilityBrush" Color="#DCDCAA" />
+          <SolidColorBrush x:Key="AkburaEditor.UtilityModifierBrush" Color="#DCDCAA" />
+          <SolidColorBrush x:Key="AkburaEditor.MarkupExtensionTypeBrush" Color="#57C9B1" />
+          <SolidColorBrush x:Key="AkburaEditor.MarkupExtensionPropertyBrush" Color="#9CDCFE" />
+          <SolidColorBrush x:Key="AkburaEditor.MarkupExtensionValueBrush" Color="#D6A17B" />
+          <SolidColorBrush x:Key="AkburaEditor.MarkupExtensionPunctuationBrush" Color="#D4D4D4" />
+          <SolidColorBrush x:Key="AkburaEditor.EmbeddedCSharpBrush" Color="#D4D4D4" />
+          <SolidColorBrush x:Key="AkburaEditor.ClassNameBrush" Color="#57C9B1" />
+          <SolidColorBrush x:Key="AkburaEditor.StructNameBrush" Color="#57C9B1" />
+          <SolidColorBrush x:Key="AkburaEditor.InterfaceNameBrush" Color="#57C9B1" />
+          <SolidColorBrush x:Key="AkburaEditor.EnumNameBrush" Color="#57C9B1" />
+          <SolidColorBrush x:Key="AkburaEditor.DelegateNameBrush" Color="#57C9B1" />
+          <SolidColorBrush x:Key="AkburaEditor.TypeParameterNameBrush" Color="#57C9B1" />
+          <SolidColorBrush x:Key="AkburaEditor.MethodNameBrush" Color="#DCDCAA" />
+          <SolidColorBrush x:Key="AkburaEditor.ExtensionMethodNameBrush" Color="#DCDCAA" />
+          <SolidColorBrush x:Key="AkburaEditor.PropertyNameBrush" Color="#9CDCFE" />
+          <SolidColorBrush x:Key="AkburaEditor.EventNameBrush" Color="#D4D4D4" />
+          <SolidColorBrush x:Key="AkburaEditor.FieldNameBrush" Color="#D4D4D4" />
+          <SolidColorBrush x:Key="AkburaEditor.EnumMemberNameBrush" Color="#D4D4D4" />
+          <SolidColorBrush x:Key="AkburaEditor.ConstantNameBrush" Color="#D4D4D4" />
+          <SolidColorBrush x:Key="AkburaEditor.LocalNameBrush" Color="#D4D4D4" />
+          <SolidColorBrush x:Key="AkburaEditor.ParameterNameBrush" Color="#D4D4D4" />
+          <SolidColorBrush x:Key="AkburaEditor.LabelNameBrush" Color="#D4D4D4" />
+          <SolidColorBrush x:Key="AkburaEditor.ErrorBrush" Color="#E04B4B" />
+          <SolidColorBrush x:Key="AkburaEditor.WarningBrush" Color="#C58A00" />
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Styles.Resources>
+</Styles>

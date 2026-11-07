@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "Akbura.AvaloniaEdit.BrowserSmoke": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:61925;http://localhost:61926"
+    }
+  }
+}

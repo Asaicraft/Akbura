@@ -11,6 +11,44 @@ namespace Akbura.Workspaces.UnitTests;
 
 public sealed class CanonicalDiagnosticServiceTests
 {
+    [Fact]
+    public void LocationlessIssuesAreNotArtificiallyAssignedToTheEditorsOffsetZero()
+    {
+        var locationless = new AkburaDiagnosticRecord
+        {
+            Id = "AKBURA_TEST_PROJECT", Severity = AkburaDiagnosticSeverity.Warning,
+            Message = "Project context is incomplete", FilePath = "", Span = default, LineSpan = default,
+            Kind = AkburaDiagnosticKind.Infrastructure,
+        };
+        var report = new AkburaDiagnosticReport([locationless], AkburaDiagnosticService.SelectDiagnostics(
+            [locationless], Path.GetFullPath("View.akbura"), 20, new TextSpan(0, 20), CancellationToken.None));
+        Assert.Single(report.Diagnostics);
+        Assert.Empty(report.SourceDiagnostics);
+        Assert.Equal("", report.Diagnostics[0].FilePath);
+    }
+
+    [Theory]
+    [InlineData("// 😀\r\n<UnknownControl Missing=", "Report.akbura")]
+    [InlineData("/* multiline\r\n😀 */\r\n.class { Width: ; }", "Report.akcss")]
+    public void DiagnosticReportPreservesCanonicalRecordsAndExistingSourceProjection(string source, string fileName)
+    {
+        using var workspace = new AkburaWorkspace();
+        var text = SourceText.From(source);
+        var context = workspace.OpenOrChangeDocumentContext(new Uri(Path.GetFullPath(fileName)), text);
+        var expected = AkburaDiagnosticEngine.Collect(context.Document.SyntaxTree,
+            context.Project.Compilation.GetSemanticModel(context.Document.SyntaxTree));
+        var report = workspace.LanguageServices.Diagnostics.GetDiagnosticReport(context, new TextSpan(0, text.Length));
+        Assert.NotEmpty(report.Diagnostics);
+        Assert.Equal(expected.Length, report.Diagnostics.Length);
+        for (var index = 0; index < expected.Length; index++)
+        {
+            Assert.True(AkburaDiagnosticCanonicalComparer.Instance.Equals(expected[index], report.Diagnostics[index]));
+            Assert.True(report.Diagnostics[index].Provenance.HasFlag(DiagnosticProvenance.Workspaces));
+        }
+        Assert.Equal(workspace.LanguageServices.Diagnostics.GetDiagnostics(context, new TextSpan(0, text.Length)).ToArray(),
+            report.SourceDiagnostics.ToArray());
+    }
+
     [Theory]
     [InlineData("akbura.module-identity")]
     [InlineData("akbura.module-reference")]

@@ -28,6 +28,12 @@ internal sealed class AkburaDiagnosticService : IAkburaDiagnosticService
         AkburaDocumentContext context,
         TextSpan requestedSpan,
         CancellationToken cancellationToken = default)
+        => GetDiagnosticReport(context, requestedSpan, cancellationToken).SourceDiagnostics;
+
+    public AkburaDiagnosticReport GetDiagnosticReport(
+        AkburaDocumentContext context,
+        TextSpan requestedSpan,
+        CancellationToken cancellationToken = default)
     {
         if (context == null)
         {
@@ -43,7 +49,12 @@ internal sealed class AkburaDiagnosticService : IAkburaDiagnosticService
             semanticModel,
             cancellationToken: cancellationToken);
 
-        return SelectDiagnostics(diagnostics, document.FilePath, document.Text.Length, requestedSpan, cancellationToken);
+        return new AkburaDiagnosticReport(
+            diagnostics.Select(diagnostic => diagnostic with
+            {
+                Provenance = diagnostic.Provenance | DiagnosticProvenance.Workspaces,
+            }).ToImmutableArray(),
+            SelectDiagnostics(diagnostics, document.FilePath, document.Text.Length, requestedSpan, cancellationToken));
     }
 
     internal static ImmutableArray<AkburaDiagnosticSpan> SelectDiagnostics(

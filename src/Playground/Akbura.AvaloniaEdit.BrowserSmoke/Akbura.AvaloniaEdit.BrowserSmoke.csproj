@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+  <PropertyGroup>
+    <TargetFramework>net10.0-browser</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AkburaBuildTasksOutputDirectory>$(MSBuildThisFileDirectory)..\..\Akbura.Build.Tasks\bin\$(Configuration)\net10.0</AkburaBuildTasksOutputDirectory>
+    <AkburaBuildTasksAssembly>$(AkburaBuildTasksOutputDirectory)\Akbura.Build.Tasks.dll</AkburaBuildTasksAssembly>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Link SkiaSharp and HarfBuzz into the runtime for build/run as well as publish. -->
+    <WasmBuildNative>true</WasmBuildNative>
+    <!-- After publish, Visual Studio must run the build targets to restore the native-linked run bundle. -->
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+    <!-- This harness audits the interpreter path. MEF composition is not trimming-safe by default. -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <RunAOTCompilation>false</RunAOTCompilation>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Browser" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <ProjectReference Include="../../Akbura.Build.Tasks/Akbura.Build.Tasks.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <ProjectReference Include="../../Akbura.BlackSilence/Akbura.BlackSilence.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" PrivateAssets="all" />
+    <ProjectReference Include="../Akbura.AvaloniaEdit/Akbura.AvaloniaEdit.csproj" />
+  </ItemGroup>
+  <Target Name="EmbedSmokeMetadata" AfterTargets="ResolveReferences" BeforeTargets="PrepareResources">
+    <ItemGroup>
+      <EmbeddedResource Include="@(ReferencePath)" Condition="'%(ReferencePath.Filename)' == 'System.Runtime'">
+        <LogicalName>SmokeReferences.System.Runtime.dll</LogicalName>
+      </EmbeddedResource>
+    </ItemGroup>
+  </Target>
+  <Import Project="../../Akbura/buildTransitive/Akbura.targets" />
+</Project>

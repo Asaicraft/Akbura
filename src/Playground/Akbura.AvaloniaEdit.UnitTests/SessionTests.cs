@@ -94,8 +94,15 @@ public sealed class SessionTests
         Assert.True(workspace.CurrentSolution.TryGetDocumentContext(uri, out var context));
         var expected = workspace.LanguageServices.Classification.GetClassifications(context, new TextSpan(0, source.Length));
         Assert.Equal(expected.ToArray(), session.Classifications.ToArray());
-        editor.Document.Insert(0, "// 😀\n");
-        Assert.Empty(session.Classifications); // Old numeric spans are invalid immediately.
+        var colorizer = Assert.Single(editor.TextArea.TextView.LineTransformers.OfType<Highlighting.WorkspaceColorizer>());
+        var previous = colorizer.Spans;
+        const string prefix = "// 😀\n";
+        editor.Document.Insert(0, prefix);
+        Assert.Empty(session.Classifications); // Authoritative results are invalid; presentation is mapped separately.
+        Assert.Equal(previous.Select(span => span with
+        {
+            Span = new TextSpan(span.Span.Start + prefix.Length, span.Span.Length),
+        }).ToArray(), colorizer.Spans.ToArray());
         await session.RefreshAsync();
         Assert.NotEmpty(session.Classifications);
     });

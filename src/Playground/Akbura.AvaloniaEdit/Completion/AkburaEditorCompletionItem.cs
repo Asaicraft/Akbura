@@ -11,6 +11,7 @@ namespace Akbura.AvaloniaEdit.Completion;
 public sealed class AkburaEditorCompletionItem : ICompletionData
 {
     private readonly AkburaEditorSession _session;
+
     internal AkburaEditorCompletionItem(AkburaEditorSession session, AkburaEditorSession.RequestSnapshot snapshot,
         AkburaSyntacticDocument syntax, AkburaDocumentContext context,
         AkburaCompletionItem? native, AkburaProjectedCompletionItem? projected, TextSpan span)
@@ -28,39 +29,68 @@ public sealed class AkburaEditorCompletionItem : ICompletionData
     {
         get;
     }
+
     internal AkburaSyntacticDocument Syntax
     {
         get;
     }
+
     internal AkburaDocumentContext Context
     {
         get;
     }
+
     internal AkburaCompletionItem? Native
     {
         get;
     }
+
     internal AkburaProjectedCompletionItem? Projected
     {
         get;
     }
+
     public TextSpan SourceSpan
     {
         get;
     }
+
     public bool IsProjected => Projected != null;
+
     public string ResolveKey => Projected?.ResolveKey ?? Native!.ResolveKey;
+
     public string DisplayText => Projected?.DisplayText ?? Native!.DisplayText;
+
     public string InsertText => Projected?.InsertText ?? Native!.InsertText;
+
     public string SortText => Projected?.SortText ?? Native!.SortText;
+
     public string Kind => Projected?.Kind.ToString() ?? Native!.Kind.ToString();
+
     public string Text => Projected?.FilterText ?? Native!.FilterText;
+
     public object Content => Native is { Suffix.Length: > 0 } item ? $"{DisplayText}  {item.Suffix}" : DisplayText;
-    // Do not execute a native lazy documentation factory in a drawing callback.
+
+    /// <summary>
+    /// Gets the projected completion detail, when available.
+    /// </summary>
+    /// <remarks>
+    /// Native lazy documentation is resolved separately by the session to avoid executing
+    /// its factory in a drawing callback.
+    /// </remarks>
     public object? Description => Projected?.Detail;
-    // The session presents descriptions beside the list instead of AvaloniaEdit's TopLevel-anchored tooltip.
+
+    /// <summary>
+    /// Gets the description presented by AvaloniaEdit's built-in tooltip.
+    /// </summary>
+    /// <remarks>
+    /// Returns <see langword="null"/> because the session presents documentation beside
+    /// the completion list through <see cref="CompletionDescriptionPopup"/>.
+    /// </remarks>
     object? ICompletionData.Description => null;
+
     public IImage? Image => null;
+
     public double Priority => Native is { } item ? 100 - item.Priority : 50;
 
     public void Complete(TextArea textArea, ISegment completionSegment, EventArgs insertionRequestEventArgs) =>

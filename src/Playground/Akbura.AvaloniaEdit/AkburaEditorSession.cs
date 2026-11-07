@@ -88,6 +88,11 @@ public sealed partial class AkburaEditorSession : IDisposable
     {
         get; private set;
     } = [];
+
+    /// <summary>
+    /// Classifications accepted for the current source and project context. While analysis is
+    /// pending, the renderer may retain separately tracked provisional colors.
+    /// </summary>
     public ImmutableArray<AkburaClassifiedSpan> Classifications
     {
         get; private set;
@@ -134,10 +139,11 @@ public sealed partial class AkburaEditorSession : IDisposable
 
     private void BufferChanged(object? sender, DocumentChangeEventArgs e)
     {
+        _colorizer.TrackChange(_document, e);
         if (_suppressBufferEvents) return;
         _text = _text.WithChanges(new TextChange(new TextSpan(e.Offset, e.RemovalLength), e.InsertedText.Text));
         Interlocked.Increment(ref _revision);
-        InvalidatePresentation();
+        InvalidateAnalysis();
     }
 
     private void BufferUpdateFinished(object? sender, EventArgs e)
@@ -159,7 +165,8 @@ public sealed partial class AkburaEditorSession : IDisposable
             _document = _editor.Document;
             _text = SourceText.From(_document.Text);
             Interlocked.Increment(ref _revision);
-            InvalidatePresentation();
+            InvalidateAnalysis();
+            _colorizer.SetSpans(_document, []);
             SubscribeBuffer();
             _ = RefreshAsync();
         }
@@ -188,12 +195,12 @@ public sealed partial class AkburaEditorSession : IDisposable
                 _publishedText = document.Text;
                 Interlocked.Increment(ref _revision);
             }
-            InvalidatePresentation();
+            InvalidateAnalysis();
             _ = RefreshAsync();
         });
     }
 
-    private void InvalidatePresentation()
+    private void InvalidateAnalysis()
     {
         _analysisCancellation?.Cancel();
         CancelCompletionRequests();
@@ -203,7 +210,6 @@ public sealed partial class AkburaEditorSession : IDisposable
         Diagnostics = [];
         DiagnosticRecords = [];
         Completions = [];
-        _colorizer.SetSpans(_document, []);
         _markers.SetDiagnostics(_document, []);
         DiagnosticsChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -253,15 +259,19 @@ public sealed partial class AkburaEditorSession : IDisposable
         {
             if (delay > TimeSpan.Zero) await Task.Delay(delay, cancellation.Token);
             context = await SynchronizeAsync(snapshot, cancellation.Token);
-            var syntax = await _options.Scheduler.RunAsync(token => Task.FromResult(
-                AkburaSyntacticDocument.Parse(snapshot.Text, context.Document.FilePath, token)), cancellation.Token);
             var span = new TextSpan(0, snapshot.Text.Length);
-            // Publish syntax colors before potentially expensive semantic analysis.
-            var syntactic = await _options.Scheduler.RunAsync(token => Task.FromResult(
-                _workspace.LanguageServices.Classification.GetSyntacticClassifications(syntax, span, token)), cancellation.Token);
-            if (cancellation.IsCancellationRequested || sequence != _analysisSequence || !IsCurrent(snapshot, context)) return;
-            Classifications = syntactic;
-            _colorizer.SetSpans(_document, syntactic);
+            // Syntax-first is useful on initial load. Once colors exist, retain their mapped
+            // presentation until the combined result is ready, avoiding a semantic/syntax flash.
+            if (!_colorizer.HasPresentation)
+            {
+                var syntax = await _options.Scheduler.RunAsync(token => Task.FromResult(
+                    AkburaSyntacticDocument.Parse(snapshot.Text, context.Document.FilePath, token)), cancellation.Token);
+                var syntactic = await _options.Scheduler.RunAsync(token => Task.FromResult(
+                    _workspace.LanguageServices.Classification.GetSyntacticClassifications(syntax, span, token)), cancellation.Token);
+                if (cancellation.IsCancellationRequested || sequence != _analysisSequence || !IsCurrent(snapshot, context)) return;
+                Classifications = syntactic;
+                _colorizer.SetSpans(_document, syntactic);
+            }
             var analysis = await _options.Scheduler.RunAsync(token => Task.FromResult((
                 Colors: _workspace.LanguageServices.Classification.GetClassifications(context, span, token),
                 Report: _workspace.LanguageServices.Diagnostics.GetDiagnosticReport(context, span, token))), cancellation.Token);
@@ -306,6 +316,7 @@ public sealed partial class AkburaEditorSession : IDisposable
         DetachCompletion();
         DetachHover();
         _editor.TextArea.TextView.LineTransformers.Remove(_colorizer);
+        _colorizer.Clear();
         _editor.TextArea.TextView.BackgroundRenderers.Remove(_markers);
         _editor.TextArea.TextView.Redraw();
         _binding.Dispose();

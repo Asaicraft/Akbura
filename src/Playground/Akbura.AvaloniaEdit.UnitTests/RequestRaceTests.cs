@@ -1,4 +1,3 @@
-using Akbura.AvaloniaEdit.Infrastructure;
 using Avalonia.Controls;
 using AvaloniaEdit.Document;
 
@@ -140,52 +139,4 @@ public sealed class RequestRaceTests
     {
         Scheduler = scheduler, AutomaticCompletion = false, AnalysisDelay = TimeSpan.FromHours(1),
     };
-
-    private sealed class ControlledScheduler : IAkburaEditorScheduler
-    {
-        private Hold? _next;
-        public bool FailNext
-        {
-            get; set;
-        }
-        public Hold HoldNextResult()
-        {
-            var hold = new Hold();
-            Interlocked.Exchange(ref _next, hold);
-            return hold;
-        }
-
-        public Task<T> RunAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
-        {
-            var hold = Interlocked.Exchange(ref _next, null);
-            if (FailNext)
-            {
-                FailNext = false;
-                return Task.FromException<T>(new InvalidOperationException("Controlled service failure"));
-            }
-            return Task.Run(async () =>
-            {
-                // Deliberately ignore cancellation for a held result: identity checks must still protect the UI.
-                var result = await operation(hold == null ? cancellationToken : CancellationToken.None);
-                if (hold != null)
-                {
-                    hold.Started.TrySetResult();
-                    await hold.Release.Task.WaitAsync(TimeSpan.FromSeconds(30));
-                }
-                return result;
-            });
-        }
-    }
-
-    private sealed class Hold
-    {
-        public TaskCompletionSource Started
-        {
-            get;
-        } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public TaskCompletionSource Release
-        {
-            get;
-        } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    }
 }

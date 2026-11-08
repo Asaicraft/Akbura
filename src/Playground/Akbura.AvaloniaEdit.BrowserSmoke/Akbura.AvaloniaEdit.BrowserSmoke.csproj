@@ -9,7 +9,9 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- Link SkiaSharp and HarfBuzz into the runtime for build/run as well as publish. -->
     <WasmBuildNative>true</WasmBuildNative>
-    <!-- After publish, Visual Studio must run the build targets to restore the native-linked run bundle. -->
+    <!-- DeployOnBuild otherwise skips linking the development bundle that Visual Studio runs. -->
+    <WasmBuildOnlyAfterPublish>false</WasmBuildOnlyAfterPublish>
+    <!-- Keep Visual Studio's launch bundle in sync with generated native assets. -->
     <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
     <!-- This harness audits the interpreter path. MEF composition is not trimming-safe by default. -->
     <PublishTrimmed>false</PublishTrimmed>
@@ -22,12 +24,15 @@
     <ProjectReference Include="../../Akbura.BlackSilence/Akbura.BlackSilence.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" PrivateAssets="all" />
     <ProjectReference Include="../Akbura.AvaloniaEdit/Akbura.AvaloniaEdit.csproj" />
   </ItemGroup>
-  <Target Name="EmbedSmokeMetadata" AfterTargets="ResolveReferences" BeforeTargets="PrepareResources">
+  <Target Name="EmbedSmokeMetadata" BeforeTargets="AssignTargetPaths" DependsOnTargets="ResolveReferences;FindReferenceAssembliesForReferences">
     <ItemGroup>
-      <EmbeddedResource Include="@(ReferencePath)" Condition="'%(ReferencePath.Filename)' == 'System.Runtime'">
-        <LogicalName>SmokeReferences.System.Runtime.dll</LogicalName>
+      <_SmokeReference Include="@(ReferencePathWithRefAssemblies)" Condition="'%(ReferencePathWithRefAssemblies.Extension)' == '.dll'" />
+      <EmbeddedResource Include="@(_SmokeReference)">
+        <LogicalName>SmokeReferences.%(Filename)%(Extension)</LogicalName>
+        <WithCulture>false</WithCulture>
       </EmbeddedResource>
     </ItemGroup>
+    <Error Condition="'@(_SmokeReference)' == ''" Text="The browser smoke host requires the build's resolved compile-time assembly references." />
   </Target>
   <Import Project="../../Akbura/buildTransitive/Akbura.targets" />
 </Project>

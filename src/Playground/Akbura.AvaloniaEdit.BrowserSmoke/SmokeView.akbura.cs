@@ -2,8 +2,8 @@ using Akbura.AvaloniaEdit.Infrastructure;
 using Akbura.Engine;
 using Akbura.Workspaces;
 using Akbura.Workspaces.Projects;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
+using Avalonia.Interactivity;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 namespace Akbura.AvaloniaEdit.BrowserSmoke;
@@ -12,56 +12,355 @@ internal sealed partial class SmokeView : AkburaControl
 {
     private AkburaWorkspace? _workspace;
     private AkburaEditorSession? _session;
+    private bool _smokeStarted;
+
+    private AkburaWorkspace Workspace =>
+        _workspace ?? throw new InvalidOperationException("The workspace has not been initialized.");
+
+    private AkburaEditorSession Session =>
+        _session ?? throw new InvalidOperationException("The editor session has not been initialized.");
 
     public SmokeView()
         : base(AkburaEngine.Empty)
     {
     }
 
-    protected override void OnInitialized()
+    protected override void OnLoaded(RoutedEventArgs e)
     {
-        base.OnInitialized();
+        base.OnLoaded(e);
+        if (_smokeStarted)
+        {
+            return;
+        }
+
+        _smokeStarted = true;
         _ = RunSmokeAsync();
     }
 
+
+    private const string ViewModelPath = "Models/ViewModel.cs";
+
+    private const string InitialSource =
+        """
+        using Avalonia.Controls;
+        <TextBlock IsHitTestV />
+        """;
+
+    private const string BindingSource =
+        """
+        using Avalonia.Controls;
+        using Demo;
+        param ViewModel Vm;
+        <TextBlock Text=${x.bind Vm.Profile.} />
+        """;
+
     private async Task RunSmokeAsync()
     {
+        var stage = "metadata setup";
+
         try
         {
-            // Metadata is embedded by the host, read as bytes, and never discovered through Assembly.Location.
-            using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("SmokeReferences.System.Runtime.dll")
-                ?? throw new InvalidOperationException("Embedded reference is missing.");
-            var reference = MetadataReference.CreateFromStream(stream);
-            var context = new ProjectContext(ProjectId.CreateNewId(), "", "", "Demo",
-                CSharpCompilation.Create("BrowserSmoke", [CSharpSyntaxTree.ParseText(HostTypes)], [reference],
-                    new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)), []);
-            _workspace = new AkburaWorkspace(context);
-            const string source = "using Avalonia.Controls;\nusing Demo;\nparam ViewModel Vm;\n<TextBlock Text=${x.bind Vm.Profile.} />";
-            editor.Text = source;
-            _session = editor.Bind(_workspace, _workspace.DefaultProjectId, new Uri("memory:///Smoke.akbura"),
-                new() { Scheduler = new AkburaInlineScheduler(), CompletionGesture = null });
-            _session.ServiceFailed += (_, e) => status.Text = $"FAILED: {e.Operation}: {e.Exception.Message}";
-            await _session.Ready;
-            if (_session.LastServiceError is { } error) throw error;
-            if (_session.Classifications.IsEmpty) throw new InvalidOperationException("No classifications.");
-            editor.CaretOffset = source.IndexOf("Vm.Profile.", StringComparison.Ordinal) + "Vm.Profile.".Length;
-            await _session.RequestCompletionAsync();
-            if (_session.LastServiceError is { } completionError) throw completionError;
-            var item = _session.Completions.FirstOrDefault(item => item.IsProjected && item.DisplayText == "Name")
-                ?? throw new InvalidOperationException("No projected Name completion.");
-            if (!await _session.CommitCompletionAsync(item)) throw new InvalidOperationException("Commit was rejected.");
-            editor.Undo();
-            if (editor.Text != source) throw new InvalidOperationException("Undo did not restore the source.");
-            var hover = await _session.GetHoverAsync(source.IndexOf("x.bind", StringComparison.Ordinal));
-            if (hover == null) throw new InvalidOperationException("No hover information.");
-            status.Text = "PASS: browser highlighting, diagnostics, projected completion, hover and undo. Single UI thread.";
+            await InitializeWorkspaceAsync();
+
+            stage = "initial analysis";
+            VerifyMetadata();
+
+            stage = "inherited completion";
+            await VerifyInheritedCompletionAsync();
+
+            await VerifyProjectedCompletionLifecycleAsync(
+                currentStage => stage = currentStage);
+
+            status.Text =
+                "PASS: real .NET/Avalonia/Akbura metadata, " +
+                "inherited member, live source rename, " +
+                "completion, hover and undo.";
         }
-        catch (Exception error) { status.Text = $"FAILED: {error.GetType().Name}: {error.Message}"; }
+        catch (Exception error)
+        {
+            Console.Error.WriteLine($"Smoke failure during {stage}: {error}");
+
+            status.Text =
+                $"FAILED ({stage}): " +
+                $"{error.GetType().Name}: {error.Message}";
+        }
     }
 
-    private const string HostTypes = """
-        namespace Avalonia.Controls { public class Control {} public class TextBlock : Control { public string Text { get; set; } } }
-        namespace Akbura { public class AkburaControl : Avalonia.Controls.Control {} }
-        namespace Demo { public class ViewModel { public Profile Profile { get; set; } } public class Profile { public string Name { get; set; } } }
+    private async Task InitializeWorkspaceAsync()
+    {
+        var bundle = await ReadReferencesAsync();
+
+        _workspace = new AkburaWorkspace();
+
+        var project = _workspace.DefaultProject;
+
+        project.UseAvalonia(bundle);
+        project.AddSource(ViewModelPath, ViewModelSource);
+
+        editor.Text = InitialSource;
+
+        _session = editor.Bind(
+            project,
+            new Uri("memory:///Smoke.akbura"),
+            new()
+            {
+                Scheduler = new AkburaInlineScheduler()
+            });
+
+        _session.ServiceFailed += (_, e) =>
+        {
+            Console.Error.WriteLine($"Editor service failure during {e.Operation}: {e.Exception}");
+
+            status.Text = $"FAILED: {e.Operation}: {e.Exception.Message}";
+        };
+
+        await _session.Ready;
+        EnsureHealthy();
+    }
+
+    private void VerifyMetadata()
+    {
+        Require(
+            !Session.Classifications.IsEmpty,
+            "No classifications from real metadata.");
+
+        var textBlock = Workspace.DefaultProject
+            .Context
+            .CSharpCompilation
+            .GetTypeByMetadataName("Avalonia.Controls.TextBlock");
+
+        Require(
+            textBlock?.ContainingAssembly.Name == "Avalonia.Controls",
+            "TextBlock is not supplied by real Avalonia metadata.");
+    }
+
+    private async Task VerifyInheritedCompletionAsync()
+    {
+        editor.CaretOffset = PositionAfter(
+            InitialSource,
+            "IsHitTestV");
+
+        await RequestCompletionAsync();
+
+        var completion = Session.Completions.SingleOrDefault(
+            item => !item.IsProjected &&
+                    item.DisplayText == "IsHitTestVisible");
+
+        Require(
+            completion is not null,
+            "No inherited InputElement.IsHitTestVisible completion.");
+
+        Require(
+            await Session.CommitCompletionAsync(completion),
+            "Native completion was rejected.");
+
+        await Session.RefreshAsync();
+
+        var hover = await Session.GetHoverAsync(
+            PositionOf(editor.Text, "IsHitTestVisible"));
+
+        Require(
+            hover is not null,
+            "No hover for the inherited Avalonia member.");
+
+        VerifyUndo(InitialSource, "Native completion");
+    }
+
+    private async Task VerifyProjectedCompletionLifecycleAsync(Action<string> setStage)
+    {
+        var project = Workspace.DefaultProject;
+
+        setStage("projected source completion");
+
+        await ApplyAndAnalyzeAsync(() => editor.Text = BindingSource);
+
+        editor.CaretOffset = PositionAfter(BindingSource, "Vm.Profile.");
+
+        await RequestCompletionAsync();
+
+        var completion = Session.Completions.SingleOrDefault(
+            item => item.IsProjected &&
+                    item.DisplayText == "Name");
+
+        Require(
+            completion is not null,
+            "No projected Name completion from AddSource.");
+
+        Require(
+            await Session.CommitCompletionAsync(completion),
+            "Projected commit was rejected.");
+
+        VerifyUndo(BindingSource, "Projected completion");
+
+        var hover = await Session.GetHoverAsync(PositionOf(BindingSource, "x.bind"));
+
+        Require(hover is not null, "No hover information.");
+
+        setStage("live source update");
+
+        await ApplyAndAnalyzeAsync(() =>
+            project.UpdateSource(
+                ViewModelPath,
+                ViewModelSource.Replace("Name", "DisplayName")));
+
+        Require(
+            editor.Text == BindingSource &&
+            ReferenceEquals(editor.Session, Session),
+            "A source update changed or rebound the editor.");
+
+        Require(
+            !await Session.CommitCompletionAsync(completion),
+            "An obsolete completion was accepted.");
+
+        await RequestCompletionAsync();
+
+        RequireProjectedCompletion(
+            "DisplayName",
+            expected: true);
+
+        RequireProjectedCompletion(
+            "Name",
+            expected: false);
+
+        setStage("interactive editor");
+
+        await ApplyAndAnalyzeAsync(() =>
+            project.UpdateSource(
+                ViewModelPath,
+                ViewModelSource));
+
+        await RequestCompletionAsync();
+
+        RequireProjectedCompletion(
+            "Name",
+            expected: true);
+    }
+
+    private async Task ApplyAndAnalyzeAsync(Action update)
+    {
+        var analysis = NextAnalysis(Session);
+
+        update();
+
+        await analysis;
+    }
+
+    private async Task RequestCompletionAsync()
+    {
+        await Session.RequestCompletionAsync();
+        EnsureHealthy();
+    }
+
+    private void RequireProjectedCompletion(
+        string propertyName,
+        bool expected)
+    {
+        var exists = Session.Completions.Any(
+            item => item.IsProjected &&
+                    item.DisplayText == propertyName);
+
+        Require(
+            exists == expected,
+            expected
+                ? $"Projected completion '{propertyName}' was not found."
+                : $"Obsolete projected completion '{propertyName}' still exists.");
+    }
+
+    private void VerifyUndo(string expectedSource, string operation)
+    {
+        editor.Undo();
+
+        Require(
+            editor.Text == expectedSource,
+            $"{operation} undo did not restore the source.");
+    }
+
+    private void EnsureHealthy()
+    {
+        var session = Session;
+
+        if (session.LastServiceError is { } error)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(error).Throw();
+        }
+    }
+
+    private static int PositionOf(string source, string text)
+    {
+        var index = source.IndexOf(
+            text,
+            StringComparison.Ordinal);
+
+        Require(
+            index >= 0,
+            $"Text '{text}' was not found in the source.");
+
+        return index;
+    }
+
+    private static int PositionAfter(string source, string text)
+    {
+        return PositionOf(source, text) + text.Length;
+    }
+
+    private static void Require([DoesNotReturnIf(false)] bool condition, string message)
+    {
+        if (!condition)
+        {
+            throw new InvalidOperationException(message);
+        }
+    }
+
+    private static Task NextAnalysis(AkburaEditorSession session)
+    {
+        var updated = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        session.AnalysisUpdated += Complete;
+
+        return updated.Task.WaitAsync(TimeSpan.FromSeconds(60));
+
+        void Complete(object? sender, EventArgs args)
+        {
+            session.AnalysisUpdated -= Complete;
+            updated.TrySetResult();
+        }
+    }
+
+    private static async Task<AkburaReferenceSet> ReadReferencesAsync()
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+        var images = new List<byte[]>();
+
+        foreach (var name in assembly.GetManifestResourceNames().Where(name => name.StartsWith("SmokeReferences.", StringComparison.Ordinal)))
+        {
+            using var stream = assembly.GetManifestResourceStream(name)
+                ?? throw new InvalidOperationException($"Embedded metadata '{name}' is missing.");
+            using var image = new MemoryStream();
+            await stream.CopyToAsync(image);
+            images.Add(image.ToArray());
+        }
+
+        return images.Count == 0
+            ? throw new InvalidOperationException("No resolved compiler metadata was embedded by the build.")
+            : AkburaReferenceSet.FromImages(images);
+    }
+
+    private const string ViewModelSource = """
+        namespace Demo;
+
+        public sealed class ViewModel
+        {
+            public Profile Profile
+            {
+                get; set;
+            } = new();
+        }
+
+        public sealed class Profile
+        {
+            public string Name
+            {
+                get; set;
+            } = "";
+        }
         """;
 }

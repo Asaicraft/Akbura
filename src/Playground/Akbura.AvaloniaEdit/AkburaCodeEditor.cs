@@ -13,6 +13,16 @@ public class AkburaCodeEditor : global::AvaloniaEdit.TextEditor
         get; private set;
     }
 
+    /// <summary>
+    /// Binds this editor to the existing workspace and identity owned by a project facade.
+    /// </summary>
+    public AkburaEditorSession Bind(AkburaProject project, Uri documentUri, AkburaEditorOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+        _ = project.Context;
+        return Bind(project.Workspace, project.Id, documentUri, options);
+    }
+
     public AkburaEditorSession Bind(AkburaWorkspace workspace, AkburaProjectId projectId,
         Uri documentUri, AkburaEditorOptions? options = null)
     {

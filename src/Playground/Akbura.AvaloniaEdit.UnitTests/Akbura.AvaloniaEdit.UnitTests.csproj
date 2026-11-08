@@ -14,4 +14,11 @@
     <Using Include="Xunit" />
     <ProjectReference Include="../Akbura.AvaloniaEdit/Akbura.AvaloniaEdit.csproj" />
   </ItemGroup>
+  <Target Name="WriteCompilerReferenceCatalog" BeforeTargets="CopyFilesToOutputDirectory" DependsOnTargets="ResolveReferences;FindReferenceAssembliesForReferences">
+    <ItemGroup>
+      <_ConfigurationCompilerReference Include="@(ReferencePathWithRefAssemblies)" Condition="'%(ReferencePathWithRefAssemblies.Extension)' == '.dll'" />
+    </ItemGroup>
+    <MakeDir Directories="$(TargetDir)" />
+    <WriteLinesToFile File="$(TargetDir)CompilerReferences.txt" Lines="@(_ConfigurationCompilerReference->'%(FullPath)')" Overwrite="true" WriteOnlyWhenDifferent="true" />
+  </Target>
 </Project>

@@ -71,10 +71,11 @@ internal sealed partial class SmokeView : AkburaControl
             await VerifyProjectedCompletionLifecycleAsync(
                 currentStage => stage = currentStage);
 
+            await VerifyAkcssAsync(currentStage => stage = currentStage);
+
             status.Text =
-                "PASS: real .NET/Avalonia/Akbura metadata, " +
-                "inherited member, live source rename, " +
-                "completion, hover and undo.";
+                "PASS: real metadata, utilities, styles/@apply, AKCSS input, " +
+                "live source updates, completion, hover and undo.";
         }
         catch (Exception error)
         {
@@ -101,7 +102,7 @@ internal sealed partial class SmokeView : AkburaControl
 
         _session = editor.Bind(
             project,
-            new Uri("memory:///Smoke.akbura"),
+            new Uri("memory:///Views/Smoke.akbura"),
             new()
             {
                 Scheduler = new AkburaInlineScheduler()

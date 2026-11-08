@@ -7,12 +7,23 @@ namespace Akbura.AvaloniaEdit.BrowserSmoke;
     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
         <Button Content="Complete"
                 Margin="8"
-                Click={async () => await editor.RequestCompletionAsync()} />
+                Focusable="False"
+                Click={async () => await RequestActiveCompletionAsync()} />
         <TextBlock x.Name="status"
                    Text="Starting in-memory editor smoke test…"
                    Margin="8" />
     </StackPanel>
-    <AkburaCodeEditor x.Name="editor"
-                      ShowLineNumbers="True"
-                      FontSize="16" />
+    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,*">
+        <TextBlock Text="Markup" Margin="8" />
+        <TextBlock Grid.Column="1" Text="AKCSS companion" Margin="8" />
+        <AkburaCodeEditor x.Name="editor"
+                          Grid.Row="1"
+                          ShowLineNumbers="True"
+                          FontSize="16" />
+        <AkburaCodeEditor x.Name="stylesEditor"
+                          Grid.Row="1"
+                          Grid.Column="1"
+                          ShowLineNumbers="True"
+                          FontSize="16" />
+    </Grid>
 </DockPanel>

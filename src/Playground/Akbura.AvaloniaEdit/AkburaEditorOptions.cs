@@ -5,6 +5,13 @@ namespace Akbura.AvaloniaEdit;
 
 public sealed record AkburaEditorOptions
 {
+#if DEBUG
+    internal EditorPerformance? Performance
+    {
+        get; init;
+    }
+#endif
+
     public TimeSpan AnalysisDelay
     {
         get; init;

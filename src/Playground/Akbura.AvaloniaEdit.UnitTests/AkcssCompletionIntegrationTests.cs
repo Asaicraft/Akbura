@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.AvaloniaEdit.Completion;
 using Akbura.AvaloniaEdit.Infrastructure;
 using Akbura.AvaloniaEdit.Highlighting;
@@ -30,6 +31,7 @@ public sealed class AkcssCompletionIntegrationTests
             using var host = new Host(file, markedSource);
             await host.Session.Ready;
             host.Window.KeyTextInput(typed);
+            await host.Session.CompletionIdle;
             Assert.Null(host.Session.LastServiceError);
             var native = host.NativeCompletions();
             Assert.Contains(native.Items, item => item.DisplayText == expected);
@@ -152,6 +154,7 @@ public sealed class AkcssCompletionIntegrationTests
         using var host = new Host(inline ? "Main.akbura" : "Main.akcss", source);
         await host.Session.Ready;
         host.Window.KeyTextInput(expected == "primary" ? "i" : "u");
+        await host.Session.CompletionIdle;
         var native = host.NativeCompletions();
         Assert.Contains(native.Items, item => item.DisplayText == expected && item.Kind.ToString() == kind);
         host.AssertAdaptation(native);
@@ -187,6 +190,7 @@ public sealed class AkcssCompletionIntegrationTests
         using var host = new Host(file, source);
         await host.Session.Ready;
         host.Window.KeyTextInput("z");
+        await host.Session.CompletionIdle;
         Assert.Null(host.Session.LastServiceError);
         Assert.Empty(host.Session.Completions);
         Assert.Null(host.Session.CompletionPopup);
@@ -202,7 +206,7 @@ public sealed class AkcssCompletionIntegrationTests
         using var host = new Host(inline ? "Main.akbura" : "Main.akcss", source);
         await host.Session.Ready;
         host.Window.KeyTextInput(".");
-        await WaitUntilAsync(() => host.Session.Completions.Any(item => item.IsProjected && item.DisplayText == "Abs"));
+        await WaitUntilAsync(() => host.Session.Completions.Any(static (item, text) => item.IsProjected && item.DisplayText == text, "Abs"));
         Assert.NotNull(host.Session.CompletionPopup);
         Assert.Null(host.Session.LastServiceError);
     });
@@ -210,7 +214,16 @@ public sealed class AkcssCompletionIntegrationTests
     [Fact]
     public Task ModuleDotsRemainInputAndCanonicalImportDoesNotDuplicateSemicolon() => EditorTestHost.Run(async () =>
     {
-        using var host = new Host("Main.akcss", "@using Akbura|;");
+#if DEBUG
+        var metrics = new Akbura.AvaloniaEdit.Infrastructure.EditorPerformance();
+#endif
+        using var host = new Host("Main.akcss", "@using Akbura|;", new()
+        {
+            Scheduler = new AkburaInlineScheduler(), AnalysisDelay = TimeSpan.FromHours(1),
+#if DEBUG
+            Performance = metrics,
+#endif
+        });
         await host.Session.Ready;
         await host.Session.RequestCompletionAsync();
         host.Session.CompletionPopup!.CompletionList.SelectedItem = Assert.Single(host.Session.Completions,
@@ -218,6 +231,18 @@ public sealed class AkcssCompletionIntegrationTests
         host.Window.KeyTextInput(".");
         Assert.Equal("@using Akbura.;", host.Editor.Text);
         await host.Session.RequestCompletionAsync();
+        Assert.Null(host.Session.LastServiceError);
+        Assert.Contains(host.NativeCompletions().Items, item => item.Kind == AkburaCompletionKind.AkcssModule &&
+            item.DisplayText == "Akbura.Styles.akcss");
+        Assert.True(host.Workspace.CurrentSolution.TryGetDocumentContext(host.Uri, out var moduleContext));
+        var cached = Assert.IsType<Akbura.Workspaces.Documents.AkburaSyntacticDocument>(host.Session.CachedSyntax);
+        Assert.Equal(host.Editor.Text, cached.Text.ToString());
+#if DEBUG
+        Assert.Equal(1, metrics.CountOf("Parse"));
+        Assert.Equal(1, metrics.CountOf("WithText"));
+#endif
+        Assert.Contains(host.Workspace.LanguageServices.Completion.GetCompletions(cached, moduleContext, host.Editor.CaretOffset).Items,
+            item => item.DisplayText == "Akbura.Styles.akcss");
         var completion = Assert.Single(host.Session.Completions,
             item => item.Native?.Kind == AkburaCompletionKind.AkcssModule && item.DisplayText == "Akbura.Styles.akcss");
         Assert.True(await host.Session.CommitCompletionAsync(completion, ';'));
@@ -282,7 +307,7 @@ public sealed class AkcssCompletionIntegrationTests
         });
         await host.Session.Ready;
         await host.UpdateAsync(() => host.RegisterStyles(Styles));
-        var colorizer = Assert.Single(host.Editor.TextArea.TextView.LineTransformers.OfType<WorkspaceColorizer>());
+        var colorizer = Assert.IsType<WorkspaceColorizer>(Assert.Single(host.Editor.TextArea.TextView.LineTransformers, static transformer => transformer is WorkspaceColorizer));
         var colors = colorizer.Spans;
         var held = scheduler.HoldNextResult(skipOperations: 1);
         var old = host.Session.RequestCompletionAsync();

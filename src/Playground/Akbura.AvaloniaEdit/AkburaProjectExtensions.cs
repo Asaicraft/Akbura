@@ -1,3 +1,5 @@
+using Akbura.Collections;
+using Akbura.Pools;
 using Akbura.Workspaces.Projects;
 using Avalonia;
 using Avalonia.Controls;
@@ -21,12 +23,12 @@ public static class AkburaProjectExtensions
         "System.ComponentModel.Primitives",
     ];
 
-    private static readonly Assembly[] Roots =
+    private static readonly ArrayElement<Assembly>[] Roots =
     [
-        typeof(Control).Assembly,
-        typeof(AvaloniaObject).Assembly,
-        typeof(AvaloniaXamlLoader).Assembly,
-        typeof(AkburaControl).Assembly,
+        new() { Value = typeof(Control).Assembly },
+        new() { Value = typeof(AvaloniaObject).Assembly },
+        new() { Value = typeof(AvaloniaXamlLoader).Assembly },
+        new() { Value = typeof(AkburaControl).Assembly },
     ];
 
     /// <summary>
@@ -68,7 +70,7 @@ public static class AkburaProjectExtensions
 
             foreach (var assembly in Roots)
             {
-                update.AddAssembly(assembly);
+                update.AddAssembly(assembly.Value);
             }
         });
     }
@@ -80,15 +82,35 @@ public static class AkburaProjectExtensions
             throw new InvalidOperationException("UseAvalonia requires prepared compiler metadata on this host. Call UseAvalonia(preparedReferenceSet), or configure project.ReferenceResolver first.");
         }
 
-        var explicitPaths = paths.Split(Path.PathSeparator).Concat(Roots.Select(assembly =>
+        using var explicitPaths = ImmutableArrayBuilder<string>.Rent();
+        var seen = PooledHashSet<string>.GetInstance();
+        try
         {
-            var location = assembly.Location;
-
-            return string.IsNullOrEmpty(location)
-                ? throw new InvalidOperationException($"Metadata for '{assembly.GetName().Name}' has no file location. Call UseAvalonia(preparedReferenceSet).")
-                : location;
-        }));
-
-        return AkburaReferenceSet.FromFiles(explicitPaths.Distinct(StringComparer.Ordinal));
+            foreach (var path in paths.Split(Path.PathSeparator))
+            {
+                if (seen.Add(path))
+                {
+                    explicitPaths.Add(path);
+                }
+            }
+            foreach (var root in Roots)
+            {
+                var assembly = root.Value;
+                var location = assembly.Location;
+                if (string.IsNullOrEmpty(location))
+                {
+                    throw new InvalidOperationException($"Metadata for '{assembly.GetName().Name}' has no file location. Call UseAvalonia(preparedReferenceSet).");
+                }
+                if (seen.Add(location))
+                {
+                    explicitPaths.Add(location);
+                }
+            }
+            return AkburaReferenceSet.FromFiles(explicitPaths.AsEnumerable());
+        }
+        finally
+        {
+            seen.Free();
+        }
     }
 }

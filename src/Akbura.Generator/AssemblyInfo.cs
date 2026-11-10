@@ -6,3 +6,6 @@
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Akbura.VisualStudio")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Akbura.Workspaces.MSBuild")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Akbura.BlackSilence")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Akbura.AvaloniaEdit")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Akbura.AvaloniaEdit.BrowserSmoke")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Akbura.AvaloniaEdit.UnitTests")]

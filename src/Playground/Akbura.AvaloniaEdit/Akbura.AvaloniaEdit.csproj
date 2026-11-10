@@ -13,6 +13,7 @@
     <ProjectReference Include="../../Akbura.BlackSilence/Akbura.BlackSilence.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" PrivateAssets="all" />
     <ProjectReference Include="../../Workspaces/Akbura.Workspaces/Akbura.Workspaces.csproj" />
     <InternalsVisibleTo Include="Akbura.AvaloniaEdit.UnitTests" />
+    <InternalsVisibleTo Include="Akbura.AvaloniaEdit.BrowserSmoke" />
   </ItemGroup>
   <Import Project="../../Akbura/buildTransitive/Akbura.targets" />
 </Project>

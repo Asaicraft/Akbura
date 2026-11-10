@@ -3,7 +3,7 @@ using Avalonia.Controls;
 
 namespace Akbura.AvaloniaEdit.BrowserSmoke;
 
-<DockPanel>
+<DockPanel x.Name="root">
     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
         <Button Content="Complete"
                 Margin="8"

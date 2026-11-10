@@ -17,6 +17,9 @@
     <PublishTrimmed>false</PublishTrimmed>
     <RunAOTCompilation>false</RunAOTCompilation>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' != 'Debug' and '$(Configuration)' != 'DebugStats'">
+    <DefaultItemExcludes>$(DefaultItemExcludes);Debugging\**</DefaultItemExcludes>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia.Browser" />
     <PackageReference Include="Avalonia.Themes.Fluent" />

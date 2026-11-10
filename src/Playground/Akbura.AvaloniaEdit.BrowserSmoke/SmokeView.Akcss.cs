@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.AvaloniaEdit.Completion;
 using Akbura.AvaloniaEdit.Infrastructure;
 using Avalonia.Threading;
@@ -29,7 +30,7 @@ internal sealed partial class SmokeView
         const string imported = "using Avalonia.Controls;\nusing Akbura.Styles.akcss;\n<Button p />";
         await SetMarkupAsync(imported, "Button p");
         await RequestCompletionAsync();
-        Require(Session.Completions.Any(item => !item.IsProjected && item.Kind == "TailwindUtility" && item.Text == "p-"),
+        Require(Session.Completions.Any(static (item, expected) => !item.IsProjected && item.Kind == expected.Kind && item.Text == expected.Text, (Kind: "TailwindUtility", Text: "p-")),
             "The real Akbura.Styles.akcss module did not expose padding utilities.");
 
         setStage("hyphen input with an open popup");
@@ -56,6 +57,7 @@ internal sealed partial class SmokeView
             editor.TextArea.PerformTextInput(character.ToString());
             Require(editor.Text == previous.Insert(position, character.ToString()), "Utility punctuation changed normal typing.");
         }
+        await Session.CompletionIdle;
         square = NativeCompletion(Session, "square-(double size)");
         Require(square.InsertText == "square-48", "The typed utility argument was lost.");
         Require(await Session.CommitCompletionAsync(square), "Parameterized utility commit was rejected.");
@@ -98,7 +100,7 @@ internal sealed partial class SmokeView
         Require(!await Session.CommitCompletionAsync(obsolete), "An obsolete stylesheet completion was accepted.");
         await RequestCompletionAsync();
         _ = NativeCompletion(Session, "round-(double size)");
-        Require(!Session.Completions.Any(item => item.DisplayText == "square-(double size)"), "The old stylesheet utility remained visible.");
+        Require(!Session.Completions.Any(static (item, text) => item.DisplayText == text, "square-(double size)"), "The old stylesheet utility remained visible.");
 
         setStage("interactive markup and stylesheet editors");
         await ApplyAndAnalyzeAsync(() => Workspace.OpenOrChangeDocument(StylesUri, SourceText.From(AkcssSource)));
@@ -133,8 +135,9 @@ internal sealed partial class SmokeView
 
     private static async Task<AkburaEditorCompletionItem> WaitForNativeCompletionAsync(AkburaEditorSession session, string text)
     {
+        await session.CompletionIdle;
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        while (!session.Completions.Any(item => !item.IsProjected && item.DisplayText == text))
+        while (!session.Completions.Any(static (item, name) => !item.IsProjected && item.DisplayText == name, text))
         {
             if (session.LastServiceError is { } error)
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(error).Throw();

@@ -18,6 +18,10 @@ internal sealed partial class CompletionDescriptionPopup : AkburaControl, IDispo
     private long _sequence;
     private Size _placementTargetSize;
     private bool _disposed;
+    private int _updates;
+    private readonly Dictionary<AkburaEditorCompletionItem, DescriptionEntry> _descriptions = [];
+    private CancellationTokenSource _cacheLifetime = new();
+    private AkburaEditorCompletionItem? _cacheIdentity;
 
     internal Popup Popup => descriptionPopup;
 
@@ -34,7 +38,76 @@ internal sealed partial class CompletionDescriptionPopup : AkburaControl, IDispo
         owner.Closed += OwnerClosed;
     }
 
-    private void SelectionChanged(object? sender, SelectionChangedEventArgs e) => _ = UpdateDescriptionAsync();
+    internal IDisposable BeginUpdate()
+    {
+        _updates++;
+        return new SelectionUpdate(this);
+    }
+
+    private sealed class SelectionUpdate(CompletionDescriptionPopup owner) : IDisposable
+    {
+        public void Dispose()
+        {
+            if (--owner._updates == 0)
+            {
+                _ = owner.UpdateDescriptionAsync();
+            }
+        }
+    }
+
+    private void SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_updates == 0)
+        {
+            _ = UpdateDescriptionAsync();
+        }
+    }
+
+    private Task<string?> CachedDescription(AkburaEditorCompletionItem item)
+    {
+        if (_cacheIdentity is { } previous && (previous.Snapshot.Revision != item.Snapshot.Revision ||
+            !ReferenceEquals(previous.Snapshot.Buffer, item.Snapshot.Buffer) || !ReferenceEquals(previous.Context.Solution, item.Context.Solution)))
+        {
+            _cacheLifetime.Cancel();
+            _cacheLifetime.Dispose();
+            _cacheLifetime = new();
+            _descriptions.Clear();
+        }
+        _cacheIdentity = item;
+        if (_descriptions.TryGetValue(item, out var cached))
+        {
+            return cached.Task;
+        }
+
+        if (_descriptions.Count >= 64)
+        {
+            _descriptions.Clear();
+        }
+
+        var entry = new DescriptionEntry();
+        _descriptions[item] = entry;
+        return entry.Task = FetchDescriptionAsync(item, _cacheLifetime.Token, entry);
+    }
+
+    private sealed class DescriptionEntry
+    {
+        internal Task<string?> Task
+        {
+            get; set;
+        } = System.Threading.Tasks.Task.FromResult<string?>(null);
+    }
+
+    private async Task<string?> FetchDescriptionAsync(AkburaEditorCompletionItem item, CancellationToken token, DescriptionEntry entry)
+    {
+        string? result;
+        try { result = await _getDescription(item, token); }
+        catch (OperationCanceledException) { result = null; }
+        // The session reports service failures. Observe a fault even if selection stopped waiting.
+        catch (Exception) { result = null; }
+        if (string.IsNullOrWhiteSpace(result) && _descriptions.TryGetValue(item, out var cached) && ReferenceEquals(cached, entry))
+            _descriptions.Remove(item);
+        return result;
+    }
 
     private async Task UpdateDescriptionAsync()
     {
@@ -51,7 +124,7 @@ internal sealed partial class CompletionDescriptionPopup : AkburaControl, IDispo
         _pending = cancellation;
         try
         {
-            var description = await _getDescription(item, cancellation.Token);
+            var description = await CachedDescription(item).WaitAsync(cancellation.Token);
             if (_disposed || cancellation.IsCancellationRequested || sequence != _sequence ||
                 !ReferenceEquals(_owner.CompletionList.SelectedItem, item) || string.IsNullOrWhiteSpace(description))
             {
@@ -120,6 +193,10 @@ internal sealed partial class CompletionDescriptionPopup : AkburaControl, IDispo
         }
         _disposed = true;
         _pending?.Cancel();
+        _cacheLifetime.Cancel();
+        _cacheLifetime.Dispose();
+        _descriptions.Clear();
+        _cacheIdentity = null;
         _owner.CompletionList.SelectionChanged -= SelectionChanged;
         _owner.CompletionList.LayoutUpdated -= OnListLayoutUpdated;
         _owner.Closed -= OwnerClosed;

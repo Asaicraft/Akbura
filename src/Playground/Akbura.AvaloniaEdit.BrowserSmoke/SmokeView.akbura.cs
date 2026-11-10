@@ -1,9 +1,10 @@
+using Akbura.Collections;
+using Akbura.Pools;
 using Akbura.AvaloniaEdit.Infrastructure;
 using Akbura.Engine;
 using Akbura.Workspaces;
 using Akbura.Workspaces.Projects;
 using Avalonia.Interactivity;
-using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 namespace Akbura.AvaloniaEdit.BrowserSmoke;
@@ -76,6 +77,9 @@ internal sealed partial class SmokeView : AkburaControl
             status.Text =
                 "PASS: real metadata, utilities, styles/@apply, AKCSS input, " +
                 "live source updates, completion, hover and undo.";
+#if DEBUG
+            InitializePerformance();
+#endif
         }
         catch (Exception error)
         {
@@ -143,12 +147,9 @@ internal sealed partial class SmokeView : AkburaControl
 
         await RequestCompletionAsync();
 
-        var completion = Session.Completions.SingleOrDefault(
-            item => !item.IsProjected &&
-                    item.DisplayText == "IsHitTestVisible");
-
-        Require(
-            completion is not null,
+        var completion = RequireNotNull(
+            Session.Completions.SingleOrDefault(static item => !item.IsProjected &&
+                item.DisplayText == "IsHitTestVisible"),
             "No inherited InputElement.IsHitTestVisible completion.");
 
         Require(
@@ -179,12 +180,9 @@ internal sealed partial class SmokeView : AkburaControl
 
         await RequestCompletionAsync();
 
-        var completion = Session.Completions.SingleOrDefault(
-            item => item.IsProjected &&
-                    item.DisplayText == "Name");
-
-        Require(
-            completion is not null,
+        var completion = RequireNotNull(
+            Session.Completions.SingleOrDefault(static item => item.IsProjected &&
+                item.DisplayText == "Name"),
             "No projected Name completion from AddSource.");
 
         Require(
@@ -257,8 +255,7 @@ internal sealed partial class SmokeView : AkburaControl
         bool expected)
     {
         var exists = Session.Completions.Any(
-            item => item.IsProjected &&
-                    item.DisplayText == propertyName);
+            static (item, name) => item.IsProjected && item.DisplayText == name, propertyName);
 
         Require(
             exists == expected,
@@ -304,7 +301,10 @@ internal sealed partial class SmokeView : AkburaControl
         return PositionOf(source, text) + text.Length;
     }
 
-    private static void Require([DoesNotReturnIf(false)] bool condition, string message)
+    private static T RequireNotNull<T>(T? value, string message) where T : class =>
+        value ?? throw new InvalidOperationException(message);
+
+    private static void Require(bool condition, string message)
     {
         if (!condition)
         {
@@ -329,20 +329,30 @@ internal sealed partial class SmokeView : AkburaControl
     private static async Task<AkburaReferenceSet> ReadReferencesAsync()
     {
         var assembly = Assembly.GetExecutingAssembly();
-        var images = new List<byte[]>();
-
-        foreach (var name in assembly.GetManifestResourceNames().Where(name => name.StartsWith("SmokeReferences.", StringComparison.Ordinal)))
+        var images = ArrayBuilder<byte[]>.GetInstance();
+        try
         {
-            using var stream = assembly.GetManifestResourceStream(name)
-                ?? throw new InvalidOperationException($"Embedded metadata '{name}' is missing.");
-            using var image = new MemoryStream();
-            await stream.CopyToAsync(image);
-            images.Add(image.ToArray());
-        }
+            foreach (var name in assembly.GetManifestResourceNames())
+            {
+                if (!name.StartsWith("SmokeReferences.", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                using var stream = assembly.GetManifestResourceStream(name)
+                    ?? throw new InvalidOperationException($"Embedded metadata '{name}' is missing.");
+                using var image = new MemoryStream();
+                await stream.CopyToAsync(image);
+                images.Add(image.ToArray());
+            }
 
-        return images.Count == 0
-            ? throw new InvalidOperationException("No resolved compiler metadata was embedded by the build.")
-            : AkburaReferenceSet.FromImages(images);
+            return images.Count == 0
+                ? throw new InvalidOperationException("No resolved compiler metadata was embedded by the build.")
+                : AkburaReferenceSet.FromImages(images);
+        }
+        finally
+        {
+            images.Free();
+        }
     }
 
     private const string ViewModelSource = """

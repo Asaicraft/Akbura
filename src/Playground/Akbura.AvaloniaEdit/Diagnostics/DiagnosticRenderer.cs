@@ -15,6 +15,11 @@ internal sealed class DiagnosticRenderer(AkburaCodeEditor editor) : IBackgroundR
 
     public void SetDiagnostics(TextDocument buffer, ImmutableArray<AkburaDiagnosticSpan> issues)
     {
+        if (ReferenceEquals(_buffer, buffer) && _issues.SequenceEqual(issues))
+        {
+            return;
+        }
+
         _buffer = buffer;
         _issues = issues;
         editor.TextArea.TextView.InvalidateLayer(Layer);

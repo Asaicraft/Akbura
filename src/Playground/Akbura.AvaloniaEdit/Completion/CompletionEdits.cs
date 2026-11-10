@@ -1,32 +1,49 @@
+using Akbura.Pools;
+
 namespace Akbura.AvaloniaEdit.Completion;
 
 internal static class CompletionEdits
 {
+    private static readonly IComparer<TextChange> SourceOrder = Comparer<TextChange>.Create(static (left, right) =>
+    {
+        var order = left.Span.Start.CompareTo(right.Span.Start);
+        return order != 0 ? order : left.Span.Length.CompareTo(right.Span.Length);
+    });
+
     // Validate the entire set before touching the editable buffer. All offsets share one UTF-16 base.
     public static ImmutableArray<TextChange> Validate(AkburaCompletionChange change, int length)
     {
         // An insertion at a replacement's start is valid (for example a leading import).
         // Sort it first here so reverse application replaces the old text before inserting the prefix.
-        var edits = change.Changes.OrderBy(edit => edit.Span.Start).ThenBy(edit => edit.Span.Length).ToImmutableArray();
-        var end = -1;
-        var previousStart = -1;
-        long newLength = length;
-
-        foreach (var edit in edits)
+        var edits = ArrayBuilder<TextChange>.GetInstance(change.Changes.Length);
+        try
         {
-            if (edit.Span.Start > length || edit.Span.Length > length - edit.Span.Start ||
-                edit.Span.Start < end || edit.Span.Start == previousStart && edit.Span.Length == 0)
+            edits.AddRange(change.Changes);
+            edits.Sort(SourceOrder);
+            var end = -1;
+            var previousStart = -1;
+            long newLength = length;
+
+            foreach (var edit in edits)
             {
-                throw new InvalidOperationException("Completion contains invalid or overlapping source edits.");
+                if (edit.Span.Start > length || edit.Span.Length > length - edit.Span.Start ||
+                    edit.Span.Start < end || edit.Span.Start == previousStart && edit.Span.Length == 0)
+                {
+                    throw new InvalidOperationException("Completion contains invalid or overlapping source edits.");
+                }
+
+                end = edit.Span.End;
+                previousStart = edit.Span.Start;
+                newLength += (edit.NewText?.Length ?? 0) - edit.Span.Length;
             }
 
-            end = edit.Span.End;
-            previousStart = edit.Span.Start;
-            newLength += (edit.NewText?.Length ?? 0) - edit.Span.Length;
+            return change.NewPosition < 0 || change.NewPosition > newLength || newLength > int.MaxValue
+                ? throw new InvalidOperationException("Completion returned an invalid caret position.")
+                : edits.ToImmutable();
         }
-
-        return change.NewPosition < 0 || change.NewPosition > newLength || newLength > int.MaxValue
-            ? throw new InvalidOperationException("Completion returned an invalid caret position.")
-            : edits;
+        finally
+        {
+            edits.Free();
+        }
     }
 }

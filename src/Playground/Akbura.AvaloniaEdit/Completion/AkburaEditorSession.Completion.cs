@@ -1,9 +1,11 @@
+using Akbura.Pools;
 using Akbura.AvaloniaEdit.Completion;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using AvaloniaEdit.CodeCompletion;
+using AvaloniaEdit.Document;
 
 namespace Akbura.AvaloniaEdit;
 
@@ -18,12 +20,26 @@ public sealed partial class AkburaEditorSession
     private bool _incompleteCompletion;
     private int _completionPosition = -1;
     private int _lastCaretOffset = -1;
+    private bool _completionInputPosted;
+    private long _completionInputEpoch;
+    private char _pendingCompletionCharacter;
+    private TextDocument? _completionBuffer;
+    private string? _completionContext;
+    private bool _completionEditsCompatible;
+    private bool _completionCatalogNeedsRefresh;
+    private AkburaEditorCompletionItem? _preferredCompletionItem;
+    private Avalonia.Vector? _preferredCompletionScroll;
+
+    internal Task CompletionIdle => _automaticCompletionTask ?? Task.CompletedTask;
+    private Task? _automaticCompletionTask;
 
     public ImmutableArray<AkburaEditorCompletionItem> Completions
     {
         get; private set;
     } = [];
+
     internal CompletionWindow? CompletionPopup => _completionWindow;
+
     internal Avalonia.Controls.Primitives.Popup? DescriptionPopup => _completionDescription?.Popup;
 
     private void AttachCompletion()
@@ -84,7 +100,15 @@ public sealed partial class AkburaEditorSession
         DismissHover();
         if (!_applyingCompletion && _completionPosition != position)
         {
-            DismissCompletion();
+            if (_completionWindow is { } popup && position >= popup.StartOffset && position <= popup.EndOffset)
+            {
+                _completionPosition = position;
+                ScheduleCompletion('\0');
+            }
+            else
+            {
+                DismissCompletion();
+            }
         }
     }
 
@@ -99,8 +123,75 @@ public sealed partial class AkburaEditorSession
         // Trigger eligibility is checked against the shared syntactic/C# contexts in the request.
         if (!char.IsControl(character))
         {
-            _ = RequestCompletionAsync(false, character, CancellationToken.None);
+            ScheduleCompletion(character);
         }
+    }
+
+    private void ScheduleCompletion(char character)
+    {
+        _pendingCompletionCharacter = character;
+        if (_completionInputPosted)
+        {
+            return;
+        }
+
+        _completionInputPosted = true;
+        var epoch = _completionInputEpoch;
+        var idle = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _automaticCompletionTask = idle.Task;
+        Dispatcher.UIThread.Post(async () =>
+        {
+            if (epoch != _completionInputEpoch)
+            {
+                idle.TrySetResult();
+                return;
+            }
+
+            _completionInputPosted = false;
+
+            try
+            {
+                if (!_disposed)
+                {
+                    await RequestCompletionAsync(false, _pendingCompletionCharacter, CancellationToken.None);
+                }
+
+                idle.TrySetResult();
+            }
+            catch (Exception error)
+            {
+                if (!_disposed)
+                {
+                    ReportFailure("Completion", error, Capture());
+                }
+
+                idle.TrySetResult();
+            }
+        }, DispatcherPriority.Background);
+    }
+
+    private bool TrackCompletionChange(DocumentChangeEventArgs change)
+    {
+        if (_applyingCompletion || _completionWindow is not { } popup || !ReferenceEquals(_completionBuffer, _document))
+        {
+            return false;
+        }
+
+        var oldEnd = popup.EndOffset - change.InsertionLength + change.RemovalLength;
+        if (change.Offset < popup.StartOffset || change.Offset + change.RemovalLength > oldEnd ||
+            !IsCompletionPrefix(change.InsertedText.Text))
+        {
+            return false;
+        }
+
+        _completionPosition = change.Offset + change.InsertionLength;
+        _completionCatalogNeedsRefresh = true;
+        _preferredCompletionItem ??= popup.CompletionList.SelectedItem as AkburaEditorCompletionItem;
+        _preferredCompletionScroll ??= popup.CompletionList.ScrollViewer?.Offset;
+        // Retain the last visible rows while awaiting the provider. Its old prefix
+        // catalog is not a promise that longer utility arguments can be filtered locally.
+        popup.CompletionList.IsFiltering = false;
+        return true;
     }
 
     private void TextEntering(object? sender, TextInputEventArgs e)
@@ -111,18 +202,18 @@ public sealed partial class AkburaEditorSession
             return;
         }
 
-        if (!Completions.Contains(item) || !IsCurrent(item.Snapshot, item.Context, true))
-        {
-            DismissCompletion();
-            return; // Keep normal text input when the visible catalog has just become obsolete.
-        }
-
         var character = e.Text[0];
         if (!CompletionCommitPolicy.ShouldCommit(item, character))
         {
             return;
         }
 
+        if (!Completions.Contains(item) || !IsCurrent(item.Snapshot, item.Context, true))
+        {
+            // A retained UI row is not a current edit. Keep the typed character and
+            // let normal input obtain a fresh catalog instead of accepting stale offsets.
+            return;
+        }
         e.Handled = true;
         _ = CommitCompletionAsync(item, character);
     }
@@ -130,6 +221,8 @@ public sealed partial class AkburaEditorSession
     private void CancelCompletionRequests()
     {
         _completionCancellation?.Cancel();
+        _completionInputEpoch++;
+        _completionInputPosted = false;
 
         // Commit cancellation also happens on text changes. A character already inserted by a commit remains in the buffer.
         if (!_applyingCompletion)
@@ -142,13 +235,29 @@ public sealed partial class AkburaEditorSession
     {
         var popup = _completionWindow;
         _completionWindow = null;
+        _completionEditsCompatible = false;
+        _completionCatalogNeedsRefresh = false;
+        _preferredCompletionItem = null;
+        _preferredCompletionScroll = null;
+        _completionBuffer = null;
+        _completionContext = null;
         _completionDescription?.Dispose();
         _completionDescription = null;
+#if DEBUG
+        if (popup != null) _options.Performance?.Count("PopupDisposed");
+#endif
         popup?.Hide();
     }
 
-    public Task RequestCompletionAsync(CancellationToken cancellationToken = default) =>
-        RequestCompletionAsync(true, '\0', cancellationToken);
+    public Task RequestCompletionAsync(CancellationToken cancellationToken = default)
+    {
+        // An explicit invocation supersedes an unresolved insertion. Its typed
+        // character is already in the buffer and must survive the fresh request.
+        _commitCancellation?.Cancel();
+        _completionInputEpoch++;
+        _completionInputPosted = false;
+        return RequestCompletionAsync(true, '\0', cancellationToken);
+    }
 
     private async Task RequestCompletionAsync(bool isExplicit, char character, CancellationToken cancellationToken)
     {
@@ -167,23 +276,29 @@ public sealed partial class AkburaEditorSession
         AkburaDocumentContext? context = null;
         try
         {
-            context = await SynchronizeAsync(snapshot, cancellation.Token);
+            context = await SynchronizeAsync(snapshot, cancellation.Token, "completion-sync");
+            var syntax = await GetSyntaxAsync(snapshot, context, cancellation.Token);
 
-            var results = await _options.Scheduler.RunAsync(async token =>
+            var results = await _services.RunAsync("completion", 0, async token =>
             {
-                var syntax = AkburaSyntacticDocument.Parse(snapshot.Text, context.Document.FilePath, token);
+#if DEBUG
+                using var providerMeasurement = _options.Performance?.Measure("CompletionProvider");
+#endif
                 var nativeContext = syntax.GetCompletionContext(snapshot.Position, token);
                 var akcssContext = syntax.GetAkcssCompletionContext(snapshot.Position, token);
                 var csharp = syntax.TryGetCSharpCompletionContext(snapshot.Position, out _, token);
                 if (!isExplicit && !incomplete && nativeContext.IsDefault && akcssContext.IsDefault && !csharp)
                 {
-                    return (Syntax: syntax, Native: default, Projected: null);
+                    return (Syntax: syntax, Native: default(AkburaCompletionResult), Projected: (AkburaProjectedCompletionResult?)null, Context: "unsupported");
                 }
 
+#if DEBUG
+                _options.Performance?.Count("CompletionProvider");
+#endif
                 var native = _workspace.LanguageServices.Completion.GetCompletions(syntax, context, snapshot.Position, token);
                 var projected = await _workspace.LanguageServices.ProjectedCSharp.GetCompletionsAsync(syntax, context,
                     snapshot.Position, new(isExplicit, incomplete, character), token).ConfigureAwait(false);
-                return (Syntax: syntax, Native: native, Projected: projected);
+                return (Syntax: syntax, Native: native, Projected: projected, Context: $"{nativeContext.Kind}/{akcssContext.Kind}/{csharp}");
             }, cancellation.Token);
 
             if (cancellation.IsCancellationRequested || sequence != _completionSequence || !IsCurrent(snapshot, context, checkPosition: true))
@@ -191,72 +306,133 @@ public sealed partial class AkburaEditorSession
                 return;
             }
 
-            var items = ImmutableArray.CreateBuilder<AkburaEditorCompletionItem>();
-            var identities = new HashSet<string>(StringComparer.Ordinal);
-            if (results.Projected is { } projected)
-            {
-                foreach (var item in projected.Items)
-                {
-                    if (identities.Add("csharp\0" + item.ResolveKey))
-                    {
-                        items.Add(new(this, snapshot, results.Syntax, context, null, item, item.SourceSpan));
-                    }
-                }
-            }
-
-            foreach (var item in results.Native.Items)
-            {
-                items.Add(new(this, snapshot, results.Syntax, context, item, null, results.Native.ApplicableSpan));
-            }
-
-            Completions = [.. items.OrderBy(item => item.SortText, StringComparer.Ordinal)];
+#if DEBUG
+            using var adaptationMeasurement = _options.Performance?.Measure("CompletionAdaptation");
+            _options.Performance?.Count("CompletionAdaptation");
+#endif
+            Completions = AdaptCompletionItems(snapshot, results.Syntax, context, results.Native, results.Projected);
+#if DEBUG
+            _options.Performance?.Count("CompletionPublished");
+#endif
             _incompleteCompletion = results.Native.IsIncomplete || results.Projected?.IsIncomplete == true;
-            DismissCompletion();
-
             if (Completions.IsEmpty || TopLevel.GetTopLevel(_editor) == null)
             {
+                DismissCompletion();
                 return;
             }
-
-            var popup = new CompletionWindow(_editor.TextArea)
+            var startOffset = snapshot.Position;
+            foreach (var item in Completions)
             {
-                StartOffset = Math.Min(snapshot.Position, Completions.Min(item => item.SourceSpan.Start)),
-                EndOffset = snapshot.Position,
-            };
-
+                startOffset = Math.Min(startOffset, item.SourceSpan.Start);
+            }
+            var popup = _completionWindow;
+            var previous = _preferredCompletionItem ?? popup?.CompletionList.SelectedItem as AkburaEditorCompletionItem;
+            var scroll = _preferredCompletionScroll ?? popup?.CompletionList.ScrollViewer?.Offset;
+            if (popup == null || !ReferenceEquals(_completionBuffer, snapshot.Buffer) ||
+                popup.StartOffset != startOffset || _completionContext != results.Context)
+            {
+                DismissCompletion();
+#if DEBUG
+                _options.Performance?.Count("PopupCreated");
+#endif
+                popup = new CompletionWindow(_editor.TextArea) { StartOffset = startOffset, EndOffset = snapshot.Position };
+                _completionWindow = popup;
+                _completionBuffer = snapshot.Buffer;
+                _completionContext = results.Context;
+                _completionDescription = new CompletionDescriptionPopup(popup, GetCompletionDescriptionAsync);
+                var ownedPopup = popup;
+                popup.Closed += (_, _) =>
+                {
+                    if (ReferenceEquals(_completionWindow, ownedPopup))
+                    {
+#if DEBUG
+                        _options.Performance?.Count("PopupDisposed");
+#endif
+                        _completionWindow = null;
+                        _completionBuffer = null;
+                        _completionDescription?.Dispose();
+                        _completionDescription = null;
+                        CancelCompletionRequests();
+                        _completionSequence++;
+                        _incompleteCompletion = false;
+                    }
+                };
+            }
+#if DEBUG
+            else _options.Performance?.Count("PopupReused");
+#endif
+            _completionEditsCompatible = true;
+            popup.EndOffset = snapshot.Position;
+            using var selectionUpdate = _completionDescription!.BeginUpdate();
+            popup.CompletionList.CompletionData.Clear();
             foreach (var item in Completions)
             {
                 popup.CompletionList.CompletionData.Add(item);
             }
 
             var filter = snapshot.Text.ToString(TextSpan.FromBounds(popup.StartOffset, snapshot.Position));
-            var argumentItem = Completions.FirstOrDefault(item => item.Native?.Kind == AkburaCompletionKind.TailwindUtility &&
-                filter.Length > item.Text.Length && filter.StartsWith(item.Text, StringComparison.OrdinalIgnoreCase));
-            // The shared utility catalog already matches this source prefix. Its FilterText
-            // remains the insertion prefix, so a second prefix filter would hide the item.
-            popup.CompletionList.IsFiltering = argumentItem == null;
-            _completionWindow = popup;
-            _completionDescription = new CompletionDescriptionPopup(popup, GetCompletionDescriptionAsync);
-            popup.Closed += (_, _) =>
+            AkburaEditorCompletionItem? argumentItem = null;
+            foreach (var item in Completions)
             {
-                if (ReferenceEquals(_completionWindow, popup))
+                if (item.Native?.Kind == AkburaCompletionKind.TailwindUtility &&
+                    filter.Length > item.Text.Length && filter.StartsWith(item.Text, StringComparison.OrdinalIgnoreCase))
                 {
-                    _completionWindow = null;
-                    _completionDescription?.Dispose();
-                    _completionDescription = null;
-                    _completionCancellation?.Cancel();
-                    _completionSequence++;
-                    _incompleteCompletion = false;
+                    argumentItem = item;
+                    break;
                 }
-            };
-            popup.Show();
+            }
+            // AvaloniaEdit caches both the last query and the filtered item objects.
+            // Reset through public APIs before filtering replacement data. A distinct
+            // nonmatching query also handles a previously empty prefix without reflection.
+            popup.CompletionList.IsFiltering = false;
+            popup.CompletionList.SelectItem("\0");
+            popup.CompletionList.IsFiltering = true;
+            popup.CompletionList.SelectItem("");
+            popup.CompletionList.IsFiltering = argumentItem == null;
+            if (!popup.IsOpen)
+            {
+                popup.Show();
+            }
+
             popup.CompletionList.SelectItem(filter);
-            if (argumentItem != null && popup.CompletionList.SelectedItem == null)
+            // SelectItemFiltering posts its best selection at Loaded priority. Restore
+            // user selection and scroll after those callbacks, before completing this request.
+            await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Loaded);
+
+            if (cancellation.IsCancellationRequested || sequence != _completionSequence ||
+                !ReferenceEquals(_completionWindow, popup) || !IsCurrent(snapshot, context, true))
+            {
+                return;
+            }
+
+            var retained = previous == null ? null : FindCurrentCandidate(previous);
+            if (retained != null && popup.CompletionList.CurrentList?.Contains(retained) == true)
+            {
+                popup.CompletionList.SelectedItem = retained;
+                if (scroll is { } offset && popup.CompletionList.ScrollViewer is { } viewer)
+                {
+                    viewer.Offset = offset;
+                }
+            }
+            else if (argumentItem != null && popup.CompletionList.SelectedItem == null)
             {
                 popup.CompletionList.SelectedItem = argumentItem;
             }
+
+            _preferredCompletionItem = null;
+            _preferredCompletionScroll = null;
+            popup.CompletionList.IsVisible = popup.CompletionList.CurrentList?.Count > 0;
+            if (!popup.CompletionList.IsVisible)
+            {
+                DismissCompletion();
+            }
         }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested || !IsCurrent(snapshot)) { }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested || !IsCurrent(snapshot))
+        {
+#if DEBUG
+            _options.Performance?.Count("CompletionCanceled");
+#endif
+        }
         catch (Exception error)
         {
             if (!cancellation.IsCancellationRequested && sequence == _completionSequence)
@@ -273,7 +449,101 @@ public sealed partial class AkburaEditorSession
         }
     }
 
-    internal void CommitFromPopup(AkburaEditorCompletionItem item) => _ = CommitCompletionAsync(item);
+    private AkburaEditorCompletionItem? FindCurrentCandidate(AkburaEditorCompletionItem previous)
+    {
+        // Compare provider fields, never assume a resolve key survives another snapshot.
+        // A unique current candidate supplies its own syntax, offsets and resolve identity.
+        AkburaEditorCompletionItem? match = null;
+        foreach (var item in Completions)
+        {
+            if (item.IsProjected != previous.IsProjected || item.DisplayText != previous.DisplayText ||
+                item.Text != previous.Text || item.SortText != previous.SortText || item.Kind != previous.Kind ||
+                item.Native?.Suffix != previous.Native?.Suffix || item.Native?.NamespaceImport != previous.Native?.NamespaceImport)
+            {
+                continue;
+            }
+            if (match != null)
+            {
+                return null;
+            }
+            match = item;
+        }
+        return match;
+    }
+
+    private static readonly IComparer<(AkburaEditorCompletionItem Item, int Order)> CompletionOrderComparer =
+        Comparer<(AkburaEditorCompletionItem Item, int Order)>.Create(static (left, right) =>
+        {
+            var order = StringComparer.Ordinal.Compare(left.Item.SortText, right.Item.SortText);
+            return order != 0 ? order : left.Order.CompareTo(right.Order);
+        });
+
+    private ImmutableArray<AkburaEditorCompletionItem> AdaptCompletionItems(RequestSnapshot snapshot,
+        AkburaSyntacticDocument syntax, AkburaDocumentContext context, AkburaCompletionResult native,
+        AkburaProjectedCompletionResult? projected)
+    {
+        var items = ArrayBuilder<(AkburaEditorCompletionItem Item, int Order)>.GetInstance();
+        var identities = PooledHashSet<string>.GetInstance();
+        try
+        {
+            if (projected is { } projection)
+            {
+                foreach (var item in projection.Items)
+                {
+                    if (identities.Add(item.ResolveKey))
+                    {
+                        items.Add((new(this, snapshot, syntax, context, null, item, item.SourceSpan), items.Count));
+                    }
+                }
+            }
+            foreach (var item in native.Items)
+            {
+                items.Add((new(this, snapshot, syntax, context, item, null, native.ApplicableSpan), items.Count));
+            }
+            items.Sort(CompletionOrderComparer);
+            using var result = ImmutableArrayBuilder<AkburaEditorCompletionItem>.Rent(items.Count);
+            foreach (var item in items)
+            {
+                result.Add(item.Item);
+            }
+            return result.ToImmutable();
+        }
+        finally
+        {
+            identities.Free();
+            items.Free();
+        }
+    }
+
+    private static bool IsCompletionPrefix(ReadOnlySpan<char> text)
+    {
+        foreach (var character in text)
+        {
+            if (!char.IsLetterOrDigit(character) && character is not ('_' or '-' or '.'))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private bool HasObsoleteCompletions()
+    {
+        foreach (var item in Completions)
+        {
+            if (!IsCurrent(item.Snapshot, item.Context))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Task? _popupCommitTask;
+
+    internal Task CompletionCommitIdle => _popupCommitTask ?? Task.CompletedTask;
+
+    internal void CommitFromPopup(AkburaEditorCompletionItem item) => _popupCommitTask = CommitCompletionAsync(item);
 
     private async Task<string?> GetCompletionDescriptionAsync(AkburaEditorCompletionItem item, CancellationToken cancellationToken)
     {
@@ -283,8 +553,11 @@ public sealed partial class AkburaEditorSession
         }
         try
         {
-            var description = await _options.Scheduler.RunAsync(async token =>
+            var description = await _services.RunAsync("description", 0, async token =>
             {
+#if DEBUG
+                _options.Performance?.Count("DescriptionProvider");
+#endif
                 if (item.Native is { } native)
                 {
                     token.ThrowIfCancellationRequested();
@@ -297,7 +570,7 @@ public sealed partial class AkburaEditorSession
             return !cancellationToken.IsCancellationRequested && IsCurrent(item.Snapshot, item.Context, true)
                 ? description : null;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || _disposed)
+        catch (OperationCanceledException)
         {
             return null;
         }
@@ -316,6 +589,18 @@ public sealed partial class AkburaEditorSession
     {
         VerifyUsable();
         ArgumentNullException.ThrowIfNull(item);
+        if (commitCharacter == null && Completions.Contains(item) && !IsCurrent(item.Snapshot, item.Context, true) &&
+            _completionEditsCompatible && ReferenceEquals(item.Snapshot.Buffer, _document))
+        {
+            var current = Capture();
+            await RequestCompletionAsync(cancellationToken);
+            if (!IsCurrent(current, checkPosition: true) || FindCurrentCandidate(item) is not { } refreshed)
+            {
+                return false;
+            }
+
+            item = refreshed;
+        }
         var snapshot = item.Snapshot;
         if (_editor.IsReadOnly || !Completions.Contains(item) || !IsCurrent(snapshot, item.Context, true))
         {
@@ -345,7 +630,7 @@ public sealed partial class AkburaEditorSession
         var sequence = ++_commitSequence;
         try
         {
-            var change = await _options.Scheduler.RunAsync(async token => item.Projected is { } projected
+            var change = await _services.RunAsync("commit", 0, async token => item.Projected is { } projected
                 ? (await _workspace.LanguageServices.ProjectedCSharp.ResolveCompletionAsync(item.Syntax, item.Context,
                     snapshot.Position, projected.ResolveKey, token).ConfigureAwait(false))?.Change
                 : _workspace.LanguageServices.Completion.GetCompletionChange(item.Syntax, item.Context,
@@ -373,8 +658,9 @@ public sealed partial class AkburaEditorSession
                         _document.Remove(snapshot.Position, 1);
                     }
 
-                    foreach (var edit in edits.Reverse())
+                    for (var index = edits.Length - 1; index >= 0; index--)
                     {
+                        var edit = edits[index];
                         _document.Replace(edit.Span.Start, edit.Span.Length, edit.NewText ?? "");
                     }
 

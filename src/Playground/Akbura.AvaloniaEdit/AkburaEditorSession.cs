@@ -331,6 +331,7 @@ public sealed partial class AkburaEditorSession : IDisposable
 #if DEBUG
             using var measurement = _options.Performance?.Measure("Synchronize");
             _options.Performance?.Count("Synchronize");
+            _options.Performance?.Count(stream);
 #endif
             cancellationToken.ThrowIfCancellationRequested();
             if (_disposed || snapshot.Revision != Interlocked.Read(ref _revision))
@@ -397,8 +398,8 @@ public sealed partial class AkburaEditorSession : IDisposable
             ReferenceEquals(_refreshSolution, _workspace.CurrentSolution);
     }
 
-    private Task<AkburaSyntacticDocument> GetSyntaxAsync(RequestSnapshot snapshot, AkburaDocumentContext context, CancellationToken token) =>
-        _syntax.GetAsync(new(snapshot.Buffer, snapshot.Revision, context.Document.FilePath, snapshot.Text), token);
+    private Task<AkburaSyntacticDocument> GetSyntaxAsync(RequestSnapshot snapshot, string filePath, CancellationToken token) =>
+        _syntax.GetAsync(new(snapshot.Buffer, snapshot.Revision, filePath, snapshot.Text), token);
 
     internal AkburaSyntacticDocument? CachedSyntax => _syntax.Accepted;
 
@@ -428,7 +429,7 @@ public sealed partial class AkburaEditorSession : IDisposable
             }
 
             var span = new TextSpan(0, snapshot.Text.Length);
-            var syntax = await GetSyntaxAsync(snapshot, context, cancellation.Token);
+            var syntax = await GetSyntaxAsync(snapshot, context.Document.FilePath, cancellation.Token);
             if (!_colorizer.HasPresentation)
             {
                 var syntactic = await _services.RunAsync("syntactic-colors", 1, token =>

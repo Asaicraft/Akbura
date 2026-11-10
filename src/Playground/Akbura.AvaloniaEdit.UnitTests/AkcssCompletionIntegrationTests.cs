@@ -251,11 +251,17 @@ public sealed class AkcssCompletionIntegrationTests
         Assert.Equal("@using Akbura.;", host.Editor.Text);
     });
 
-    [Fact]
-    public Task TypingAParameterizedUtilityNeverInsertsItsSignatureOrAnotherCandidate() => EditorTestHost.Run(async () =>
+    [Theory]
+    [InlineData("markup")]
+    [InlineData("inline")]
+    [InlineData("standalone")]
+    public Task TypingAParameterizedUtilityNeverInsertsItsSignatureOrAnotherCandidate(string kind) => EditorTestHost.Run(async () =>
     {
-        using var host = new Host("Main.akbura", "using Avalonia.Controls;\n<Button sq| />");
-        host.RegisterStyles(Styles);
+        var source = kind == "markup" ? "using Avalonia.Controls;\n<Button sq| />"
+            : Styles + "\nButton.secondary { @apply sq|; }";
+        if (kind == "inline") source = "@akcss {\n" + source + "\n}\n<Button />";
+        using var host = new Host(kind == "standalone" ? "Main.akcss" : "Main.akbura", source);
+        if (kind == "markup") host.RegisterStyles(Styles);
         await host.Session.Ready;
         await host.Session.RequestCompletionAsync();
         foreach (var character in "uare-48")
@@ -264,15 +270,16 @@ public sealed class AkcssCompletionIntegrationTests
             var position = host.Editor.CaretOffset;
             host.Window.KeyTextInput(character.ToString());
             Assert.Equal(before.Insert(position, character.ToString()), host.Editor.Text);
+            await host.Session.CompletionIdle;
         }
-        await host.Session.RequestCompletionAsync();
         var item = Assert.Single(host.Session.Completions, item => item.DisplayText == "square-(double size)");
         Assert.Equal("square-48", item.InsertText);
         Assert.NotNull(host.Session.CompletionPopup);
         Assert.Same(item, host.Session.CompletionPopup.CompletionList.SelectedItem);
+        var beforeCommit = host.Editor.Text;
         Assert.True(await host.Session.CommitCompletionAsync(item));
-        Assert.Contains("<Button square-48 />", host.Editor.Text);
-        Assert.DoesNotContain("double size", host.Editor.Text);
+        Assert.Equal(beforeCommit, host.Editor.Text);
+        Assert.Contains(kind == "markup" ? "<Button square-48 />" : "@apply square-48;", host.Editor.Text);
     });
 
     [Fact]
@@ -390,7 +397,8 @@ public sealed class AkcssCompletionIntegrationTests
             item.InsertText.EndsWith("Pine.akcss", StringComparison.Ordinal)).InsertText;
         host.Editor.Text = $"@using Avalonia.Controls;\n@using {oak};\n@using {pine};\nButton.secondary {{\n    @apply pr;\n}}";
         host.Editor.CaretOffset = host.Editor.Text.IndexOf("@apply pr", StringComparison.Ordinal) + "@apply pr".Length;
-        await host.Session.RequestCompletionAsync();
+        host.Window.KeyTextInput("i");
+        await host.Session.CompletionIdle;
         var native = host.NativeCompletions();
         Assert.Equal(2, native.Items.Count(item => item.DisplayText == "primary"));
         host.AssertAdaptation(native);

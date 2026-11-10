@@ -276,29 +276,59 @@ public sealed partial class AkburaEditorSession
         AkburaDocumentContext? context = null;
         try
         {
-            context = await SynchronizeAsync(snapshot, cancellation.Token, "completion-sync");
-            var syntax = await GetSyntaxAsync(snapshot, context, cancellation.Token);
+            var solution = _workspace.CurrentSolution;
+            AkburaSyntacticDocument syntax;
+            if (solution.TryGetDocument(DocumentUri, out var document))
+            {
+                syntax = await GetSyntaxAsync(snapshot, document.FilePath, cancellation.Token);
+            }
+            else
+            {
+                context = await SynchronizeAsync(snapshot, cancellation.Token, "completion-sync");
+                syntax = await GetSyntaxAsync(snapshot, context.Document.FilePath, cancellation.Token);
+            }
 
+            var completionContext = await _services.RunAsync("completion-context", 0, token =>
+            {
+                var nativeContext = syntax.GetCompletionContext(snapshot.Position, token);
+                var akcssContext = syntax.GetAkcssCompletionContext(snapshot.Position, token);
+                var csharp = syntax.TryGetCSharpCompletionContext(snapshot.Position, out _, token);
+                return Task.FromResult((Native: nativeContext, Akcss: akcssContext, CSharp: csharp));
+            }, cancellation.Token);
+
+            if (!isExplicit && !incomplete && completionContext.Native.IsDefault &&
+                completionContext.Akcss.IsDefault && !completionContext.CSharp)
+            {
+                if (!cancellation.IsCancellationRequested && sequence == _completionSequence &&
+                    IsCurrent(snapshot, context, checkPosition: true) &&
+                    (context != null || ReferenceEquals(solution, _workspace.CurrentSolution)))
+                {
+                    Completions = [];
+                    _incompleteCompletion = false;
+                    DismissCompletion();
+                }
+                return;
+            }
+
+            context ??= await SynchronizeAsync(snapshot, cancellation.Token, "completion-sync");
             var results = await _services.RunAsync("completion", 0, async token =>
             {
 #if DEBUG
                 using var providerMeasurement = _options.Performance?.Measure("CompletionProvider");
-#endif
-                var nativeContext = syntax.GetCompletionContext(snapshot.Position, token);
-                var akcssContext = syntax.GetAkcssCompletionContext(snapshot.Position, token);
-                var csharp = syntax.TryGetCSharpCompletionContext(snapshot.Position, out _, token);
-                if (!isExplicit && !incomplete && nativeContext.IsDefault && akcssContext.IsDefault && !csharp)
-                {
-                    return (Syntax: syntax, Native: default(AkburaCompletionResult), Projected: (AkburaProjectedCompletionResult?)null, Context: "unsupported");
-                }
-
-#if DEBUG
                 _options.Performance?.Count("CompletionProvider");
+                _options.Performance?.Count("NativeCompletionProvider");
 #endif
                 var native = _workspace.LanguageServices.Completion.GetCompletions(syntax, context, snapshot.Position, token);
-                var projected = await _workspace.LanguageServices.ProjectedCSharp.GetCompletionsAsync(syntax, context,
-                    snapshot.Position, new(isExplicit, incomplete, character), token).ConfigureAwait(false);
-                return (Syntax: syntax, Native: native, Projected: projected, Context: $"{nativeContext.Kind}/{akcssContext.Kind}/{csharp}");
+                AkburaProjectedCompletionResult? projected = null;
+                if (completionContext.CSharp)
+                {
+#if DEBUG
+                    _options.Performance?.Count("ProjectedCompletionProvider");
+#endif
+                    projected = await _workspace.LanguageServices.ProjectedCSharp.GetCompletionsAsync(syntax, context,
+                        snapshot.Position, new(isExplicit, incomplete, character), token).ConfigureAwait(false);
+                }
+                return (Native: native, Projected: projected);
             }, cancellation.Token);
 
             if (cancellation.IsCancellationRequested || sequence != _completionSequence || !IsCurrent(snapshot, context, checkPosition: true))
@@ -310,7 +340,7 @@ public sealed partial class AkburaEditorSession
             using var adaptationMeasurement = _options.Performance?.Measure("CompletionAdaptation");
             _options.Performance?.Count("CompletionAdaptation");
 #endif
-            Completions = AdaptCompletionItems(snapshot, results.Syntax, context, results.Native, results.Projected);
+            Completions = AdaptCompletionItems(snapshot, syntax, context, results.Native, results.Projected);
 #if DEBUG
             _options.Performance?.Count("CompletionPublished");
 #endif
@@ -328,8 +358,9 @@ public sealed partial class AkburaEditorSession
             var popup = _completionWindow;
             var previous = _preferredCompletionItem ?? popup?.CompletionList.SelectedItem as AkburaEditorCompletionItem;
             var scroll = _preferredCompletionScroll ?? popup?.CompletionList.ScrollViewer?.Offset;
+            var contextKey = $"{completionContext.Native.Kind}/{completionContext.Akcss.Kind}/{completionContext.CSharp}";
             if (popup == null || !ReferenceEquals(_completionBuffer, snapshot.Buffer) ||
-                popup.StartOffset != startOffset || _completionContext != results.Context)
+                popup.StartOffset != startOffset || _completionContext != contextKey)
             {
                 DismissCompletion();
 #if DEBUG
@@ -338,7 +369,7 @@ public sealed partial class AkburaEditorSession
                 popup = new CompletionWindow(_editor.TextArea) { StartOffset = startOffset, EndOffset = snapshot.Position };
                 _completionWindow = popup;
                 _completionBuffer = snapshot.Buffer;
-                _completionContext = results.Context;
+                _completionContext = contextKey;
                 _completionDescription = new CompletionDescriptionPopup(popup, GetCompletionDescriptionAsync);
                 var ownedPopup = popup;
                 popup.Closed += (_, _) =>

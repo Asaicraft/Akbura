@@ -125,7 +125,7 @@ public sealed partial class AkburaEditorSession
             }
 
             context = await SynchronizeAsync(snapshot, cancellation.Token, "hover-sync");
-            var syntax = await GetSyntaxAsync(snapshot, context, cancellation.Token);
+            var syntax = await GetSyntaxAsync(snapshot, context.Document.FilePath, cancellation.Token);
             var info = await _services.RunAsync("hover", 0, async token =>
             {
                 var projected = await _workspace.LanguageServices.ProjectedCSharp.GetQuickInfoAsync(

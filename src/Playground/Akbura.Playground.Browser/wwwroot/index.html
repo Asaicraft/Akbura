@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Akbura Playground</title>
+    <style>
+        html, body, #out {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        body {
+            background: #ecf0f5;
+            color: #253047;
+            font: 15px system-ui, sans-serif;
+        }
+
+        #startup {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            margin: 0;
+            padding: 24px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="out"></div>
+    <p id="startup" role="status">Loading Akbura Playground…</p>
+    <script type="module" src="./main.js"></script>
+</body>
+</html>

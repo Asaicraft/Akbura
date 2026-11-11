@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+  <PropertyGroup>
+    <TargetFramework>net10.0-browser</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Link SkiaSharp and HarfBuzz in development builds and published bundles. -->
+    <WasmBuildNative>true</WasmBuildNative>
+    <WasmBuildOnlyAfterPublish>false</WasmBuildOnlyAfterPublish>
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+    <!-- The editor and preview compile and load managed assemblies at runtime. -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <RunAOTCompilation>false</RunAOTCompilation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Browser" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+    <ProjectReference Include="../Akbura.Playground/Akbura.Playground.csproj" />
+  </ItemGroup>
+
+  <Target Name="EmbedPlaygroundCompilerReferences" BeforeTargets="AssignTargetPaths"
+          DependsOnTargets="ResolveReferences;FindReferenceAssembliesForReferences">
+    <ItemGroup>
+      <_PlaygroundCompilerReference Include="@(ReferencePathWithRefAssemblies)"
+                                    Condition="'%(ReferencePathWithRefAssemblies.Extension)' == '.dll'" />
+      <EmbeddedResource Include="@(_PlaygroundCompilerReference)">
+        <LogicalName>PlaygroundReferences.%(Filename)%(Extension)</LogicalName>
+        <WithCulture>false</WithCulture>
+      </EmbeddedResource>
+    </ItemGroup>
+    <Error Condition="'@(_PlaygroundCompilerReference)' == ''"
+           Text="Akbura.Playground requires the build's resolved compiler metadata." />
+  </Target>
+</Project>

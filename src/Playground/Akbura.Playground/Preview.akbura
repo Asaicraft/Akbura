@@ -1,0 +1,21 @@
+using Avalonia.Controls;
+
+state int Count = 0;
+
+<Border Margin="24"
+        Padding="24"
+        Width="280"
+        Background="White"
+        BorderBrush="#DCE2ED"
+        BorderThickness="1"
+        CornerRadius="12"
+        HorizontalAlignment="Center"
+        VerticalAlignment="Center">
+    <StackPanel Spacing="12">
+        <TextBlock Text="Counter"
+                   FontSize="26"
+                   FontWeight="SemiBold" />
+        <TextBlock Text={$"Count: {Count}"} FontSize="18" />
+        <Button Content="Increment" Click={Count++} />
+    </StackPanel>
+</Border>

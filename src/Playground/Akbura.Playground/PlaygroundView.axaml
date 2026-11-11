@@ -1,0 +1,81 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:editor="using:Akbura.AvaloniaEdit"
+             x:Class="Akbura.Playground.PlaygroundView"
+             Background="#EEF1F6">
+    <Grid Margin="16" ColumnDefinitions="*,8,*">
+        <ThemeVariantScope RequestedThemeVariant="Dark">
+            <Border Background="#181E2C" CornerRadius="10" ClipToBounds="True">
+                <Grid RowDefinitions="Auto,*">
+                    <Border Padding="16,12" Background="#232B3B">
+                        <TextBlock Text="Preview.akbura"
+                                   Foreground="#F0F2F7"
+                                   FontSize="14"
+                                   FontWeight="SemiBold" />
+                    </Border>
+                    <editor:AkburaCodeEditor x:Name="SourceEditor"
+                                             Grid.Row="1"
+                                             Background="#181E2C"
+                                             Foreground="#F0F2F7"
+                                             FontFamily="Cascadia Mono, Consolas, monospace"
+                                             FontSize="15"
+                                             ShowLineNumbers="True"
+                                             HorizontalScrollBarVisibility="Auto"
+                                             VerticalScrollBarVisibility="Auto" />
+                </Grid>
+            </Border>
+        </ThemeVariantScope>
+
+        <GridSplitter Grid.Column="1"
+                      Background="Transparent"
+                      ResizeDirection="Columns"
+                      HorizontalAlignment="Stretch"
+                      VerticalAlignment="Stretch" />
+
+        <Border Grid.Column="2"
+                Background="#F8F9FC"
+                BorderBrush="#DCE2ED"
+                BorderThickness="1"
+                CornerRadius="10"
+                ClipToBounds="True">
+            <Grid RowDefinitions="Auto,*,Auto">
+                <Border Padding="16,12"
+                        Background="White"
+                        BorderBrush="#DCE2ED"
+                        BorderThickness="0,0,0,1">
+                    <DockPanel LastChildFill="True">
+                        <TextBlock x:Name="PreviewStatus"
+                                   DockPanel.Dock="Right"
+                                   Text="Preparing editor…"
+                                   Foreground="#525F75"
+                                   VerticalAlignment="Center"
+                                   FontSize="12" />
+                        <TextBlock Text="Live preview"
+                                   Foreground="#192238"
+                                   FontSize="14"
+                                   FontWeight="SemiBold" />
+                    </DockPanel>
+                </Border>
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <ContentControl x:Name="PreviewHost"
+                                    HorizontalContentAlignment="Stretch"
+                                    VerticalContentAlignment="Stretch" />
+                </ScrollViewer>
+                <Border x:Name="DiagnosticPanel"
+                        Grid.Row="2"
+                        IsVisible="False"
+                        Padding="16,12"
+                        Background="#FFF4ED"
+                        BorderBrush="#F1D6C7"
+                        BorderThickness="0,1,0,0">
+                    <ScrollViewer MaxHeight="132" VerticalScrollBarVisibility="Auto">
+                        <TextBlock x:Name="PreviewDiagnostics"
+                                   TextWrapping="Wrap"
+                                   Foreground="#883B24"
+                                   FontSize="13" />
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

@@ -9,3 +9,4 @@
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Akbura.AvaloniaEdit")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Akbura.AvaloniaEdit.BrowserSmoke")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Akbura.AvaloniaEdit.UnitTests")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Akbura.Playground")]

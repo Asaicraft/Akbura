@@ -8,11 +8,17 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- Link SkiaSharp and HarfBuzz in development builds and published bundles. -->
     <WasmBuildNative>true</WasmBuildNative>
+    <WasmEnableThreads Condition="'$(WasmEnableThreads)' == ''">true</WasmEnableThreads>
     <WasmBuildOnlyAfterPublish>false</WasmBuildOnlyAfterPublish>
     <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
     <!-- The editor and preview compile and load managed assemblies at runtime. -->
     <PublishTrimmed>false</PublishTrimmed>
     <RunAOTCompilation>false</RunAOTCompilation>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(WasmEnableThreads)' == 'true'">
+    <!-- Avoid reusing WebCIL cached from a single-threaded runtime pack. -->
+    <WasmEnableWebcil Condition="'$(WasmEnableWebcil)' == ''">false</WasmEnableWebcil>
+    <DefineConstants>$(DefineConstants);AKBURA_WASM_THREADS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

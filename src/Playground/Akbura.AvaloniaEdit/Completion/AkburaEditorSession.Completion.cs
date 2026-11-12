@@ -23,6 +23,7 @@ public sealed partial class AkburaEditorSession
     private bool _completionInputPosted;
     private long _completionInputEpoch;
     private char _pendingCompletionCharacter;
+    private string? _completionGestureText;
     private TextDocument? _completionBuffer;
     private string? _completionContext;
     private bool _completionEditsCompatible;
@@ -48,6 +49,7 @@ public sealed partial class AkburaEditorSession
         _editor.TextArea.TextEntering += TextEntering;
         _editor.TextArea.Caret.PositionChanged += CaretMoved;
         _editor.AddHandler(InputElement.KeyDownEvent, KeyDown, RoutingStrategies.Tunnel);
+        _editor.AddHandler(InputElement.KeyUpEvent, KeyUp, RoutingStrategies.Tunnel, handledEventsToo: true);
         _editor.DetachedFromVisualTree += EditorDetached;
     }
 
@@ -57,11 +59,13 @@ public sealed partial class AkburaEditorSession
         _editor.TextArea.TextEntering -= TextEntering;
         _editor.TextArea.Caret.PositionChanged -= CaretMoved;
         _editor.RemoveHandler(InputElement.KeyDownEvent, KeyDown);
+        _editor.RemoveHandler(InputElement.KeyUpEvent, KeyUp);
         _editor.DetachedFromVisualTree -= EditorDetached;
     }
 
     private void EditorDetached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e)
     {
+        _completionGestureText = null;
         CancelCompletionRequests();
         DismissCompletion();
         DismissHover();
@@ -69,9 +73,11 @@ public sealed partial class AkburaEditorSession
 
     private void KeyDown(object? sender, KeyEventArgs e)
     {
+        _completionGestureText = null;
         if (_options.CompletionGesture?.Matches(e) == true)
         {
             e.Handled = true;
+            _completionGestureText = e.Key == Key.Space ? " " : e.KeySymbol;
             _ = RequestCompletionAsync();
         }
         else if (e.Key == Key.Escape)
@@ -81,6 +87,8 @@ public sealed partial class AkburaEditorSession
             DismissHover();
         }
     }
+
+    private void KeyUp(object? sender, KeyEventArgs e) => _completionGestureText = null;
 
     private void CaretMoved(object? sender, EventArgs e)
     {
@@ -196,6 +204,15 @@ public sealed partial class AkburaEditorSession
 
     private void TextEntering(object? sender, TextInputEventArgs e)
     {
+        var gestureText = _completionGestureText;
+        _completionGestureText = null;
+        // Browser input can deliver text separately after the handled key event.
+        if (gestureText != null && e.Text == gestureText)
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (_editor.IsReadOnly || e.Text is not { Length: 1 } ||
             _completionWindow?.CompletionList.SelectedItem is not AkburaEditorCompletionItem item)
         {

@@ -23,6 +23,7 @@ internal sealed class PreviewCompiler
     private readonly CSharpCompilation _compilation;
     private readonly string _rootNamespace;
     private readonly string _projectDirectory;
+    private CompilationSnapshot? _lastSuccessfulCompilation;
 
     public PreviewCompiler(
         ImmutableArray<MetadataReference> references,
@@ -40,7 +41,10 @@ internal sealed class PreviewCompiler
     public PreviewCompilation Compile(SourceText source, string filePath, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var tree = ComponentSyntaxTree.ParseText(source, filePath, cancellationToken);
+        var previous = Volatile.Read(ref _lastSuccessfulCompilation);
+        var tree = previous != null && previous.Tree.FilePath == filePath
+            ? UpdateTree(previous.Tree, source, cancellationToken)
+            : ComponentSyntaxTree.ParseText(source, filePath, cancellationToken);
         using var messages = ImmutableArrayBuilder<string>.Rent();
 
         if (tree.GetRoot().ContainsDiagnostics)
@@ -55,11 +59,8 @@ internal sealed class PreviewCompiler
             messages.Clear();
         }
 
-        var compilation = OperatingSystem.IsBrowser()
-            ? _compilation.WithAssemblyName($"{PreviewAssemblyName}.{Interlocked.Increment(ref _browserAssemblyRevision)}")
-            : _compilation;
         var catalog = AkburaGenerationCatalogBuilder.Create(
-            compilation, [tree], _rootNamespace, _projectDirectory, cancellationToken);
+            _compilation, [tree], _rootNamespace, _projectDirectory, previous?.Compilation, cancellationToken);
         var model = catalog.Compilation.GetSemanticModel(tree);
         var diagnostics = AkburaDiagnosticEngine.Collect(tree, model, cancellationToken: cancellationToken);
         if (AppendDiagnostics(diagnostics, messages))
@@ -88,9 +89,14 @@ internal sealed class PreviewCompiler
                 AkcssDocumentWriter.GetHintName(module), cancellationToken));
         }
 
+        var compilation = _compilation.AddSyntaxTrees(generatedTrees.ToImmutable());
+        if (OperatingSystem.IsBrowser())
+        {
+            compilation = compilation.WithAssemblyName($"{PreviewAssemblyName}.{Interlocked.Increment(ref _browserAssemblyRevision)}");
+        }
+
         using var image = new MemoryStream();
-        var emit = compilation.AddSyntaxTrees(generatedTrees.ToImmutable()).Emit(image,
-            cancellationToken: cancellationToken);
+        var emit = compilation.Emit(image, cancellationToken: cancellationToken);
         foreach (var diagnostic in emit.Diagnostics)
         {
             if (diagnostic.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning)
@@ -100,9 +106,40 @@ internal sealed class PreviewCompiler
         }
 
         var results = messages.ToImmutable();
-        return emit.Success
-            ? new PreviewCompilation(results, image.ToArray(), input.Component.MetadataName)
-            : new PreviewCompilation(results);
+        if (!emit.Success)
+        {
+            return new PreviewCompilation(results);
+        }
+
+        var preview = new PreviewCompilation(results, image.ToArray(), input.Component.MetadataName);
+        cancellationToken.ThrowIfCancellationRequested();
+        // A concurrent compile may have already replaced the snapshot we started from.
+        Interlocked.CompareExchange(ref _lastSuccessfulCompilation, new CompilationSnapshot(tree, catalog.Compilation), previous);
+        return preview;
+    }
+
+    private static ComponentSyntaxTree UpdateTree(ComponentSyntaxTree previous, SourceText source, CancellationToken cancellationToken)
+    {
+        var oldText = previous.Text.ToString().AsSpan();
+        var newText = source.ToString().AsSpan();
+        var start = oldText.CommonPrefixLength(newText);
+        if (start == oldText.Length && start == newText.Length)
+        {
+            return previous;
+        }
+
+        // The editor supplies independent text snapshots. Narrow the changed range
+        // so the parser can keep syntax nodes outside the edit.
+        var oldEnd = oldText.Length;
+        var newEnd = newText.Length;
+        while (oldEnd > start && newEnd > start && oldText[oldEnd - 1] == newText[newEnd - 1])
+        {
+            oldEnd--;
+            newEnd--;
+        }
+
+        var change = new TextChangeRange(TextSpan.FromBounds(start, oldEnd), newEnd - start);
+        return previous.WithChangedText(source, [change], cancellationToken);
     }
 
     private static bool AppendDiagnostics(
@@ -124,4 +161,6 @@ internal sealed class PreviewCompiler
 
         return hasErrors;
     }
+
+    private sealed record CompilationSnapshot(ComponentSyntaxTree Tree, AkburaCompilation Compilation);
 }

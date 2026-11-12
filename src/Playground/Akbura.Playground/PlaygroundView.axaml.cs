@@ -19,9 +19,7 @@ public sealed partial class PlaygroundView : UserControl
     private static readonly TimeSpan PreviewDelay = TimeSpan.FromMilliseconds(350);
 
     private readonly Func<AkburaReferenceSet>? _prepareReferences;
-    private readonly IAkburaEditorScheduler _scheduler = OperatingSystem.IsBrowser()
-        ? new AkburaInlineScheduler()
-        : new AkburaThreadPoolScheduler();
+    private readonly IAkburaEditorScheduler _scheduler;
     private CancellationTokenSource? _lifetime;
     private CancellationTokenSource? _previewRequest;
     private AkburaWorkspace? _workspace;
@@ -29,13 +27,16 @@ public sealed partial class PlaygroundView : UserControl
     private PreviewCompiler? _compiler;
     private PreviewInstance? _preview;
 
-    public PlaygroundView() : this(null)
+    public PlaygroundView() : this(null, null)
     {
     }
 
-    internal PlaygroundView(Func<AkburaReferenceSet>? prepareReferences)
+    internal PlaygroundView(Func<AkburaReferenceSet>? prepareReferences, IAkburaEditorScheduler? scheduler)
     {
         _prepareReferences = prepareReferences;
+        _scheduler = scheduler ?? (OperatingSystem.IsBrowser()
+            ? new AkburaInlineScheduler()
+            : new AkburaThreadPoolScheduler());
         InitializeComponent();
         using var reader = new StreamReader(AssetLoader.Open(StarterAsset));
         SourceEditor.Text = reader.ReadToEnd();
@@ -56,7 +57,7 @@ public sealed partial class PlaygroundView : UserControl
         try
         {
             PreviewStatus.Text = "Preparing editor…";
-            await YieldBeforeBrowserWorkAsync(token);
+            await YieldBeforeInlineWorkAsync(token);
             var (workspace, compiler) = await _scheduler.RunAsync(
                 cancellation => Task.FromResult(CreateEnvironment(cancellation)), token);
             if (token.IsCancellationRequested)
@@ -134,7 +135,7 @@ public sealed partial class PlaygroundView : UserControl
             }
 
             PreviewStatus.Text = "Compiling…";
-            await YieldBeforeBrowserWorkAsync(token);
+            await YieldBeforeInlineWorkAsync(token);
             var result = await _scheduler.RunAsync(cancellation => Task.FromResult(
                 compiler.Compile(SourceText.From(source), PreviewFilePath, cancellation)), token);
             token.ThrowIfCancellationRequested();
@@ -201,9 +202,9 @@ public sealed partial class PlaygroundView : UserControl
         PreviewDiagnostics.Text = diagnostics.IsDefaultOrEmpty ? string.Empty : string.Join(Environment.NewLine, diagnostics);
     }
 
-    private static async Task YieldBeforeBrowserWorkAsync(CancellationToken token)
+    private async Task YieldBeforeInlineWorkAsync(CancellationToken token)
     {
-        if (OperatingSystem.IsBrowser())
+        if (_scheduler is AkburaInlineScheduler)
         {
             await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background, token);
         }

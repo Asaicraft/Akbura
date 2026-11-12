@@ -32,6 +32,18 @@
 <body>
     <div id="out"></div>
     <p id="startup" role="status">Loading Akbura Playground…</p>
-    <script type="module" src="./main.js"></script>
+    <script type="module">
+        const startup = document.getElementById('startup');
+
+        try {
+            const { dotnet } = await import('./_framework/dotnet.js');
+            const runtime = await dotnet.create();
+            await runtime.runMain(runtime.getConfig().mainAssemblyName, []);
+            startup.remove();
+        } catch (error) {
+            startup.textContent = 'Akbura Playground could not start. See the browser console.';
+            console.error(error);
+        }
+    </script>
 </body>
 </html>

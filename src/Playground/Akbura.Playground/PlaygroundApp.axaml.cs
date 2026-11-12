@@ -1,3 +1,4 @@
+using Akbura.AvaloniaEdit.Infrastructure;
 using Akbura.Workspaces.Projects;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -8,6 +9,11 @@ namespace Akbura.Playground;
 public sealed partial class PlaygroundApp : Application
 {
     public Func<AkburaReferenceSet>? PrepareReferences
+    {
+        get; init;
+    }
+
+    public IAkburaEditorScheduler? Scheduler
     {
         get; init;
     }
@@ -25,7 +31,7 @@ public sealed partial class PlaygroundApp : Application
         }
         else if (ApplicationLifetime is ISingleViewApplicationLifetime singleView)
         {
-            singleView.MainView = new PlaygroundView(PrepareReferences);
+            singleView.MainView = new PlaygroundView(PrepareReferences, Scheduler);
         }
 
         base.OnFrameworkInitializationCompleted();

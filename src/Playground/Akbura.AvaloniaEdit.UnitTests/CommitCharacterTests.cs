@@ -70,9 +70,13 @@ public sealed class CommitCharacterTests
             window.KeyPressQwerty(Avalonia.Input.PhysicalKey.Escape, Avalonia.Input.RawInputModifiers.None);
             Assert.Null(session.CompletionPopup);
             window.KeyPressQwerty(Avalonia.Input.PhysicalKey.Space, Avalonia.Input.RawInputModifiers.Control);
+            window.KeyTextInput(" ");
+            Assert.Equal("st", editor.Text);
             await Until(() => session.CompletionPopup != null);
             window.KeyReleaseQwerty(Avalonia.Input.PhysicalKey.Space, Avalonia.Input.RawInputModifiers.Control);
             window.KeyPressQwerty(Avalonia.Input.PhysicalKey.Escape, Avalonia.Input.RawInputModifiers.None);
+            window.KeyTextInput(" ");
+            Assert.Equal("st ", editor.Text);
             editor.Text = "// plain comment ";
             editor.CaretOffset = editor.Text.Length;
             window.KeyTextInput("x");

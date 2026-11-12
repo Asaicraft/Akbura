@@ -1,3 +1,4 @@
+using Akbura.AvaloniaEdit.Infrastructure;
 using Akbura.Engine;
 using Akbura.Workspaces.Projects;
 using Avalonia;
@@ -12,6 +13,9 @@ internal static class Program
     private static Task Main() => AppBuilder.Configure<PlaygroundApp>(() => new PlaygroundApp
         {
             PrepareReferences = ReadCompilerReferences,
+#if AKBURA_WASM_THREADS
+            Scheduler = new AkburaThreadPoolScheduler(),
+#endif
         })
         .WithInterFont()
         .UseAkbura()

@@ -3098,15 +3098,22 @@ internal partial class AkburaSemanticModel
         };
     }
 
-    internal static void AddDuplicateMarkupPropertySetterDiagnostics(MarkupAttributeSyntax markupAttribute, Symbols.IPropertySymbol property, MarkupAttributeBindingKind bindingKind, ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+    internal void AddDuplicateMarkupPropertySetterDiagnostics(
+        MarkupAttributeSyntax markupAttribute,
+        Symbols.IPropertySymbol property,
+        MarkupAttributeBindingKind bindingKind,
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
+        // The class attribute applies AKCSS independently of Avalonia's Classes property.
         if (!IsMarkupPropertySetter(bindingKind) ||
+            GetMarkupPropertyName(markupAttribute) == "class" ||
             GetContainingMarkupStartTag(markupAttribute) is not { } startTag)
         {
             return;
         }
 
         var propertyName = property.Name;
+        var definition = GetMarkupPropertyDefinition(property);
         foreach (var attribute in startTag.Attributes)
         {
             if (attribute.Position >= markupAttribute.Position)
@@ -3114,8 +3121,24 @@ internal partial class AkburaSemanticModel
                 break;
             }
 
-            if (GetMarkupPropertyName(attribute) == propertyName &&
-                IsMarkupPropertySetter(GetMarkupAttributeBindingKind(attribute)))
+            if (!IsMarkupPropertySetter(GetMarkupAttributeBindingKind(attribute)))
+            {
+                continue;
+            }
+
+            // The x.Name directive also assigns a writable CLR Name property.
+            var assignsControlName = propertyName == "Name" &&
+                !property.IsAttachedProperty &&
+                property.ClrPropertyDefinition.Symbol is Microsoft.CodeAnalysis.IPropertySymbol
+                {
+                    Type.SpecialType: SpecialType.System_String,
+                    SetMethod.DeclaredAccessibility: Accessibility.Public,
+                } &&
+                IsMarkupNameDirective(attribute);
+            if (assignsControlName ||
+                (CanTargetSameMarkupProperty(attribute, propertyName, definition) &&
+                 GetSymbolInfo(attribute).Symbol is Symbols.IPropertySymbol previous &&
+                 TargetsSameMarkupProperty(property, definition, previous)))
             {
                 diagnosticsBuilder.Add(new AkburaSemanticDiagnostic(
                     markupAttribute,
@@ -3124,6 +3147,39 @@ internal partial class AkburaSemanticModel
                 return;
             }
         }
+    }
+
+    private static bool CanTargetSameMarkupProperty(MarkupAttributeSyntax attribute,
+        string propertyName, CSharpSymbolDefinition definition)
+    {
+        var name = GetMarkupPropertyName(attribute);
+        // Attached property references can include or omit the Property suffix.
+        return name != "class" &&
+            (name == propertyName ||
+             (attribute is MarkupAttachedPropertyAttributeSyntax && name.Length > 0 &&
+              (name == definition.Name || propertyName == definition.Name)));
+    }
+
+    private static bool TargetsSameMarkupProperty(Symbols.IPropertySymbol property,
+        CSharpSymbolDefinition definition, Symbols.IPropertySymbol previous)
+    {
+        var previousDefinition = GetMarkupPropertyDefinition(previous);
+        return definition.IsDefault && previousDefinition.IsDefault
+            ? property.Name == previous.Name && ReferenceEquals(property.Parameter, previous.Parameter) &&
+                ReferenceEquals(property.Command, previous.Command)
+            : definition.Equals(previousDefinition);
+    }
+
+    private static CSharpSymbolDefinition GetMarkupPropertyDefinition(Symbols.IPropertySymbol property)
+    {
+        if (!property.AttachedPropertyDefinition.IsDefault)
+        {
+            return property.AttachedPropertyDefinition;
+        }
+
+        return !property.AvaloniaPropertyDefinition.IsDefault
+            ? property.AvaloniaPropertyDefinition
+            : property.ClrPropertyDefinition;
     }
 
     private static bool IsMarkupPropertySetter(MarkupAttributeBindingKind bindingKind)

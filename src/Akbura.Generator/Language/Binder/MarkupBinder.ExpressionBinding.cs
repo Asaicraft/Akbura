@@ -34,7 +34,7 @@ internal sealed partial class MarkupBinder
             diagnostics.Add(new AkburaSemanticDiagnostic(syntax,
                 ErrorCodes.AKBURA_SEMANTIC_ExpressionBindingUnsupportedTarget, [reason]));
         if (property != null)
-            AkburaSemanticModel.AddDuplicateMarkupPropertySetterDiagnostics(attribute, property, bindingKind, diagnostics);
+            SemanticModel.AddDuplicateMarkupPropertySetterDiagnostics(attribute, property, bindingKind, diagnostics);
 
         var raw = syntax.Expression.GetRawCSharpExpression();
         var binding = raw == null ? CSharpBindingResult.Empty :

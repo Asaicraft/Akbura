@@ -9337,12 +9337,24 @@ public class SemanticPipelineTests
     [InlineData("<TextBlock Text={mystate} Text={myotherState}/>", true)]
     [InlineData("<TextBlock Text={mystate} out:Text={myotherState}/>", false)]
     [InlineData("<TextBlock out:Text={mystate} out:Text={myotherState}/>", false)]
+    [InlineData("<ComboBox x.Name=\"ExampleSelector\" AutomationProperties.Name=\"Example\"/>", false)]
+    [InlineData("<ComboBox AutomationProperties.Name=\"Example\" x.Name=\"ExampleSelector\"/>", false)]
+    [InlineData("<ComboBox Name=\"ExampleSelector\" AutomationProperties.Name=\"Example\"/>", false)]
+    [InlineData("<ComboBox AutomationProperties.Name=\"Example\" Name=\"ExampleSelector\"/>", false)]
+    [InlineData("<ComboBox x.Name=\"ExampleSelector\" Name=\"Example\"/>", true)]
+    [InlineData("<ComboBox AutomationProperties.Name=\"Example\" Avalonia.Automation.AutomationProperties.Name=\"File\"/>", true)]
+    [InlineData("<ComboBox AutomationProperties.NameProperty=\"Example\" AutomationProperties.Name=\"File\"/>", true)]
+    [InlineData("<ComboBox AutomationProperties.Name=\"Example\" AutomationProperties.NameProperty=\"File\"/>", true)]
+    [InlineData("<ComboBox AutomationProperties.Name=\"Example\" OtherAutomationProperties.Name=\"File\"/>", false)]
+    [InlineData("<Border Classes=\"avalonia-card\" class=\"akcssCard\"/>", false)]
+    [InlineData("<Border class=\"akcssCard\" Classes=\"avalonia-card\"/>", false)]
     public void SemanticModel_DetectsOnlyDuplicateMarkupPropertySetters(
         string markup,
         bool expectDuplicateSetter)
     {
         var code =
             "using Avalonia.Controls;\n" +
+            "using Avalonia.Automation;\n" +
             "\n" +
             "state string mystate = \"\";\n" +
             "state string myotherState = \"\";\n" +
@@ -9350,7 +9362,16 @@ public class SemanticPipelineTests
             markup;
 
         var syntaxTree = AkburaSyntaxTree.ParseText(code);
-        var semanticModel = CreateSemanticModel(syntaxTree);
+        var semanticModel = CreateSemanticModel(syntaxTree, CreateCSharpCompilation(
+            """
+            using Avalonia;
+
+            public class OtherAutomationProperties : AvaloniaObject
+            {
+                public static readonly AttachedProperty<string> NameProperty =
+                    AvaloniaProperty.RegisterAttached<OtherAutomationProperties, AvaloniaObject, string>("Name");
+            }
+            """));
         var element = GetOnlyMarkupElement(syntaxTree);
         var attributes = element.StartTag!.Attributes;
 
@@ -9359,6 +9380,8 @@ public class SemanticPipelineTests
         var firstDiagnostics = semanticModel.GetSemanticDiagnostics(attributes[0]);
         var secondDiagnostics = semanticModel.GetSemanticDiagnostics(attributes[1]);
 
+        Assert.NotNull(semanticModel.GetSymbolInfo(attributes[0]).Symbol);
+        Assert.NotNull(semanticModel.GetSymbolInfo(attributes[1]).Symbol);
         Assert.DoesNotContain(firstDiagnostics, diagnostic =>
             diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupDuplicatePropertySetter);
 
@@ -9366,7 +9389,9 @@ public class SemanticPipelineTests
         {
             var diagnostic = Assert.Single(secondDiagnostics, diagnostic =>
                 diagnostic.Code == ErrorCodes.AKBURA_SEMANTIC_MarkupDuplicatePropertySetter);
-            Assert.Contains("Text", diagnostic.Message);
+            var property = Assert.IsAssignableFrom<Akbura.Language.Symbols.IPropertySymbol>(
+                semanticModel.GetSymbolInfo(attributes[1]).Symbol);
+            Assert.Contains(property.Name, diagnostic.Message);
         }
         else
         {

@@ -1097,7 +1097,7 @@ internal sealed partial class MarkupBinder : Binder
                     property,
                     bindingKind,
                     diagnosticsBuilder);
-                AkburaSemanticModel.AddDuplicateMarkupPropertySetterDiagnostics(
+                SemanticModel.AddDuplicateMarkupPropertySetterDiagnostics(
                     markupAttribute,
                     property,
                     bindingKind,

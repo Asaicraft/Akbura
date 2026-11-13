@@ -11,13 +11,16 @@ using System.Collections.Immutable;
 namespace Akbura.Playground;
 
 /// <summary>
-/// Compiles a component and its inline AKCSS into a preview assembly.
+/// Compiles an Akbura project into a preview assembly.
 /// </summary>
 internal sealed class PreviewCompiler
 {
     private const string PreviewAssemblyName = "Akbura.Playground.Preview";
     private static readonly CSharpParseOptions ParseOptions =
         CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+    private static readonly StringComparer FilePathComparer = OperatingSystem.IsWindows()
+        ? StringComparer.OrdinalIgnoreCase
+        : StringComparer.Ordinal;
     private static long _browserAssemblyRevision;
 
     private readonly CSharpCompilation _compilation;
@@ -31,62 +34,110 @@ internal sealed class PreviewCompiler
         string projectDirectory = "")
     {
         _rootNamespace = rootNamespace;
-        _projectDirectory = projectDirectory;
+        _projectDirectory = Path.GetFullPath(string.IsNullOrEmpty(projectDirectory) ? "." : projectDirectory);
         _compilation = CSharpCompilation.Create(
             PreviewAssemblyName,
             references: references,
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 
-    public PreviewCompilation Compile(SourceText source, string filePath, CancellationToken cancellationToken)
+    public PreviewCompilation Compile(
+        ImmutableArray<(string FilePath, SourceText Text)> sources,
+        string entryFilePath,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var previous = Volatile.Read(ref _lastSuccessfulCompilation);
-        var tree = previous != null && previous.Tree.FilePath == filePath
-            ? UpdateTree(previous.Tree, source, cancellationToken)
-            : ComponentSyntaxTree.ParseText(source, filePath, cancellationToken);
+        var entryPath = Path.GetFullPath(entryFilePath, _projectDirectory);
+        var sourceTrees = ImmutableDictionary.CreateBuilder<string, AkburaSyntaxTree>(FilePathComparer);
+        using var trees = ImmutableArrayBuilder<AkburaSyntaxTree>.Rent(sources.Length);
         using var messages = ImmutableArrayBuilder<string>.Rent();
+        var hasSyntaxErrors = false;
 
-        if (tree.GetRoot().ContainsDiagnostics)
+        foreach (var (filePath, source) in sources)
         {
-            var syntaxDiagnostics = AkburaDiagnosticEngine.Collect(tree, includeSemantic: false,
-                cancellationToken: cancellationToken);
-            if (AppendDiagnostics(syntaxDiagnostics, messages))
+            cancellationToken.ThrowIfCancellationRequested();
+            var path = Path.GetFullPath(filePath, _projectDirectory);
+            var extension = Path.GetExtension(path);
+            var isAkcss = extension.Equals(".akcss", StringComparison.OrdinalIgnoreCase);
+            if (!isAkcss && !extension.Equals(".akbura", StringComparison.OrdinalIgnoreCase))
             {
-                return new PreviewCompilation(messages.ToImmutable());
+                return new PreviewCompilation([$"'{filePath}' must be an .akbura or .akcss file."]);
+            }
+            if (sourceTrees.ContainsKey(path))
+            {
+                return new PreviewCompilation([$"The preview project contains '{filePath}' more than once."]);
             }
 
-            messages.Clear();
+            var tree = previous != null && previous.Trees.TryGetValue(path, out var oldTree)
+                ? UpdateTree(oldTree, source, cancellationToken)
+                : ParseTree(source, path, isAkcss, cancellationToken);
+            trees.Add(tree);
+            sourceTrees.Add(path, tree);
+            if (tree.GetRootSyntax().ContainsDiagnostics)
+            {
+                var syntaxDiagnostics = AkburaDiagnosticEngine.Collect(tree, includeSemantic: false,
+                    cancellationToken: cancellationToken);
+                hasSyntaxErrors |= AppendDiagnostics(syntaxDiagnostics, messages);
+            }
         }
 
+        if (hasSyntaxErrors)
+        {
+            return new PreviewCompilation(messages.ToImmutable());
+        }
+        if (!sourceTrees.TryGetValue(entryPath, out var entryTree) || entryTree is not ComponentSyntaxTree ||
+            GlobalUsings.IsComponentFile(entryTree))
+        {
+            return new PreviewCompilation([$"'{entryFilePath}' must name a component in the preview project."]);
+        }
+
+        messages.Clear();
         var catalog = AkburaGenerationCatalogBuilder.Create(
-            _compilation, [tree], _rootNamespace, _projectDirectory, previous?.Compilation, cancellationToken);
-        var model = catalog.Compilation.GetSemanticModel(tree);
-        var diagnostics = AkburaDiagnosticEngine.Collect(tree, model, cancellationToken: cancellationToken);
-        if (AppendDiagnostics(diagnostics, messages))
+            _compilation, trees.ToImmutable(), _rootNamespace, _projectDirectory, previous?.Compilation, cancellationToken);
+
+        using var diagnosticRecords = ImmutableArrayBuilder<AkburaDiagnosticRecord>.Rent();
+        foreach (var tree in trees.WrittenSpan)
+        {
+            var model = GlobalUsings.IsComponentFile(tree) || GlobalUsings.IsAkcssFile(tree)
+                ? null
+                : catalog.Compilation.GetSemanticModel(tree);
+            var diagnostics = AkburaDiagnosticEngine.Collect(tree, model, cancellationToken: cancellationToken);
+            diagnosticRecords.AddRange(diagnostics.AsSpan());
+        }
+        if (diagnosticRecords.Count > 0 &&
+            AppendDiagnostics(AkburaDiagnosticCollection.Deduplicate(diagnosticRecords.AsEnumerable()), messages))
         {
             return new PreviewCompilation(messages.ToImmutable());
         }
 
-        if (catalog.Components.Length != 1)
+        var generatedFileCount = catalog.Components.Length + catalog.ExternalAkcssModules.Length + catalog.InlineAkcssModules.Length;
+        using var generatedTrees = ImmutableArrayBuilder<SyntaxTree>.Rent(generatedFileCount);
+        string? componentTypeName = null;
+        foreach (var input in catalog.Components)
         {
-            messages.Add("The preview needs one Akbura component.");
+            var componentSource = ComponentDocumentWriter.Generate(input.Component, input.SemanticModel,
+                input.SourcePath, catalog.AkcssModuleTypeNames, cancellationToken);
+            generatedTrees.Add(CSharpSyntaxTree.ParseText(componentSource, ParseOptions,
+                ComponentDocumentWriter.GetHintName(input.Component, input.SourcePath), cancellationToken));
+            if (ReferenceEquals(input.SemanticModel.SyntaxTree, entryTree))
+            {
+                componentTypeName = input.Component.MetadataName;
+            }
+        }
+        if (componentTypeName == null)
+        {
+            messages.Add($"The preview could not find the component declared in '{entryFilePath}'.");
             return new PreviewCompilation(messages.ToImmutable());
         }
 
-        var input = catalog.Components[0];
-        var componentSource = ComponentDocumentWriter.Generate(input.Component, input.SemanticModel,
-            input.SourcePath, catalog.AkcssModuleTypeNames, cancellationToken);
-
-        using var generatedTrees = ImmutableArrayBuilder<SyntaxTree>.Rent(1 + catalog.InlineAkcssModules.Length);
-        generatedTrees.Add(CSharpSyntaxTree.ParseText(componentSource, ParseOptions,
-            ComponentDocumentWriter.GetHintName(input.Component, input.SourcePath), cancellationToken));
+        foreach (var module in catalog.ExternalAkcssModules)
+        {
+            generatedTrees.Add(GenerateAkcss(module, catalog, cancellationToken));
+        }
         foreach (var module in catalog.InlineAkcssModules)
         {
-            var moduleSource = AkcssDocumentWriter.Generate(module, catalog.AkcssSourceMap, catalog.RootNamespace,
-                cancellationToken);
-            generatedTrees.Add(CSharpSyntaxTree.ParseText(moduleSource, ParseOptions,
-                AkcssDocumentWriter.GetHintName(module), cancellationToken));
+            generatedTrees.Add(GenerateAkcss(module, catalog, cancellationToken));
         }
 
         var compilation = _compilation.AddSyntaxTrees(generatedTrees.ToImmutable());
@@ -111,14 +162,38 @@ internal sealed class PreviewCompiler
             return new PreviewCompilation(results);
         }
 
-        var preview = new PreviewCompilation(results, image.ToArray(), input.Component.MetadataName);
+        var preview = new PreviewCompilation(results, image.ToArray(), componentTypeName);
         cancellationToken.ThrowIfCancellationRequested();
         // A concurrent compile may have already replaced the snapshot we started from.
-        Interlocked.CompareExchange(ref _lastSuccessfulCompilation, new CompilationSnapshot(tree, catalog.Compilation), previous);
+        var snapshot = new CompilationSnapshot(sourceTrees.ToImmutable(), catalog.Compilation);
+        Interlocked.CompareExchange(ref _lastSuccessfulCompilation, snapshot, previous);
         return preview;
     }
 
-    private static ComponentSyntaxTree UpdateTree(ComponentSyntaxTree previous, SourceText source, CancellationToken cancellationToken)
+    private AkburaSyntaxTree ParseTree(SourceText source, string path, bool isAkcss, CancellationToken cancellationToken)
+    {
+        if (!isAkcss)
+        {
+            return ComponentSyntaxTree.ParseText(source, path, cancellationToken);
+        }
+
+        var sourcePath = Path.GetRelativePath(_projectDirectory, path);
+        if (Path.IsPathRooted(sourcePath) || sourcePath.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+        {
+            sourcePath = Path.GetFileName(path);
+        }
+        var logicalName = AkcssGeneratedModuleNames.GetMetadataName(_rootNamespace, sourcePath);
+        return AkcssSyntaxTree.ParseText(source, path, logicalName, cancellationToken);
+    }
+
+    private static SyntaxTree GenerateAkcss(AkcssGenerationInput module, AkburaGenerationCatalog catalog,
+        CancellationToken cancellationToken)
+    {
+        var moduleSource = AkcssDocumentWriter.Generate(module, catalog.AkcssSourceMap, catalog.RootNamespace, cancellationToken);
+        return CSharpSyntaxTree.ParseText(moduleSource, ParseOptions, AkcssDocumentWriter.GetHintName(module), cancellationToken);
+    }
+
+    private static AkburaSyntaxTree UpdateTree(AkburaSyntaxTree previous, SourceText source, CancellationToken cancellationToken)
     {
         var oldText = previous.Text.ToString().AsSpan();
         var newText = source.ToString().AsSpan();
@@ -139,7 +214,12 @@ internal sealed class PreviewCompiler
         }
 
         var change = new TextChangeRange(TextSpan.FromBounds(start, oldEnd), newEnd - start);
-        return previous.WithChangedText(source, [change], cancellationToken);
+        return previous switch
+        {
+            ComponentSyntaxTree component => component.WithChangedText(source, [change], cancellationToken),
+            AkcssSyntaxTree akcss => akcss.WithChangedText(source, [change], cancellationToken),
+            _ => throw new InvalidOperationException("Unsupported preview syntax tree."),
+        };
     }
 
     private static bool AppendDiagnostics(
@@ -162,5 +242,5 @@ internal sealed class PreviewCompiler
         return hasErrors;
     }
 
-    private sealed record CompilationSnapshot(ComponentSyntaxTree Tree, AkburaCompilation Compilation);
+    private sealed record CompilationSnapshot(ImmutableDictionary<string, AkburaSyntaxTree> Trees, AkburaCompilation Compilation);
 }

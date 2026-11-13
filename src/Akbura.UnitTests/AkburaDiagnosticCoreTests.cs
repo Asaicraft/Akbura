@@ -203,6 +203,66 @@ public sealed class AkburaDiagnosticCoreTests
     }
 
     [Fact]
+    public void SemanticCollector_ReportsNoErrorsAfterInsertingHyphenatedInlineUtilities()
+    {
+        const string code =
+            """
+            using Avalonia.Controls;
+
+            @akcss {
+                @using Avalonia;
+                @using Avalonia.Controls;
+                @using Avalonia.Layout;
+
+                @utilities {
+                }
+            }
+
+            <Border border-b-1 border-t-2>
+                <ContentControl content-stretch>
+                    <TextBlock self-y-center />
+                </ContentControl>
+            </Border>
+            """;
+        const string utilities =
+            """
+                    Border.border-b-(double width) {
+                        BorderThickness: new Thickness(0, 0, 0, width);
+                    }
+
+                    Border.border-t-(double width) {
+                        BorderThickness: new Thickness(0, width, 0, 0);
+                    }
+
+                    TextBlock.self-y-center {
+                        VerticalAlignment: VerticalAlignment.Center;
+                    }
+
+                    ContentControl.content-stretch {
+                        HorizontalContentAlignment: HorizontalAlignment.Stretch;
+                        VerticalContentAlignment: VerticalAlignment.Stretch;
+                    }
+
+            """;
+        var position = code.IndexOf("    }", StringComparison.Ordinal);
+        var previous = ComponentSyntaxTree.ParseText(code, "View.akbura");
+        var text = previous.Text.WithChanges(new TextChange(new TextSpan(position, 0), utilities));
+        var updated = previous.WithChangedText(text);
+        var full = ComponentSyntaxTree.ParseText(text, "View.akbura");
+        var references = CreateCompilation();
+
+        AssertNoErrors(full);
+        AssertNoErrors(updated);
+
+        void AssertNoErrors(ComponentSyntaxTree tree)
+        {
+            var model = new AkburaCompilation(references, [tree], "Demo").GetSemanticModel(tree);
+            var diagnostics = AkburaDiagnosticEngine.Collect(tree, model);
+            Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Severity == AkburaDiagnosticSeverity.Error);
+        }
+    }
+
+    [Fact]
     public void ImportedSemanticDiagnostic_UsesOwningFileAndItsCrLfUnicodeLineMap()
     {
         var component = ComponentSyntaxTree.ParseText(SourceText.From("<object />"), "View.akbura");

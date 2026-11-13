@@ -615,7 +615,7 @@ internal sealed partial class Parser
     {
         var (openParen, targetType, closeParen) = ParseIncrementalAkcssOptionalSelectorTarget();
         var dotToken = ReadRequiredIncrementalToken(SyntaxKind.DotToken);
-        var name = ParseIncrementalAkcssSimpleName();
+        var name = ParseAkcssUtilityName(incremental: true);
         return (openParen, targetType, closeParen, dotToken, name);
     }
 

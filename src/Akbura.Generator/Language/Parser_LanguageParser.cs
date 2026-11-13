@@ -741,11 +741,15 @@ partial class Parser
         return GreenSyntaxFactory.IdentifierName(ParseIdentifierToken());
     }
 
-    private GreenIdentifierNameSyntax ParseAkcssUtilityName()
+    private GreenIdentifierNameSyntax ParseAkcssUtilityName(bool incremental = false)
     {
-        var first = IsAkcssNameToken(CurrentToken)
-            ? EatMarkupNameTokenAsIdentifier()
+        var first = IsAkcssNameToken(Peek())
+            ? Read()
             : ParseIdentifierToken();
+        if (first.Kind != SyntaxKind.IdentifierToken)
+        {
+            first = ConvertToIdentifier(first);
+        }
         if (first.ContainsDiagnostics)
         {
             return GreenSyntaxFactory.IdentifierName(first);
@@ -754,30 +758,35 @@ partial class Parser
         PooledStringBuilder? pooledText = null;
         StringBuilder? text = null;
         var last = first;
-        while (CurrentToken.Kind == SyntaxKind.MinusToken &&
-            PeekToken(1).Kind != SyntaxKind.OpenParenToken &&
-            IsAkcssUtilityNamePartToken(PeekToken(1)) &&
-            !CurrentToken.ContainsDiagnostics &&
-            !PeekToken(1).ContainsDiagnostics &&
-            AreAdjacent(last, CurrentToken) &&
-            AreAdjacent(CurrentToken, PeekToken(1)))
+        var next = Peek();
+        while (next.Kind == SyntaxKind.MinusToken &&
+            !next.ContainsDiagnostics &&
+            AreAdjacent(last, next))
         {
+            var part = Peek(1);
+            if (!IsAkcssUtilityNamePartToken(part) || part.ContainsDiagnostics || !AreAdjacent(next, part))
+            {
+                break;
+            }
+
             if (text == null)
             {
                 pooledText = PooledStringBuilder.GetInstance();
                 text = pooledText.Builder;
                 text.Append(first.Text);
             }
-            text.Append(EatToken(SyntaxKind.MinusToken).Text);
+            text.Append(Read().Text);
 
-            last = EatToken();
+            last = Read();
             text.Append(last.Text);
-            while (IsAkcssUtilityNamePartToken(CurrentToken) &&
-                !CurrentToken.ContainsDiagnostics &&
-                AreAdjacent(last, CurrentToken))
+            next = Peek();
+            while (IsAkcssUtilityNamePartToken(next) &&
+                !next.ContainsDiagnostics &&
+                AreAdjacent(last, next))
             {
-                last = EatToken();
+                last = Read();
                 text.Append(last.Text);
+                next = Peek();
             }
         }
 
@@ -793,6 +802,9 @@ partial class Parser
             value,
             value,
             last.TrailingTrivia.Node));
+
+        GreenSyntaxToken Peek(int offset = 0) => incremental ? PeekIncrementalToken(offset) : PeekToken(offset);
+        GreenSyntaxToken Read() => incremental ? ReadIncrementalToken() : EatToken();
     }
 
     private static bool IsAkcssUtilityNamePartToken(GreenSyntaxToken token)

@@ -281,6 +281,54 @@ public sealed class AkcssIncrementalParserTests
         Assert.Equal(code, syntax.ToFullString());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void InsertHyphenatedUtilityDeclarations_ReusesSiblingsAndMatchesFullParse(bool standalone)
+    {
+        const string oldCode =
+            """
+            @akcss {
+                @utilities {
+                    Border.border-t-(double width) { BorderThickness: new Thickness(0, width, 0, 0); }
+                    Grid.gap-(double size) { ColumnSpacing: size; }
+                }
+            }
+            """;
+        const string inserted =
+            "        Border.border-b-(double width) { BorderThickness: new Thickness(0, 0, 0, width); }\n" +
+            "        TextBlock.self-y-center { VerticalAlignment: VerticalAlignment.Center; }\n" +
+            "        TextBlock.text-2xl { FontSize: 24; }\n";
+        var source = standalone ? oldCode["@akcss {".Length..oldCode.LastIndexOf('}')] : oldCode;
+        var position = source.IndexOf("        Grid.gap", StringComparison.Ordinal);
+        var newCode = source.Insert(position, inserted);
+        var change = new TextChangeRange(new TextSpan(position, 0), inserted.Length);
+        var oldTree = standalone ? (AkburaSyntaxTree)AkcssSyntaxTree.ParseText(source) : ComponentSyntaxTree.ParseText(source);
+        var fullTree = standalone ? (AkburaSyntaxTree)AkcssSyntaxTree.ParseText(newCode) : ComponentSyntaxTree.ParseText(newCode);
+        var incrementalTree = oldTree is AkcssSyntaxTree stylesheet
+            ? (AkburaSyntaxTree)stylesheet.WithChangedText(newCode, [change])
+            : ((ComponentSyntaxTree)oldTree).WithChangedText(newCode, [change]);
+        var oldSection = GetUtilitiesSection(oldTree);
+        var newSection = GetUtilitiesSection(incrementalTree);
+        var fullSection = GetUtilitiesSection(fullTree);
+
+        Assert.False(incrementalTree.GetRootSyntax().ContainsDiagnostics, FormatDiagnostics(incrementalTree.GetRootSyntax()));
+        Assert.Equal(newCode, incrementalTree.GetRootSyntax().ToFullString());
+        Assert.Equal(5, newSection.Utilities.Count);
+        Assert.Same(oldSection.Utilities[0].Green, newSection.Utilities[0].Green);
+        Assert.Same(oldSection.Utilities[1].Green, newSection.Utilities[4].Green);
+        for (var index = 0; index < newSection.Utilities.Count; index++)
+        {
+            var actual = newSection.Utilities[index]!.Selector;
+            var expected = fullSection.Utilities[index]!.Selector;
+            Assert.Equal(expected.Name.Identifier.ValueText, actual.Name.Identifier.ValueText);
+            Assert.Equal(expected.Parameters.Count, actual.Parameters.Count);
+        }
+
+        static AkcssUtilitiesSectionSyntax GetUtilitiesSection(AkburaSyntaxTree tree) =>
+            Assert.Single(tree.GetRootSyntax().DescendantNodes().OfType<AkcssUtilitiesSectionSyntax>());
+    }
+
     [Fact]
     public void StyleRuleAssignmentEdit_ReusesSiblingBodyMembersAndRules()
     {

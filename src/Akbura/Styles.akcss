@@ -5220,6 +5220,58 @@
 		AkburaControl.ExplicitBottomBorderThickness: width;
 	}
 
+	Border.border-x {
+		AkburaControl.ExplicitLeftBorderThickness: 1d;
+		AkburaControl.ExplicitRightBorderThickness: 1d;
+	}
+
+	Border.border-x-(double width) {
+		AkburaControl.ExplicitLeftBorderThickness: width;
+		AkburaControl.ExplicitRightBorderThickness: width;
+	}
+
+	Border.border-y {
+		AkburaControl.ExplicitTopBorderThickness: 1d;
+		AkburaControl.ExplicitBottomBorderThickness: 1d;
+	}
+
+	Border.border-y-(double width) {
+		AkburaControl.ExplicitTopBorderThickness: width;
+		AkburaControl.ExplicitBottomBorderThickness: width;
+	}
+
+	Border.border-t {
+		AkburaControl.ExplicitTopBorderThickness: 1d;
+	}
+
+	Border.border-t-(double width) {
+		AkburaControl.ExplicitTopBorderThickness: width;
+	}
+
+	Border.border-r {
+		AkburaControl.ExplicitRightBorderThickness: 1d;
+	}
+
+	Border.border-r-(double width) {
+		AkburaControl.ExplicitRightBorderThickness: width;
+	}
+
+	Border.border-b {
+		AkburaControl.ExplicitBottomBorderThickness: 1d;
+	}
+
+	Border.border-b-(double width) {
+		AkburaControl.ExplicitBottomBorderThickness: width;
+	}
+
+	Border.border-l {
+		AkburaControl.ExplicitLeftBorderThickness: 1d;
+	}
+
+	Border.border-l-(double width) {
+		AkburaControl.ExplicitLeftBorderThickness: width;
+	}
+
 	Border.border-(string color)-(int shade) {
 		BorderBrush: Amx.DynamicResource<IBrush>("--color-" + color + "-" + shade);
 	}
@@ -6431,6 +6483,58 @@
 		AkburaControl.ExplicitTopBorderThickness: width;
 		AkburaControl.ExplicitRightBorderThickness: width;
 		AkburaControl.ExplicitBottomBorderThickness: width;
+	}
+
+	TemplatedControl.border-x {
+		AkburaControl.ExplicitLeftBorderThickness: 1d;
+		AkburaControl.ExplicitRightBorderThickness: 1d;
+	}
+
+	TemplatedControl.border-x-(double width) {
+		AkburaControl.ExplicitLeftBorderThickness: width;
+		AkburaControl.ExplicitRightBorderThickness: width;
+	}
+
+	TemplatedControl.border-y {
+		AkburaControl.ExplicitTopBorderThickness: 1d;
+		AkburaControl.ExplicitBottomBorderThickness: 1d;
+	}
+
+	TemplatedControl.border-y-(double width) {
+		AkburaControl.ExplicitTopBorderThickness: width;
+		AkburaControl.ExplicitBottomBorderThickness: width;
+	}
+
+	TemplatedControl.border-t {
+		AkburaControl.ExplicitTopBorderThickness: 1d;
+	}
+
+	TemplatedControl.border-t-(double width) {
+		AkburaControl.ExplicitTopBorderThickness: width;
+	}
+
+	TemplatedControl.border-r {
+		AkburaControl.ExplicitRightBorderThickness: 1d;
+	}
+
+	TemplatedControl.border-r-(double width) {
+		AkburaControl.ExplicitRightBorderThickness: width;
+	}
+
+	TemplatedControl.border-b {
+		AkburaControl.ExplicitBottomBorderThickness: 1d;
+	}
+
+	TemplatedControl.border-b-(double width) {
+		AkburaControl.ExplicitBottomBorderThickness: width;
+	}
+
+	TemplatedControl.border-l {
+		AkburaControl.ExplicitLeftBorderThickness: 1d;
+	}
+
+	TemplatedControl.border-l-(double width) {
+		AkburaControl.ExplicitLeftBorderThickness: width;
 	}
 
 	TemplatedControl.border-(string color)-(int shade) {

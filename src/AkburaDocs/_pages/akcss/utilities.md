@@ -589,7 +589,7 @@ Common categories include:
 | Opacity | `opacity-50`, `opacity-100` |
 | Colors | `bg-blue-500`, `text-white` |
 | Typography | `text-lg`, `font-bold`, `text-center` |
-| Borders | `border-1`, `border-slate-300` |
+| Borders | `border-1`, `border-t`, `border-b-2`, `border-x-4`, `border-slate-300` |
 | Radius | `rounded-md`, `rounded-full` |
 | Shadows | `shadow`, `shadow-lg`, `shadow-2xl` |
 
@@ -597,6 +597,7 @@ Utilities are type-aware. For example:
 
 - `gap-4` works differently for `StackPanel` and `Grid`.
 - `rounded-md` is available for controls supporting `CornerRadius`.
+- `border-t`, `border-r`, `border-b`, and `border-l` set one edge on `Border` and `TemplatedControl`. `border-x` sets left and right, and `border-y` sets top and bottom. Each defaults to 1 DIP and also accepts a numeric suffix in DIP.
 - `text-center` is available for text controls.
 - `bg-blue-500` is resolved for controls supporting `Background`.
 

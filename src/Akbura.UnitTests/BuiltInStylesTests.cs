@@ -1,4 +1,5 @@
 using Akbura.Language;
+using Akbura.Language.CodeGeneration;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -6,7 +7,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using System.Reflection;
 
 namespace Akbura.UnitTests;
 
@@ -142,6 +145,69 @@ public sealed class BuiltInStylesTests
         Assert.Equal("5", Assert.Single(operations["gap-x-5"].Arguments).Text);
         Assert.Equal("Row.gap-y", operations["gap-y-7"].Utility?.MetadataName);
         Assert.Equal("7", Assert.Single(operations["gap-y-7"].Arguments).Text);
+    }
+
+    [Theory]
+    [InlineData("Border", "Border")]
+    [InlineData("Button", "TemplatedControl")]
+    public async Task StylesAkcss_AppliesBorderWidthsToTheirOwnSides(string control, string owner)
+    {
+        var component =
+            $$"""
+            using Avalonia.Controls;
+            using Akbura.Styles.akcss;
+
+            <StackPanel>
+                <{{control}} BorderThickness="5,6,7,8" border-b />
+                <{{control}} border-x-2 border-y />
+                <{{control}} border-1 border-x-2 border-y-4 border-t-0 border-r-3 border-b-6 border-l-5 />
+            </StackPanel>
+            """;
+        var compilation = CreateCSharpCompilation().WithOptions(
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(
+                """
+                public partial class BorderWidths
+                {
+                    public BorderWidths() : base(global::Akbura.Engine.AkburaEngine.Empty)
+                    {
+                        InitializeIfNeeded();
+                    }
+                }
+                """));
+        var tree = AkburaSyntaxTree.ParseText(component, "BorderWidths.akbura");
+        var catalog = AkburaGenerationCatalogBuilder.Create(compilation, [tree], "", "");
+        var input = Assert.Single(catalog.Components);
+        var attributes = tree.GetRoot().DescendantNodes().OfType<TailwindAttributeSyntax>();
+        foreach (var attribute in attributes)
+        {
+            var operation = Assert.IsAssignableFrom<ITailwindUtilityAttributeOperation>(
+                input.SemanticModel.GetOperation(attribute));
+            Assert.False(operation.HasErrors, attribute.ToFullString());
+            Assert.Equal($"{owner}.{operation.UtilityName}", operation.Utility?.MetadataName);
+        }
+
+        var source = ComponentDocumentWriter.Generate(
+            input.Component, input.SemanticModel, input.SourcePath, catalog.AkcssModuleTypeNames, CancellationToken.None);
+        using var image = new MemoryStream();
+        var emit = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(source)).Emit(image);
+        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+        var assembly = Assembly.Load(image.ToArray());
+        var componentType = assembly.GetType(input.Component.MetadataName, throwOnError: true)!;
+
+        await AvaloniaHeadlessTestSession.GetSession().Dispatch(() =>
+        {
+            var view = Assert.IsAssignableFrom<AkburaControl>(Activator.CreateInstance(componentType));
+            var panel = Assert.IsType<StackPanel>(view.Child);
+            Assert.Equal(new Thickness(5, 6, 7, 1), GetThickness(panel.Children[0]));
+            Assert.Equal(new Thickness(2, 1, 2, 1), GetThickness(panel.Children[1]));
+            Assert.Equal(new Thickness(5, 0, 3, 6), GetThickness(panel.Children[2]));
+            return true;
+        }, CancellationToken.None);
+
+        static Thickness GetThickness(Control control) => control is Border border
+            ? border.BorderThickness
+            : Assert.IsType<Button>(control).BorderThickness;
     }
 
     private static void AssertStaticUtility(

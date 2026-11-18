@@ -4,6 +4,8 @@ using Akbura.Workspaces.Completion;
 using Akbura.Workspaces.Documents;
 using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.Input;
+using Avalonia.Threading;
 using Microsoft.CodeAnalysis.Text;
 using Xunit.Abstractions;
 
@@ -11,6 +13,52 @@ namespace Akbura.AvaloniaEdit.UnitTests;
 
 public sealed class AutomaticCompletionRoutingTests(ITestOutputHelper output)
 {
+    [Fact]
+    public Task DelayedAutomaticCompletionCoalescesInputAndCanBeInvokedImmediately() => EditorTestHost.Run(async () =>
+    {
+#if DEBUG
+        var performance = new EditorPerformance();
+#endif
+        using var host = new Host("using Avalonia.Controls;\n<Button W| />", options: new()
+        {
+            Scheduler = new AkburaInlineScheduler(),
+            AnalysisDelay = TimeSpan.FromHours(1),
+            AutomaticCompletionDelay = TimeSpan.FromMilliseconds(500),
+#if DEBUG
+            Performance = performance,
+#endif
+        });
+        await host.Session.Ready;
+#if DEBUG
+        performance.Reset();
+#endif
+        host.Editor.TextArea.PerformTextInput("i");
+        var first = host.Session.CompletionIdle;
+        await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
+        Assert.False(first.IsCompleted);
+        host.Editor.TextArea.PerformTextInput("d");
+        Assert.True(first.IsCompleted);
+        await host.Session.CompletionIdle;
+        Assert.Contains(host.Session.Completions, item => item.DisplayText == "Width");
+#if DEBUG
+        Assert.Equal(1, performance.CountOf("CompletionProvider"));
+#endif
+
+        host.Editor.TextArea.PerformTextInput("t");
+        var pending = host.Session.CompletionIdle;
+        var explicitRequest = host.Session.RequestCompletionAsync();
+        Assert.True(pending.IsCompleted);
+        await explicitRequest;
+        Assert.Contains(host.Session.Completions, item => item.DisplayText == "Width");
+
+        host.Editor.TextArea.PerformTextInput("h");
+        pending = host.Session.CompletionIdle;
+        host.Window.KeyPressQwerty(PhysicalKey.Escape, Avalonia.Input.RawInputModifiers.None);
+        Assert.True(pending.IsCompleted);
+        Assert.Null(host.Session.CompletionPopup);
+        Assert.Contains("Width", host.Editor.Text);
+    });
+
     [Theory]
     [InlineData("Rejected.akcss", "// ordinary comment |")]
     [InlineData("Rejected.akbura", "@akcss {\n// ordinary comment |\n}\n<Button />")]

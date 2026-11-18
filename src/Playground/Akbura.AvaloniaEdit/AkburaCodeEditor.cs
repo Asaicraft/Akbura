@@ -51,7 +51,9 @@ public class AkburaCodeEditor : global::AvaloniaEdit.TextEditor
 
         options ??= new AkburaEditorOptions();
         ArgumentNullException.ThrowIfNull(options.Scheduler);
-        if (options.AnalysisDelay < TimeSpan.Zero || options.HoverDelay < TimeSpan.Zero)
+        if (options.AnalysisDelay < TimeSpan.Zero || options.HoverDelay < TimeSpan.Zero ||
+            options.AutomaticCompletionDelay < TimeSpan.Zero ||
+            options.AutomaticCompletionDelay.TotalMilliseconds > int.MaxValue)
         {
             throw new ArgumentOutOfRangeException(nameof(options));
         }

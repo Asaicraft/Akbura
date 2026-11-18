@@ -16,10 +16,13 @@ namespace Akbura.Playground;
 public sealed partial class PlaygroundView : AkburaControl
 {
     private static readonly TimeSpan PreviewDelay = TimeSpan.FromMilliseconds(350);
+    private static readonly TimeSpan BrowserAutomaticCompletionDelay = TimeSpan.FromMilliseconds(180);
 
     private readonly Func<AkburaReferenceSet>? _prepareReferences;
     private readonly IAkburaEditorScheduler _scheduler;
     private readonly ImmutableArray<PlaygroundExample> _examples;
+    private readonly SemaphoreSlim _previewCompilationGate = new(1, 1);
+    private readonly DispatcherTimer _previewTimer = new(PreviewDelay, DispatcherPriority.Background, Dispatcher.UIThread);
     private ImmutableArray<AkburaProjectId> _projectIds;
     private CancellationTokenSource? _lifetime;
     private CancellationTokenSource? _bindingRequest;
@@ -28,7 +31,9 @@ public sealed partial class PlaygroundView : AkburaControl
     private AkburaEditorSession? _editorSession;
     private PreviewCompiler? _compiler;
     private PreviewInstance? _preview;
+    private bool _previewRequested;
     private PlaygroundFile? _activeFile;
+    private bool _activeFileDirty;
 
     public PlaygroundView() : this(null, null)
     {
@@ -51,6 +56,7 @@ public sealed partial class PlaygroundView : AkburaControl
         ExampleSelector.SelectionChanged += ExampleChanged;
         ExampleSelector.SelectedIndex = 0;
         SourceEditor.TextChanged += SourceChanged;
+        _previewTimer.Tick += PreviewTimerTick;
     }
 
     protected override void OnLoaded(RoutedEventArgs e)
@@ -82,8 +88,7 @@ public sealed partial class PlaygroundView : AkburaControl
             _compiler = compiler;
             if (ExampleSelector.SelectedItem is PlaygroundExample example && _activeFile is { } file)
             {
-                _ = BindFileAsync(workspace, _projectIds[ExampleSelector.SelectedIndex], example, file, token);
-                await RefreshPreviewAsync(compiler, example, TimeSpan.Zero, token);
+                await BindFileAsync(workspace, _projectIds[ExampleSelector.SelectedIndex], example, file, token);
             }
         }
         catch (Exception error)
@@ -140,24 +145,43 @@ public sealed partial class PlaygroundView : AkburaControl
             return;
         }
 
-        FileSelector.ItemsSource = example.Files;
-        FileSelector.SelectedItem = example.EntryFile;
-        if (_compiler is { } compiler && _lifetime is { } lifetime)
+        _previewTimer.Stop();
+        _previewRequest?.Cancel();
+        _previewRequested = false;
+        ClearPreview();
+        ShowDiagnostics([]);
+        if (_compiler != null)
         {
-            ClearPreview();
-            ShowDiagnostics([]);
-            _ = RefreshPreviewAsync(compiler, example, TimeSpan.Zero, lifetime.Token);
+            PreviewStatus.Text = "Preparing editor…";
         }
+        FileSelector.SelectionChanged -= FileChanged;
+        try
+        {
+            FileSelector.ItemsSource = example.Files;
+            FileSelector.SelectedItem = example.EntryFile;
+        }
+        finally
+        {
+            FileSelector.SelectionChanged += FileChanged;
+        }
+        SelectFile(example, example.EntryFile);
     }
 
     private void FileChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (FileSelector.SelectedItem is not PlaygroundFile file || ReferenceEquals(file, _activeFile) ||
-            ExampleSelector.SelectedItem is not PlaygroundExample example)
+        if (FileSelector.SelectedItem is PlaygroundFile file && ExampleSelector.SelectedItem is PlaygroundExample example)
+        {
+            SelectFile(example, file);
+        }
+    }
+
+    private void SelectFile(PlaygroundExample example, PlaygroundFile file)
+    {
+        if (ReferenceEquals(file, _activeFile))
         {
             return;
         }
-
+        SaveActiveFile();
         _bindingRequest?.Cancel();
         _editorSession?.Dispose();
         _editorSession = null;
@@ -196,9 +220,19 @@ public sealed partial class PlaygroundView : AkburaControl
             }, token);
             token.ThrowIfCancellationRequested();
 
-            _editorSession = SourceEditor.Bind(workspace, projectId, PlaygroundFile.GetDocumentUri(file.FilePath),
-                new() { Scheduler = _scheduler });
+            _editorSession = SourceEditor.Bind(workspace, projectId, PlaygroundFile.GetDocumentUri(file.FilePath), new()
+            {
+                Scheduler = _scheduler,
+                AutomaticCompletionDelay = OperatingSystem.IsBrowser() ? BrowserAutomaticCompletionDelay : TimeSpan.Zero,
+            });
             SourceEditor.IsReadOnly = false;
+            if (_compiler is { } compiler && !_previewRequested)
+            {
+                // Once a preview is visible, the associated document already accepts input.
+                SourceEditor.TextArea.Focus();
+                _previewRequested = true;
+                _ = RefreshPreviewAsync(compiler, example, lifetime);
+            }
         }
         catch (Exception error)
         {
@@ -223,15 +257,37 @@ public sealed partial class PlaygroundView : AkburaControl
             return;
         }
 
-        _activeFile.Text = SourceText.From(SourceEditor.Text);
-        if (_compiler is { } compiler && _lifetime is { } lifetime &&
-            ExampleSelector.SelectedItem is PlaygroundExample example)
+        _activeFileDirty = true;
+        _previewRequest?.Cancel();
+        if (!_previewTimer.IsEnabled)
         {
-            _ = RefreshPreviewAsync(compiler, example, PreviewDelay, lifetime.Token);
+            PreviewStatus.Text = "Pending…";
+        }
+
+        _previewTimer.Stop();
+        _previewTimer.Start();
+    }
+
+    private void SaveActiveFile()
+    {
+        if (_activeFileDirty && _activeFile is { } file)
+        {
+            file.Text = SourceText.From(SourceEditor.Text);
+            _activeFileDirty = false;
         }
     }
 
-    private async Task RefreshPreviewAsync(PreviewCompiler compiler, PlaygroundExample example, TimeSpan delay, CancellationToken lifetime)
+    private void PreviewTimerTick(object? sender, EventArgs e)
+    {
+        _previewTimer.Stop();
+        if (_compiler is { } compiler && _lifetime is { } lifetime &&
+            ExampleSelector.SelectedItem is PlaygroundExample example)
+        {
+            _ = RefreshPreviewAsync(compiler, example, lifetime.Token);
+        }
+    }
+
+    private async Task RefreshPreviewAsync(PreviewCompiler compiler, PlaygroundExample example, CancellationToken lifetime)
     {
         _previewRequest?.Cancel();
         using var request = CancellationTokenSource.CreateLinkedTokenSource(lifetime);
@@ -239,17 +295,25 @@ public sealed partial class PlaygroundView : AkburaControl
         var token = request.Token;
         try
         {
-            var sources = example.GetSources();
-            if (delay > TimeSpan.Zero)
+            PreviewCompilation result;
+            // Give a canceled compiler time to finish before starting the next revision.
+            await _previewCompilationGate.WaitAsync(token);
+            try
             {
-                PreviewStatus.Text = "Pending…";
-                await Task.Delay(delay, token);
+                token.ThrowIfCancellationRequested();
+                PreviewStatus.Text = "Compiling…";
+                await YieldBeforeInlineWorkAsync(token);
+                token.ThrowIfCancellationRequested();
+                SaveActiveFile();
+                var sources = example.GetSources();
+                result = await _scheduler.RunAsync(cancellation => Task.FromResult(
+                    compiler.Compile(sources, example.EntryFile.FilePath, cancellation)), token);
+            }
+            finally
+            {
+                _previewCompilationGate.Release();
             }
 
-            PreviewStatus.Text = "Compiling…";
-            await YieldBeforeInlineWorkAsync(token);
-            var result = await _scheduler.RunAsync(cancellation => Task.FromResult(
-                compiler.Compile(sources, example.EntryFile.FilePath, cancellation)), token);
             token.ThrowIfCancellationRequested();
             ShowDiagnostics(result.Diagnostics);
             if (!result.Success)
@@ -331,11 +395,14 @@ public sealed partial class PlaygroundView : AkburaControl
 
     protected override void OnUnloaded(RoutedEventArgs e)
     {
+        _previewTimer.Stop();
+        SaveActiveFile();
         var lifetime = _lifetime;
         _lifetime = null;
         lifetime?.Cancel();
         SourceEditor.IsReadOnly = true;
         _compiler = null;
+        _previewRequested = false;
         _editorSession?.Dispose();
         _editorSession = null;
         _workspace?.Dispose();

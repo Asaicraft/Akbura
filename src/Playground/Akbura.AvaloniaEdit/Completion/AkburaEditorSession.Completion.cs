@@ -20,8 +20,8 @@ public sealed partial class AkburaEditorSession
     private bool _incompleteCompletion;
     private int _completionPosition = -1;
     private int _lastCaretOffset = -1;
-    private bool _completionInputPosted;
-    private long _completionInputEpoch;
+    private DispatcherTimer? _completionInputTimer;
+    private TaskCompletionSource? _pendingCompletionInput;
     private char _pendingCompletionCharacter;
     private string? _completionGestureText;
     private TextDocument? _completionBuffer;
@@ -104,6 +104,10 @@ public sealed partial class AkburaEditorSession
         {
             _completionCancellation?.Cancel();
         }
+        if (_completionInputTimer is { IsEnabled: true })
+        {
+            CancelScheduledCompletion();
+        }
 
         DismissHover();
         if (!_applyingCompletion && _completionPosition != position)
@@ -138,44 +142,73 @@ public sealed partial class AkburaEditorSession
     private void ScheduleCompletion(char character)
     {
         _pendingCompletionCharacter = character;
-        if (_completionInputPosted)
+        if (_pendingCompletionInput != null && _options.AutomaticCompletionDelay == TimeSpan.Zero)
         {
             return;
         }
 
-        _completionInputPosted = true;
-        var epoch = _completionInputEpoch;
+        CancelScheduledCompletion();
         var idle = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _pendingCompletionInput = idle;
         _automaticCompletionTask = idle.Task;
-        Dispatcher.UIThread.Post(async () =>
+        if (_options.AutomaticCompletionDelay == TimeSpan.Zero)
         {
-            if (epoch != _completionInputEpoch)
+            Dispatcher.UIThread.Post(() => _ = CompleteScheduledInputAsync(idle), DispatcherPriority.Background);
+        }
+        else
+        {
+            if (_completionInputTimer == null)
             {
-                idle.TrySetResult();
-                return;
+                _completionInputTimer = new DispatcherTimer(_options.AutomaticCompletionDelay,
+                    DispatcherPriority.Background, Dispatcher.UIThread);
+                _completionInputTimer.Tick += CompletionInputTimerTick;
             }
+            _completionInputTimer.Start();
+        }
+    }
 
-            _completionInputPosted = false;
+    private void CompletionInputTimerTick(object? sender, EventArgs e)
+    {
+        _completionInputTimer!.Stop();
+        if (_pendingCompletionInput is { } idle)
+        {
+            _ = CompleteScheduledInputAsync(idle);
+        }
+    }
 
-            try
+    private async Task CompleteScheduledInputAsync(TaskCompletionSource idle)
+    {
+        if (!ReferenceEquals(_pendingCompletionInput, idle))
+        {
+            return;
+        }
+
+        _pendingCompletionInput = null;
+        try
+        {
+            if (!_disposed)
             {
-                if (!_disposed)
-                {
-                    await RequestCompletionAsync(false, _pendingCompletionCharacter, CancellationToken.None);
-                }
-
-                idle.TrySetResult();
+                await RequestCompletionAsync(false, _pendingCompletionCharacter, CancellationToken.None);
             }
-            catch (Exception error)
+        }
+        catch (Exception error)
+        {
+            if (!_disposed)
             {
-                if (!_disposed)
-                {
-                    ReportFailure("Completion", error, Capture());
-                }
-
-                idle.TrySetResult();
+                ReportFailure("Completion", error, Capture());
             }
-        }, DispatcherPriority.Background);
+        }
+        finally
+        {
+            idle.TrySetResult();
+        }
+    }
+
+    private void CancelScheduledCompletion()
+    {
+        _completionInputTimer?.Stop();
+        _pendingCompletionInput?.TrySetResult();
+        _pendingCompletionInput = null;
     }
 
     private bool TrackCompletionChange(DocumentChangeEventArgs change)
@@ -238,8 +271,7 @@ public sealed partial class AkburaEditorSession
     private void CancelCompletionRequests()
     {
         _completionCancellation?.Cancel();
-        _completionInputEpoch++;
-        _completionInputPosted = false;
+        CancelScheduledCompletion();
 
         // Commit cancellation also happens on text changes. A character already inserted by a commit remains in the buffer.
         if (!_applyingCompletion)
@@ -271,8 +303,7 @@ public sealed partial class AkburaEditorSession
         // An explicit invocation supersedes an unresolved insertion. Its typed
         // character is already in the buffer and must survive the fresh request.
         _commitCancellation?.Cancel();
-        _completionInputEpoch++;
-        _completionInputPosted = false;
+        CancelScheduledCompletion();
         return RequestCompletionAsync(true, '\0', cancellationToken);
     }
 

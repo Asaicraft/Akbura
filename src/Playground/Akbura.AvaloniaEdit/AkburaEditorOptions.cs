@@ -27,6 +27,14 @@ public sealed record AkburaEditorOptions
         get; init;
     } = true;
 
+    /// <summary>
+    /// Time to wait after the latest input before requesting automatic completion.
+    /// </summary>
+    public TimeSpan AutomaticCompletionDelay
+    {
+        get; init;
+    }
+
     public KeyGesture? CompletionGesture
     {
         get; init;

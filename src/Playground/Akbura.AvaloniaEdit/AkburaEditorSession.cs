@@ -529,6 +529,7 @@ public sealed partial class AkburaEditorSession : IDisposable
         if (_disposed) return;
         _disposed = true;
         Interlocked.Increment(ref _revision);
+        CancelScheduledCompletion();
         _lifetime.Cancel();
         _syntax.Dispose();
         _services.Dispose();

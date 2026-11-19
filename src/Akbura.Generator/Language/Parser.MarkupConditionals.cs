@@ -87,7 +87,8 @@ internal sealed partial class Parser
     private GreenMarkupBlockSyntax ParseMarkupBlockSyntax(
         ArrayBuilder<GreenMarkupComponentNameSyntax> openTags,
         ref GreenMarkupEndTagSyntax? pendingEndTag,
-        bool incremental)
+        bool incremental,
+        bool isAkcssTemplateBlock = false)
     {
         if (incremental && TryReadReusableIncrementalNode<GreenMarkupBlockSyntax>(out var reusable))
         {
@@ -104,7 +105,10 @@ internal sealed partial class Parser
             {
                 var kind = PeekMarkupConditionalToken(incremental).Kind;
                 if (kind is SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken or SyntaxKind.LessSlashToken ||
-                    IsMarkupConditionalDirectiveStart(incremental, SyntaxKind.ElseKeyword))
+                    IsMarkupConditionalDirectiveStart(incremental, SyntaxKind.ElseKeyword) ||
+                    isAkcssTemplateBlock && content.Count > 0 &&
+                    content[content.Count - 1] is GreenMarkupElementContentSyntax &&
+                    IsAkcssDeclarationAfterTemplateMarkup(incremental))
                 {
                     break;
                 }

@@ -56,6 +56,10 @@ internal sealed partial class Lexer : IDisposable
 		InMarkupDoubleQuotedText = 1 << 14,
 		InMarkupSingleQuotedText = 1 << 15,
 		InExpressionBinding = 1 << 16,
+		InAkcssMixinParameters = 1 << 17,
+		InAkcssIncludeArguments = 1 << 18,
+		InAkcssExpression = 1 << 19,
+		InAkcssBasedOnExpression = 1 << 20,
 	}
 
 	internal struct TokenInfo
@@ -191,6 +195,9 @@ internal sealed partial class Lexer : IDisposable
 				LexerMode.InMarkupForeachHeader => ParseMarkupForeachHeader(),
 				LexerMode.InMarkupCodeStatement => ParseMarkupCodeStatement(),
 				LexerMode.InMarkupForeachKey => ParseMarkupCondition(stopAtMarkupSibling: true),
+				LexerMode.InAkcssMixinParameters or LexerMode.InAkcssIncludeArguments or
+				LexerMode.InAkcssExpression or LexerMode.InAkcssBasedOnExpression =>
+					ParseAkcssCSharpFragment(mode),
 				_ => default
 			};
 

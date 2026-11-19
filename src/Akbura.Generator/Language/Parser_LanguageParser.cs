@@ -223,6 +223,7 @@ partial class Parser
     internal GreenInlineAkcssBlockSyntax ParseInlineAkcssBlockSyntax()
     {
         var mode = _mode;
+        ResetLookaheadForLexerModeChange();
         _mode = Lexer.LexerMode.InAkcss;
 
         try
@@ -242,6 +243,7 @@ partial class Parser
         }
         finally
         {
+            ResetLookaheadForLexerModeChange();
             _mode = mode;
         }
     }
@@ -289,6 +291,12 @@ partial class Parser
 
     private GreenAkcssTopLevelMemberSyntax ParseAkcssTopLevelMemberSyntaxCore()
     {
+        var keyword = PeekAkcssDirectiveKeyword(incremental: false);
+        if (keyword is SyntaxKind.ThemeKeyword or SyntaxKind.MixinKeyword)
+        {
+            return ParseAkcssNamedDeclaration(keyword, incremental: false);
+        }
+
         if (CurrentToken.Kind == SyntaxKind.AtToken &&
             PeekToken(1).Kind == SyntaxKind.UsingKeyword)
         {
@@ -393,8 +401,10 @@ partial class Parser
 
         try
         {
-            while (CurrentToken.Kind is not (SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken))
+            while (CurrentToken.Kind is not (SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken) &&
+                !IsAkcssNamedDeclarationStart(incremental: false))
             {
+                _cancellationToken.ThrowIfCancellationRequested();
                 utilities.Add(ParseAkcssUtilityDeclarationSyntax());
             }
 
@@ -492,8 +502,10 @@ partial class Parser
 
         try
         {
-            while (CurrentToken.Kind is not (SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken))
+            while (CurrentToken.Kind is not (SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken) &&
+                !IsAkcssNamedDeclarationStart(incremental: false))
             {
+                _cancellationToken.ThrowIfCancellationRequested();
                 members.Add(ParseAkcssBodyMemberSyntax());
             }
 
@@ -507,6 +519,11 @@ partial class Parser
 
     private GreenAkcssBodyMemberSyntax ParseAkcssBodyMemberSyntax()
     {
+        if (ParseNewAkcssBodyMember(incremental: false) is { } member)
+        {
+            return member;
+        }
+
         if (CurrentToken.Kind == SyntaxKind.AtToken &&
             PeekToken(1).Kind == SyntaxKind.IfKeyword)
         {
@@ -537,7 +554,7 @@ partial class Parser
     {
         var propertyName = ParseAkcssCSharpTypeUntil(SyntaxKind.ColonToken);
         var colon = EatToken(SyntaxKind.ColonToken);
-        var expression = ParseAkcssExpressionUntilSemicolonOrCloseBrace();
+        var expression = ParseAkcssExpression();
         var semicolon = TryEatToken(SyntaxKind.SemicolonToken);
 
         return GreenSyntaxFactory.AkcssAssignmentSyntax(propertyName, colon, expression, semicolon);
@@ -591,7 +608,7 @@ partial class Parser
         var atToken = EatToken(SyntaxKind.AtToken);
         var ifKeyword = EatToken(SyntaxKind.IfKeyword);
         var openParen = EatToken(SyntaxKind.OpenParenToken);
-        var condition = ParseAkcssExpressionUntil(SyntaxKind.CloseParenToken);
+        var condition = ParseAkcssExpression();
         var closeParen = EatToken(SyntaxKind.CloseParenToken);
         var openBrace = EatToken(SyntaxKind.OpenBraceToken);
         var members = ParseAkcssBodyMemberList();
@@ -714,7 +731,8 @@ partial class Parser
                CurrentToken.Kind != terminator)
         {
             if (terminator == SyntaxKind.ColonToken &&
-                CurrentToken.Kind is SyntaxKind.SemicolonToken or SyntaxKind.CloseBraceToken)
+                (CurrentToken.Kind is SyntaxKind.SemicolonToken or SyntaxKind.CloseBraceToken ||
+                    IsAkcssNamedDeclarationStart(incremental: false)))
             {
                 break;
             }
@@ -827,67 +845,8 @@ partial class Parser
             (SyntaxFacts.IsReservedKeyword(token.Kind) && token.ValueText is not null);
     }
 
-    private GreenCSharpExpressionSyntax ParseAkcssExpressionUntilSemicolonOrCloseBrace()
-        => ParseAkcssExpressionUntil(SyntaxKind.SemicolonToken, SyntaxKind.CloseBraceToken);
-
-    private GreenCSharpExpressionSyntax ParseAkcssExpressionUntil(
-        SyntaxKind firstTerminator,
-        SyntaxKind? secondTerminator = null)
-    {
-        var pooledRawText = PooledStringBuilder.GetInstance();
-        var rawText = pooledRawText.Builder;
-        var parenDepth = 0;
-        var bracketDepth = 0;
-        var braceDepth = 0;
-
-        while (CurrentToken.Kind != SyntaxKind.EndOfFileToken)
-        {
-            var kind = CurrentToken.Kind;
-
-            if (parenDepth == 0 &&
-                bracketDepth == 0 &&
-                braceDepth == 0 &&
-                (kind == firstTerminator ||
-                 (secondTerminator.HasValue && kind == secondTerminator.Value)))
-            {
-                break;
-            }
-
-            var token = EatToken();
-            rawText.Append(token.ToFullString());
-
-            switch (kind)
-            {
-                case SyntaxKind.OpenParenToken:
-                    parenDepth++;
-                    break;
-                case SyntaxKind.CloseParenToken when parenDepth > 0:
-                    parenDepth--;
-                    break;
-                case SyntaxKind.OpenBracketToken:
-                    bracketDepth++;
-                    break;
-                case SyntaxKind.CloseBracketToken when bracketDepth > 0:
-                    bracketDepth--;
-                    break;
-                case SyntaxKind.OpenBraceToken:
-                    braceDepth++;
-                    break;
-                case SyntaxKind.CloseBraceToken when braceDepth > 0:
-                    braceDepth--;
-                    break;
-            }
-        }
-
-        var expression = CSharpFactory.ParseExpression(
-            pooledRawText.ToStringAndFree(),
-            offset: 0,
-            options: null,
-            consumeFullText: true);
-
-        return GreenSyntaxFactory.CSharpExpressionSyntax(
-            GreenSyntaxFactory.CSharpRawToken(expression));
-    }
+    private GreenCSharpExpressionSyntax ParseAkcssExpression() =>
+        GreenSyntaxFactory.CSharpExpressionSyntax(ReadAkcssCSharpSyntax(Lexer.LexerMode.InAkcssExpression));
 
     #endregion
 
@@ -1407,6 +1366,10 @@ partial class Parser
                         candidateEndTag = pendingEndTag;
                         pendingEndTag = null;
                     }
+                    else if (_inAkcssTemplate && CurrentToken.Kind == SyntaxKind.CloseBraceToken)
+                    {
+                        break;
+                    }
                     else if (CurrentToken.Kind == SyntaxKind.LessSlashToken)
                     {
                         candidateEndTag = ParseMarkupEndTagSyntax();
@@ -1448,7 +1411,8 @@ partial class Parser
                 openTags.Pop();
             }
 
-            return GreenSyntaxFactory.MarkupElementSyntax(startTag, body.ToList(), endTag);
+            return DiagnoseUnclosedAkcssTemplateElement(
+                GreenSyntaxFactory.MarkupElementSyntax(startTag, body.ToList(), endTag));
         }
         finally
         {
@@ -1466,12 +1430,7 @@ partial class Parser
         {
             GreenNode? skippedSyntax = null;
 
-            while (CurrentToken.Kind is not (
-               SyntaxKind.EndOfFileToken or
-               SyntaxKind.GreaterThanToken or
-               SyntaxKind.SlashGreaterToken or
-               SyntaxKind.LessThanToken or
-               SyntaxKind.LessSlashToken))
+            while (!IsMarkupStartTagBoundary(CurrentToken.Kind))
             {
                 if (!IsMarkupAttributeStart())
                 {
@@ -1524,6 +1483,12 @@ partial class Parser
         ref GreenMarkupEndTagSyntax? pendingEndTag)
     {
         _markupCurrentContentTagDepth = openTags.Count;
+        var templateDirective = PeekAkcssTemplateMarkupDirective(incremental: false);
+        if (templateDirective != SyntaxKind.None)
+        {
+            return ParseAkcssTemplateMarkupDirective(templateDirective, incremental: false);
+        }
+
         if (IsMarkupForeachDirectiveStart(incremental: false))
         {
             return ParseMarkupForeachStatementSyntax(openTags, ref pendingEndTag, incremental: false);
@@ -1629,8 +1594,10 @@ partial class Parser
             {
                 _cancellationToken.ThrowIfCancellationRequested();
 
-                if (IsMarkupConditionalDirectiveStart(incremental: false) || IsMarkupForeachDirectiveStart(incremental: false) ||
-                    inConditionalBlock && CurrentToken.Kind == SyntaxKind.CloseBraceToken)
+                if (IsMarkupConditionalDirectiveStart(incremental: false) ||
+                    IsMarkupForeachDirectiveStart(incremental: false) ||
+                    (inConditionalBlock || _inAkcssTemplate) && CurrentToken.Kind == SyntaxKind.CloseBraceToken ||
+                    PeekAkcssTemplateMarkupDirective(incremental: false) != SyntaxKind.None)
                 {
                     break;
                 }
@@ -1696,7 +1663,8 @@ partial class Parser
         var braceDepth = 0;
         var seenBlock = false;
 
-        while (CurrentToken.Kind is not (SyntaxKind.EndOfFileToken or SyntaxKind.LessSlashToken))
+        while (CurrentToken.Kind is not (SyntaxKind.EndOfFileToken or SyntaxKind.LessSlashToken) &&
+            !(_inAkcssTemplate && braceDepth == 0 && CurrentToken.Kind == SyntaxKind.CloseBraceToken))
         {
             var token = EatToken();
             rawText.Append(token.ToFullString());
@@ -1817,8 +1785,9 @@ partial class Parser
         }
     }
 
-    private static bool IsMarkupStartTagBoundary(SyntaxKind kind)
-        => kind is SyntaxKind.EndOfFileToken or
+    private bool IsMarkupStartTagBoundary(SyntaxKind kind)
+        => _inAkcssTemplate && kind == SyntaxKind.CloseBraceToken ||
+            kind is SyntaxKind.EndOfFileToken or
             SyntaxKind.GreaterThanToken or
             SyntaxKind.SlashGreaterToken or
             SyntaxKind.LessThanToken or

@@ -219,6 +219,39 @@ public class LexerQuickScannerTests
 		Assert.True(quick.Hits > 0);
 	}
 
+	[Fact]
+	public void AkcssThemeTokensMatchKindsTextAndTriviaInBothModes()
+	{
+		const string code = "@theme Button Theme {\r\n" +
+			"\t@template-bind Background, Content;\r\n" +
+			"\t&:focus-visible /template/ #part { @include Mixin(); }\r\n" +
+			"\t@based-on Hello.Theme; // trailing trivia\r\n" +
+			"}\r\n@mixin Button Mixin(string template) { }\r\n" +
+			"theme template mixin include based on @template";
+
+		foreach (var mode in new[] { Lexer.LexerMode.InAkcss, Lexer.LexerMode.TopLevel })
+		{
+			using var regular = new Lexer(SourceText.From(code), enableQuickScanner: false);
+			using var quick = new Lexer(SourceText.From(code), enableQuickScanner: true, collectQuickScannerStats: true);
+			while (true)
+			{
+				var expected = regular.Lex(mode);
+				var actual = quick.Lex(mode);
+				Assert.Equal(expected.Kind, actual.Kind);
+				Assert.Equal(expected.ContextualKind, actual.ContextualKind);
+				Assert.Equal(expected.Text, actual.Text);
+				Assert.Equal(expected.GetLeadingTrivia()?.ToFullString(), actual.GetLeadingTrivia()?.ToFullString());
+				Assert.Equal(expected.GetTrailingTrivia()?.ToFullString(), actual.GetTrailingTrivia()?.ToFullString());
+				if (expected.Kind == SyntaxKind.EndOfFileToken)
+				{
+					break;
+				}
+			}
+
+			Assert.True(quick.QuickScannerHitCount > 0);
+		}
+	}
+
 	private static (string Text, SyntaxKind[] Kinds, int Hits, int Fallbacks) AssertQuickMatchesRegular(
 		string code,
 		Lexer.LexerMode mode)

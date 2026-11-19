@@ -8,7 +8,7 @@ using Akbura.Language.Syntax.Green;
 
 namespace Akbura.Language.Syntax.Green
 {
-    internal sealed partial class GreenAkcssTemplateTraversalSyntax : GreenNode
+    internal sealed partial class GreenAkcssTemplateTraversalSyntax : GreenAkcssSelectorStepSyntax
     {
         public readonly GreenSyntaxToken OpenSlash;
         public readonly GreenSyntaxToken TemplateKeyword;
@@ -176,7 +176,7 @@ namespace Akbura.Language.Syntax.Green
 
 namespace Akbura.Language.Syntax
 {
-    internal sealed partial class AkcssTemplateTraversalSyntax : AkburaSyntax
+    internal sealed partial class AkcssTemplateTraversalSyntax : AkcssSelectorStepSyntax
     {
         private AkburaSyntax? _target;
 

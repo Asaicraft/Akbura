@@ -1201,34 +1201,34 @@ node AkcssBasedOnDirectiveSyntax : AkcssBodyMemberSyntax {
 	Semicolon    : SemicolonToken;
 }
 
-// An AKCSS body member such as &:pointerover /template/ ContentPresenter { ... }.
+// An AKCSS body member such as ^:pointerover /template/ ContentPresenter { ... }.
 node AkcssNestedStyleRuleSyntax : AkcssBodyMemberSyntax {
-	Selector   : AkcssNestedSelectorSyntax;
+	Selector   : AkcssSelectorSyntax;
 	OpenBrace  : OpenBraceToken;
 	Members    : syntaxlist<AkcssBodyMemberSyntax>;
 	CloseBrace : CloseBraceToken;
 }
 
-// The initial compound can be followed by ordered /template/ traversal steps.
-node AkcssNestedSelectorSyntax {
-	Initial    : AkcssParentCompoundSelectorSyntax;
-	Traversals : syntaxlist<AkcssTemplateTraversalSyntax>;
+// An absolute or parent-anchored compound followed by its ordered relationships.
+node AkcssSelectorSyntax {
+	Initial : AkcssSelectorCompoundSyntax;
+	Steps   : syntaxlist<AkcssSelectorStepSyntax>;
 }
 
-// The first compound starts with & and retains adjacent components such as .accent.
-node AkcssParentCompoundSelectorSyntax {
+// The first compound of a relative selector starts with ^ and accepts adjacent suffixes.
+node AkcssParentCompoundSelectorSyntax : AkcssSelectorCompoundSyntax {
 	Anchor     : AkcssParentSelectorSyntax;
 	Components : syntaxlist<AkcssSelectorComponentSyntax>;
 }
 
-// The & anchor refers to the enclosing selector context, which a mixin
+// The ^ anchor refers to the enclosing selector context, which a mixin
 // obtains from its inclusion site during expansion.
 node AkcssParentSelectorSyntax {
-	AmpersandToken : AmpersandToken;
+	CaretToken : CaretToken;
 }
 
 // Each /template/ step owns its punctuation and the following compound selector.
-node AkcssTemplateTraversalSyntax {
+node AkcssTemplateTraversalSyntax : AkcssSelectorStepSyntax {
 	OpenSlash       : SlashToken;
 	TemplateKeyword : TemplateKeyword;
 	CloseSlash      : SlashToken;
@@ -1236,7 +1236,7 @@ node AkcssTemplateTraversalSyntax {
 }
 
 // Adjacent components such as ContentPresenter#PART_ContentPresenter form one compound.
-node AkcssCompoundSelectorSyntax {
+node AkcssCompoundSelectorSyntax : AkcssSelectorCompoundSyntax {
 	Components : syntaxlist<AkcssSelectorComponentSyntax>;
 }
 
@@ -1267,6 +1267,28 @@ node AkcssNameSelectorSyntax : AkcssSelectorComponentSyntax {
 node AkcssPseudoClassSelectorSyntax : AkcssSelectorComponentSyntax {
 	ColonToken : ColonToken;
 	Name       : SimpleName;
+}
+
+abstract node AkcssSelectorCompoundSyntax;
+
+abstract node AkcssSelectorStepSyntax;
+
+// The separating whitespace stays in the original tokens' trivia.
+node AkcssDescendantSelectorSyntax : AkcssSelectorStepSyntax {
+	Target : AkcssCompoundSelectorSyntax;
+}
+
+node AkcssChildSelectorSyntax : AkcssSelectorStepSyntax {
+	GreaterThanToken : GreaterThanToken;
+	Target           : AkcssCompoundSelectorSyntax;
+}
+
+// A general top-level rule such as Border > TextBlock { ... }.
+node AkcssSelectorRuleSyntax : AkcssTopLevelMemberSyntax {
+	Selector   : AkcssSelectorSyntax;
+	OpenBrace  : OpenBraceToken;
+	Members    : syntaxlist<AkcssBodyMemberSyntax>;
+	CloseBrace : CloseBraceToken;
 }
 
 

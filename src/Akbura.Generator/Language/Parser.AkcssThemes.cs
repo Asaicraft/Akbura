@@ -31,6 +31,10 @@ internal sealed partial class Parser
     private bool IsAkcssNamedDeclarationStart(bool incremental) =>
         PeekAkcssDirectiveKeyword(incremental) is SyntaxKind.ThemeKeyword or SyntaxKind.MixinKeyword;
 
+    private bool IsAkcssTopLevelDirectiveStart(bool incremental) =>
+        PeekAkcssDirectiveKeyword(incremental) is SyntaxKind.ThemeKeyword or SyntaxKind.MixinKeyword or
+            SyntaxKind.UsingKeyword or SyntaxKind.UtilitiesKeyword;
+
     private GreenSyntaxToken ReadAkcssKeyword(SyntaxKind kind, bool incremental)
     {
         var token = PeekAkcssToken(incremental);
@@ -82,7 +86,7 @@ internal sealed partial class Parser
 
     private GreenAkcssBodyMemberSyntax? ParseNewAkcssBodyMember(bool incremental)
     {
-        if (PeekAkcssToken(incremental).Kind == SyntaxKind.AmpersandToken)
+        if (IsAkcssSelectorAnchor(PeekAkcssToken(incremental).Kind))
         {
             return ParseAkcssNestedStyleRule(incremental);
         }
@@ -261,31 +265,33 @@ internal sealed partial class Parser
     private bool IsAkcssDeclarationAfterTemplateMarkup(bool incremental)
     {
         var first = PeekAkcssToken(incremental);
-        if (first.Kind is not (SyntaxKind.AmpersandToken or SyntaxKind.AtToken) && first.Text is not ("@theme" or "@mixin"))
+        if (!IsAfterAkcssLineBreak(first))
         {
             return false;
         }
 
+        ResetLookaheadForLexerModeChange();
+        var previousMode = _mode;
+        _mode = Lexer.LexerMode.InAkcss;
         try
         {
-            var token = PeekToken(0);
-            var next = PeekToken(1);
-            if (token.Kind == SyntaxKind.AmpersandToken)
+            var token = CurrentToken;
+            if (token.Kind != SyntaxKind.AtToken)
             {
-                return next.Kind is SyntaxKind.DotToken or SyntaxKind.HashToken or SyntaxKind.ColonToken or
-                    SyntaxKind.SlashToken or SyntaxKind.OpenBraceToken;
+                return HasAkcssRuleHeader(allowRelative: true, allowUtilityParameters: true);
             }
 
-            return token.Text is "@theme" or "@mixin" && IsAkcssNameToken(next) &&
-                IsAkcssNameToken(PeekToken(2)) &&
-                PeekToken(3).Kind is SyntaxKind.OpenBraceToken or SyntaxKind.OpenParenToken;
+            return PeekToken(1).ContextualKind switch
+            {
+                SyntaxKind.ThemeKeyword or SyntaxKind.MixinKeyword => HasAkcssNamedDeclarationHeader(PeekToken(1).ContextualKind),
+                SyntaxKind.UtilitiesKeyword => PeekToken(2).Kind == SyntaxKind.OpenBraceToken,
+                _ => false,
+            };
         }
         finally
         {
-            if (incremental)
-            {
-                ResetLookaheadForLexerModeChange();
-            }
+            ResetLookaheadForLexerModeChange();
+            _mode = previousMode;
         }
     }
 
@@ -591,125 +597,6 @@ internal sealed partial class Parser
         finally
         {
             _pool.Free(builder);
-        }
-    }
-
-    private GreenAkcssNestedStyleRuleSyntax ParseAkcssNestedStyleRule(bool incremental)
-    {
-        // The old selector can contain merged names and raw C# type tokens.
-        // Re-lex its components to check adjacency against the current text.
-        ResetLookaheadForLexerModeChange();
-        var ampersand = EatToken(SyntaxKind.AmpersandToken);
-        var anchor = GreenSyntaxFactory.AkcssParentCompoundSelectorSyntax(
-            GreenSyntaxFactory.AkcssParentSelectorSyntax(ampersand),
-            ParseAkcssSelectorComponents(ampersand, allowType: false));
-        var traversals = _pool.Allocate<GreenAkcssTemplateTraversalSyntax>();
-        try
-        {
-            while (CurrentToken.Kind == SyntaxKind.SlashToken ||
-                CurrentToken.ContextualKind == SyntaxKind.TemplateKeyword && PeekToken(1).Kind == SyntaxKind.SlashToken)
-            {
-                _cancellationToken.ThrowIfCancellationRequested();
-                var openSlash = EatToken(SyntaxKind.SlashToken);
-                var keyword = EatContextualToken(SyntaxKind.TemplateKeyword);
-                var closeSlash = EatToken(SyntaxKind.SlashToken);
-                var components = ParseAkcssSelectorComponents(previousToken: null, allowType: true);
-                var target = GreenSyntaxFactory.AkcssCompoundSelectorSyntax(components);
-                if (components.Count == 0)
-                {
-                    target = AddError(target, 0, 0, ErrorCodes.ERR_SyntaxError, "template selector");
-                }
-                traversals.Add(GreenSyntaxFactory.AkcssTemplateTraversalSyntax(openSlash, keyword, closeSlash, target));
-            }
-
-            var selector = GreenSyntaxFactory.AkcssNestedSelectorSyntax(anchor, traversals.ToList());
-            var openBrace = ReadAkcssNestedRuleOpenBrace();
-            ResetLookaheadForLexerModeChange();
-            var (members, closeBrace) = ParseAkcssBracedMembers(openBrace, incremental);
-            return GreenSyntaxFactory.AkcssNestedStyleRuleSyntax(selector, openBrace, members, closeBrace);
-        }
-        finally
-        {
-            _pool.Free(traversals);
-        }
-    }
-
-    private GreenSyntaxList<GreenAkcssSelectorComponentSyntax> ParseAkcssSelectorComponents(
-        GreenSyntaxToken? previousToken, bool allowType)
-    {
-        var components = _pool.Allocate<GreenAkcssSelectorComponentSyntax>();
-        try
-        {
-            if (allowType && CurrentToken.Kind == SyntaxKind.OpenParenToken)
-            {
-                var openParen = EatToken();
-                var type = ReadAkcssCSharpType(incremental: false, allowTuple: true);
-                var closeParen = EatToken(SyntaxKind.CloseParenToken);
-                components.Add(GreenSyntaxFactory.AkcssTypeSelectorSyntax(
-                    GreenSyntaxFactory.AkcssParenthesizedSelectorTypeSyntax(openParen, type, closeParen)));
-                previousToken = closeParen;
-            }
-            else if (allowType && IsAkcssNameToken(CurrentToken))
-            {
-                previousToken = EatToken();
-                components.Add(GreenSyntaxFactory.AkcssTypeSelectorSyntax(CreateAkcssCSharpTypeSyntax(previousToken.ToFullString())));
-            }
-
-            while (CurrentToken.Kind is SyntaxKind.DotToken or SyntaxKind.HashToken or SyntaxKind.ColonToken)
-            {
-                _cancellationToken.ThrowIfCancellationRequested();
-                var punctuation = EatToken();
-                var separated = previousToken != null && !AreAdjacent(previousToken, punctuation) ||
-                    IsAkcssNameToken(CurrentToken) && !AreAdjacent(punctuation, CurrentToken);
-                if (separated)
-                {
-                    punctuation = AddError(punctuation, ErrorCodes.ERR_SyntaxError, "adjacent selector component");
-                }
-
-                var name = ParseAkcssUtilityName();
-                GreenAkcssSelectorComponentSyntax component = punctuation.Kind switch
-                {
-                    SyntaxKind.DotToken => GreenSyntaxFactory.AkcssClassSelectorSyntax(punctuation, name),
-                    SyntaxKind.HashToken => GreenSyntaxFactory.AkcssNameSelectorSyntax(punctuation, name),
-                    _ => GreenSyntaxFactory.AkcssPseudoClassSelectorSyntax(punctuation, name),
-                };
-                components.Add(component);
-                previousToken = name.Identifier;
-            }
-
-            return components.ToList();
-        }
-        finally
-        {
-            _pool.Free(components);
-        }
-    }
-
-    private GreenSyntaxToken ReadAkcssNestedRuleOpenBrace()
-    {
-        if (CurrentToken.Kind == SyntaxKind.OpenBraceToken)
-        {
-            return EatToken();
-        }
-
-        var tokens = _pool.Allocate<GreenSyntaxToken>();
-        try
-        {
-            while (CurrentToken.Kind is not (SyntaxKind.OpenBraceToken or SyntaxKind.CloseBraceToken or
-                SyntaxKind.EndOfFileToken or SyntaxKind.AtToken or SyntaxKind.AmpersandToken))
-            {
-                _cancellationToken.ThrowIfCancellationRequested();
-                tokens.Add(EatToken());
-            }
-
-            var brace = EatToken(SyntaxKind.OpenBraceToken);
-            return tokens.ToList().Node is { } skipped
-                ? AddLeadingSkippedSyntax(AddError(brace, ErrorCodes.ERR_SyntaxError, "nested selector"), skipped)
-                : brace;
-        }
-        finally
-        {
-            _pool.Free(tokens);
         }
     }
 }

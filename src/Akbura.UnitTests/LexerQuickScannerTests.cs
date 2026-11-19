@@ -224,7 +224,7 @@ public class LexerQuickScannerTests
 	{
 		const string code = "@theme Button Theme {\r\n" +
 			"\t@template-bind Background, Content;\r\n" +
-			"\t&:focus-visible /template/ #part { @include Mixin(); }\r\n" +
+			"\t^:focus-visible /template/ #part { @include Mixin(); }\r\n" +
 			"\t@based-on Hello.Theme; // trailing trivia\r\n" +
 			"}\r\n@mixin Button Mixin(string template) { }\r\n" +
 			"theme template mixin include based on @template";

@@ -8,7 +8,7 @@ using Akbura.Language.Syntax.Green;
 
 namespace Akbura.Language.Syntax.Green
 {
-    internal sealed partial class GreenAkcssParentCompoundSelectorSyntax : GreenNode
+    internal sealed partial class GreenAkcssParentCompoundSelectorSyntax : GreenAkcssSelectorCompoundSyntax
     {
         public readonly GreenAkcssParentSelectorSyntax Anchor;
         public readonly GreenNode? _components;
@@ -148,7 +148,7 @@ namespace Akbura.Language.Syntax.Green
 
 namespace Akbura.Language.Syntax
 {
-    internal sealed partial class AkcssParentCompoundSelectorSyntax : AkburaSyntax
+    internal sealed partial class AkcssParentCompoundSelectorSyntax : AkcssSelectorCompoundSyntax
     {
         private AkburaSyntax? _anchor;
         private AkburaSyntax? _components;

@@ -10,33 +10,33 @@ namespace Akbura.Language.Syntax.Green
 {
     internal sealed partial class GreenAkcssParentSelectorSyntax : GreenNode
     {
-        public readonly GreenSyntaxToken AmpersandToken;
+        public readonly GreenSyntaxToken CaretToken;
 
         public GreenAkcssParentSelectorSyntax(
-            GreenSyntaxToken ampersandToken,
+            GreenSyntaxToken caretToken,
             ImmutableArray<AkburaDiagnostic>? diagnostics,
             ImmutableArray<AkburaSyntaxAnnotation>? annotations)
             : base((ushort)SyntaxKind.AkcssParentSelectorSyntax, diagnostics, annotations)
         {
-            AmpersandToken = ampersandToken;
+            CaretToken = caretToken;
 
             var flags = Flags;
             var fullWidth = FullWidth;
-            AdjustWidthAndFlags(AmpersandToken, ref fullWidth, ref flags);
+            AdjustWidthAndFlags(CaretToken, ref fullWidth, ref flags);
 
             SlotCount = 1;
             FullWidth = fullWidth;
             Flags = flags;
         }
 
-        public GreenAkcssParentSelectorSyntax UpdateAkcssParentSelectorSyntax(GreenSyntaxToken ampersandToken)
+        public GreenAkcssParentSelectorSyntax UpdateAkcssParentSelectorSyntax(GreenSyntaxToken caretToken)
         {
-            if (AmpersandToken == ampersandToken)
+            if (CaretToken == caretToken)
             {
                 return this;
             }
 
-            var result = GreenSyntaxFactory.AkcssParentSelectorSyntax(ampersandToken);
+            var result = GreenSyntaxFactory.AkcssParentSelectorSyntax(caretToken);
             var diagnostics = GetDiagnostics();
             if (!diagnostics.IsDefaultOrEmpty)
             {
@@ -52,12 +52,12 @@ namespace Akbura.Language.Syntax.Green
             return result;
         }
 
-        public GreenAkcssParentSelectorSyntax WithAmpersandToken(GreenSyntaxToken ampersandToken) =>
-            UpdateAkcssParentSelectorSyntax(ampersandToken);
+        public GreenAkcssParentSelectorSyntax WithCaretToken(GreenSyntaxToken caretToken) =>
+            UpdateAkcssParentSelectorSyntax(caretToken);
 
         public override GreenNode? GetSlot(int index) => index switch
         {
-            0 => AmpersandToken,
+            0 => CaretToken,
             _ => null,
         };
 
@@ -65,10 +65,10 @@ namespace Akbura.Language.Syntax.Green
             new AkcssParentSelectorSyntax(this, parent, position);
 
         public override GreenNode WithDiagnostics(ImmutableArray<AkburaDiagnostic>? diagnostics) =>
-            new GreenAkcssParentSelectorSyntax(AmpersandToken, diagnostics, GetAnnotations());
+            new GreenAkcssParentSelectorSyntax(CaretToken, diagnostics, GetAnnotations());
 
         public override GreenNode WithAnnotations(ImmutableArray<AkburaSyntaxAnnotation>? annotations) =>
-            new GreenAkcssParentSelectorSyntax(AmpersandToken, GetDiagnostics(), annotations);
+            new GreenAkcssParentSelectorSyntax(CaretToken, GetDiagnostics(), annotations);
 
         public override void Accept(GreenSyntaxVisitor visitor) => visitor.VisitAkcssParentSelectorSyntax(this);
 
@@ -83,16 +83,16 @@ namespace Akbura.Language.Syntax.Green
 
     internal static partial class GreenSyntaxFactory
     {
-        public static GreenAkcssParentSelectorSyntax AkcssParentSelectorSyntax(GreenSyntaxToken ampersandToken)
+        public static GreenAkcssParentSelectorSyntax AkcssParentSelectorSyntax(GreenSyntaxToken caretToken)
         {
-            AkburaDebug.Assert(ampersandToken is { Kind: SyntaxKind.AmpersandToken });
+            AkburaDebug.Assert(caretToken is { Kind: SyntaxKind.CaretToken });
 
-            if (GreenNodeCache.TryGetNode((ushort)SyntaxKind.AkcssParentSelectorSyntax, ampersandToken, out var hash) is GreenAkcssParentSelectorSyntax cached)
+            if (GreenNodeCache.TryGetNode((ushort)SyntaxKind.AkcssParentSelectorSyntax, caretToken, out var hash) is GreenAkcssParentSelectorSyntax cached)
             {
                 return cached;
             }
 
-            var result = new GreenAkcssParentSelectorSyntax(ampersandToken, diagnostics: null, annotations: null);
+            var result = new GreenAkcssParentSelectorSyntax(caretToken, diagnostics: null, annotations: null);
             if (hash > 0)
             {
                 GreenNodeCache.AddNode(result, hash);
@@ -121,7 +121,7 @@ namespace Akbura.Language.Syntax.Green
     internal partial class GreenSyntaxRewriter
     {
         public override GreenNode? VisitAkcssParentSelectorSyntax(GreenAkcssParentSelectorSyntax node) =>
-            node.UpdateAkcssParentSelectorSyntax((GreenSyntaxToken)VisitToken(node.AmpersandToken));
+            node.UpdateAkcssParentSelectorSyntax((GreenSyntaxToken)VisitToken(node.CaretToken));
     }
 }
 
@@ -136,17 +136,17 @@ namespace Akbura.Language.Syntax
 
         internal new GreenAkcssParentSelectorSyntax Green => Unsafe.As<GreenAkcssParentSelectorSyntax>(base.Green);
 
-        public SyntaxToken AmpersandToken =>
-            new(this, Green.AmpersandToken, GetChildPosition(0), GetChildIndex(0));
+        public SyntaxToken CaretToken =>
+            new(this, Green.CaretToken, GetChildPosition(0), GetChildIndex(0));
 
-        public AkcssParentSelectorSyntax UpdateAkcssParentSelectorSyntax(SyntaxToken ampersandToken)
+        public AkcssParentSelectorSyntax UpdateAkcssParentSelectorSyntax(SyntaxToken caretToken)
         {
-            if (AmpersandToken == ampersandToken)
+            if (CaretToken == caretToken)
             {
                 return this;
             }
 
-            var result = SyntaxFactory.AkcssParentSelectorSyntax(ampersandToken);
+            var result = SyntaxFactory.AkcssParentSelectorSyntax(caretToken);
             var diagnostics = GetDiagnostics();
             if (!diagnostics.IsDefaultOrEmpty)
             {
@@ -162,8 +162,8 @@ namespace Akbura.Language.Syntax
             return result;
         }
 
-        public AkcssParentSelectorSyntax WithAmpersandToken(SyntaxToken ampersandToken) =>
-            UpdateAkcssParentSelectorSyntax(ampersandToken);
+        public AkcssParentSelectorSyntax WithCaretToken(SyntaxToken caretToken) =>
+            UpdateAkcssParentSelectorSyntax(caretToken);
 
         public override AkburaSyntax? GetNodeSlot(int index) => null;
 
@@ -188,14 +188,14 @@ namespace Akbura.Language.Syntax
 
     internal static partial class SyntaxFactory
     {
-        internal static AkcssParentSelectorSyntax AkcssParentSelectorSyntax(SyntaxToken ampersandToken)
+        internal static AkcssParentSelectorSyntax AkcssParentSelectorSyntax(SyntaxToken caretToken)
         {
-            if (ampersandToken.Node is not GreenSyntaxToken || ampersandToken.Kind != SyntaxKind.AmpersandToken)
+            if (caretToken.Node is not GreenSyntaxToken || caretToken.Kind != SyntaxKind.CaretToken)
             {
-                ThrowHelper.ThrowArgumentException(nameof(ampersandToken), "ampersandToken must be SyntaxKind.AmpersandToken.");
+                ThrowHelper.ThrowArgumentException(nameof(caretToken), "caretToken must be SyntaxKind.CaretToken.");
             }
 
-            var green = GreenSyntaxFactory.AkcssParentSelectorSyntax(Unsafe.As<GreenSyntaxToken>(ampersandToken.Node!));
+            var green = GreenSyntaxFactory.AkcssParentSelectorSyntax(Unsafe.As<GreenSyntaxToken>(caretToken.Node!));
             return Unsafe.As<AkcssParentSelectorSyntax>(green.CreateRed(null, 0));
         }
     }
@@ -219,7 +219,7 @@ namespace Akbura.Language.Syntax
     internal partial class SyntaxRewriter
     {
         public override AkburaSyntax? VisitAkcssParentSelectorSyntax(AkcssParentSelectorSyntax node) =>
-            node.UpdateAkcssParentSelectorSyntax(VisitToken(node.AmpersandToken));
+            node.UpdateAkcssParentSelectorSyntax(VisitToken(node.CaretToken));
     }
 }
 

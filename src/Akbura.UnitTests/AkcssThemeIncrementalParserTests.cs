@@ -21,7 +21,7 @@ public sealed class AkcssThemeIncrementalParserTests
                     <TextBlock />
                 </ContentPresenter>
             }
-            &:pointerover /template/ ContentPresenter#PART_Initial {
+            ^:pointerover /template/ ContentPresenter#PART_Initial {
                 @include Helpers("State");
             }
             Width: 12d;
@@ -124,7 +124,7 @@ public sealed class AkcssThemeIncrementalParserTests
     }
 
     [Theory]
-    [InlineData("&:pointerover", "& :pointerover")]
+    [InlineData("^:pointerover", "&:pointerover")]
     [InlineData("/template/", "template/")]
     [InlineData("/template/", "/template")]
     [InlineData("Helpers(\"First\");", "Helpers(\"First\";")]
@@ -161,6 +161,112 @@ public sealed class AkcssThemeIncrementalParserTests
         Assert.False(actual.ContainsDiagnostics);
         Assert.Same(Members(old)[0].Green, Members(direct)[0].Green);
         Assert.Same(Members(old)[0].Green, Members(actual)[0].Green);
+    }
+
+    public static IEnumerable<object[]> SelectorEdits()
+    {
+        (string Before, string After, bool Broken)[] pairs =
+        {
+            ("^:pointerover", "^ :pointerover", false),
+            ("ContentPresenter#PART_Initial", "ContentPresenter #PART_Initial", false),
+            ("Button.primary", "Button .primary", false),
+            (" /template/ ContentPresenter", " ContentPresenter", false),
+            ("Border TextBlock", "Border > TextBlock", false),
+            ("<First, Second>", "<First, Third>", false),
+            ("^:pointerover", "&:pointerover", true),
+            ("Button.primary", "Button/* with spaces */.primary", false),
+            ("Button.primary", "Button/* with spaces */ .primary", false),
+            ("Second>) > TextBlock", "Second> > TextBlock", true),
+            ("Grid > TextBlock { }", "Grid > TextBlock ;", true),
+            ("</ContentPresenter>\n    }", "</ContentPresenter>", true),
+        };
+
+        foreach (var inline in new[] { false, true })
+        {
+            foreach (var (before, after, broken) in pairs)
+            {
+                yield return new object[] { inline, before, before, after, broken };
+                yield return new object[] { inline, before, after, before, false };
+            }
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(SelectorEdits))]
+    public void SelectorEditsMatchFreshParseAndReuseUnchangedNeighbors(
+        bool inline, string fixtureText, string before, string after, bool hasDiagnostics)
+    {
+        var body = Fixture + "\n\nButton.primary { }\n\nBorder TextBlock { }\n\n" +
+            "(global::Demo.Border<First, Second>) > TextBlock { }\n\n" +
+            "Grid > TextBlock { }\n\n.following { Width: 8d; }";
+        var source = (inline ? WrapInline(body) : body).ReplaceLineEndings("\n");
+        if (fixtureText != before)
+        {
+            var start = source.IndexOf(fixtureText, StringComparison.Ordinal);
+            Assert.True(start >= 0);
+            source = source.Remove(start, fixtureText.Length).Insert(start, before);
+        }
+
+        var edit = NarrowReplacement(source, before, after);
+        var (old, direct, actual) = ApplyEdits(source, inline, edit);
+        Assert.Equal(hasDiagnostics, direct.ContainsDiagnostics);
+        Assert.Equal(hasDiagnostics, actual.ContainsDiagnostics);
+        Assert.Same(Members(old)[0].Green, Members(direct)[0].Green);
+        Assert.Same(Members(old).Last().Green, Members(direct).Last().Green);
+
+        // The standalone tree API reparses when either tree has diagnostics.
+        if (inline || !old.ContainsDiagnostics && !hasDiagnostics)
+        {
+            Assert.Same(Members(old)[0].Green, Members(actual)[0].Green);
+            Assert.Same(Members(old).Last().Green, Members(actual).Last().Green);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, "@theme global::Demo.Controls.Button FollowingTheme { }")]
+    [InlineData(true, "@theme global::Demo.Controls.Button FollowingTheme { }")]
+    [InlineData(false, "(global::Avalonia.Controls.Border) TextBlock { FontSize: 14d; }")]
+    [InlineData(true, "(global::Avalonia.Controls.Border) TextBlock { FontSize: 14d; }")]
+    public void TemplateDelimiterEditsPreserveTheFollowingDeclaration(bool inline, string following)
+    {
+        const string braces = "    }\n}\n";
+        var body = "@theme Button T {\n    @template {\n        <Border />\n" + braces + following +
+            "\n\n@mixin Button Unchanged() { }";
+        var source = inline ? WrapInline(body) : body;
+        var (old, direct, broken) = ApplyEdits(source, inline, Replacement(source, braces, ""));
+        var theme = Assert.IsType<AkcssThemeDeclarationSyntax>(Members(broken)[0]);
+        Assert.True(Assert.IsType<AkcssTemplateDirectiveSyntax>(Assert.Single(theme.Members)).Body.CloseBraceToken.IsMissing);
+        Assert.False(Members(broken)[1].ContainsDiagnostics);
+        Assert.Equal(following, Members(broken)[1].ToFullString().Trim());
+        Assert.Same(Members(old).Last().Green, Members(direct).Last().Green);
+        if (inline)
+        {
+            Assert.Same(Members(old).Last().Green, Members(broken).Last().Green);
+        }
+        var start = source.IndexOf(braces, StringComparison.Ordinal);
+        var (_, _, restored) = ApplyEdits(broken.ToFullString(), inline, new TextChange(new TextSpan(start, 0), braces));
+        Assert.False(restored.ContainsDiagnostics);
+        AssertExactSource(source, restored);
+    }
+
+    private static TextChange NarrowReplacement(string source, string original, string replacement)
+    {
+        var edit = Replacement(source, original, replacement);
+        var start = 0;
+        var oldEnd = original.Length;
+        var newEnd = replacement.Length;
+        while (start < oldEnd && start < newEnd && original[start] == replacement[start])
+        {
+            start++;
+        }
+
+        while (start < oldEnd && start < newEnd && original[oldEnd - 1] == replacement[newEnd - 1])
+        {
+            oldEnd--;
+            newEnd--;
+        }
+
+        return new TextChange(new TextSpan(edit.Span.Start + start, oldEnd - start), replacement[start..newEnd]);
     }
 
     private static MarkupElementSyntax FindMarkupElement(AkburaSyntax root, string name) =>

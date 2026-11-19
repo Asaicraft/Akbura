@@ -87,7 +87,7 @@ public sealed class AkcssThemeSyntaxFactoryTests
     public void NestedSelectorPreservesAnchorTraversalAndCompoundOrder()
     {
         var initial = AkcssParentCompoundSelectorSyntax(
-            AkcssParentSelectorSyntax(Token(SyntaxKind.AmpersandToken)),
+            AkcssParentSelectorSyntax(Token(SyntaxKind.CaretToken)),
             SingletonList<AkcssSelectorComponentSyntax>(AkcssPseudoClassSelectorSyntax(
                 Token(SyntaxKind.ColonToken),
                 IdentifierName(IdentifierWithTrailingSpace("pointerover")))));
@@ -101,11 +101,14 @@ public sealed class AkcssThemeSyntaxFactoryTests
             Token(SyntaxKind.TemplateKeyword),
             TokenWithTrailingSpace(SyntaxKind.SlashToken),
             target);
-        var selector = AkcssNestedSelectorSyntax(initial, SingletonList(traversal));
+        var selector = AkcssSelectorSyntax(initial, SingletonList<AkcssSelectorStepSyntax>(traversal));
 
-        Assert.Equal("&:pointerover /template/ ContentPresenter#PART_ContentPresenter", selector.ToFullString());
-        Assert.Equal(SyntaxKind.AmpersandToken, selector.Initial.Anchor.AmpersandToken.Kind);
-        Assert.Same(selector.Initial, selector.Initial.Anchor.Parent);
+        Assert.Equal("^:pointerover /template/ ContentPresenter#PART_ContentPresenter", selector.ToFullString());
+        var parent = Assert.IsType<AkcssParentCompoundSelectorSyntax>(selector.Initial);
+        Assert.Equal(SyntaxKind.CaretToken, parent.Anchor.CaretToken.Kind);
+        Assert.Same(parent, parent.Anchor.Parent);
+        Assert.Same(parent.Anchor, parent.Anchor.WithCaretToken(parent.Anchor.CaretToken));
+        Assert.Throws<ArgumentException>(() => parent.Anchor.WithCaretToken(Token(SyntaxKind.AmpersandToken)));
         Assert.Same(selector, new IdentityRewriter().Visit(selector));
 
         var parenthesized = AkcssParenthesizedSelectorTypeSyntax(
@@ -114,6 +117,58 @@ public sealed class AkcssThemeSyntaxFactoryTests
             Token(SyntaxKind.CloseParenToken));
         Assert.Equal("(global::Controls.ContentPresenter)", AkcssTypeSelectorSyntax(parenthesized).ToFullString());
         Assert.Throws<ArgumentException>(() => AkcssTypeSelectorSyntax(IdentifierName("ContentPresenter")));
+    }
+
+    [Fact]
+    public void SharedSelectorStepsKeepSlotsPositionsAndMetadataThroughUpdates()
+    {
+        var initial = AkcssCompoundSelectorSyntax(SingletonList<AkcssSelectorComponentSyntax>(
+            AkcssClassSelectorSyntax(Token(SyntaxKind.DotToken), IdentifierName(IdentifierWithTrailingSpace("card")))));
+        var target = AkcssCompoundSelectorSyntax(SingletonList<AkcssSelectorComponentSyntax>(
+            AkcssClassSelectorSyntax(Token(SyntaxKind.DotToken), IdentifierName(IdentifierWithTrailingSpace("label")))));
+        var descendant = AkcssDescendantSelectorSyntax(target);
+        var child = AkcssChildSelectorSyntax(TokenWithTrailingSpace(SyntaxKind.GreaterThanToken),
+            AkcssCompoundSelectorSyntax(SingletonList<AkcssSelectorComponentSyntax>(AkcssTypeSelectorSyntax(TypeFragment("TextBlock ")))));
+        var selector = AkcssSelectorSyntax(initial, List<AkcssSelectorStepSyntax>([descendant, child]));
+        var rule = AkcssSelectorRuleSyntax(selector, Token(SyntaxKind.OpenBraceToken), default, Token(SyntaxKind.CloseBraceToken));
+
+        const string text = ".card .label > TextBlock {}";
+        Assert.Equal(text, rule.ToFullString());
+        Assert.Equal(new TextSpan(0, text.Length), rule.FullSpan);
+        Assert.Same(rule, rule.Selector.Parent);
+        var parsedDescendant = Assert.IsType<AkcssDescendantSelectorSyntax>(rule.Selector.Steps[0]);
+        var parsedChild = Assert.IsType<AkcssChildSelectorSyntax>(rule.Selector.Steps[1]);
+        Assert.Same(parsedDescendant, parsedDescendant.Target.Parent);
+        Assert.Same(parsedChild, parsedChild.Target.Parent);
+        Assert.Same(parsedChild, parsedChild.GreaterThanToken.Parent);
+        Assert.Equal(rule.Selector.Initial.FullSpan.End, parsedDescendant.FullSpan.Start);
+        Assert.Equal(parsedDescendant.FullSpan.End, parsedChild.GreaterThanToken.Span.Start);
+        Assert.Equal(parsedChild.GreaterThanToken.FullSpan.End, parsedChild.Target.FullSpan.Start);
+        Assert.Equal(parsedChild.Target.FullSpan.End, rule.OpenBrace.FullSpan.Start);
+
+        Assert.Same(rule, new IdentityRewriter().Visit(rule));
+        Assert.Same(rule.Green, new GreenSyntaxRewriter().Visit(rule.Green));
+        Assert.Same(parsedChild, parsedChild.UpdateAkcssChildSelectorSyntax(parsedChild.GreaterThanToken, parsedChild.Target));
+        Assert.Throws<ArgumentException>(() => parsedChild.WithGreaterThanToken(Token(SyntaxKind.SlashToken)));
+
+        var diagnostic = new SyntaxDiagnosticInfo(0, 1, ErrorCodes.ERR_SyntaxError, ["selector"]);
+        var annotation = new AkburaSyntaxAnnotation("selector test");
+        var decorated = child.WithDiagnostics(diagnostic).WithAnnotations(annotation);
+        var updated = decorated.WithTarget(target);
+        Assert.Same(diagnostic, Assert.Single(updated.GetDiagnostics()));
+        Assert.Same(annotation, Assert.Single(updated.GetAnnotations()));
+        var rewritten = Assert.IsType<GreenAkcssChildSelectorSyntax>(new ReplaceChildTokenRewriter().Visit(decorated.Green));
+        Assert.Same(diagnostic, Assert.Single(rewritten.GetDiagnostics()));
+        Assert.Same(annotation, Assert.Single(rewritten.GetAnnotations()));
+        Assert.Equal(" >", rewritten.GreaterThanToken.ToFullString());
+    }
+
+    private sealed class ReplaceChildTokenRewriter : GreenSyntaxRewriter
+    {
+        public override GreenNode? VisitToken(GreenSyntaxToken? token) =>
+            token?.Kind == SyntaxKind.GreaterThanToken
+                ? GreenSyntaxFactory.Token(GreenSyntaxFactory.Whitespace(" "), SyntaxKind.GreaterThanToken, null)
+                : base.VisitToken(token);
     }
 
     private static CSharpTypeSyntax TypeFragment(string text) => CSharpTypeSyntax(TokenList(CSharpRawToken(text)));

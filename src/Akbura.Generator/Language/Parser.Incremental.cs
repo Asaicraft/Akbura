@@ -241,7 +241,7 @@ internal sealed partial class Parser
             return ParseIncrementalAkcssUtilitiesSectionSyntaxCore();
         }
 
-        return ParseIncrementalAkcssStyleRuleSyntaxCore();
+        return ParseAkcssSelectorRule(incremental: true);
     }
 
     private GreenAkcssUsingDirectiveSyntax ParseIncrementalAkcssUsingDirectiveSyntaxCore()
@@ -263,32 +263,6 @@ internal sealed partial class Parser
             semicolon);
     }
 
-    private GreenAkcssStyleRuleSyntax ParseIncrementalAkcssStyleRuleSyntaxCore()
-    {
-        if (TryReadReusableIncrementalNode<GreenAkcssStyleRuleSyntax>(out var rule))
-        {
-            return rule;
-        }
-
-        var selector = ParseIncrementalAkcssStyleSelectorSyntax();
-        var openBrace = ReadRequiredIncrementalToken(SyntaxKind.OpenBraceToken);
-        var members = ParseIncrementalAkcssBodyMemberList();
-        var closeBrace = ReadRequiredIncrementalToken(SyntaxKind.CloseBraceToken);
-
-        return GreenSyntaxFactory.AkcssStyleRuleSyntax(selector, openBrace, members, closeBrace);
-    }
-
-    private GreenAkcssStyleSelectorSyntax ParseIncrementalAkcssStyleSelectorSyntax()
-    {
-        if (TryReadReusableIncrementalNode<GreenAkcssStyleSelectorSyntax>(out var selector))
-        {
-            return selector;
-        }
-
-        var (openParen, targetType, closeParen, dotToken, name) = ParseIncrementalAkcssStyleSelectorParts();
-        return GreenSyntaxFactory.AkcssStyleSelectorSyntax(openParen, targetType, closeParen, dotToken, name);
-    }
-
     private GreenAkcssUtilitiesSectionSyntax ParseIncrementalAkcssUtilitiesSectionSyntaxCore()
     {
         if (TryReadReusableIncrementalNode<GreenAkcssUtilitiesSectionSyntax>(out var section))
@@ -304,7 +278,7 @@ internal sealed partial class Parser
         try
         {
             while (PeekIncrementalTokenKind() is not (SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken) &&
-                !IsAkcssNamedDeclarationStart(incremental: true))
+                !IsAkcssTopLevelDirectiveStart(incremental: true))
             {
                 _cancellationToken.ThrowIfCancellationRequested();
                 utilities.Add(ParseIncrementalAkcssUtilityDeclarationSyntax());
@@ -332,12 +306,7 @@ internal sealed partial class Parser
             return utility;
         }
 
-        var selector = ParseIncrementalAkcssUtilitySelectorSyntax();
-        var openBrace = ReadRequiredIncrementalToken(SyntaxKind.OpenBraceToken);
-        var members = ParseIncrementalAkcssBodyMemberList();
-        var closeBrace = ReadRequiredIncrementalToken(SyntaxKind.CloseBraceToken);
-
-        return GreenSyntaxFactory.AkcssUtilityDeclarationSyntax(selector, openBrace, members, closeBrace);
+        return ParseAkcssUtilityBody(ParseIncrementalAkcssUtilitySelectorSyntax(), incremental: true);
     }
 
     private GreenAkcssUtilitySelectorSyntax ParseIncrementalAkcssUtilitySelectorSyntax()
@@ -399,8 +368,7 @@ internal sealed partial class Parser
 
         try
         {
-            while (PeekIncrementalTokenKind() is not (SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken) &&
-                !IsAkcssNamedDeclarationStart(incremental: true))
+            while (!IsAkcssBodyEnd(incremental: true))
             {
                 _cancellationToken.ThrowIfCancellationRequested();
                 members.Add(ParseIncrementalAkcssBodyMemberSyntax());
@@ -602,25 +570,6 @@ internal sealed partial class Parser
         var state = ParseIncrementalAkcssSimpleName();
 
         return GreenSyntaxFactory.AkcssAdditionalPseudoStateSyntax(atToken, state);
-    }
-
-    private (
-        GreenSyntaxToken? OpenParen,
-        GreenCSharpTypeSyntax? TargetType,
-        GreenSyntaxToken? CloseParen,
-        GreenSyntaxToken? DotToken,
-        GreenSimpleNameSyntax? Name) ParseIncrementalAkcssStyleSelectorParts()
-    {
-        var (openParen, targetType, closeParen) = ParseIncrementalAkcssOptionalSelectorTarget();
-
-        if (PeekIncrementalTokenKind() == SyntaxKind.DotToken)
-        {
-            var dotToken = ReadRequiredIncrementalToken(SyntaxKind.DotToken);
-            var name = ParseIncrementalAkcssSimpleName();
-            return (openParen, targetType, closeParen, dotToken, name);
-        }
-
-        return (openParen, targetType, closeParen, null, null);
     }
 
     private (

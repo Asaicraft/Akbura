@@ -47,7 +47,7 @@ internal sealed partial class Lexer
             if (character == '<' && next == '/' ||
                 braces == 0 && (character is ';' or '}' ||
                     character == ')' && parentheses == 0 && brackets == 0 ||
-                    character == '&' && next is '.' or ':' or '#'))
+                    brackets == 0 && (character is '^' or '&') && IsFollowingAkcssSelector()))
             {
                 break;
             }
@@ -149,6 +149,23 @@ internal sealed partial class Lexer
         LexerMode.InAkcssIncludeArguments => CSharpFactory.ParseArgumentList(text),
         _ => CSharpFactory.ParseExpression(text, consumeFullText: mode != LexerMode.InAkcssBasedOnExpression),
     };
+
+    private bool IsFollowingAkcssSelector()
+    {
+        // Only stop at punctuation that cannot start the right operand of a
+        // C# binary expression. In particular, . followed by a digit is a literal.
+        var offset = 1;
+        while (char.IsWhiteSpace(TextWindow.PeekChar(offset)))
+        {
+            offset++;
+        }
+
+        var character = TextWindow.PeekChar(offset);
+        var next = TextWindow.PeekChar(offset + 1);
+        return character is ':' or '#' or '>' or '{' ||
+            character == '.' && SyntaxFacts.IsIdentifierStartCharacter(next) ||
+            character == '/' && next is not ('*' or '/');
+    }
 
     private bool IsFollowingAkcssDirective()
     {

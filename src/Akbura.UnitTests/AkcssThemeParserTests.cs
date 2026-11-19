@@ -19,13 +19,13 @@ public sealed class AkcssThemeParserTests
         }
 
         @mixin Button ButtonStates(string prefix) {
-            &:pointerover /template/ ContentPresenter#PART_ContentPresenter {
+            ^:pointerover /template/ ContentPresenter#PART_ContentPresenter {
                 @include PresenterBrushes(prefix, "PointerOver");
             }
-            &:pressed /template/ ContentPresenter#PART_ContentPresenter {
+            ^:pressed /template/ ContentPresenter#PART_ContentPresenter {
                 @include PresenterBrushes(prefix, "Pressed");
             }
-            &:disabled /template/ ContentPresenter#PART_ContentPresenter {
+            ^:disabled /template/ ContentPresenter#PART_ContentPresenter {
                 @include PresenterBrushes(prefix, "Disabled");
             }
         }
@@ -37,11 +37,11 @@ public sealed class AkcssThemeParserTests
                     @include DefaultContentPresenterTBind();
                 </ContentPresenter>
             }
-            & /template/ #PART_ContentPresenter { RecognizesAccessKey: true; }
+            ^ /template/ #PART_ContentPresenter { RecognizesAccessKey: true; }
             @include ButtonStates("Button");
-            &.accent {
+            ^.accent {
                 @include ButtonStates("AccentButton");
-                &:focus-visible /template/ (global::Demo.Controls.Presenter<First, Second>)#PART_ContentPresenter {
+                ^:focus-visible /template/ (global::Demo.Controls.Presenter<First, Second>)#PART_ContentPresenter {
                     Background: Amx.DynamicResource("AccentButtonBackgroundPressed");
                 }
             }
@@ -91,10 +91,11 @@ public sealed class AkcssThemeParserTests
         var states = Assert.IsType<AkcssMixinDeclarationSyntax>(members[2]);
         Assert.Equal(3, states.Members.Count);
         var firstRule = Assert.IsType<AkcssNestedStyleRuleSyntax>(states.Members[0]);
-        Assert.Equal(SyntaxKind.AmpersandToken, firstRule.Selector.Initial.Anchor.AmpersandToken.Kind);
+        var initial = Assert.IsType<AkcssParentCompoundSelectorSyntax>(firstRule.Selector.Initial);
+        Assert.Equal(SyntaxKind.CaretToken, initial.Anchor.CaretToken.Kind);
         Assert.Equal("pointerover",
-            Assert.IsType<AkcssPseudoClassSelectorSyntax>(Assert.Single(firstRule.Selector.Initial.Components)).Name.Identifier.ValueText);
-        var traversal = Assert.Single(firstRule.Selector.Traversals);
+            Assert.IsType<AkcssPseudoClassSelectorSyntax>(Assert.Single(initial.Components)).Name.Identifier.ValueText);
+        var traversal = Assert.IsType<AkcssTemplateTraversalSyntax>(Assert.Single(firstRule.Selector.Steps));
         Assert.Equal(SyntaxKind.SlashToken, traversal.OpenSlash.Kind);
         Assert.Equal(SyntaxKind.TemplateKeyword, traversal.TemplateKeyword.Kind);
         Assert.Equal(SyntaxKind.SlashToken, traversal.CloseSlash.Kind);
@@ -117,11 +118,11 @@ public sealed class AkcssThemeParserTests
         Assert.Equal(SyntaxKind.SemicolonToken, markupInclude.Directive.Semicolon.Kind);
         Assert.Same(markupInclude, markupInclude.Directive.Parent);
         var accent = Assert.IsType<AkcssNestedStyleRuleSyntax>(theme.Members[4]);
-        Assert.IsType<AkcssClassSelectorSyntax>(Assert.Single(accent.Selector.Initial.Components));
+        Assert.IsType<AkcssClassSelectorSyntax>(Assert.Single(Assert.IsType<AkcssParentCompoundSelectorSyntax>(accent.Selector.Initial).Components));
         var focus = Assert.IsType<AkcssNestedStyleRuleSyntax>(accent.Members[1]);
         Assert.Equal("focus-visible",
-            Assert.IsType<AkcssPseudoClassSelectorSyntax>(Assert.Single(focus.Selector.Initial.Components)).Name.Identifier.ValueText);
-        var typed = Assert.IsType<AkcssTypeSelectorSyntax>(Assert.Single(focus.Selector.Traversals).Target.Components[0]);
+            Assert.IsType<AkcssPseudoClassSelectorSyntax>(Assert.Single(Assert.IsType<AkcssParentCompoundSelectorSyntax>(focus.Selector.Initial).Components)).Name.Identifier.ValueText);
+        var typed = Assert.IsType<AkcssTypeSelectorSyntax>(Assert.IsType<AkcssTemplateTraversalSyntax>(Assert.Single(focus.Selector.Steps)).Target.Components[0]);
         Assert.IsType<AkcssParenthesizedSelectorTypeSyntax>(typed.Type);
 
         var compact = Assert.IsType<AkcssThemeDeclarationSyntax>(members[4]);
@@ -250,10 +251,10 @@ public sealed class AkcssThemeParserTests
     [InlineData("@theme Button Broken { @template-bin Background; }")]
     [InlineData("@theme Button Broken { @based-o Hello.MyTheme; }")]
     [InlineData("@theme Button Broken { @based-on Hello.MyTheme }")]
-    [InlineData("@theme Button Broken { & /template/ { } }")]
-    [InlineData("@theme Button Broken { & :pointerover { } }")]
-    [InlineData("@theme Button Broken { & > Child { } }")]
-    [InlineData("@theme Button Broken { &:pointerover template/ #Part { } }")]
+    [InlineData("@theme Button Broken { ^ /template/ { } }")]
+    [InlineData("@theme Button Broken { ^: pointerover { } }")]
+    [InlineData("@theme Button Broken { ^ > > Child { } }")]
+    [InlineData("@theme Button Broken { ^:pointerover template/ #Part { } }")]
     public void MalformedSyntaxRoundTripsAndKeepsFollowingTheme(string malformed)
     {
         var source = malformed + "\r\n@theme Button FollowingTheme { Padding: (8, 4); }\r\n";
@@ -278,7 +279,7 @@ public sealed class AkcssThemeParserTests
             """ + "\n" + closingTag + "\n" + """
                 }
 
-                &:pointerover { Opacity: 0.8d; }
+                ^:pointerover { Opacity: 0.8d; }
             }
             @theme Button FollowingTheme { Padding: (8, 4); }
             """;
@@ -297,12 +298,65 @@ public sealed class AkcssThemeParserTests
     [InlineData("@mixin Button M(")]
     [InlineData("@theme Button T { @template { <Grid")]
     [InlineData("@theme Button T { @template { <Grid>text @template-bind Background,")]
-    [InlineData("@theme Button T { & /template/")]
+    [InlineData("@theme Button T { ^ /template/")]
     public void TruncatedAtEofPreservesSource(string source)
     {
         var root = AkcssSyntaxTree.ParseText(source).GetRoot();
         AssertExactSource(source, root);
         Assert.True(root.ContainsDiagnostics);
+    }
+
+    [Fact]
+    public void EmbeddedCSharpKeepsBitwiseOperatorsAndIndexFromEnd()
+    {
+        const string source = """
+            @theme Button OperatorTheme {
+                @if ((flags & mask) != 0) {
+                    Value: flags ^ mask;
+                    Swap: flags & mask;
+                    Enabled: left && right;
+                    Item: items[^1];
+                }
+                @include Values(flags & mask, flags ^ mask, items[^1], left && right, "^ &");
+                @based-on Resolve(flags ^ mask);
+                ^:pointerover { Opacity: 0.8d; }
+            }
+            """;
+        var root = AkcssSyntaxTree.ParseText(source).GetRoot();
+        AssertExactSource(source, root);
+        Assert.False(root.ContainsDiagnostics);
+        var theme = Assert.IsType<AkcssThemeDeclarationSyntax>(Assert.Single(root.Members));
+        var conditional = Assert.IsType<AkcssIfDirectiveSyntax>(theme.Members[0]);
+        Assert.Equal("(flags & mask) != 0", conditional.Condition.GetRawCSharpExpression()!.ToString());
+        Assert.Equal(new[] { "flags ^ mask", "flags & mask", "left && right", "items[^1]" },
+            conditional.Members.Cast<AkcssAssignmentSyntax>()
+                .Select(assignment => assignment.Expression.GetRawCSharpExpression()!.ToString()));
+        var include = Assert.IsType<AkcssIncludeDirectiveSyntax>(theme.Members[1]);
+        Assert.Equal(new[] { "flags & mask", "flags ^ mask", "items[^1]", "left && right", "\"^ &\"" },
+            include.Directive.Arguments.Arguments.Select(argument => argument.GetRawCSharpExpression()!.ToString()));
+        var basedOn = Assert.IsType<AkcssBasedOnDirectiveSyntax>(theme.Members[2]);
+        Assert.Equal("Resolve(flags ^ mask)", basedOn.Expression.GetRawCSharpExpression()!.ToString());
+        Assert.IsType<AkcssNestedStyleRuleSyntax>(theme.Members[3]);
+    }
+
+    [Fact]
+    public void BrokenCSharpArgumentListStopsBeforeACaretRule()
+    {
+        const string source = """
+            @theme Button OperatorTheme {
+                @include Values(flags ^ mask
+                ^ > TextBlock { Opacity: 1d; }
+            }
+            """;
+        var root = AkcssSyntaxTree.ParseText(source).GetRoot();
+        AssertExactSource(source, root);
+        var theme = Assert.IsType<AkcssThemeDeclarationSyntax>(Assert.Single(root.Members));
+        var include = Assert.IsType<AkcssIncludeDirectiveSyntax>(theme.Members[0]);
+        Assert.True(include.Directive.Arguments.CloseParen.IsMissing);
+        Assert.Equal("flags ^ mask", Assert.Single(include.Directive.Arguments.Arguments).GetRawCSharpExpression()!.ToString());
+        var rule = Assert.IsType<AkcssNestedStyleRuleSyntax>(theme.Members[1]);
+        Assert.False(rule.ContainsDiagnostics);
+        Assert.IsType<AkcssChildSelectorSyntax>(Assert.Single(rule.Selector.Steps));
     }
 
     internal static string WrapInline(string akcss) => "@akcss {\n" + akcss + "\n}\nstate int counter = 1;\n<Panel />\n";

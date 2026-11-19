@@ -10,13 +10,13 @@ namespace Akbura.Language.Syntax.Green
 {
     internal sealed partial class GreenAkcssNestedStyleRuleSyntax : GreenAkcssBodyMemberSyntax
     {
-        public readonly GreenAkcssNestedSelectorSyntax Selector;
+        public readonly GreenAkcssSelectorSyntax Selector;
         public readonly GreenSyntaxToken OpenBrace;
         public readonly GreenNode? _members;
         public readonly GreenSyntaxToken CloseBrace;
 
         public GreenAkcssNestedStyleRuleSyntax(
-            GreenAkcssNestedSelectorSyntax selector,
+            GreenAkcssSelectorSyntax selector,
             GreenSyntaxToken openBrace,
             GreenNode? members,
             GreenSyntaxToken closeBrace,
@@ -48,7 +48,7 @@ namespace Akbura.Language.Syntax.Green
             new(_members);
 
         public GreenAkcssNestedStyleRuleSyntax UpdateAkcssNestedStyleRuleSyntax(
-            GreenAkcssNestedSelectorSyntax selector,
+            GreenAkcssSelectorSyntax selector,
             GreenSyntaxToken openBrace,
             GreenSyntaxList<GreenAkcssBodyMemberSyntax> members,
             GreenSyntaxToken closeBrace)
@@ -77,7 +77,7 @@ namespace Akbura.Language.Syntax.Green
             return result;
         }
 
-        public GreenAkcssNestedStyleRuleSyntax WithSelector(GreenAkcssNestedSelectorSyntax selector) =>
+        public GreenAkcssNestedStyleRuleSyntax WithSelector(GreenAkcssSelectorSyntax selector) =>
             UpdateAkcssNestedStyleRuleSyntax(selector, OpenBrace, Members, CloseBrace);
 
         public GreenAkcssNestedStyleRuleSyntax WithOpenBrace(GreenSyntaxToken openBrace) =>
@@ -133,7 +133,7 @@ namespace Akbura.Language.Syntax.Green
     internal static partial class GreenSyntaxFactory
     {
         public static GreenAkcssNestedStyleRuleSyntax AkcssNestedStyleRuleSyntax(
-            GreenAkcssNestedSelectorSyntax selector,
+            GreenAkcssSelectorSyntax selector,
             GreenSyntaxToken openBrace,
             GreenSyntaxList<GreenAkcssBodyMemberSyntax> members,
             GreenSyntaxToken closeBrace)
@@ -172,7 +172,7 @@ namespace Akbura.Language.Syntax.Green
     {
         public override GreenNode? VisitAkcssNestedStyleRuleSyntax(GreenAkcssNestedStyleRuleSyntax node) =>
             node.UpdateAkcssNestedStyleRuleSyntax(
-                (GreenAkcssNestedSelectorSyntax)Visit(node.Selector)!,
+                (GreenAkcssSelectorSyntax)Visit(node.Selector)!,
                 (GreenSyntaxToken)VisitToken(node.OpenBrace),
                 VisitList(node.Members),
                 (GreenSyntaxToken)VisitToken(node.CloseBrace));
@@ -193,8 +193,8 @@ namespace Akbura.Language.Syntax
 
         internal new GreenAkcssNestedStyleRuleSyntax Green => Unsafe.As<GreenAkcssNestedStyleRuleSyntax>(base.Green);
 
-        public AkcssNestedSelectorSyntax Selector =>
-            (AkcssNestedSelectorSyntax)GetRed(ref _selector, 0)!;
+        public AkcssSelectorSyntax Selector =>
+            (AkcssSelectorSyntax)GetRed(ref _selector, 0)!;
 
         public SyntaxToken OpenBrace =>
             new(this, Green.OpenBrace, GetChildPosition(1), GetChildIndex(1));
@@ -206,7 +206,7 @@ namespace Akbura.Language.Syntax
             new(this, Green.CloseBrace, GetChildPositionFromEnd(1), GetChildIndex(3));
 
         public AkcssNestedStyleRuleSyntax UpdateAkcssNestedStyleRuleSyntax(
-            AkcssNestedSelectorSyntax selector,
+            AkcssSelectorSyntax selector,
             SyntaxToken openBrace,
             SyntaxList<AkcssBodyMemberSyntax> members,
             SyntaxToken closeBrace)
@@ -235,7 +235,7 @@ namespace Akbura.Language.Syntax
             return result;
         }
 
-        public AkcssNestedStyleRuleSyntax WithSelector(AkcssNestedSelectorSyntax selector) =>
+        public AkcssNestedStyleRuleSyntax WithSelector(AkcssSelectorSyntax selector) =>
             UpdateAkcssNestedStyleRuleSyntax(selector, OpenBrace, Members, CloseBrace);
 
         public AkcssNestedStyleRuleSyntax WithOpenBrace(SyntaxToken openBrace) =>
@@ -281,7 +281,7 @@ namespace Akbura.Language.Syntax
     internal static partial class SyntaxFactory
     {
         internal static AkcssNestedStyleRuleSyntax AkcssNestedStyleRuleSyntax(
-            AkcssNestedSelectorSyntax selector,
+            AkcssSelectorSyntax selector,
             SyntaxToken openBrace,
             SyntaxList<AkcssBodyMemberSyntax> members,
             SyntaxToken closeBrace)
@@ -330,7 +330,7 @@ namespace Akbura.Language.Syntax
     {
         public override AkburaSyntax? VisitAkcssNestedStyleRuleSyntax(AkcssNestedStyleRuleSyntax node) =>
             node.UpdateAkcssNestedStyleRuleSyntax(
-                (AkcssNestedSelectorSyntax)Visit(node.Selector)!,
+                (AkcssSelectorSyntax)Visit(node.Selector)!,
                 VisitToken(node.OpenBrace),
                 VisitList(node.Members),
                 VisitToken(node.CloseBrace));

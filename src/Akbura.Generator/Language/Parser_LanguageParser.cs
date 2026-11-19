@@ -309,7 +309,7 @@ partial class Parser
             return ParseAkcssUtilitiesSectionSyntaxCore();
         }
 
-        return ParseAkcssStyleRuleSyntaxCore();
+        return ParseAkcssSelectorRule(incremental: false);
     }
 
     private GreenAkcssUsingDirectiveSyntax ParseAkcssUsingDirectiveSyntaxCore()
@@ -402,7 +402,7 @@ partial class Parser
         try
         {
             while (CurrentToken.Kind is not (SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken) &&
-                !IsAkcssNamedDeclarationStart(incremental: false))
+                !IsAkcssTopLevelDirectiveStart(incremental: false))
             {
                 _cancellationToken.ThrowIfCancellationRequested();
                 utilities.Add(ParseAkcssUtilityDeclarationSyntax());
@@ -425,12 +425,7 @@ partial class Parser
 
     private GreenAkcssUtilityDeclarationSyntax ParseAkcssUtilityDeclarationSyntax()
     {
-        var selector = ParseAkcssUtilitySelectorSyntax();
-        var openBrace = EatAkcssOpenBraceToken();
-        var members = ParseAkcssBodyMemberList();
-        var closeBrace = EatToken(SyntaxKind.CloseBraceToken);
-
-        return GreenSyntaxFactory.AkcssUtilityDeclarationSyntax(selector, openBrace, members, closeBrace);
+        return ParseAkcssUtilityBody(ParseAkcssUtilitySelectorSyntax(), incremental: false);
     }
 
     private GreenAkcssUtilitySelectorSyntax ParseAkcssUtilitySelectorSyntax()
@@ -502,8 +497,7 @@ partial class Parser
 
         try
         {
-            while (CurrentToken.Kind is not (SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken) &&
-                !IsAkcssNamedDeclarationStart(incremental: false))
+            while (!IsAkcssBodyEnd(incremental: false))
             {
                 _cancellationToken.ThrowIfCancellationRequested();
                 members.Add(ParseAkcssBodyMemberSyntax());

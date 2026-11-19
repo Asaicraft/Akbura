@@ -261,7 +261,7 @@ namespace Akbura.Language.Syntax
 		MarkupTemplateBindDirectiveSyntax = 612,
 		AkcssBasedOnDirectiveSyntax = 613,
 		AkcssNestedStyleRuleSyntax = 614,
-		AkcssNestedSelectorSyntax = 615,
+		AkcssSelectorSyntax = 615,
 		AkcssParentCompoundSelectorSyntax = 616,
 		AkcssParentSelectorSyntax = 617,
 		AkcssTemplateTraversalSyntax = 618,
@@ -272,6 +272,11 @@ namespace Akbura.Language.Syntax
 		AkcssClassSelectorSyntax = 623,
 		AkcssNameSelectorSyntax = 624,
 		AkcssPseudoClassSelectorSyntax = 625,
+		AkcssSelectorCompoundSyntax = 626,
+		AkcssSelectorStepSyntax = 627,
+		AkcssDescendantSelectorSyntax = 628,
+		AkcssChildSelectorSyntax = 629,
+		AkcssSelectorRuleSyntax = 630,
 
 		// Identifiers and types
 		Type = 700,

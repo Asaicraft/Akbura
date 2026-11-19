@@ -107,7 +107,8 @@ internal sealed partial class Parser
                 if (kind is SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken or SyntaxKind.LessSlashToken ||
                     IsMarkupConditionalDirectiveStart(incremental, SyntaxKind.ElseKeyword) ||
                     isAkcssTemplateBlock && content.Count > 0 &&
-                    content[content.Count - 1] is GreenMarkupElementContentSyntax &&
+                    content[content.Count - 1] is GreenMarkupElementContentSyntax
+                    { Element: { EndTag: not null } or { StartTag.CloseToken.Kind: SyntaxKind.SlashGreaterToken } } &&
                     IsAkcssDeclarationAfterTemplateMarkup(incremental))
                 {
                     break;

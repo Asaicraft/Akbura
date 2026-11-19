@@ -47,6 +47,8 @@ internal sealed class MetadataAkcssModuleSymbol : Symbol, IMetadataAkcssModuleSy
 
     public ImmutableArray<IAkcssSymbol> AkcssSymbols => _akcssSymbols;
 
+    public ImmutableArray<IAkcssDeclarationOwner> Declarations => ImmutableArray<IAkcssDeclarationOwner>.CastUp(AkcssSymbols);
+
     public string? Path => SourcePath;
 
     public AkburaSyntax? DeclaringSyntax => null;

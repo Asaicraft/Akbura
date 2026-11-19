@@ -23,4 +23,9 @@ internal enum DeclarationKind : byte
     AkcssUsing,
     AkcssStyle,
     AkcssUtility,
+    AkcssSelectorRule,
+    AkcssTheme,
+    AkcssMixin,
+    AkcssMixinParameter,
+    AkcssTemplate,
 }

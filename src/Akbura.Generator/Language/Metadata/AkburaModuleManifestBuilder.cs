@@ -227,7 +227,10 @@ internal static class AkburaModuleManifestBuilder
         using var children = ImmutableArrayBuilder<AkburaModuleDeclaration>.Rent();
         foreach (var child in declaration.Children)
         {
-            children.Add(CreateAkcssDeclaration(child));
+            if (child.Kind is DeclarationKind.AkcssUsing or DeclarationKind.AkcssStyle or DeclarationKind.AkcssUtility)
+            {
+                children.Add(CreateAkcssDeclaration(child));
+            }
         }
 
         var akcssUtility = declaration.Kind == DeclarationKind.AkcssUtility

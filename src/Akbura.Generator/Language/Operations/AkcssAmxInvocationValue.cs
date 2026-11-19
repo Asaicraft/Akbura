@@ -12,12 +12,14 @@ internal readonly struct AkcssAmxInvocationValue
         AkcssAmxInvocationKind kind,
         CSharpSymbolDefinition typeArgument,
         ImmutableArray<ExpressionSyntax> arguments,
-        IMethodSymbol? methodSymbol)
+        IMethodSymbol? methodSymbol,
+        CSharpOperationDefinition key = default)
     {
         Kind = kind;
         TypeArgument = typeArgument;
         Arguments = arguments.IsDefault ? ImmutableArray<ExpressionSyntax>.Empty : arguments;
         MethodSymbol = methodSymbol;
+        Key = key;
     }
 
     public AkcssAmxInvocationKind Kind { get; }
@@ -27,4 +29,6 @@ internal readonly struct AkcssAmxInvocationValue
     public ImmutableArray<ExpressionSyntax> Arguments { get; }
 
     public IMethodSymbol? MethodSymbol { get; }
+
+    public CSharpOperationDefinition Key { get; }
 }

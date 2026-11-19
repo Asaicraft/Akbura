@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using AkburaDocumentSyntax = Akbura.Language.Syntax.AkburaDocumentSyntax;
 using MarkupElementSyntax = Akbura.Language.Syntax.MarkupElementSyntax;
 using MarkupRootSyntax = Akbura.Language.Syntax.MarkupRootSyntax;
 
@@ -376,7 +377,7 @@ internal partial class AkburaSemanticModel
     }
 
     private IEnumerable<string>
-        GetAkburaComponentCandidateMetadataNames(string componentName)
+        GetAkburaComponentCandidateMetadataNames(string componentName, MarkupElementSyntax? site = null)
     {
         var name = componentName.Trim();
         if (name.Length == 0)
@@ -390,7 +391,9 @@ internal partial class AkburaSemanticModel
             yield break;
         }
 
-        var usingDirectives = GetCSharpUsingDirectives();
+        var usingDirectives = site != null && AkcssSemanticFacts.FindTemplate(site) != null
+            ? GetAkcssCSharpUsingDirectives(site)
+            : GetCSharpUsingDirectives();
         var aliasSeparator = name.IndexOf("::", StringComparison.Ordinal);
         if (aliasSeparator > 0)
         {
@@ -434,7 +437,7 @@ internal partial class AkburaSemanticModel
         }
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var @namespace in GetAkburaUsingNamespaces())
+        foreach (var @namespace in GetAkburaUsingNamespaces(usingDirectives))
         {
             var metadataName = @namespace + "." + name;
             if (seen.Add(metadataName))
@@ -443,9 +446,7 @@ internal partial class AkburaSemanticModel
             }
         }
 
-        var currentNamespace = GetAkburaNamespaceText(
-            SyntaxTree.GetRoot(),
-            SyntaxTree);
+        var currentNamespace = GetMarkupDocumentNamespace();
         if (currentNamespace.Length > 0)
         {
             var metadataName = currentNamespace + "." + name;
@@ -460,6 +461,11 @@ internal partial class AkburaSemanticModel
             yield return name;
         }
     }
+
+    internal string GetMarkupDocumentNamespace() =>
+        SyntaxTree.GetRootSyntax() is AkburaDocumentSyntax document
+            ? GetAkburaNamespaceText(document, SyntaxTree)
+            : GetDefaultAkburaNamespaceText(SyntaxTree);
 
     private ImmutableArray<VisibleMarkupNamespace> GetVisibleMarkupNamespaces()
     {
@@ -476,9 +482,7 @@ internal partial class AkburaSemanticModel
             AddVisibleMarkupNamespace(
                 builder,
                 seen,
-                GetAkburaNamespaceText(
-                    SyntaxTree.GetRoot(),
-                    SyntaxTree),
+                GetMarkupDocumentNamespace(),
                 alias: null);
 
             foreach (var directive in GetCSharpUsingDirectives())

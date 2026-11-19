@@ -119,6 +119,12 @@ internal sealed partial class BinderFactory
             return CreateAkcssStyleBinder();
         }
 
+        public override Binder VisitAkcssSelectorRuleSyntax(AkcssSelectorRuleSyntax node) => CreateAkcssStyleBinder();
+
+        public override Binder VisitAkcssThemeDeclarationSyntax(AkcssThemeDeclarationSyntax node) => CreateAkcssStyleBinder();
+
+        public override Binder VisitAkcssMixinDeclarationSyntax(AkcssMixinDeclarationSyntax node) => CreateAkcssStyleBinder();
+
         private MarkupBinder CreateMarkupBinder()
         {
             var declaration = RequiredDeclaration(
@@ -126,7 +132,8 @@ internal sealed partial class BinderFactory
                 DeclarationKind.MarkupElement,
                 DeclarationKind.MarkupConditionalBranch,
                 DeclarationKind.MarkupForeach,
-                DeclarationKind.MarkupCodeBlock);
+                DeclarationKind.MarkupCodeBlock,
+                DeclarationKind.AkcssTemplate);
             var next = Factory.BindingSession.AddContainingBlockBinders(
                 Next,
                 DeclarationFacts.GetSyntax(declaration),
@@ -152,7 +159,10 @@ internal sealed partial class BinderFactory
         {
             var declaration = RequiredDeclaration(
                 DeclarationKind.AkcssStyle,
-                DeclarationKind.AkcssUtility);
+                DeclarationKind.AkcssUtility,
+                DeclarationKind.AkcssSelectorRule,
+                DeclarationKind.AkcssTheme,
+                DeclarationKind.AkcssMixin);
             return new AkcssStyleBinder(
                 Factory.SemanticModel,
                 Next,

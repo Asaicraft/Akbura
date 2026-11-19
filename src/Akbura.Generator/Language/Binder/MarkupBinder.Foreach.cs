@@ -143,6 +143,13 @@ internal sealed partial class MarkupBinder
                 body.Add(new(nested, foreachStatement: bound));
                 continue;
             }
+            if (syntax is MarkupIncludeDirectiveSyntax or MarkupTemplateBindDirectiveSyntax)
+            {
+                children.Add(SemanticModel.BindingSession.BindSemanticSyntax(syntax));
+                body.Add(new(syntax));
+                continue;
+            }
+
             var content = SemanticModel.CreateMarkupChildren(owner, SyntaxFactory.SingletonList(syntax), model,
                 out var contentDiagnostics, ownerType);
             diagnostics.AddRange(contentDiagnostics);

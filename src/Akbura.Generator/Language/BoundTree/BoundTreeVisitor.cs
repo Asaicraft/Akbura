@@ -80,6 +80,8 @@ internal abstract class BoundTreeVisitor
 
     public virtual void VisitAkcssIntercept(BoundAkcssIntercept node) => DefaultVisit(node);
 
+    public virtual void VisitAkcssContextual(BoundAkcssContextual node) => DefaultVisit(node);
+
     public virtual void VisitExpression(BoundExpression node) => DefaultVisit(node);
 
     public virtual void VisitUseHookInvocation(BoundUseHookInvocation node) => VisitExpression(node);
@@ -182,6 +184,8 @@ internal abstract class BoundTreeVisitor<TResult>
     public virtual TResult? VisitAkcssApply(BoundAkcssApply node) => DefaultVisit(node);
 
     public virtual TResult? VisitAkcssIntercept(BoundAkcssIntercept node) => DefaultVisit(node);
+
+    public virtual TResult? VisitAkcssContextual(BoundAkcssContextual node) => DefaultVisit(node);
 
     public virtual TResult? VisitExpression(BoundExpression node) => DefaultVisit(node);
 
@@ -323,6 +327,8 @@ internal abstract class BoundTreeVisitor<TParameter, TResult>
 
     public virtual TResult? VisitAkcssIntercept(BoundAkcssIntercept node, TParameter parameter) =>
         DefaultVisit(node, parameter);
+
+    public virtual TResult? VisitAkcssContextual(BoundAkcssContextual node, TParameter parameter) => DefaultVisit(node, parameter);
 
     public virtual TResult? VisitExpression(BoundExpression node, TParameter parameter) =>
         DefaultVisit(node, parameter);

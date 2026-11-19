@@ -43,7 +43,7 @@ internal sealed class AkcssStyleSymbol : Symbol, IAkcssSymbol
 
     public string? ClassName { get; }
 
-    AkburaSyntax IAkcssSymbol.DeclarationSyntax => DeclarationSyntax;
+    AkburaSyntax IAkcssDeclarationOwner.DeclarationSyntax => DeclarationSyntax;
 
     public AkcssStyleRuleSyntax DeclarationSyntax { get; }
 

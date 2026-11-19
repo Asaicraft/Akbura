@@ -75,6 +75,19 @@ internal static class AkburaDiagnosticEngine
     {
         var owner = GetSourceOwner(tree, semanticModel, diagnostic.Syntax);
         var record = CreateRecord(owner.Tree, diagnostic, diagnostic.Span, AkburaDiagnosticKind.Semantic);
+        if (!diagnostic.RelatedSyntax.IsEmpty)
+        {
+            var related = ImmutableArray.CreateBuilder<AkburaDiagnosticLocation>(diagnostic.RelatedSyntax.Length);
+            foreach (var syntax in diagnostic.RelatedSyntax)
+            {
+                var relatedOwner = GetSourceOwner(tree, semanticModel, syntax);
+                var span = ClampSpan(syntax.Span.Start, syntax.Span.Length, relatedOwner.Tree.Text.Length);
+                related.Add(new AkburaDiagnosticLocation(relatedOwner.Tree.FilePath, span,
+                    relatedOwner.Tree.Text.Lines.GetLinePositionSpan(span)));
+            }
+
+            record = record with { AdditionalLocations = related.MoveToImmutable() };
+        }
         if (owner.ModuleIdentity != null)
         {
             return record with { Properties = record.Properties.Add("akbura.module-identity", owner.ModuleIdentity) };

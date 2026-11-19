@@ -11,7 +11,15 @@ internal sealed partial class MarkupBinder
 {
     private BoundMarkupIfStatement BindMarkupIfStatement(MarkupIfStatementSyntax syntax)
     {
-        var owner = AkburaSemanticModel.GetContainingMarkupElement(syntax)!;
+        var owner = AkburaSemanticModel.GetContainingMarkupElement(syntax);
+        if (owner is null)
+        {
+            var error = new AkburaSemanticDiagnostic(syntax, ErrorCodes.AKBURA_SEMANTIC_AkcssTemplate,
+                ["A markup condition requires an owning element."]);
+            SemanticModel.SetSemanticDiagnostics(syntax, [error]);
+            return new BoundMarkupIfStatement(syntax, this, [], [error]);
+        }
+
         var ownerSymbol = SemanticModel.GetSymbolInfo(owner).Symbol;
         var model = ownerSymbol switch
         {

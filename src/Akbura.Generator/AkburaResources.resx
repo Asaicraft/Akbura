@@ -438,4 +438,25 @@
   <data name="AKBURA_SEMANTIC_ForeachKeyInvalid" xml:space="preserve">
     <value>Invalid markup foreach identity key: {0}.</value>
   </data>
+  <data name="AKBURA_SEMANTIC_AkcssSelector" xml:space="preserve">
+    <value>{0}</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_AkcssMixin" xml:space="preserve">
+    <value>{0}</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_AkcssTemplate" xml:space="preserve">
+    <value>{0}</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_AkcssTemplateBinding" xml:space="preserve">
+    <value>{0}</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_AkcssBaseTheme" xml:space="preserve">
+    <value>{0}</value>
+  </data>
+  <data name="AKBURA_SEMANTIC_AkcssSetter" xml:space="preserve">
+    <value>{0}</value>
+  </data>
+  <data name="AKBURA_GENERATION_AkcssUnsupported" xml:space="preserve">
+    <value>Runtime generation for {0} is deferred. The construct is available for semantic analysis.</value>
+  </data>
 </root>

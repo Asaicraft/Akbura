@@ -15,7 +15,8 @@ internal sealed class AkcssModuleSymbol : Symbol, IAkcssModuleSymbol
         string? path,
         ImmutableArray<Microsoft.CodeAnalysis.Location> locations = default,
         ImmutableArray<ISymbolDeclarationReference> declaringSyntaxReferences = default,
-        bool isImplicitlyDeclared = false)
+        bool isImplicitlyDeclared = false,
+        ImmutableArray<IAkcssDeclarationOwner> declarations = default)
         : base(containingSymbol, locations, declaringSyntaxReferences, isImplicitlyDeclared)
     {
         DeclaringSyntax = declaringSyntax ?? throw new ArgumentNullException(nameof(declaringSyntax));
@@ -23,6 +24,7 @@ internal sealed class AkcssModuleSymbol : Symbol, IAkcssModuleSymbol
         AkcssSymbols = akcssSymbols.IsDefault
             ? ImmutableArray<IAkcssSymbol>.Empty
             : akcssSymbols;
+        Declarations = declarations.IsDefault ? ImmutableArray<IAkcssDeclarationOwner>.CastUp(AkcssSymbols) : declarations;
         Path = string.IsNullOrWhiteSpace(path) ? null : path;
     }
 
@@ -41,6 +43,8 @@ internal sealed class AkcssModuleSymbol : Symbol, IAkcssModuleSymbol
     public new IAkburaComponentSymbol? ContainingSymbol => (IAkburaComponentSymbol?)base.ContainingSymbol;
 
     public ImmutableArray<IAkcssSymbol> AkcssSymbols { get; }
+
+    public ImmutableArray<IAkcssDeclarationOwner> Declarations { get; }
 
     public string? Path { get; }
 

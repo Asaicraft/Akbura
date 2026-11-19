@@ -61,6 +61,13 @@ internal static class AkcssDocumentWriter
 
         try
         {
+            if (plan.Unsupported is { } unsupported)
+            {
+                var line = input.SemanticModel!.SyntaxTree.Text.Lines.GetLineFromPosition(unsupported.Span.Start).LineNumber + 1;
+                var path = Microsoft.CodeAnalysis.CSharp.SyntaxFactory.Literal(plan.SourcePath).Text;
+                return SourceText.From($"#line {line} {path}\n#error {unsupported.Code} {unsupported.Message}\n#line default\n", Encoding.UTF8);
+            }
+
 #if STATS
             using var emissionMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEmission);
 #endif

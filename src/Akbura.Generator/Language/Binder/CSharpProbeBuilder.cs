@@ -75,7 +75,8 @@ internal sealed partial class CSharpProbeBuilder
             CSharpProbeBinder.AddProbeMethod(
                 probeScope.MemberDeclarations,
                 method),
-            "__AkburaStatementProbe");
+            "__AkburaStatementProbe",
+            _binder.SemanticModel.GetMarkupCSharpUsingDirectives(scope));
     }
 
     public CSharpProbeProjection CreateExpressionProjection(AkburaSyntax scope, CSharp.ExpressionSyntax expression, int relativePosition, ITypeSymbol? targetType = null)
@@ -345,7 +346,8 @@ internal sealed partial class CSharpProbeBuilder
             CSharpProbeBinder.AddProbeMethod(
                 probeScope.MemberDeclarations,
                 method),
-            "__AkburaProbe");
+            "__AkburaProbe",
+            _binder.SemanticModel.GetMarkupCSharpUsingDirectives(scope));
     }
 
     private static CSharp.MethodDeclarationSyntax ApplyContainingMethodContext(CSharp.MethodDeclarationSyntax probeMethod, CSharp.MethodDeclarationSyntax? containingMethod)

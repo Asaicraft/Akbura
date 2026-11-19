@@ -125,7 +125,11 @@ internal sealed class DeclarationSymbolTable
             DeclarationKind.Command or
             DeclarationKind.AkcssModule or
             DeclarationKind.AkcssStyle or
-            DeclarationKind.AkcssUtility;
+            DeclarationKind.AkcssUtility or
+            DeclarationKind.AkcssSelectorRule or
+            DeclarationKind.AkcssTheme or
+            DeclarationKind.AkcssMixin or
+            DeclarationKind.AkcssMixinParameter;
     }
 
     private static bool IsAllowed(

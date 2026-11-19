@@ -3142,7 +3142,7 @@ public class SemanticPipelineTests
     }
 
     [Fact]
-    public void SemanticModel_AkcssUtilityAssignment_ResolvesParameterAndDetectsAmxInvocation()
+    public void SemanticModel_AkcssUtilityAssignment_ResolvesParameterAndPreservesNestedAmxInvocation()
     {
         const string code =
             "@akcss {\n" +
@@ -3163,12 +3163,13 @@ public class SemanticPipelineTests
 
         Assert.Equal("value", Assert.Single(symbol.Parameters).Name);
         Assert.Equal("Width", operation.Property?.Name);
-        Assert.Equal(AkcssPropertyValueKind.AmxInvocation, operation.ValueKind);
+        Assert.Equal(AkcssPropertyValueKind.CSharpExpression, operation.ValueKind);
         Assert.Equal("Double", operation.ValueType.Name);
-        var amx = Assert.IsType<AkcssAmxInvocationValue>(operation.ConvertedValue);
-        Assert.Equal(AkcssAmxInvocationKind.DynamicResource, amx.Kind);
-        Assert.Equal("Double", amx.TypeArgument.Name);
-        Assert.Equal("\"--spacing\"", Assert.Single(amx.Arguments).ToString());
+        Assert.Null(operation.ConvertedValue);
+        var multiplication = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.Operations.IBinaryOperation>(operation.ValueOperation.Operation);
+        var invocation = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.Operations.IInvocationOperation>(multiplication.RightOperand);
+        Assert.Equal("DynamicResource", invocation.TargetMethod.Name);
+        Assert.Equal("Double", Assert.Single(invocation.TargetMethod.TypeArguments).Name);
         AssertCSharpRootChild(operation, operation.ValueOperationTree);
         Assert.Contains(EnumerateCSharpOperations(operation), csharpOperation =>
             csharpOperation.TargetSymbol is ITailwindUtilityParameterSymbol { Name: "value" });

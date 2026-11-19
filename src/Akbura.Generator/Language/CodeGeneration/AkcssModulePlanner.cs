@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Pools;
@@ -20,7 +21,10 @@ internal static class AkcssModulePlanner
         CancellationToken cancellationToken = default)
     {
         var module = input.Module;
-        var moduleSymbols = module.AkcssSymbols;
+        var unsupported = module.DeclaringSyntax is { } syntax && AkcssSemanticFacts.FindContextualModuleMember(syntax) is { } member
+            ? new AkburaSemanticDiagnostic(member, ErrorCodes.AKBURA_GENERATION_AkcssUnsupported, [member.Kind.ToString()])
+            : null;
+        var moduleSymbols = unsupported is null ? module.AkcssSymbols : ImmutableArray<IAkcssSymbol>.Empty;
 
         using var symbols = ImmutableArrayBuilder<AkcssSymbolGenerationPlan>.Rent(moduleSymbols.Length);
 
@@ -91,7 +95,8 @@ internal static class AkcssModulePlanner
                 module.MetadataName,
                 module.IsInlined,
                 pooledSymbols,
-                pooledRuntimeStyles);
+                pooledRuntimeStyles,
+                unsupported);
         }
         catch
         {

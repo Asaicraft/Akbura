@@ -873,7 +873,7 @@ internal partial class AkburaSemanticModel
                     containingSymbol.DeclarationSyntax) ||
                 !IsAkcssApplyTargetCompatible(
                     symbol,
-                    containingSymbol))
+                    containingSymbol.TargetType))
             {
                 continue;
             }

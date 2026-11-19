@@ -439,6 +439,8 @@ internal class BoundTreeRewriter : BoundTreeVisitor<BoundNode?>
         return node.Update(containingAkcssSymbol, node.Items, appliedSymbols);
     }
 
+    public override BoundNode? VisitAkcssContextual(BoundAkcssContextual node) => node.WithChildren(VisitList(node.Children));
+
     public override BoundNode? VisitAkcssIntercept(BoundAkcssIntercept node)
     {
         var containingAkcssSymbol = (IAkcssSymbol)VisitSymbol(node.ContainingAkcssSymbol)!;

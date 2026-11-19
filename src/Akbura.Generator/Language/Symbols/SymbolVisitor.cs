@@ -35,6 +35,14 @@ internal abstract class SymbolVisitor
 
     public virtual void VisitAkcss(IAkcssSymbol symbol) => DefaultVisit(symbol);
 
+    public virtual void VisitAkcssSelectorRule(AkcssSelectorRuleSymbol symbol) => DefaultVisit(symbol);
+
+    public virtual void VisitAkcssTheme(AkcssThemeSymbol symbol) => DefaultVisit(symbol);
+
+    public virtual void VisitAkcssMixin(AkcssMixinSymbol symbol) => DefaultVisit(symbol);
+
+    public virtual void VisitAkcssMixinParameter(AkcssMixinParameterSymbol symbol) => DefaultVisit(symbol);
+
     public virtual void VisitTailwindUtility(ITailwindUtilitySymbol symbol) => VisitAkcss(symbol);
 
     public virtual void VisitTailwindUtilityParameter(ITailwindUtilityParameterSymbol symbol) => DefaultVisit(symbol);

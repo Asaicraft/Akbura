@@ -15,7 +15,7 @@ internal abstract partial class AkburaSemanticModel
         ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnostics)
     {
         var boundary = GetConditionalTemplateCaptureBoundary(syntax);
-        if (boundary == null || SyntaxTree.GetRoot() is not AkburaDocumentSyntax document)
+        if (boundary == null || SyntaxTree.GetRootSyntax() is not AkburaDocumentSyntax document)
         {
             return;
         }

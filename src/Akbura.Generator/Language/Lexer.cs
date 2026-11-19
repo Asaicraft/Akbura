@@ -2534,7 +2534,14 @@ internal sealed partial class Lexer : IDisposable
 		{
 			AkburaDebug.AssertNotNull(tokenInfo.Text);
 
-			token = GreenSyntaxToken.Identifier(leadingNode, tokenInfo.Text, trailingNode);
+			token = tokenInfo.ContextualKind == SyntaxKind.None
+				? GreenSyntaxToken.Identifier(leadingNode, tokenInfo.Text, trailingNode)
+				: GreenSyntaxToken.Identifier(
+					tokenInfo.ContextualKind,
+					leadingNode,
+					tokenInfo.Text,
+					tokenInfo.StringValue ?? tokenInfo.Text,
+					trailingNode);
 		}
 		else if (tokenInfo.Kind == SyntaxKind.StringLiteralToken)
 		{

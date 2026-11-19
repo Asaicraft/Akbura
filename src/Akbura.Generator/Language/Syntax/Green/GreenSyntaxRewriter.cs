@@ -13,6 +13,11 @@ internal partial class GreenSyntaxRewriter : GreenSyntaxVisitor<GreenNode>
         return node;
     }
 
+    public override GreenNode? Visit(GreenNode? node)
+    {
+        return node is GreenSyntaxToken token ? VisitToken(token) : base.Visit(node);
+    }
+
     [return: NotNullIfNotNull(nameof(token))]
     public override GreenNode? VisitToken(GreenSyntaxToken? token)
     {

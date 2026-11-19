@@ -135,6 +135,12 @@ namespace Akbura.Language.Syntax
 				SyntaxKind.InterceptKeyword => "intercept",
 				SyntaxKind.DollarToken => "$",
 				SyntaxKind.ForeachKeyword => "foreach",
+				SyntaxKind.ThemeKeyword => "theme",
+				SyntaxKind.TemplateKeyword => "template",
+				SyntaxKind.MixinKeyword => "mixin",
+				SyntaxKind.IncludeKeyword => "include",
+				SyntaxKind.BasedKeyword => "based",
+				SyntaxKind.OnKeyword => "on",
 
 				_ => string.Empty,
 			};
@@ -187,12 +193,26 @@ namespace Akbura.Language.Syntax
 
 		public static partial SyntaxKind GetContextualKeywordKind(string text)
 		{
-			return SyntaxKind.None;
+			return text switch
+			{
+				"theme" => SyntaxKind.ThemeKeyword,
+				"template" => SyntaxKind.TemplateKeyword,
+				"mixin" => SyntaxKind.MixinKeyword,
+				"include" => SyntaxKind.IncludeKeyword,
+				"based" => SyntaxKind.BasedKeyword,
+				"on" => SyntaxKind.OnKeyword,
+				_ => SyntaxKind.None,
+			};
 		}
 
 		public static partial bool IsContextualKeyword(SyntaxKind kind)
 		{
-			return false;
+			return kind is SyntaxKind.ThemeKeyword or
+				SyntaxKind.TemplateKeyword or
+				SyntaxKind.MixinKeyword or
+				SyntaxKind.IncludeKeyword or
+				SyntaxKind.BasedKeyword or
+				SyntaxKind.OnKeyword;
 		}
 
 		public static partial object? GetValue(SyntaxKind kind, string text)

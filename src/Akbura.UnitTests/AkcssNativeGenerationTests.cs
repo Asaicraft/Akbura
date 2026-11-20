@@ -1,6 +1,5 @@
 using Akbura.BlackSilence;
 using Akbura.Diagnostics;
-using Akbura.Furioso;
 using Akbura.Language.Syntax;
 using Akbura.Language;
 using Akbura.Language.CodeGeneration;
@@ -66,13 +65,12 @@ public sealed partial class AkcssNativeGenerationTests
         """;
 
     [Theory]
-    [InlineData(0, null)]
-    [InlineData(1, null)]
-    [InlineData(2, null)]
-    [InlineData(0, nameof(AkburaCsGenerator))]
-    [InlineData(0, nameof(AkburaBlackSilenceGenerator))]
-    [InlineData(1, nameof(AkburaBlackSilenceGenerator))]
-    public async Task RequiredThemeCompilesAndRunsWithNativeStateAndResources(int mode, string? generatorName)
+    [InlineData(0, false)]
+    [InlineData(1, false)]
+    [InlineData(2, false)]
+    [InlineData(0, true)]
+    [InlineData(1, true)]
+    public async Task RequiredThemeCompilesAndRunsWithNativeStateAndResources(int mode, bool useBlackSilence)
     {
         var files = new (string Name, string Text)[]
         {
@@ -88,7 +86,7 @@ public sealed partial class AkcssNativeGenerationTests
                 </StackPanel>
                 """),
         };
-        var fixture = Generate(files, mode: (ComponentGenerationMode)mode, generatorName: generatorName, host: """
+        var fixture = Generate(files, mode: (ComponentGenerationMode)mode, useBlackSilence: useBlackSilence, host: """
             namespace HelloWorld;
             public partial class ThemeReferences : Akbura.AkburaControl
             {
@@ -198,7 +196,7 @@ public sealed partial class AkcssNativeGenerationTests
     }
 
     private static GenerationFixture Generate((string Name, string Text)[] files, string host = "",
-        ComponentGenerationMode mode = ComponentGenerationMode.ReleaseDirect, bool validateSemantics = true, string? generatorName = null,
+        ComponentGenerationMode mode = ComponentGenerationMode.ReleaseDirect, bool validateSemantics = true, bool useBlackSilence = false,
         MetadataReference[]? references = null)
     {
         var options = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
@@ -227,14 +225,9 @@ public sealed partial class AkcssNativeGenerationTests
             }
         }
 
-        if (generatorName != null)
+        if (useBlackSilence)
         {
-            IIncrementalGenerator generator = generatorName switch
-            {
-                nameof(AkburaCsGenerator) => new AkburaCsGenerator(),
-                nameof(AkburaBlackSilenceGenerator) => new AkburaBlackSilenceGenerator(),
-                _ => throw new ArgumentOutOfRangeException(nameof(generatorName)),
-            };
+            var generator = new AkburaBlackSilenceGenerator();
             var additionalTexts = files.Select(file => (AdditionalText)new AkburaBlackSilenceGeneratorTests.TestAdditionalText(
                 Path.Combine(path, file.Name), SourceText.From(file.Text))).ToImmutableArray();
             var driver = CSharpGeneratorDriver.Create(

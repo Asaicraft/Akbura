@@ -1,6 +1,6 @@
 using Akbura.Akcss;
+using Akbura.BlackSilence;
 using Akbura.CompilerAnotations;
-using Akbura.Furioso;
 using Akbura.Language;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
@@ -20,8 +20,11 @@ using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace Akbura.UnitTests;
 
 [Collection(AvaloniaHeadlessCollection.Name)]
-public sealed class AkburaCsGeneratorTests
+public sealed class BlackSilenceGeneratedBehaviorTests
 {
+    private static readonly AkburaBlackSilenceGeneratorTests.TestAnalyzerConfigOptionsProvider s_options =
+        new(string.Empty, string.Empty, publishDiagnostics: true);
+
     [Fact]
     public void SemanticModel_PreservesNullableAnnotationsForExplicitComponentTypes()
     {
@@ -114,11 +117,7 @@ public sealed class AkburaCsGeneratorTests
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -139,16 +138,15 @@ public sealed class AkburaCsGeneratorTests
             static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error);
         var generatedText = Assert.Single(
-                Assert.Single(driver.GetRunResult().Results)
-                    .GeneratedSources)
+                GetDocumentSources(Assert.Single(driver.GetRunResult().Results)))
             .SourceText
             .ToString();
         Assert.Contains(
-            "Parameter<NullableComponent, object?> ValueProperty",
+            "Parameter<global::NullableComponent, object?> ValueProperty",
             generatedText,
             StringComparison.Ordinal);
         Assert.Contains(
-            "Parameter<NullableComponent, " +
+            "Parameter<global::NullableComponent, " +
                 "global::System.Collections.Generic.IReadOnlyList<string?>?> ValuesProperty",
             generatedText,
             StringComparison.Ordinal);
@@ -194,11 +192,7 @@ public sealed class AkburaCsGeneratorTests
         var sourcePath = Path.Combine(
             Environment.CurrentDirectory,
             "IconButton.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -217,7 +211,7 @@ public sealed class AkburaCsGeneratorTests
             static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error);
         var generated = Assert.Single(
-            Assert.Single(driver.GetRunResult().Results).GeneratedSources);
+            GetDocumentSources(Assert.Single(driver.GetRunResult().Results)));
         var text = generated.SourceText.ToString();
         Assert.Contains(
             "private global::Avalonia.Controls.Shapes.Path __element1",
@@ -265,11 +259,7 @@ public sealed class AkburaCsGeneratorTests
         var sourcePath = Path.Combine(
             Environment.CurrentDirectory,
             "ThemeButton.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -288,7 +278,7 @@ public sealed class AkburaCsGeneratorTests
             static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error);
         var generated = Assert.Single(
-            Assert.Single(driver.GetRunResult().Results).GeneratedSources);
+            GetDocumentSources(Assert.Single(driver.GetRunResult().Results)));
         Assert.Contains(
             "ThemeProperty, __element1",
             generated.SourceText.ToString(),
@@ -326,11 +316,7 @@ public sealed class AkburaCsGeneratorTests
         var sourcePath = Path.Combine(
             Environment.CurrentDirectory,
             "Icon.akcss");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -349,7 +335,7 @@ public sealed class AkburaCsGeneratorTests
             static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error);
         var generated = Assert.Single(
-            Assert.Single(driver.GetRunResult().Results).GeneratedSources);
+            GetDocumentSources(Assert.Single(driver.GetRunResult().Results)));
         var text = generated.SourceText.ToString();
         Assert.Contains(
             "global::Avalonia.Controls.Shapes.Path",
@@ -393,8 +379,7 @@ public sealed class AkburaCsGeneratorTests
             references: SymbolTests.CreateAvaloniaReferences(),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var sourcePath = Path.Combine(Environment.CurrentDirectory, "Counter.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts: [new TestAdditionalText(sourcePath, SourceText.From(component))],
             parseOptions: parseOptions);
 
@@ -408,11 +393,11 @@ public sealed class AkburaCsGeneratorTests
             static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
         var result = Assert.Single(driver.GetRunResult().Results);
         Assert.Null(result.Exception);
-        var generated = Assert.Single(result.GeneratedSources);
+        var generated = Assert.Single(GetDocumentSources(result));
         Assert.StartsWith("Akbura.Component.Counter.akbura.", generated.HintName, StringComparison.Ordinal);
         var text = generated.SourceText.ToString();
         Assert.Contains("partial class Counter : global::Akbura.AkburaControl", text, StringComparison.Ordinal);
-        Assert.Contains("Parameter<Counter, int> InitialProperty", text, StringComparison.Ordinal);
+        Assert.Contains("Parameter<global::Counter, int> InitialProperty", text, StringComparison.Ordinal);
         Assert.Contains("StateInfo<int> s_stateInfo_count", text, StringComparison.Ordinal);
         Assert.Contains("void Increment(int delta)", text, StringComparison.Ordinal);
         Assert.Contains("private global::Avalonia.Controls.TextBlock label", text, StringComparison.Ordinal);
@@ -463,11 +448,7 @@ public sealed class AkburaCsGeneratorTests
         var sourcePath = Path.Combine(
             Environment.CurrentDirectory,
             "AncestorLink.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -486,8 +467,7 @@ public sealed class AkburaCsGeneratorTests
             static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error);
         var generated = Assert.Single(
-            Assert.Single(driver.GetRunResult().Results)
-                .GeneratedSources);
+            GetDocumentSources(Assert.Single(driver.GetRunResult().Results)));
         Assert.Contains(
             "StyledElement? FindAncestor(StyledElement? current)",
             generated.SourceText.ToString(),
@@ -520,11 +500,7 @@ public sealed class AkburaCsGeneratorTests
             references: SymbolTests.CreateAvaloniaReferences(),
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary));
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -590,11 +566,7 @@ public sealed class AkburaCsGeneratorTests
         var sourcePath = Path.Combine(
             Environment.CurrentDirectory,
             "ReactiveContent.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -613,8 +585,7 @@ public sealed class AkburaCsGeneratorTests
             static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error);
         var generated = Assert.Single(
-            Assert.Single(driver.GetRunResult().Results)
-                .GeneratedSources);
+            GetDocumentSources(Assert.Single(driver.GetRunResult().Results)));
         Assert.Contains(
             "ContentControl.ContentProperty, isHighlighted",
             generated.SourceText.ToString(),
@@ -692,8 +663,7 @@ public sealed class AkburaCsGeneratorTests
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var featureViewPath = Path.Combine(Environment.CurrentDirectory, "FeatureView.akbura");
         var appPath = Path.Combine(Environment.CurrentDirectory, "App.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(featureViewPath, SourceText.From(featureView)),
@@ -709,7 +679,7 @@ public sealed class AkburaCsGeneratorTests
         Assert.DoesNotContain(
             generatorDiagnostics,
             static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
-        var generatedSources = Assert.Single(driver.GetRunResult().Results).GeneratedSources;
+        var generatedSources = GetDocumentSources(Assert.Single(driver.GetRunResult().Results));
         var appSource = Assert.Single(
             generatedSources,
             static source => source.HintName.Contains("App.akbura", StringComparison.Ordinal));
@@ -740,12 +710,12 @@ public sealed class AkburaCsGeneratorTests
         var generatedSource = GenerateWhitespaceComponent(component);
 
         Assert.Contains(
-            "$\"Increment to {count+1}\"",
+            "$@\"Increment to {count+1}\"",
             generatedSource,
             StringComparison.Ordinal);
 
         Assert.DoesNotContain(
-            "$\"    Increment to {count+1}\"",
+            "$@\"    Increment to {count+1}\"",
             generatedSource,
             StringComparison.Ordinal);
     }
@@ -767,7 +737,7 @@ public sealed class AkburaCsGeneratorTests
         var generatedSource = GenerateWhitespaceComponent(component);
 
         Assert.Contains(
-            "$\"    Increment to {count+1}\"",
+            "$@\"    Increment to {count+1}\"",
             generatedSource,
             StringComparison.Ordinal);
     }
@@ -813,8 +783,7 @@ public sealed class AkburaCsGeneratorTests
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var wrapperPath = Path.Combine(Environment.CurrentDirectory, "MegaWrapper.akbura");
         var consumerPath = Path.Combine(Environment.CurrentDirectory, "MyAkbura.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(wrapperPath, SourceText.From(wrapper)),
@@ -830,7 +799,7 @@ public sealed class AkburaCsGeneratorTests
         Assert.DoesNotContain(
             generatorDiagnostics,
             static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
-        var generatedSources = Assert.Single(driver.GetRunResult().Results).GeneratedSources;
+        var generatedSources = GetDocumentSources(Assert.Single(driver.GetRunResult().Results));
         Assert.Equal(2, generatedSources.Length);
         var wrapperSource = Assert.Single(
             generatedSources,
@@ -930,8 +899,7 @@ public sealed class AkburaCsGeneratorTests
         var emptyConsumerPath = Path.Combine(
             Environment.CurrentDirectory,
             "EmptyCollectionConsumer.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(wrapperPath, SourceText.From(wrapper)),
@@ -948,13 +916,13 @@ public sealed class AkburaCsGeneratorTests
         Assert.DoesNotContain(
             generatorDiagnostics,
             static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
-        var generatedSources = Assert.Single(driver.GetRunResult().Results).GeneratedSources;
+        var generatedSources = GetDocumentSources(Assert.Single(driver.GetRunResult().Results));
         var wrapperSource = Assert.Single(
             generatedSources,
             static source => source.HintName.Contains("CollectionWrapper.akbura", StringComparison.Ordinal));
         var wrapperText = wrapperSource.SourceText.ToString();
         Assert.Contains(
-            "ReadOnlyParameter<CollectionWrapper, global::System.Collections.Generic.IList<global::Avalonia.Controls.Control>>",
+            "CollectionParameter<global::CollectionWrapper, global::System.Collections.Generic.IList<global::Avalonia.Controls.Control>>",
             wrapperText,
             StringComparison.Ordinal);
         Assert.Contains(
@@ -1079,11 +1047,7 @@ public sealed class AkburaCsGeneratorTests
         var consumerPath = Path.Combine(
             Environment.CurrentDirectory,
             "NamedCollectionConsumer.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -1104,8 +1068,7 @@ public sealed class AkburaCsGeneratorTests
             generatorDiagnostics,
             static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error);
-        var generatedSources = Assert.Single(
-            driver.GetRunResult().Results).GeneratedSources;
+        var generatedSources = GetDocumentSources(Assert.Single(driver.GetRunResult().Results));
         var ownerSource = Assert.Single(
             generatedSources,
             static source => source.HintName.Contains(
@@ -1113,11 +1076,11 @@ public sealed class AkburaCsGeneratorTests
                 StringComparison.Ordinal));
         var ownerText = ownerSource.SourceText.ToString();
         Assert.Contains(
-            "ReadOnlyParameter<NamedCollectionOwner, global::System.Collections.Generic.IList<global::Demo.TestPage>>",
+            "CollectionParameter<global::NamedCollectionOwner, global::System.Collections.Generic.IList<global::Demo.TestPage>>",
             ownerText,
             StringComparison.Ordinal);
         Assert.Contains(
-            "private readonly global::System.Collections.ObjectModel.ObservableCollection<global::Demo.TestPage> __collection_Pages = [];",
+            "private readonly global::System.Collections.ObjectModel.ObservableCollection<global::Demo.TestPage> __collection_Pages_",
             ownerText,
             StringComparison.Ordinal);
         Assert.DoesNotContain(
@@ -1163,13 +1126,19 @@ public sealed class AkburaCsGeneratorTests
                 var ownerControl = Assert.IsAssignableFrom<AkburaControl>(
                     consumerControl.Child);
                 var pagesProperty = ownerControl.GetType().GetProperty("Pages")!;
-                Assert.False(pagesProperty.CanWrite);
                 var pages = Assert.IsAssignableFrom<System.Collections.IList>(
                     pagesProperty.GetValue(ownerControl));
                 Assert.Equal(2, pages.Count);
                 Assert.Equal(
                     "ObservableCollection`1",
                     pages.GetType().Name);
+
+                var page = Assert.IsAssignableFrom<Control>(pages[1]);
+                var suppliedPages = Array.CreateInstance(page.GetType(), 1);
+                suppliedPages.SetValue(page, 0);
+                pagesProperty.SetValue(ownerControl, suppliedPages);
+                Assert.Same(pages, pagesProperty.GetValue(ownerControl));
+                Assert.Same(page, Assert.Single(pages.Cast<object>()));
 
                 window.Close();
             },
@@ -1226,11 +1195,7 @@ public sealed class AkburaCsGeneratorTests
         var sourcePath = Path.Combine(
             Environment.CurrentDirectory,
             "EffectView.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -1249,7 +1214,7 @@ public sealed class AkburaCsGeneratorTests
             static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error);
         var generated = Assert.Single(
-            Assert.Single(driver.GetRunResult().Results).GeneratedSources);
+            GetDocumentSources(Assert.Single(driver.GetRunResult().Results)));
         Assert.Contains(
             "global::Akbura.Hooks.EffectHooks.useEffect(",
             generated.SourceText.ToString(),
@@ -1377,11 +1342,7 @@ public sealed class AkburaCsGeneratorTests
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary));
         var projectDirectory = Environment.CurrentDirectory;
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -1410,7 +1371,7 @@ public sealed class AkburaCsGeneratorTests
             static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error);
         var featureViewSource = Assert.Single(
-            Assert.Single(driver.GetRunResult().Results).GeneratedSources,
+            GetDocumentSources(Assert.Single(driver.GetRunResult().Results)),
             static source => source.HintName.Contains(
                 "FeatureView.akbura",
                 StringComparison.Ordinal));
@@ -1557,12 +1518,7 @@ public sealed class AkburaCsGeneratorTests
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary));
         GeneratorDriver driver =
-            CSharpGeneratorDriver.Create(
-                generators:
-                [
-                    new AkburaCsGenerator()
-                        .AsSourceGenerator(),
-                ],
+            CreateDriver(
                 additionalTexts:
                 [
                     new TestAdditionalText(
@@ -1606,7 +1562,7 @@ public sealed class AkburaCsGeneratorTests
         var result = Assert.Single(
             driver.GetRunResult().Results);
         var linkSource = Assert.Single(
-            result.GeneratedSources,
+            GetDocumentSources(result),
             static source =>
                 source.HintName.Contains(
                     "Link.akbura",
@@ -1614,7 +1570,7 @@ public sealed class AkburaCsGeneratorTests
         var linkText =
             linkSource.SourceText.ToString();
         Assert.Contains(
-            "Parameter<Link, global::Components.Router>",
+            "Parameter<global::Components.Link, global::Components.Router>",
             linkText,
             StringComparison.Ordinal);
         Assert.Contains(
@@ -1797,12 +1753,7 @@ public sealed class AkburaCsGeneratorTests
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary));
         GeneratorDriver driver =
-            CSharpGeneratorDriver.Create(
-                generators:
-                [
-                    new AkburaCsGenerator()
-                        .AsSourceGenerator(),
-                ],
+            CreateDriver(
                 additionalTexts:
                 [
                     new TestAdditionalText(
@@ -1839,7 +1790,7 @@ public sealed class AkburaCsGeneratorTests
         var result = Assert.Single(
             driver.GetRunResult().Results);
         var appSource = Assert.Single(
-            result.GeneratedSources,
+            GetDocumentSources(result),
             static source =>
                 source.HintName.Contains(
                     "App.akbura",
@@ -1847,11 +1798,11 @@ public sealed class AkburaCsGeneratorTests
         var appText =
             appSource.SourceText.ToString();
         Assert.Contains(
-            "Router.PropertyChanged += ",
+            "Router).PropertyChanged += __OnPropertyBindingChanged",
             appText,
             StringComparison.Ordinal);
         Assert.Contains(
-            "url = (string)__bindingChange_",
+            "url = (string)__change",
             appText,
             StringComparison.Ordinal);
 
@@ -1962,12 +1913,7 @@ public sealed class AkburaCsGeneratorTests
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary));
         GeneratorDriver driver =
-            CSharpGeneratorDriver.Create(
-                generators:
-                [
-                    new AkburaCsGenerator()
-                        .AsSourceGenerator(),
-                ],
+            CreateDriver(
                 additionalTexts:
                 [
                     new TestAdditionalText(
@@ -2011,7 +1957,7 @@ public sealed class AkburaCsGeneratorTests
             driver.GetRunResult().Results);
         Assert.Null(result.Exception);
         var appSource = Assert.Single(
-            result.GeneratedSources,
+            GetDocumentSources(result),
             static source =>
                 source.HintName.Contains(
                     "App.akbura",
@@ -2125,11 +2071,7 @@ public sealed class AkburaCsGeneratorTests
             references: SymbolTests.CreateAvaloniaReferences(),
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary));
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -2241,7 +2183,7 @@ public sealed class AkburaCsGeneratorTests
     [Theory]
     [InlineData(
         "System.Collections.IList",
-        "ObservableCollection<global::System.Object>",
+        "ObservableCollection<object>",
         true)]
     [InlineData(
         "System.Collections.Generic.IList<Avalonia.Controls.Control>",
@@ -2271,8 +2213,7 @@ public sealed class AkburaCsGeneratorTests
             references: SymbolTests.CreateAvaloniaReferences(),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var sourcePath = Path.Combine(Environment.CurrentDirectory, "ContentShape.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts: [new TestAdditionalText(sourcePath, SourceText.From(component))],
             parseOptions: parseOptions);
 
@@ -2285,7 +2226,7 @@ public sealed class AkburaCsGeneratorTests
             generatorDiagnostics,
             static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
         var generated = Assert.Single(
-            Assert.Single(driver.GetRunResult().Results).GeneratedSources);
+            GetDocumentSources(Assert.Single(driver.GetRunResult().Results)));
         var text = generated.SourceText.ToString();
         Assert.Contains("[global::Avalonia.Metadata.Content]", text, StringComparison.Ordinal);
         Assert.Contains(backingType, text, StringComparison.Ordinal);
@@ -2325,8 +2266,7 @@ public sealed class AkburaCsGeneratorTests
             references: SymbolTests.CreateAvaloniaReferences(),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var sourcePath = Path.Combine(Environment.CurrentDirectory, "BindingView.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts: [new TestAdditionalText(sourcePath, SourceText.From(component))],
             parseOptions: parseOptions);
 
@@ -2338,11 +2278,12 @@ public sealed class AkburaCsGeneratorTests
         Assert.DoesNotContain(
             generatorDiagnostics,
             static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
-        var generated = Assert.Single(Assert.Single(driver.GetRunResult().Results).GeneratedSources);
+        var generated = Assert.Single(GetDocumentSources(Assert.Single(driver.GetRunResult().Results)));
         var text = generated.SourceText.ToString();
         Assert.Contains(".Bind(", text, StringComparison.Ordinal);
+        Assert.Contains("new global::Avalonia.Data.CompiledBinding(", text, StringComparison.Ordinal);
         Assert.Contains(
-            "CompiledBinding.Create<global::Demo.ViewModel, string>(static __source => __source.Name",
+            "static __source => ((global::Demo.ViewModel)__source).Name",
             text,
             StringComparison.Ordinal);
         Assert.DoesNotContain(
@@ -2435,8 +2376,7 @@ public sealed class AkburaCsGeneratorTests
             .OfType<Akbura.Language.Syntax.MarkupPlainAttributeSyntax>()
             .Single(attribute => attribute.Name.Identifier.ValueText == "Text");
         Assert.Empty(semanticModel.GetSemanticDiagnostics(textAttribute));
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts: [new TestAdditionalText(sourcePath, SourceText.From(component))],
             parseOptions: parseOptions);
 
@@ -2448,7 +2388,7 @@ public sealed class AkburaCsGeneratorTests
         Assert.DoesNotContain(
             generatorDiagnostics,
             static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
-        var generated = Assert.Single(Assert.Single(driver.GetRunResult().Results).GeneratedSources);
+        var generated = Assert.Single(GetDocumentSources(Assert.Single(driver.GetRunResult().Results)));
         var text = generated.SourceText.ToString();
         Assert.Contains(
             "FuncDataTemplate<global::Demo.Item>((item, __nameScope) =>",
@@ -2519,11 +2459,7 @@ public sealed class AkburaCsGeneratorTests
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary));
         var projectDirectory = Environment.CurrentDirectory;
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -2551,7 +2487,7 @@ public sealed class AkburaCsGeneratorTests
         var result = Assert.Single(driver.GetRunResult().Results);
         Assert.Null(result.Exception);
         var appSource = Assert.Single(
-            result.GeneratedSources,
+            GetDocumentSources(result),
             static generated =>
                 generated.SourceText.ToString().Contains(
                     "partial class App",
@@ -2661,12 +2597,7 @@ public sealed class AkburaCsGeneratorTests
         var sourcePath = Path.Combine(
             Environment.CurrentDirectory,
             "CustomDataTypeHost.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new Akbura.BlackSilence.AkburaBlackSilenceGenerator()
-                    .AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -2685,8 +2616,7 @@ public sealed class AkburaCsGeneratorTests
             static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error);
         var generated = Assert.Single(
-            Assert.Single(driver.GetRunResult().Results)
-                .GeneratedSources,
+            GetDocumentSources(Assert.Single(driver.GetRunResult().Results)),
             static source =>
                 source.HintName.StartsWith(
                     "Akbura.Component.",
@@ -2839,11 +2769,7 @@ public sealed class AkburaCsGeneratorTests
         Assert.False(dataTemplateOperation.HasErrors);
         Assert.True(dataTemplateOperation.IsDeferred);
 
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -2863,8 +2789,7 @@ public sealed class AkburaCsGeneratorTests
                 diagnostic.Severity ==
                 DiagnosticSeverity.Error);
         var generated = Assert.Single(
-            Assert.Single(driver.GetRunResult().Results)
-                .GeneratedSources);
+            GetDocumentSources(Assert.Single(driver.GetRunResult().Results)));
         var text = generated.SourceText.ToString();
         Assert.Contains(
             "new global::Avalonia.Markup.Xaml.Templates.DataTemplate();",
@@ -2883,11 +2808,11 @@ public sealed class AkburaCsGeneratorTests
             text,
             StringComparison.Ordinal);
         Assert.Contains(
-            "stringFormat: \"Name {0}\"",
+            "StringFormat = \"Name {0}\"",
             text,
             StringComparison.Ordinal);
         Assert.DoesNotContain(
-            "stringFormat: \"\\\"Name {0}\\\"\"",
+            "StringFormat = \"\\\"Name {0}\\\"\"",
             text,
             StringComparison.Ordinal);
         Assert.DoesNotContain(
@@ -3015,11 +2940,7 @@ public sealed class AkburaCsGeneratorTests
             semanticDiagnostic.Message,
             StringComparison.Ordinal);
 
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -3069,11 +2990,7 @@ public sealed class AkburaCsGeneratorTests
         var sourcePath = Path.Combine(
             Environment.CurrentDirectory,
             "InvalidRouter.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -3215,11 +3132,7 @@ public sealed class AkburaCsGeneratorTests
         var sourcePath = Path.Combine(
             Environment.CurrentDirectory,
             "Router.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -3239,7 +3152,7 @@ public sealed class AkburaCsGeneratorTests
                 diagnostic.Severity == DiagnosticSeverity.Error);
         var result = Assert.Single(driver.GetRunResult().Results);
         Assert.Null(result.Exception);
-        var generated = Assert.Single(result.GeneratedSources);
+        var generated = Assert.Single(GetDocumentSources(result));
         var generatedTree = CSharpSyntaxTree.ParseText(
             generated.SourceText,
             parseOptions);
@@ -3304,11 +3217,7 @@ public sealed class AkburaCsGeneratorTests
             references: SymbolTests.CreateAvaloniaReferences(),
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary));
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -3329,8 +3238,7 @@ public sealed class AkburaCsGeneratorTests
             generatorDiagnostics,
             static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error);
-        var generatedSources = Assert.Single(driver.GetRunResult().Results)
-            .GeneratedSources;
+        var generatedSources = GetDocumentSources(Assert.Single(driver.GetRunResult().Results));
         var hostSource = Assert.Single(
             generatedSources,
             static generated =>
@@ -3408,8 +3316,7 @@ public sealed class AkburaCsGeneratorTests
             references: SymbolTests.CreateAvaloniaReferences(),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var sourcePath = Path.Combine(Environment.CurrentDirectory, "StyledView.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts: [new TestAdditionalText(sourcePath, SourceText.From(component))],
             parseOptions: parseOptions);
 
@@ -3421,7 +3328,7 @@ public sealed class AkburaCsGeneratorTests
         Assert.DoesNotContain(
             generatorDiagnostics,
             static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
-        var generatedSources = Assert.Single(driver.GetRunResult().Results).GeneratedSources;
+        var generatedSources = GetDocumentSources(Assert.Single(driver.GetRunResult().Results));
         Assert.Equal(2, generatedSources.Length);
         var generatedComponent = Assert.Single(
             generatedSources,
@@ -3515,8 +3422,7 @@ public sealed class AkburaCsGeneratorTests
         var sourcePath = Path.Combine(
             Environment.CurrentDirectory,
             "ObjectStyledView.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -3535,8 +3441,7 @@ public sealed class AkburaCsGeneratorTests
             static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error);
         var generatedComponent = Assert.Single(
-            Assert.Single(driver.GetRunResult().Results)
-                .GeneratedSources,
+            GetDocumentSources(Assert.Single(driver.GetRunResult().Results)),
             static source => source.HintName.StartsWith(
                 "Akbura.Component.",
                 StringComparison.Ordinal));
@@ -3663,11 +3568,7 @@ public sealed class AkburaCsGeneratorTests
         var sourcePath = Path.Combine(
             Environment.CurrentDirectory,
             "OperationPriorityView.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -3685,8 +3586,7 @@ public sealed class AkburaCsGeneratorTests
             generatorDiagnostics,
             static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error);
-        var generatedSources = Assert.Single(
-            driver.GetRunResult().Results).GeneratedSources;
+        var generatedSources = GetDocumentSources(Assert.Single(driver.GetRunResult().Results));
         var generatedAkcss = Assert.Single(
             generatedSources,
             static source =>
@@ -3828,11 +3728,7 @@ public sealed class AkburaCsGeneratorTests
         var sourcePath = Path.Combine(
             Environment.CurrentDirectory,
             "MarkupUtilityView.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -3852,7 +3748,7 @@ public sealed class AkburaCsGeneratorTests
                 diagnostic.Severity == DiagnosticSeverity.Error);
         var result = Assert.Single(driver.GetRunResult().Results);
         var generated = Assert.Single(
-            result.GeneratedSources,
+            GetDocumentSources(result),
             static source =>
                 source.HintName.StartsWith(
                     "Akbura.Component.",
@@ -3868,11 +3764,11 @@ public sealed class AkburaCsGeneratorTests
             generatedText,
             StringComparison.Ordinal);
         Assert.Contains(
-            "RegisterAttached<MarkupUtilityView",
+            "RegisterAttached<global::MarkupUtilityView",
             generatedText,
             StringComparison.Ordinal);
         Assert.Contains(
-            "__CreateAkcssMarkupExtension_",
+            "__CreateAkcssValue0",
             generatedText,
             StringComparison.Ordinal);
         Assert.Contains(
@@ -4040,11 +3936,7 @@ public sealed class AkburaCsGeneratorTests
         var sourcePath = Path.Combine(
             Environment.CurrentDirectory,
             "PriorityUtilityView.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -4064,14 +3956,14 @@ public sealed class AkburaCsGeneratorTests
                 diagnostic.Severity == DiagnosticSeverity.Error);
         var result = Assert.Single(driver.GetRunResult().Results);
         var generated = Assert.Single(
-            result.GeneratedSources,
+            GetDocumentSources(result),
             static source =>
                 source.HintName.StartsWith(
                     "Akbura.Component.",
                     StringComparison.Ordinal));
         var generatedText = generated.SourceText.ToString();
         var generatedAkcss = Assert.Single(
-            result.GeneratedSources,
+            GetDocumentSources(result),
             static source =>
                 source.HintName.StartsWith(
                     "Akbura.Akcss.",
@@ -4079,7 +3971,7 @@ public sealed class AkburaCsGeneratorTests
         var generatedAkcssText = generatedAkcss.SourceText.ToString();
 
         Assert.Contains(
-            "bindingPriority: global::Avalonia.Data.BindingPriority.Animation",
+            "bindingPriority: (global::Avalonia.Data.BindingPriority)",
             generatedText,
             StringComparison.Ordinal);
         Assert.Contains(
@@ -4112,7 +4004,7 @@ public sealed class AkburaCsGeneratorTests
             generatedAkcssText,
             StringComparison.Ordinal);
         Assert.Contains(
-            ", __bindingPriority);",
+            "__bindingPriority);",
             generatedAkcssText,
             StringComparison.Ordinal);
         Assert.DoesNotContain(
@@ -4365,11 +4257,7 @@ public sealed class AkburaCsGeneratorTests
         var sourcePath = Path.Combine(
             Environment.CurrentDirectory,
             "MarkupUtilitySourcesView.akbura");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -4389,7 +4277,7 @@ public sealed class AkburaCsGeneratorTests
                 diagnostic.Severity == DiagnosticSeverity.Error);
         var result = Assert.Single(driver.GetRunResult().Results);
         var generated = Assert.Single(
-            result.GeneratedSources,
+            GetDocumentSources(result),
             static source =>
                 source.HintName.StartsWith(
                     "Akbura.Component.",
@@ -4413,9 +4301,10 @@ public sealed class AkburaCsGeneratorTests
             generatedText,
             StringComparison.Ordinal);
         Assert.Contains(
-            "new global::Avalonia.Data.Binding(\"IsChecked\") { Source = MyToggle }",
+            "CompiledBindingPathBuilder().Property(global::Avalonia.Controls.Primitives.ToggleButton.IsCheckedProperty,",
             generatedText,
             StringComparison.Ordinal);
+        Assert.Contains("Source = MyToggle", generatedText, StringComparison.Ordinal);
         Assert.DoesNotContain(
             updatedCompilation.GetDiagnostics(),
             static diagnostic =>
@@ -4639,8 +4528,7 @@ public sealed class AkburaCsGeneratorTests
         var projectDirectory = Path.Combine(
             Environment.CurrentDirectory,
             "AkcssApplyProject");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -4663,17 +4551,16 @@ public sealed class AkburaCsGeneratorTests
         Assert.DoesNotContain(
             generatorDiagnostics,
             static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
-        var generatedSources = Assert.Single(
-            driver.GetRunResult().Results).GeneratedSources;
+        var generatedSources = GetDocumentSources(Assert.Single(driver.GetRunResult().Results));
         var generatedCardStyles = Assert.Single(
             generatedSources,
             static source => source.HintName.Contains(
                 "CardView.akcss",
                 StringComparison.Ordinal));
         var generatedText = generatedCardStyles.SourceText.ToString();
-        Assert.Contains("double value = 4;", generatedText, StringComparison.Ordinal);
-        Assert.Contains("string color = \"red\";", generatedText, StringComparison.Ordinal);
-        Assert.Contains("int shade = 500;", generatedText, StringComparison.Ordinal);
+        Assert.Contains("new global::Avalonia.Thickness(4)", generatedText, StringComparison.Ordinal);
+        Assert.Contains("bg-red-500", generatedText, StringComparison.Ordinal);
+        Assert.Contains("500 / 1000d", generatedText, StringComparison.Ordinal);
         Assert.DoesNotContain(
             "invalid AKCSS operation",
             generatedText,
@@ -4738,13 +4625,12 @@ public sealed class AkburaCsGeneratorTests
             "    Grid.Column: 2;\n" +
             "}\n";
         var compilation = CSharpCompilation.Create(
-            "AkburaCsGeneratorTests",
+            "BlackSilenceGeneratedBehaviorTests",
             references: SymbolTests.CreateAvaloniaReferences(),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var sourcePath = Path.Combine(Environment.CurrentDirectory, "Styles.akcss");
         var additionalText = new TestAdditionalText(sourcePath, SourceText.From(akcss));
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts: [additionalText],
             parseOptions: CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview));
 
@@ -4758,7 +4644,7 @@ public sealed class AkburaCsGeneratorTests
             static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
         var generatorResult = Assert.Single(driver.GetRunResult().Results);
         Assert.Null(generatorResult.Exception);
-        var generatedSource = Assert.Single(generatorResult.GeneratedSources);
+        var generatedSource = Assert.Single(GetDocumentSources(generatorResult));
         Assert.Equal(
             "Akbura.Akcss.Styles.akcss.6f172a6a.g.cs",
             generatedSource.HintName);
@@ -4779,17 +4665,18 @@ public sealed class AkburaCsGeneratorTests
             text,
             "(6,16)-(8,18)",
             sourcePath);
-        var bindingIndex = text.IndexOf("TrackSubscription(__target", StringComparison.Ordinal);
+        var subscriptionIndex = text.IndexOf("TrackSubscription(", StringComparison.Ordinal);
+        var expressionIndex = text.IndexOf("width < 100", lineDirectiveIndex, StringComparison.Ordinal);
+        var lineDefaultIndex = text.IndexOf("#line default", lineDirectiveIndex, StringComparison.Ordinal);
         Assert.True(guardIndex >= 0);
-        Assert.True(bindingIndex >= 0);
-        var lineDefaultIndex = text.IndexOf("#line default", bindingIndex, StringComparison.Ordinal);
-        Assert.True(guardIndex < lineDirectiveIndex);
-        Assert.True(lineDirectiveIndex < bindingIndex);
-        Assert.True(bindingIndex < lineDefaultIndex);
+        Assert.True(guardIndex < subscriptionIndex);
+        Assert.True(subscriptionIndex < lineDirectiveIndex);
+        Assert.True(lineDirectiveIndex < expressionIndex);
+        Assert.True(expressionIndex < lineDefaultIndex);
 
         var mappedStatementTokens = generatedSource.SyntaxTree.GetRoot()
             .DescendantTokens()
-            .Where(token => token.SpanStart >= bindingIndex &&
+            .Where(token => token.SpanStart >= expressionIndex &&
                             token.Span.End <= lineDefaultIndex)
             .ToArray();
         AssertMappedLocation(
@@ -4889,8 +4776,7 @@ public sealed class AkburaCsGeneratorTests
         var sourcePath = Path.Combine(
             Environment.CurrentDirectory,
             "LibraryStyles.akcss");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -4914,7 +4800,7 @@ public sealed class AkburaCsGeneratorTests
                 diagnostic.Severity == DiagnosticSeverity.Error);
 
         var generatedSource = Assert.Single(
-            Assert.Single(driver.GetRunResult().Results).GeneratedSources)
+            GetDocumentSources(Assert.Single(driver.GetRunResult().Results)))
             .SourceText
             .ToString();
         Assert.Contains(
@@ -5083,7 +4969,7 @@ public sealed class AkburaCsGeneratorTests
         Assert.Equal("Width", utilitySetter.Property!.Name);
         Assert.Null(utilitySetter.Syntax);
         Assert.Equal(
-            "((global::System.Double)__arguments[0]) * global::Akbura.Amx.DynamicResource<global::System.Double>(\"--spacing\")",
+            "(global::System.Double)__arguments[0]! * global::Akbura.Amx.DynamicResource<global::System.Double>(\"--spacing\")",
             metadataUtilitySetter.Expression);
         Assert.False(metadataUtility.OperationAttributes.IsEmpty);
         Assert.True(semanticModel.GetSemanticDiagnostics(root.Element).IsEmpty);
@@ -5114,8 +5000,7 @@ public sealed class AkburaCsGeneratorTests
         var consumerDirectory = Path.Combine(
             Environment.CurrentDirectory,
             "AkcssMetadataConsumer");
-        GeneratorDriver consumerDriver = CSharpGeneratorDriver.Create(
-            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+        GeneratorDriver consumerDriver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -5137,7 +5022,7 @@ public sealed class AkburaCsGeneratorTests
             generatedConsumer.GetDiagnostics(),
             static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
         var localModuleSource = Assert.Single(
-            Assert.Single(consumerDriver.GetRunResult().Results).GeneratedSources,
+            GetDocumentSources(Assert.Single(consumerDriver.GetRunResult().Results)),
             static source => source.HintName.Contains(
                 "Consumer.akcss",
                 StringComparison.Ordinal));
@@ -5242,8 +5127,7 @@ public sealed class AkburaCsGeneratorTests
             references: SymbolTests.CreateAvaloniaReferences(),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var sourcePath = Path.Combine(Environment.CurrentDirectory, "Reactive.akcss");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts: [new TestAdditionalText(sourcePath, SourceText.From(akcss))],
             parseOptions: CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview));
 
@@ -5256,7 +5140,7 @@ public sealed class AkburaCsGeneratorTests
             generatorDiagnostics,
             static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
         var generatedSource = Assert.Single(
-            Assert.Single(driver.GetRunResult().Results).GeneratedSources);
+            GetDocumentSources(Assert.Single(driver.GetRunResult().Results)));
         var generatedText = generatedSource.SourceText.ToString();
         Assert.Contains(
             "[global::Akbura.CompilerAnotations.ObservesPropertyAttribute(\"IsEnabled\")]",
@@ -5323,8 +5207,7 @@ public sealed class AkburaCsGeneratorTests
         var sourcePath = Path.Combine(
             Environment.CurrentDirectory,
             "AttachedReactive.akcss");
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -5344,8 +5227,7 @@ public sealed class AkburaCsGeneratorTests
             static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error);
         var generatedSource = Assert.Single(
-            Assert.Single(driver.GetRunResult().Results)
-                .GeneratedSources);
+            GetDocumentSources(Assert.Single(driver.GetRunResult().Results)));
         var generatedText = generatedSource.SourceText.ToString();
         Assert.Contains(
             "[global::Akbura.CompilerAnotations." +
@@ -5382,14 +5264,13 @@ public sealed class AkburaCsGeneratorTests
             "}\n";
         var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
         var compilation = CSharpCompilation.Create(
-            "AkburaCsGeneratorCustomClassTests",
+            "BlackSilenceGeneratedBehaviorCustomClassTests",
             syntaxTrees: [CSharpSyntaxTree.ParseText(csharp, parseOptions)],
             references: SymbolTests.CreateAvaloniaReferences(),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var sourcePath = Path.Combine(Environment.CurrentDirectory, "Styles.akcss");
         var additionalText = new TestAdditionalText(sourcePath, SourceText.From(akcss));
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators: [new AkburaCsGenerator().AsSourceGenerator()],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts: [additionalText],
             parseOptions: parseOptions);
 
@@ -5403,7 +5284,7 @@ public sealed class AkburaCsGeneratorTests
             static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
         var generatorResult = Assert.Single(driver.GetRunResult().Results);
         Assert.Null(generatorResult.Exception);
-        var generatedSource = Assert.Single(generatorResult.GeneratedSources);
+        var generatedSource = Assert.Single(GetDocumentSources(generatorResult));
         var text = generatedSource.SourceText.ToString();
         Assert.Contains("__target is global::Data.MyClass", text, StringComparison.Ordinal);
         Assert.Contains("__target is global::Avalonia.AvaloniaObject", text, StringComparison.Ordinal);
@@ -5502,11 +5383,7 @@ public sealed class AkburaCsGeneratorTests
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary));
         var projectDirectory = Environment.CurrentDirectory;
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -5535,7 +5412,7 @@ public sealed class AkburaCsGeneratorTests
                 diagnostic.Severity == DiagnosticSeverity.Error);
         var result = Assert.Single(driver.GetRunResult().Results);
         Assert.Null(result.Exception);
-        var generated = Assert.Single(result.GeneratedSources);
+        var generated = Assert.Single(GetDocumentSources(result));
         var generatedText = generated.SourceText.ToString();
         Assert.Contains(
             "using System.Text;",
@@ -5574,11 +5451,7 @@ public sealed class AkburaCsGeneratorTests
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary));
         var projectDirectory = Environment.CurrentDirectory;
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -5606,7 +5479,7 @@ public sealed class AkburaCsGeneratorTests
                 diagnostic.Severity == DiagnosticSeverity.Error);
         var result = Assert.Single(driver.GetRunResult().Results);
         Assert.Null(result.Exception);
-        var generated = Assert.Single(result.GeneratedSources);
+        var generated = Assert.Single(GetDocumentSources(result));
         Assert.Contains(
             "using Avalonia.Controls;",
             generated.SourceText.ToString(),
@@ -5628,11 +5501,7 @@ public sealed class AkburaCsGeneratorTests
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary));
         var projectDirectory = Environment.CurrentDirectory;
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -5666,7 +5535,7 @@ public sealed class AkburaCsGeneratorTests
                         .AKBURA_SEMANTIC_GlobalUsingsFileContainsNonUsing));
         var result = Assert.Single(driver.GetRunResult().Results);
         Assert.Null(result.Exception);
-        Assert.Empty(result.GeneratedSources);
+        Assert.Empty(GetDocumentSources(result));
     }
 
     [Fact]
@@ -5740,11 +5609,7 @@ public sealed class AkburaCsGeneratorTests
             Environment.CurrentDirectory,
             "WhitespaceComponent.akbura");
 
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators:
-            [
-                new AkburaCsGenerator().AsSourceGenerator(),
-            ],
+        GeneratorDriver driver = CreateDriver(
             additionalTexts:
             [
                 new TestAdditionalText(
@@ -5767,7 +5632,7 @@ public sealed class AkburaCsGeneratorTests
 
         Assert.Null(result.Exception);
 
-        var generated = Assert.Single(result.GeneratedSources);
+        var generated = Assert.Single(GetDocumentSources(result));
 
         Assert.DoesNotContain(
             updatedCompilation.GetDiagnostics(),
@@ -5775,6 +5640,24 @@ public sealed class AkburaCsGeneratorTests
                 diagnostic.Severity == DiagnosticSeverity.Error);
 
         return generated.SourceText.ToString();
+    }
+
+    private static GeneratorDriver CreateDriver(
+        AdditionalText[] additionalTexts,
+        CSharpParseOptions parseOptions)
+    {
+        return CSharpGeneratorDriver.Create(
+            generators: [new AkburaBlackSilenceGenerator().AsSourceGenerator()],
+            additionalTexts: additionalTexts,
+            parseOptions: parseOptions,
+            optionsProvider: s_options);
+    }
+
+    private static ImmutableArray<GeneratedSourceResult> GetDocumentSources(GeneratorRunResult result)
+    {
+        return result.GeneratedSources
+            .Where(static source => source.HintName != HotReloadServiceWriter.HintName)
+            .ToImmutableArray();
     }
 
     private static int AssertEnhancedLineDirective(string generatedSource, string sourceSpan, string sourcePath)

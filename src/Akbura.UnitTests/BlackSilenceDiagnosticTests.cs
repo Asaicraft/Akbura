@@ -1,5 +1,7 @@
 using Akbura.BlackSilence;
+using Akbura.Diagnostics;
 using Akbura.Language;
+using Akbura.Language.CodeGeneration;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -7,7 +9,7 @@ using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json;
-using FuriosoGenerator = Akbura.Furioso.AkburaCsGenerator;
+using Diagnostic = Microsoft.CodeAnalysis.Diagnostic;
 using LanguageDiagnostic = Akbura.Language.Syntax.AkburaDiagnostic;
 using Location = Microsoft.CodeAnalysis.Location;
 using LocationKind = Microsoft.CodeAnalysis.LocationKind;
@@ -20,19 +22,19 @@ public sealed class BlackSilenceDiagnosticTests
     [InlineData("Page.akbura", "using Avalonia.Controls;\r\n<Button Missing=\"1\" />", ErrorCodes.AKBURA_SEMANTIC_MarkupPropertyNotFound)]
     [InlineData("Shared.akcss", "@using Avalonia.Controls;\r\nBorder.shared { Missing: 1; }", ErrorCodes.AKBURA_SEMANTIC_AkcssPropertyNotFound)]
     [InlineData("Page.akbura", "using Avalonia.Controls;\r\n@akcss { @using Avalonia.Controls; Border.local { Missing: 1; } }\r\n<Border class=\"local\" />", ErrorCodes.AKBURA_SEMANTIC_AkcssPropertyNotFound)]
-    public void SemanticDiagnostics_MatchFuriosoIncludingExactLocationsAndMetadata(
+    public void SemanticDiagnostics_MatchCanonicalLocationsAndMetadata(
         string relativePath,
         string source,
         string expectedCode)
     {
         var project = new DiagnosticProject();
         var file = project.File(relativePath, source);
-        var expected = Run(project, new FuriosoGenerator(), file);
+        var expected = GetCanonicalDiagnostics(project, file);
         var actual = Run(project, new AkburaBlackSilenceGenerator(), file);
 
-        Assert.Contains(expected.Diagnostics, diagnostic => diagnostic.Id == expectedCode);
-        AssertSourceLocations(file, expected.Diagnostics);
-        AssertDiagnosticParity(expected.Diagnostics, actual.Diagnostics);
+        Assert.Contains(expected, diagnostic => diagnostic.Id == expectedCode);
+        AssertSourceLocations(file, expected);
+        AssertDiagnosticParity(expected, actual.Diagnostics);
     }
 
     [Theory]
@@ -42,15 +44,14 @@ public sealed class BlackSilenceDiagnosticTests
     {
         var project = new DiagnosticProject();
         var file = project.File(path, source);
-        var expected = Run(project, new FuriosoGenerator(), file);
+        var expected = GetCanonicalDiagnostics(project, file);
         var actual = Run(project, new AkburaBlackSilenceGenerator(), file);
 
-        var diagnostic = Assert.Single(expected.Diagnostics);
+        var diagnostic = Assert.Single(expected);
         Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_GlobalUsingsFileContainsNonUsing, diagnostic.Id);
-        Assert.Empty(expected.GeneratedSources);
         AssertOnlyHotReloadService(actual);
-        AssertSourceLocations(file, expected.Diagnostics);
-        AssertDiagnosticParity(expected.Diagnostics, actual.Diagnostics);
+        AssertSourceLocations(file, expected);
+        AssertDiagnosticParity(expected, actual.Diagnostics);
     }
 
     [Theory]
@@ -59,21 +60,20 @@ public sealed class BlackSilenceDiagnosticTests
     [InlineData("Page.akbura", "using Avalonia.Controls;\r\n@akcss { @using Avalonia.Controls; Border.local { Width: 10; } /* unfinished")]
     [InlineData("GlobalUsings.akbura", "using Demo.Empty.akcss\r\nusing Avalonia.Controls;")]
     [InlineData("GlobalUsings.akcss", "@using System;\r\n/* unfinished")]
-    public void SyntaxDiagnostics_ExtendFuriosoUsingExistingParserLocations(string path, string source)
+    public void SyntaxDiagnostics_PreserveParserLocations(string path, string source)
     {
         var project = new DiagnosticProject();
         var file = project.File(path, source);
         var companion = project.File("Empty.akcss", string.Empty);
         var syntax = GetExpectedSyntaxDiagnostics(file);
-        var furioso = Run(project, new FuriosoGenerator(), file, companion);
-        var blackSilence = Run(project, new AkburaBlackSilenceGenerator(), file, companion);
+        var actual = Run(project, new AkburaBlackSilenceGenerator(), file, companion);
+        var publishedSyntax = actual.Diagnostics
+            .Where(static diagnostic => diagnostic.Properties.TryGetValue("akbura.kind", out var kind) && kind == "syntax")
+            .ToImmutableArray();
 
-        // Furioso intentionally has no parser-diagnostic publication. The new
-        // syntax coverage is checked against the existing Workspace mapping
-        // contract, while preserving every diagnostic Furioso already reports.
-        Assert.NotEmpty(syntax);
         AssertSourceLocations(file, syntax);
-        AssertDiagnosticParity(syntax.AddRange(furioso.Diagnostics), blackSilence.Diagnostics);
+        AssertDiagnosticParity(syntax, publishedSyntax);
+        AssertDiagnosticParity(GetCanonicalDiagnostics(project, file, companion), actual.Diagnostics);
     }
 
     [Fact]
@@ -83,15 +83,15 @@ public sealed class BlackSilenceDiagnosticTests
         var file = project.File(
             "Примеры/Page.akbura",
             "using Avalonia.Controls;\r\n<StackPanel>\r\n<TextBlock Text=\"Привет 😀\" /><Button Missing=\"1\" />\r\n</StackPanel>");
-        var expected = Run(project, new FuriosoGenerator(), file);
+        var expected = GetCanonicalDiagnostics(project, file);
         var actual = Run(project, new AkburaBlackSilenceGenerator(), file);
 
-        var diagnostic = Assert.Single(expected.Diagnostics);
+        var diagnostic = Assert.Single(expected);
         Assert.Equal(ErrorCodes.AKBURA_SEMANTIC_MarkupPropertyNotFound, diagnostic.Id);
         Assert.Equal(2, diagnostic.Location.GetLineSpan().StartLinePosition.Line);
         Assert.True(diagnostic.Location.SourceSpan.Start > file.Text.ToString().IndexOf("😀", StringComparison.Ordinal));
-        AssertSourceLocations(file, expected.Diagnostics);
-        AssertDiagnosticParity(expected.Diagnostics, actual.Diagnostics);
+        AssertSourceLocations(file, expected);
+        AssertDiagnosticParity(expected, actual.Diagnostics);
     }
 
     [Fact]
@@ -101,11 +101,11 @@ public sealed class BlackSilenceDiagnosticTests
         var file = project.File(
             "Page.akbura",
             "using Avalonia.Controls;\r\n@akcss { @using Avalonia.Controls; Border.local { Missing: 1; } }\r\n<Border class=\"local\" />");
-        var expected = Run(project, new FuriosoGenerator(), file);
+        var expected = GetCanonicalDiagnostics(project, file);
         var actual = Run(project, new AkburaBlackSilenceGenerator(), file);
 
-        Assert.Single(expected.Diagnostics, static diagnostic => diagnostic.Id == ErrorCodes.AKBURA_SEMANTIC_AkcssPropertyNotFound);
-        AssertDiagnosticParity(expected.Diagnostics, actual.Diagnostics);
+        Assert.Single(expected, static diagnostic => diagnostic.Id == ErrorCodes.AKBURA_SEMANTIC_AkcssPropertyNotFound);
+        AssertDiagnosticParity(expected, actual.Diagnostics);
         Assert.Single(actual.Diagnostics, static diagnostic => diagnostic.Id == ErrorCodes.AKBURA_SEMANTIC_AkcssPropertyNotFound);
     }
 
@@ -528,6 +528,28 @@ public sealed class BlackSilenceDiagnosticTests
         }
     }
 
+    private static ImmutableArray<Diagnostic> GetCanonicalDiagnostics(DiagnosticProject project, params DiagnosticFile[] files)
+    {
+        var trees = files.Select(file =>
+            file.Path.EndsWith(".akcss", StringComparison.OrdinalIgnoreCase)
+                ? (AkburaSyntaxTree)AkcssSyntaxTree.ParseText(
+                    file.Text,
+                    file.Path,
+                    AkcssGeneratedModuleNames.GetMetadataName(
+                        DiagnosticProject.RootNamespace,
+                        Path.GetRelativePath(project.Directory, file.Path).Replace('\\', '/')))
+                : ComponentSyntaxTree.ParseText(file.Text, file.Path))
+            .ToImmutableArray();
+        var compilation = AkburaProjectIndex.Create(project.Compilation, trees, DiagnosticProject.RootNamespace, project.Directory).Compilation;
+        var diagnostics = trees.SelectMany(tree => AkburaDiagnosticEngine.Collect(
+            tree,
+            GlobalUsings.IsComponentFile(tree) || GlobalUsings.IsAkcssFile(tree) ? null : compilation.GetSemanticModel(tree)));
+
+        return AkburaDiagnosticCollection.Deduplicate(diagnostics)
+            .Select(static diagnostic => AkburaDiagnosticAdapter.ToRoslyn(diagnostic))
+            .ToImmutableArray();
+    }
+
     private static ImmutableArray<Diagnostic> GetExpectedSyntaxDiagnostics(DiagnosticFile file)
     {
         AkburaSyntaxTree tree = file.Path.EndsWith(".akcss", StringComparison.Ordinal)
@@ -669,8 +691,7 @@ public sealed class BlackSilenceDiagnosticTests
             CustomTags = diagnostic.Descriptor.CustomTags.ToArray(),
             Location = DescribeLocation(diagnostic.Location),
             AdditionalLocations = diagnostic.AdditionalLocations.Select(DescribeLocation).ToArray(),
-            // Furioso has no transport metadata. Ignore only the four documented
-            // publisher fields, never an entire prefix or arbitrary properties.
+            // Publisher metadata can differ between the core collector and the generator.
             Properties = diagnostic.Properties.Where(static pair => !IsTransportProperty(pair.Key))
                 .OrderBy(static pair => pair.Key, StringComparer.Ordinal).ToArray(),
         })).OrderBy(static diagnostic => diagnostic, StringComparer.Ordinal).ToArray();
@@ -711,6 +732,8 @@ public sealed class BlackSilenceDiagnosticTests
 
     private sealed class DiagnosticProject
     {
+        public const string RootNamespace = "Demo";
+
         public DiagnosticProject()
         {
             Directory = Path.Combine(Path.GetTempPath(), "BlackSilenceDiagnosticTests", Guid.NewGuid().ToString("N"));
@@ -761,7 +784,7 @@ public sealed class BlackSilenceDiagnosticTests
         private static readonly AnalyzerConfigOptions s_empty = new Values(new Dictionary<string, string>());
         public override AnalyzerConfigOptions GlobalOptions { get; } = new Values(new Dictionary<string, string>
         {
-            ["build_property.RootNamespace"] = "Demo",
+            ["build_property.RootNamespace"] = DiagnosticProject.RootNamespace,
             ["build_property.ProjectDir"] = directory,
             ["build_property.AkburaBlackSilenceDiagnostics"] = mode,
         });

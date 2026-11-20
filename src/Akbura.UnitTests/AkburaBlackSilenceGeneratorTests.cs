@@ -2001,13 +2001,15 @@ public sealed class AkburaBlackSilenceGeneratorTests
 
         public TestAnalyzerConfigOptionsProvider(
             string rootNamespace,
-            string projectDirectory)
+            string projectDirectory,
+            bool publishDiagnostics = false)
         {
             _globalOptions = new TestAnalyzerConfigOptions(
                 new Dictionary<string, string>(StringComparer.Ordinal)
                 {
                     ["build_property.RootNamespace"] = rootNamespace,
                     ["build_property.ProjectDir"] = projectDirectory,
+                    ["build_property.AkburaBlackSilenceDiagnostics"] = publishDiagnostics ? "Publish" : "Shadow",
                 });
         }
 

@@ -8,7 +8,6 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
-using FuriosoGenerator = Akbura.Furioso.AkburaCsGenerator;
 
 namespace Akbura.Benchmarks;
 
@@ -24,7 +23,7 @@ internal static class FeatureGalleryDiagnosticParityVerification
         if (args.Contains("--help", StringComparer.Ordinal))
         {
             Console.WriteLine("--black-silence-diagnostic-parity [--output artifacts/black-silence-diagnostic-parity] [--scenario ScenarioName] [--measure-overhead | --measure-only] [--operations 32]");
-            Console.WriteLine("Checks all 16 diagnostic scenarios against fresh BlackSilence and Furioso plus canonical syntax diagnostics. Optional paired Off/Shadow/Publish measurements use this same binary.");
+            Console.WriteLine("Checks all 16 diagnostic scenarios against fresh BlackSilence and the core diagnostic engine. Optional paired Off/Shadow/Publish measurements use this same binary.");
             return true;
         }
 
@@ -94,32 +93,31 @@ internal static class FeatureGalleryDiagnosticParityVerification
 #else
                 incremental = FeatureGalleryDiagnosticWorkload.Run(workload.Driver, workload.Compilation);
 #endif
-                var fresh = RunFresh(workload, new AkburaBlackSilenceGenerator());
-                var furioso = RunFresh(workload, new FuriosoGenerator());
-                var syntax = GetCanonicalSyntaxDiagnostics(workload);
-                var expected = Describe(furioso.Diagnostics.AddRange(syntax));
+                var fresh = RunFresh(workload);
+                var canonical = GetCanonicalDiagnostics(workload);
+                var syntaxCount = canonical.Count(static diagnostic => diagnostic.Kind == AkburaDiagnosticKind.Syntax);
+                var expected = Describe(canonical.Select(static diagnostic => AkburaDiagnosticAdapter.ToRoslyn(diagnostic)).ToImmutableArray());
                 var actual = Describe(incremental.Diagnostics);
                 var freshDiagnostics = Describe(fresh.Diagnostics);
                 var differences = new List<string>();
-                AddDiagnosticDifferences("Furioso plus canonical syntax", expected, actual, differences);
+                AddDiagnosticDifferences("Core diagnostic engine", expected, actual, differences);
                 AddDiagnosticDifferences("Fresh BlackSilence", freshDiagnostics, actual, differences);
                 CompareSources(fresh, incremental, differences);
                 if (differences.Count != 0)
                 {
-                    WriteFailureSources(output, scenario, workload, incremental, fresh, furioso);
+                    WriteFailureSources(output, scenario, workload, incremental, fresh);
                 }
 
                 results.Add(new DiagnosticScenarioResult(
                     scenario.ToString(),
                     differences.Count == 0,
-                    furioso.Diagnostics.Length,
-                    syntax.Length,
+                    syntaxCount,
                     expected,
                     actual,
                     freshDiagnostics,
                     differences.ToArray(),
                     statistics));
-                Console.WriteLine($"  {(differences.Count == 0 ? "PASS" : "FAIL")}: {actual.Length} diagnostics, {syntax.Length} intentional syntax diagnostics.");
+                Console.WriteLine($"  {(differences.Count == 0 ? "PASS" : "FAIL")}: {actual.Length} diagnostics, {syntaxCount} syntax diagnostics.");
                 foreach (var difference in differences.Take(3))
                 {
                     Console.WriteLine("  " + difference);
@@ -128,7 +126,7 @@ internal static class FeatureGalleryDiagnosticParityVerification
             catch (Exception exception)
             {
                 results.Add(new DiagnosticScenarioResult(
-                    scenario.ToString(), false, 0, 0, [], [], [], [exception.ToString()], null));
+                    scenario.ToString(), false, 0, [], [], [], [exception.ToString()], null));
                 Console.WriteLine("  FAIL: " + exception.Message);
             }
         }
@@ -138,11 +136,10 @@ internal static class FeatureGalleryDiagnosticParityVerification
         Directory.CreateDirectory(output);
         var report = new
         {
-            SchemaVersion = 1,
+            SchemaVersion = 2,
             Passed = measureOnly ? (bool?)null : passed,
             VerificationExecuted = !measureOnly,
             CreatedUtc = DateTimeOffset.UtcNow,
-            IntentionalDifferences = "BlackSilence adds canonical parser diagnostics. Transport origin/kind/logical-id/document-version and descriptor message templates are not semantic identity.",
             Results = results,
             Overhead = overhead,
         };
@@ -153,9 +150,9 @@ internal static class FeatureGalleryDiagnosticParityVerification
         var markdown = new StringBuilder("# FeatureGallery diagnostic parity\r\n\r\n");
         markdown.AppendLine("Result: " + (measureOnly ? "MEASURED (parity was not run)" : passed ? "PASS" : "FAIL"));
         markdown.AppendLine();
-        markdown.AppendLine("Real FeatureGallery AdditionalFiles and compilation. Dependency scenarios add controlled fixtures; ordinary cold/no-op/EOF scenarios use the unmodified project. Furioso semantic/global diagnostics are compared exactly, with canonical parser diagnostics as an intentional addition. The separate general parity command remains strict about compiler diagnostics.");
+        markdown.AppendLine("The verification uses FeatureGallery AdditionalFiles and C# compilation. Dependency scenarios add controlled fixtures. Published diagnostics are compared with the core diagnostic engine and a fresh BlackSilence run. The comparison includes formatted messages, source locations, and semantic properties.");
         markdown.AppendLine();
-        markdown.AppendLine("| Scenario | Result | Diagnostics | Added syntax |");
+        markdown.AppendLine("| Scenario | Result | Diagnostics | Syntax diagnostics |");
         markdown.AppendLine("| --- | --- | ---: | ---: |");
         foreach (var result in results)
         {
@@ -182,9 +179,10 @@ internal static class FeatureGalleryDiagnosticParityVerification
         Console.WriteLine("Diagnostic report: " + output);
     }
 
-    private static GeneratorRunResult RunFresh(FeatureGalleryDiagnosticWorkload workload, IIncrementalGenerator generator)
+    private static GeneratorRunResult RunFresh(FeatureGalleryDiagnosticWorkload workload)
     {
-        var driver = FeatureGalleryDiagnosticWorkload.CreateDriver(workload.SourceProject, workload.Snapshot, workload.Files, generator);
+        var driver = FeatureGalleryDiagnosticWorkload.CreateDriver(
+            workload.SourceProject, workload.Snapshot, workload.Files, new AkburaBlackSilenceGenerator());
         return FeatureGalleryDiagnosticWorkload.Run(driver, workload.Compilation);
     }
 
@@ -241,8 +239,7 @@ internal static class FeatureGalleryDiagnosticParityVerification
         DiagnosticScenario scenario,
         FeatureGalleryDiagnosticWorkload workload,
         GeneratorRunResult incremental,
-        GeneratorRunResult fresh,
-        GeneratorRunResult furioso)
+        GeneratorRunResult fresh)
     {
         var directory = Path.Combine(output, "failures", scenario.ToString());
         Directory.CreateDirectory(directory);
@@ -254,7 +251,6 @@ internal static class FeatureGalleryDiagnosticParityVerification
             new UTF8Encoding(false));
         Write("incremental", incremental);
         Write("fresh", fresh);
-        Write("furioso", furioso);
 
         void Write(string pipeline, GeneratorRunResult result)
         {
@@ -281,30 +277,33 @@ internal static class FeatureGalleryDiagnosticParityVerification
         }
     }
 
-    private static ImmutableArray<Diagnostic> GetCanonicalSyntaxDiagnostics(FeatureGalleryDiagnosticWorkload workload)
+    private static ImmutableArray<AkburaDiagnosticRecord> GetCanonicalDiagnostics(FeatureGalleryDiagnosticWorkload workload)
     {
-        var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
-        foreach (var file in workload.Files)
+        var rootNamespace = workload.SourceProject.RootNamespace;
+        var directory = workload.Snapshot.ProjectDirectory;
+        var trees = workload.Files.Select(ParseSource)
+            .OrderBy(static tree => tree.Kind)
+            .ThenBy(static tree => tree.FilePath, StringComparer.Ordinal)
+            .ToImmutableArray();
+        var compilation = AkburaProjectIndex.Create(workload.Compilation, trees, rootNamespace, directory).Compilation;
+        var diagnostics = trees.SelectMany(tree => AkburaDiagnosticEngine.Collect(
+            tree,
+            GlobalUsings.IsComponentFile(tree) || GlobalUsings.IsAkcssFile(tree) ? null : compilation.GetSemanticModel(tree)));
+
+        return AkburaDiagnosticCollection.Deduplicate(diagnostics).ToImmutableArray();
+
+        AkburaSyntaxTree ParseSource(AdditionalText file)
         {
             var text = file.GetText() ?? throw new InvalidOperationException("Missing AdditionalFile source.");
-            AkburaSyntaxTree tree = file.Path.EndsWith(".akcss", StringComparison.OrdinalIgnoreCase)
+            return file.Path.EndsWith(".akcss", StringComparison.OrdinalIgnoreCase)
                 ? AkcssSyntaxTree.ParseText(
                     text,
                     file.Path,
                     AkcssGeneratedModuleNames.GetMetadataName(
-                        workload.SourceProject.RootNamespace,
-                        Path.GetRelativePath(workload.Snapshot.ProjectDirectory, file.Path).Replace('\\', '/')))
+                        rootNamespace,
+                        Path.GetRelativePath(directory, file.Path).Replace('\\', '/')))
                 : ComponentSyntaxTree.ParseText(text, file.Path);
-            foreach (var diagnostic in AkburaDiagnosticEngine.Collect(tree, includeSemantic: false))
-            {
-                if (diagnostic.Kind == AkburaDiagnosticKind.Syntax)
-                {
-                    diagnostics.Add(AkburaDiagnosticAdapter.ToRoslyn(diagnostic));
-                }
-            }
         }
-
-        return diagnostics.ToImmutable();
     }
 
     private static string[] Describe(ImmutableArray<Diagnostic> diagnostics)
@@ -444,7 +443,6 @@ internal static class FeatureGalleryDiagnosticParityVerification
     private sealed record DiagnosticScenarioResult(
         string Scenario,
         bool Passed,
-        int FuriosoCount,
         int SyntaxCount,
         string[] Expected,
         string[] Actual,

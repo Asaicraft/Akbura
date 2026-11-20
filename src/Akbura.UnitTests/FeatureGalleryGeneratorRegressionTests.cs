@@ -1,4 +1,4 @@
-using Akbura.Furioso;
+using Akbura.BlackSilence;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
@@ -51,7 +51,7 @@ public sealed class FeatureGalleryGeneratorRegressionTests
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             generators:
             [
-                new AkburaCsGenerator().AsSourceGenerator(),
+                new AkburaBlackSilenceGenerator().AsSourceGenerator(),
             ],
             additionalTexts:
             [
@@ -62,7 +62,9 @@ public sealed class FeatureGalleryGeneratorRegressionTests
                     stylesPath,
                     SourceText.From(styles)),
             ],
-            parseOptions: parseOptions);
+            parseOptions: parseOptions,
+            optionsProvider: new AkburaBlackSilenceGeneratorTests.TestAnalyzerConfigOptionsProvider(
+                string.Empty, projectDirectory, publishDiagnostics: true));
 
         driver = driver.RunGeneratorsAndUpdateCompilation(
             compilation,

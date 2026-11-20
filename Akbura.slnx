@@ -147,7 +147,6 @@
   <Project Path="src/Akbura.BlackSilence/Akbura.BlackSilence.csproj" />
   <Project Path="src/Akbura.Build.Tasks/Akbura.Build.Tasks.csproj" />
   <Project Path="src/Akbura.Diagnostics/Akbura.Diagnostics.csproj" />
-  <Project Path="src/Akbura.Furioso/Akbura.Furioso.csproj" Id="3ee5ad67-1b8f-4c3b-b023-626bc70e7a00" />
   <Project Path="src/Akbura.Generator/Akbura.Generator.csproj" />
   <Project Path="src/Akbura.HotReloadIntegrationTests/Akbura.HotReloadIntegrationTests.csproj" />
   <Project Path="src/Akbura.Preview/Akbura.Preview.csproj" />

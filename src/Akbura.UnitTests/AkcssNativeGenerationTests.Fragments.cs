@@ -65,13 +65,13 @@ public sealed partial class AkcssNativeGenerationTests
         """;
 
     [Theory]
-    [InlineData(0, null)]
-    [InlineData(1, "AkburaBlackSilenceGenerator")]
-    [InlineData(0, "AkburaCsGenerator")]
-    public async Task NativeFragmentsStyleTheRealFluentTemplateAndFollowHover(int mode, string? generator)
+    [InlineData(0, false)]
+    [InlineData(0, true)]
+    [InlineData(1, true)]
+    public async Task NativeFragmentsStyleTheRealFluentTemplateAndFollowHover(int mode, bool useBlackSilence)
     {
         var fixture = Generate([("Fragments.akcss", FragmentUtilities), ("FragmentView.akbura", FragmentViewMarkup)],
-            FragmentViewHost, mode: (ComponentGenerationMode)mode, generatorName: generator);
+            FragmentViewHost, mode: (ComponentGenerationMode)mode, useBlackSilence: useBlackSilence);
         var assembly = fixture.Compile();
         await AvaloniaHeadlessTestSession.GetSession().Dispatch(() =>
         {

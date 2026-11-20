@@ -72,9 +72,8 @@ internal readonly ref struct SourceMappingWriter
         writer.WriteIntegerLiteral(endCharacter);
         writer.Write(") ");
         writer.WriteIntegerLiteral(generatedOffset);
-        writer.Write(" ");
-        writer.WriteStringLiteral(path);
-        writer.WriteLine();
+        // Roslyn reads the path in a #line directive verbatim.
+        writer.Write(" \"").Write(path).WriteLine("\"");
 
         return new SourceMappingToken(writer);
     }

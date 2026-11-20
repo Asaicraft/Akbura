@@ -1,5 +1,3 @@
-using Akbura.BlackSilence;
-using Akbura.Furioso;
 using Akbura.Language.CodeGeneration;
 using Avalonia;
 using Avalonia.Controls;
@@ -483,13 +481,12 @@ public sealed partial class AkcssNativeGenerationTests
     }
 
     [Theory]
-    [InlineData(0, null)]
-    [InlineData(1, null)]
-    [InlineData(2, null)]
-    [InlineData(0, nameof(AkburaCsGenerator))]
-    [InlineData(0, nameof(AkburaBlackSilenceGenerator))]
-    [InlineData(1, nameof(AkburaBlackSilenceGenerator))]
-    public async Task InlineNativeStylesInstallOncePerComponentAndPreserveLegacyActivation(int mode, string? generatorName)
+    [InlineData(0, false)]
+    [InlineData(1, false)]
+    [InlineData(2, false)]
+    [InlineData(0, true)]
+    [InlineData(1, true)]
+    public async Task InlineNativeStylesInstallOncePerComponentAndPreserveLegacyActivation(int mode, bool useBlackSilence)
     {
         var fixture = Generate([
             ("Imported.akcss", Controls + "Border > TextBlock { Opacity: 0.2d; }"),
@@ -516,7 +513,7 @@ public sealed partial class AkcssNativeGenerationTests
                 public void InitializeForTest() => InitializeIfNeeded();
                 public void RenderAgain() => Update();
             }
-            """, (ComponentGenerationMode)mode, generatorName: generatorName);
+            """, (ComponentGenerationMode)mode, useBlackSilence: useBlackSilence);
         var assembly = fixture.Compile();
         await AvaloniaHeadlessTestSession.GetSession().Dispatch(() =>
         {

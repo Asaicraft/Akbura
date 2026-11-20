@@ -14,7 +14,7 @@
 
 Все вызовы проверены в CSharpProbeBinder, CSharpProbeBuilder, UseHooks, AkburaSemanticModel и CSharpReferences. Полный набор: `__AkburaStatementProbe`, `__AkburaTypeProbe`, `__AkburaReturnTypeProbe`, `__AkburaDeclarationNameProbe`, `__AkburaUsingProbe`, `__AkburaCommandProbe`, `__AkburaProbe`, `__AkburaComponentMethodProbe`, `__AkburaUseHookProbe`, `__AkburaUseHookCompletionProbe`, `__AkburaSemanticProbe`.
 
-Другие кеши, TryGetValue в AkburaModuleTypeResolver, инфраструктура ConcurrentCache, PooledDelegates, Runtime, Workspaces, LanguageServer и Furioso не изменены.
+Другие кеши, TryGetValue в AkburaModuleTypeResolver, инфраструктура ConcurrentCache, PooledDelegates, Runtime, Workspaces и LanguageServer не изменены.
 
 ## Методика
 
@@ -281,7 +281,7 @@ Release наборы частично пересекаются: это не су
 
 Порядок Akbura/driver diagnostics сохранён. Roslyn compiler diagnostics сравниваются в каноническом порядке после отдельно доказанной нестабильности их перечисления; тексты/ID/severity/properties/paths/spans не исключаются. Есть непустые diagnostics в дополнительных 36 регрессиях. Cancellation и parallel syntax equality проверены для каждого варианта.
 
-Существующие предупреждения: CS8602 в Blender.Reader, пять xUnit warnings в других тестах и шесть NuGet audit warnings benchmark dependencies. Новых предупреждений/подавлений нет. `git diff --check` выполнен; все изменённые текстовые файлы UTF-8, CRLF, завершающий CRLF. Furioso, PooledDelegates, resolver fast hit path и ConcurrentCache internals не изменены.
+Существующие предупреждения: CS8602 в Blender.Reader, пять xUnit warnings в других тестах и шесть NuGet audit warnings benchmark dependencies. Новых предупреждений/подавлений нет. `git diff --check` выполнен; все изменённые текстовые файлы UTF-8, CRLF, завершающий CRLF. PooledDelegates, resolver fast hit path и ConcurrentCache internals не изменены.
 
 ## Воспроизведение
 

@@ -71,4 +71,6 @@ Every call creates a fresh style collection. Native rules can combine predicates
 
 Use `@based-on` to inherit a source theme or an existing C# `ControlTheme`. A derived theme inherits the base template until it declares a local `@template`. Inside each native style or theme, the final setter for each Avalonia property wins after includes expand. Construction-time values and include arguments are evaluated in declaration order.
 
-Native setter values are evaluated during style or theme construction. Dynamic resource bindings resolve on the matched control. Receiver-dependent native setter expressions, context-free static resource setters, reactive AKCSS `@if` in native bodies, and nested fragments activated by legacy classes or utilities produce generation diagnostics. Mixin bodies are available from source in this stage. Restart the application to apply edits to native style and theme trees during development.
+Native setter values are evaluated during style or theme construction. Dynamic resource bindings resolve on the matched control. Receiver-dependent native setter expressions, context-free static resource setters, and reactive AKCSS `@if` in native bodies produce generation diagnostics. Mixin bodies are available from source in this stage. Restart the application to apply edits to native style and theme trees during development.
+
+See [Native fragments in utilities and classes](./native-application-fragments) for application-owned styles.

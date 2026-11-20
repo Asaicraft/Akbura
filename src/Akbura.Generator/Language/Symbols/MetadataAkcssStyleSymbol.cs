@@ -59,6 +59,8 @@ internal sealed class MetadataAkcssStyleSymbol : Symbol, IMetadataAkcssSymbol
 
     public bool HasErrors => _data.HasErrors;
 
+    public bool HasNativeBody => _data.HasNativeBody;
+
     public ImmutableArray<string> ObservedProperties => _data.ObservedProperties;
 
     public ImmutableArray<AttributeData> OperationAttributes =>

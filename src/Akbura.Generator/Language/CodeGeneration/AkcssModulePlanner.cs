@@ -35,6 +35,9 @@ internal static class AkcssModulePlanner
             var symbol = moduleSymbols[symbolIndex];
             var kind = GetGenerationKind(symbol);
             var runtimeStyleIndex = -1;
+            var nativeApplication = symbol.DeclarationSyntax is { } syntax && native != null
+                ? native.Applications.GetValueOrDefault(syntax)
+                : null;
 
             if (symbol.IsIntercepted)
             {
@@ -68,7 +71,8 @@ internal static class AkcssModulePlanner
                     runtimeStyleIndex,
                     symbol,
                     kind,
-                    HasErrors(symbol.Operations)));
+                    HasErrors(symbol.Operations),
+                    nativeApplication));
         }
 
         var sourcePath = AkcssGeneratedModuleNames.NormalizeSourcePath(input.SourcePath);

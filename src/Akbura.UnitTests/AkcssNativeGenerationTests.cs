@@ -198,7 +198,8 @@ public sealed partial class AkcssNativeGenerationTests
     }
 
     private static GenerationFixture Generate((string Name, string Text)[] files, string host = "",
-        ComponentGenerationMode mode = ComponentGenerationMode.ReleaseDirect, bool validateSemantics = true, string? generatorName = null)
+        ComponentGenerationMode mode = ComponentGenerationMode.ReleaseDirect, bool validateSemantics = true, string? generatorName = null,
+        MetadataReference[]? references = null)
     {
         var options = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
         if (mode == ComponentGenerationMode.DebugStructural)
@@ -207,7 +208,7 @@ public sealed partial class AkcssNativeGenerationTests
         }
         var path = Path.Combine(Path.GetTempPath(), "AkcssNativeGenerationTests");
         var compilation = CSharpCompilation.Create("AkcssNative_" + Guid.NewGuid().ToString("N"),
-            [CSharpSyntaxTree.ParseText(host, options)], SymbolTests.CreateAvaloniaReferences(),
+            [CSharpSyntaxTree.ParseText(host, options)], SymbolTests.CreateAvaloniaReferences().Concat(references ?? []),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
 
         var trees = files.Select(file => file.Name.EndsWith(".akcss", StringComparison.Ordinal)
@@ -270,12 +271,14 @@ public sealed partial class AkcssNativeGenerationTests
             .Where(static item => item.Kind == AkburaDiagnosticKind.Generation)
             .ToArray();
 
-        public Assembly Compile()
+        public Assembly Compile() => Assembly.Load(Emit());
+
+        public byte[] Emit()
         {
             using var output = new MemoryStream();
             var result = Compilation.Emit(output);
             Assert.True(result.Success, string.Join(Environment.NewLine, result.Diagnostics) + Environment.NewLine + Text);
-            return Assembly.Load(output.ToArray());
+            return output.ToArray();
         }
     }
 }

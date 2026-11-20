@@ -76,7 +76,9 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
         _operations = CreateOperations(
             conflictKey,
             applications,
-            _arguments.Length);
+            _arguments.Length,
+            out var nativeDefinitions);
+        NativeDefinitions = nativeDefinitions;
         _operationContributions = new IDisposable?[_operations.Length];
         _conflictKeys = GetConflictKeys(_operations);
     }
@@ -151,8 +153,51 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
 
     internal int OperationCount => _operations.Length;
 
-    internal bool SupportsHotReloadReconciliation => _operations.Length != 0 &&
+    internal ImmutableArray<NativeDefinition> NativeDefinitions { get; }
+    internal bool HasNativeBody => !NativeDefinitions.IsEmpty;
+
+    internal bool SupportsHotReloadReconciliation => !HasNativeBody && _operations.Length != 0 &&
         _operations.All(static operation => operation.SupportsHotReloadReconciliation);
+
+    internal readonly record struct NativeDefinition(IAkcssNativeStyleProvider Provider, int Index);
+
+    internal bool HasNativeArgumentVersions(ImmutableArray<long> versions)
+    {
+        if (versions.Length != _arguments.Length)
+        {
+            return false;
+        }
+        for (var index = 0; index < _arguments.Length; index++)
+        {
+            if (versions[index] != _arguments[index].ValueVersion)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    internal (ImmutableArray<object?> Values, ImmutableArray<long> Versions) CaptureNativeArguments()
+    {
+        var values = ImmutableArray.CreateBuilder<object?>(_arguments.Length);
+        var versions = ImmutableArray.CreateBuilder<long>(_arguments.Length);
+        foreach (var argument in _arguments)
+        {
+            values.Add(argument.Value);
+            versions.Add(argument.ValueVersion);
+        }
+        return (values.MoveToImmutable(), versions.MoveToImmutable());
+    }
+
+    internal void ValidateNativePriority(bool validateValues)
+    {
+        if ((_bindingPriority.HasValue && _bindingPriority != BindingPriority.StyleTrigger) ||
+            (validateValues && _variant is { HasBindingPriorityValue: true } &&
+             _variant.BindingPriority != BindingPriority.StyleTrigger))
+        {
+            throw new InvalidOperationException($"Native AKCSS utility '{Style.Name}' requires StyleTrigger binding priority.");
+        }
+    }
 
     internal bool RefreshFrameCondition()
     {
@@ -342,10 +387,10 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
 
         foreach (var argument in _arguments)
         {
-            argument.Attach(target, OnChanged);
+            argument.Attach(target, OnChanged, dispatchNativeUpdates: HasNativeBody);
         }
 
-        _variant?.Attach(target, OnChanged);
+        _variant?.Attach(target, OnChanged, dispatchNativeUpdates: HasNativeBody);
     }
 
     internal void Refresh(object target)
@@ -419,6 +464,10 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
         if (_variant != null)
         {
             DetachSource(_variant);
+        }
+        if (HasNativeBody)
+        {
+            Array.Clear(_values);
         }
         if (failures?.Count == 1)
         {
@@ -672,16 +721,23 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
     private static ImmutableArray<CandidateOperation> CreateOperations(
         string legacyConflictKey,
         ImmutableArray<AkcssUtilityApplication> applications,
-        int argumentCount)
+        int argumentCount,
+        out ImmutableArray<NativeDefinition> nativeDefinitions)
     {
         using var builder =
             ImmutableArrayBuilder<CandidateOperation>.Rent();
+        ImmutableArray<NativeDefinition>.Builder? native = null;
         for (var applicationIndex = 0;
              applicationIndex < applications.Length;
              applicationIndex++)
         {
             var application = applications[applicationIndex];
             var utility = application.Utility;
+            if (utility is IAkcssNativeStyleProvider provider)
+            {
+                (native ??= ImmutableArray.CreateBuilder<NativeDefinition>()).Add(new NativeDefinition(provider, applicationIndex));
+                continue;
+            }
             var operations = utility.Operations;
             if (!operations.IsDefaultOrEmpty &&
                 utility.Parameters.Length == argumentCount)
@@ -704,6 +760,7 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
                     application));
         }
 
+        nativeDefinitions = native?.ToImmutable() ?? [];
         return builder.ToImmutable();
     }
 
@@ -870,7 +927,13 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
 
         public void OnNext(object? value)
         {
-            _owner?.OnChanged();
+            var owner = Volatile.Read(ref _owner);
+            if (owner?.HasNativeBody == true && !Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => OnNext(value));
+                return;
+            }
+            owner?.OnChanged();
         }
 
         public void OnError(Exception error)
@@ -885,6 +948,6 @@ public sealed class AkcssUtilityCandidateActivator : AkcssStyleActivator
         {
         }
 
-        public void Deactivate() => _owner = null;
+        public void Deactivate() => Interlocked.Exchange(ref _owner, null);
     }
 }

@@ -69,7 +69,7 @@ internal readonly ref struct AkcssDeclarationMetadataWriter
         var interceptType = symbol.InterceptType.Symbol as ITypeSymbol;
         var hasClassName = symbol.ClassName != null;
 
-        var argumentCount = 4;
+        var argumentCount = plan.NativeApplication == null ? 4 : 5;
 
         if (targetType != null)
         {
@@ -125,6 +125,11 @@ internal readonly ref struct AkcssDeclarationMetadataWriter
         if (plan.HasErrors)
         {
             WriteBooleanArgument("HasErrors", true, ref argumentCount);
+        }
+
+        if (plan.NativeApplication != null)
+        {
+            WriteBooleanArgument("HasNativeBody", true, ref argumentCount);
         }
 
         Debug.Assert(argumentCount == 0);

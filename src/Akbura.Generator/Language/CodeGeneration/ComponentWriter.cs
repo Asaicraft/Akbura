@@ -134,6 +134,21 @@ internal sealed class ComponentWriter : IDisposable
 
     public bool HasAkcss => !_plan.Akcss.IsEmpty;
 
+    public void WriteAkcssDiagnostics()
+    {
+        if (_plan.Akcss.Diagnostics.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        foreach (var diagnostic in _plan.Akcss.Diagnostics)
+        {
+            using var mapping = new SourceMappingWriter(_writer, _sourceMap).WriteStart(diagnostic.Syntax, valueOffset: "#error ".Length);
+            _writer.Write("#error ").Write(diagnostic.Code).Write(" ")
+                .WriteLine(diagnostic.Message.Replace('\r', ' ').Replace('\n', ' '));
+        }
+    }
+
     public bool WriteComponentMembers()
     {
         var indent = _writer.CurrentIndent;

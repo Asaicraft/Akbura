@@ -10,9 +10,15 @@ namespace Akbura.Language.CodeGeneration;
 internal sealed record AkcssNativeModulePlan(
     ImmutableArray<AkcssNativeStylePlan> Styles,
     ImmutableArray<AkcssNativeThemePlan> Themes,
+    ImmutableDictionary<AkburaSyntax, AkcssNativeApplicationPlan> Applications,
     AkcssModuleExport? Export,
     ImmutableArray<AkburaSemanticDiagnostic> Diagnostics,
     ImmutableHashSet<string> ReservedNames);
+
+internal sealed record AkcssNativeApplicationPlan(INamedTypeSymbol Target,
+    ImmutableArray<AkcssNativeApplicationParameter> Parameters, ImmutableArray<AkcssNativeMemberPlan> Members);
+
+internal sealed record AkcssNativeApplicationParameter(string LocalName, ITypeSymbol Type, int Ordinal);
 
 internal abstract record AkcssNativeMemberPlan(AkburaSyntax Syntax);
 

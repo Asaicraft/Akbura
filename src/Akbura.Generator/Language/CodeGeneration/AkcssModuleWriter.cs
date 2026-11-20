@@ -175,7 +175,7 @@ internal readonly ref struct AkcssModuleWriter
             _writer.WriteIntegerLiteral(runtimeStyle.RuntimeStyleIndex);
             _writer.Write(" => ");
             ref readonly var symbol = ref plan.Symbols.ItemRef(runtimeStyle.SymbolIndex);
-            if (runtimeStyle.Kind == AkcssRuntimeStyleKind.Interceptor || !HasReliableOperations(symbol.Symbol))
+            if (runtimeStyle.Kind == AkcssRuntimeStyleKind.Interceptor || symbol.NativeApplication != null || !HasReliableOperations(symbol.Symbol))
             {
                 _writer.Write("null");
             }
@@ -355,7 +355,10 @@ internal readonly ref struct AkcssModuleWriter
         _writer.WriteHiddenApiAttributes();
         _metadataWriter.WriteCompilerGeneratedAttribute();
         _metadataWriter.WriteSymbolAttributes(plan);
-        _operationMetadataWriter.Write(plan.Symbol);
+        if (plan.NativeApplication == null)
+        {
+            _operationMetadataWriter.Write(plan.Symbol);
+        }
 
         _writer.Write("public static class ");
 

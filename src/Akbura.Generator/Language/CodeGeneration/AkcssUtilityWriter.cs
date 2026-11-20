@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Pools;
 using System.Diagnostics;
@@ -43,6 +44,12 @@ internal readonly ref struct AkcssUtilityWriter
             symbolPlan.Symbol.IsIntercepted)
         {
             return false;
+        }
+
+        if (AkcssSemanticFacts.HasNativeApplication(utility))
+        {
+            WriteNativeUtility(module, symbolPlan, utility);
+            return true;
         }
 
         var plan = AkcssUtilityPlanner.Create(utility, _sourceMap);
@@ -130,6 +137,34 @@ internal readonly ref struct AkcssUtilityWriter
             identifierValues.Free();
             plan.ReturnToPool();
         }
+    }
+
+    private void WriteNativeUtility(in AkcssModulePlan module, in AkcssSymbolGenerationPlan symbol, ITailwindUtilitySymbol utility)
+    {
+        WriteAttributes(module.IsInlined, utility);
+        _writer.Write("private sealed class ");
+        AkcssGeneratedNameWriter.WriteStyleTypeName(_writer, symbol.SymbolIndex);
+        _writer.Write(" : ");
+        WriteBaseType(utility);
+        if (symbol.NativeApplication != null)
+        {
+            _writer.Write(", ").Write(AkcssNativeWriter.ApplicationProvider);
+        }
+        _writer.WriteLine();
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        if (utility.Parameters.Length > 16)
+        {
+            WriteParameters(utility);
+        }
+        WriteUpdateSignature(utility, AkcssExpressionGenerator.GetTargetParameterName(utility));
+        _writer.WriteLine(" => throw new global::System.NotSupportedException(\"Apply the native AKCSS utility through a cascade.\");");
+        if (symbol.NativeApplication is { } application)
+        {
+            new AkcssNativeWriter(_writer, _sourceMap, module.Native!, module.GeneratedTypeName).WriteApplicationBody(application);
+        }
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
     }
 
     private void WriteAttributes(bool isInlined, ITailwindUtilitySymbol utility)
@@ -252,25 +287,8 @@ internal readonly ref struct AkcssUtilityWriter
         var parameters = utility.Parameters;
         var targetName = AkcssExpressionGenerator.GetTargetParameterName(utility);
 
-        _writer.Write("public override void Update(object ");
-        _writer.Write(targetName);
-
-        if (parameters.Length > 16)
-        {
-            _writer.Write(", params object[] __arguments");
-        }
-        else
-        {
-            for (var i = 0; i < parameters.Length; i++)
-            {
-                _writer.Write(", ");
-                _valueWriter.WriteTypeName(parameters[i].Type.Symbol);
-                _writer.Write(" ");
-                _writer.Write(AkcssExpressionGenerator.GetParameterName(parameters[i]));
-            }
-        }
-
-        _writer.WriteLine(")");
+        WriteUpdateSignature(utility, targetName);
+        _writer.WriteLine();
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
 
@@ -303,6 +321,30 @@ internal readonly ref struct AkcssUtilityWriter
 
         _writer.CurrentIndent -= _writer.TabSize;
         _writer.WriteLine("}");
+    }
+
+    private void WriteUpdateSignature(ITailwindUtilitySymbol utility, string targetName)
+    {
+        var parameters = utility.Parameters;
+        _writer.Write("public override void Update(object ");
+        _writer.Write(targetName);
+
+        if (parameters.Length > 16)
+        {
+            _writer.Write(", params object[] __arguments");
+        }
+        else
+        {
+            for (var i = 0; i < parameters.Length; i++)
+            {
+                _writer.Write(", ");
+                _valueWriter.WriteTypeName(parameters[i].Type.Symbol);
+                _writer.Write(" ");
+                _writer.Write(AkcssExpressionGenerator.GetParameterName(parameters[i]));
+            }
+        }
+
+        _writer.Write(")");
     }
 
     private void WriteBaseType(ITailwindUtilitySymbol utility)

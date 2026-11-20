@@ -6592,7 +6592,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
                 StringComparison.Ordinal);
     }
 
-    private ImmutableArray<string> GetAkcssImportNames(AkburaSyntax syntax)
+    internal ImmutableArray<string> GetAkcssImportNames(AkburaSyntax syntax)
     {
         using var builder = ImmutableArrayBuilder<string>.Rent();
         foreach (var usingDirective in GetAkcssUsingDirectives(syntax))

@@ -27,13 +27,15 @@ internal readonly struct AkcssSymbolGenerationPlan
         int runtimeStyleIndex,
         IAkcssSymbol symbol,
         AkcssSymbolGenerationKind kind,
-        bool hasErrors)
+        bool hasErrors,
+        AkcssNativeApplicationPlan? nativeApplication = null)
     {
         SymbolIndex = symbolIndex;
         RuntimeStyleIndex = runtimeStyleIndex;
         Symbol = symbol;
         Kind = kind;
         HasErrors = hasErrors;
+        NativeApplication = nativeApplication;
     }
 
     public int SymbolIndex { get; }
@@ -49,6 +51,8 @@ internal readonly struct AkcssSymbolGenerationPlan
     public AkcssSymbolGenerationKind Kind { get; }
 
     public bool HasErrors { get; }
+
+    public AkcssNativeApplicationPlan? NativeApplication { get; }
 
     public bool EmitsRuntimeStyle => RuntimeStyleIndex >= 0;
 }

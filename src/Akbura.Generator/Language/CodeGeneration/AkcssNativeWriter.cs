@@ -11,6 +11,7 @@ internal sealed class AkcssNativeWriter
 {
     internal const string CreateStylesMethod = "__CreateNativeStyles";
     internal const string AppendStylesMethod = "__AppendNativeStyles";
+    internal const string ApplicationProvider = "global::Akbura.Akcss.IAkcssNativeStyleProvider";
 
     private const string Selectors = "global::Avalonia.Styling.Selectors.";
     private readonly CodeWriter _writer;
@@ -24,6 +25,24 @@ internal sealed class AkcssNativeWriter
         _sourceMap = sourceMap;
         _ownerTypeName = ownerTypeName;
         _names = new AkcssNativeNames(plan.ReservedNames);
+    }
+
+    internal void WriteApplicationBody(AkcssNativeApplicationPlan application)
+    {
+        _writer.Write("global::System.Type ").Write(ApplicationProvider).Write(".NativeTargetType => typeof(")
+            .Write(Type(application.Target)).WriteLine(");");
+        var root = _names.Allocate("__akcssApplicationRoot");
+        var arguments = _names.Allocate("__akcssApplicationArguments");
+        _writer.Write("void ").Write(ApplicationProvider).Write(".BuildNativeStyle(global::Avalonia.Styling.Style ")
+            .Write(root).Write(", global::System.Collections.Generic.IReadOnlyList<object?> ").Write(arguments).WriteLine(")");
+        OpenBlock();
+        foreach (var parameter in application.Parameters)
+        {
+            _writer.Write("var ").Write(parameter.LocalName).Write(" = (").Write(Type(parameter.Type)).Write(")")
+                .Write(arguments).Write("[").WriteIntegerLiteral(parameter.Ordinal).WriteLine("]!;");
+        }
+        WriteMembers(application.Members, root, templateContext: null);
+        CloseBlock();
     }
 
     public void WriteModule(AkcssNativeModulePlan plan)
@@ -271,6 +290,15 @@ internal sealed class AkcssNativeWriter
         var markup = ComponentPlanner.CreateControlTemplate(template.Template);
         try
         {
+            if (!markup.Akcss.Diagnostics.IsDefaultOrEmpty)
+            {
+                foreach (var diagnostic in markup.Akcss.Diagnostics)
+                {
+                    WriteDiagnostic(_writer, _sourceMap, diagnostic);
+                }
+                return;
+            }
+
             if (markup.RootElementIds.Length != 1)
             {
                 WriteDiagnostic(_writer, _sourceMap, AkcssNativePlanner.Error(template.Syntax,

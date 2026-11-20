@@ -253,6 +253,7 @@ internal readonly struct MetadataAkcssSymbolData
         string? className,
         int runtimeStyleIndex,
         bool hasErrors,
+        bool hasNativeBody,
         ImmutableArray<string> observedProperties,
         ImmutableArray<AttributeData> operationAttributes)
     {
@@ -264,6 +265,7 @@ internal readonly struct MetadataAkcssSymbolData
         ClassName = className;
         RuntimeStyleIndex = runtimeStyleIndex;
         HasErrors = hasErrors;
+        HasNativeBody = hasNativeBody;
         ObservedProperties = observedProperties;
         OperationAttributes = operationAttributes;
     }
@@ -283,6 +285,8 @@ internal readonly struct MetadataAkcssSymbolData
     public int RuntimeStyleIndex { get; }
 
     public bool HasErrors { get; }
+
+    public bool HasNativeBody { get; }
 
     public ImmutableArray<string> ObservedProperties { get; }
 
@@ -344,6 +348,7 @@ internal readonly struct MetadataAkcssSymbolData
                 "RuntimeStyleIndex",
                 -1),
             MetadataAkcssModuleSymbol.GetNamedBoolean(attribute, "HasErrors"),
+            MetadataAkcssModuleSymbol.GetNamedBoolean(attribute, "HasNativeBody"),
             observedProperties.ToImmutable(),
             operations.ToImmutable());
         return true;

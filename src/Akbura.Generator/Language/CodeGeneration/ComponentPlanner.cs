@@ -237,7 +237,7 @@ internal static partial class ComponentPlanner
             }
             BuildScopeIndex();
 
-            var owner = new ComponentPlanBufferOwner(_component is null ? default : CreateAkcssPlan());
+            var owner = new ComponentPlanBufferOwner(CreateAkcssPlan());
 
             try
             {
@@ -265,7 +265,7 @@ internal static partial class ComponentPlanner
                     element.Id,
                     element.Symbol,
                     element.Type,
-                    element.RequiresLocalMarkupContext,
+                    _component == null || element.RequiresLocalMarkupContext,
                     (element.Flags & ComponentElementFlags.IsConditionalTemplateRoot) != 0));
             }
 
@@ -319,16 +319,16 @@ internal static partial class ComponentPlanner
 
         private PooledImmutableList<ComponentElementPlan> CreateElementPlans(in AkcssComponentActivatorPlan akcss)
         {
-            Debug.Assert(_component is null || akcss.Elements.Length == _elements.Count);
+            Debug.Assert(akcss.Elements.Length == _elements.Count);
 
             using var elements = ImmutableArrayBuilder<ComponentElementPlan>.Rent(_elements.Count);
 
             for (var i = 0; i < _elements.Count; i++)
             {
                 var element = _elements[i];
-                var elementAkcss = _component is null ? default : akcss.Elements[i];
+                var elementAkcss = akcss.Elements[i];
 
-                Debug.Assert(_component is null || elementAkcss.ElementId == i);
+                Debug.Assert(elementAkcss.ElementId == i);
 
                 elements.Add(new ComponentElementPlan(
                     element.Id,

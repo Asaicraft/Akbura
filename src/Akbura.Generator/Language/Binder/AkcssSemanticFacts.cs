@@ -1,3 +1,4 @@
+using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 
 namespace Akbura.Language.Binder;
@@ -6,6 +7,10 @@ internal static class AkcssSemanticFacts
 {
     public static bool IsSourceDeclaration(AkburaSyntax syntax) =>
         syntax is AkcssSelectorRuleSyntax or AkcssThemeDeclarationSyntax or AkcssMixinDeclarationSyntax;
+
+    public static bool HasNativeApplication(IAkcssSymbol symbol) =>
+        symbol is IMetadataAkcssSymbol { HasNativeBody: true } ||
+        symbol.DeclarationSyntax is { } declaration && HasContextualBody(declaration);
 
     public static bool IsContextualMember(AkburaSyntax syntax) =>
         syntax is AkcssNestedStyleRuleSyntax or AkcssIncludeDirectiveSyntax or

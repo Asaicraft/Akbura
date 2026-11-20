@@ -27,4 +27,6 @@ public sealed class AkcssSymbolAttribute : Attribute
     public int RuntimeStyleIndex { get; init; } = -1;
 
     public bool HasErrors { get; init; }
+
+    public bool HasNativeBody { get; init; }
 }

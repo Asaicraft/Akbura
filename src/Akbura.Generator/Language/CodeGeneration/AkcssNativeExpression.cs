@@ -12,7 +12,7 @@ namespace Akbura.Language.CodeGeneration;
 internal static class AkcssNativeExpression
 {
     public static bool TryFormat(AkcssContextualOperation owner, CSharpOperationDefinition definition,
-        ImmutableDictionary<AkcssMixinParameterSymbol, string> locals, out string expression, out string error)
+        ImmutableDictionary<Symbols.ISymbol, string> locals, out string expression, out string error)
     {
         expression = string.Empty;
         error = string.Empty;
@@ -25,9 +25,10 @@ internal static class AkcssNativeExpression
         var scope = new Dictionary<IParameterSymbol, string>(SymbolEqualityComparer.Default);
         foreach (var child in Enumerate(owner.Children))
         {
-            if (child is CSharpOperation { TargetSymbol: AkcssMixinParameterSymbol parameter,
+            if (child is CSharpOperation { TargetSymbol: AkcssMixinParameterSymbol or ITailwindUtilityParameterSymbol,
                     CSharpDefinition.Operation: IParameterReferenceOperation reference } &&
-                locals.TryGetValue(parameter, out var local))
+                reference.Parameter.ContainingSymbol.Name == "__AkburaSemanticProbe" &&
+                locals.TryGetValue(child.TargetSymbol!, out var local))
             {
                 scope[reference.Parameter] = local;
             }

@@ -243,7 +243,7 @@ public sealed partial class AkcssSemanticTests : SemanticArchitectureTestBase
     }
 
     [Fact]
-    public void LegacyApplicationsKeepTheNativeFragmentGenerationBoundary()
+    public void ContextualUtilityKeepsItsRuntimeIndexAndGetsANativeBody()
     {
         var fixture = Bind(Controls + "@utilities { Button.example { ^ /template/ ContentPresenter { Opacity: 0.8d; } } }");
         Assert.Empty(fixture.Model.GetSemanticDiagnostics(fixture.Root));
@@ -252,10 +252,11 @@ public sealed partial class AkcssSemanticTests : SemanticArchitectureTestBase
         var plan = AkcssModulePlanner.Create(input, "Demo");
         try
         {
-            var diagnostic = Assert.Single(plan.Native!.Diagnostics);
-            Assert.Equal(ErrorCodes.AKBURA_GENERATION_AkcssUnsupported, diagnostic.Code);
-            Assert.Contains("legacy class or utility", diagnostic.Message);
-            Assert.Single(plan.Symbols);
+            Assert.Empty(plan.Native!.Diagnostics);
+            Assert.Single(plan.Native.Applications);
+            Assert.Empty(plan.Native.Styles);
+            Assert.Equal(0, Assert.Single(plan.Symbols).RuntimeStyleIndex);
+            Assert.NotNull(Assert.Single(plan.Symbols).NativeApplication);
         }
         finally
         {

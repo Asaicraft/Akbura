@@ -299,7 +299,7 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
                 }
 
                 var nativeStyles = AkcssInlineStylesPlan.Create(input.Symbol, akcssModuleTypeNames);
-                var source = nativeStyles.IsEmpty
+                var source = nativeStyles.IsEmpty && !AkcssActivatorPlanner.UsesNativeApplications(input.Symbol, input.SemanticModel)
                     ? SourceText.From(ComponentGenerator.Generate(input.Symbol, input.SemanticModel,
                         input.SourcePath, akcssModuleTypeNames), Encoding.UTF8)
                     : ComponentDocumentWriter.Generate(input.Symbol, input.SemanticModel,
@@ -381,7 +381,9 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
         Akbura.Language.CodeGeneration.AkcssGenerationSourceMap nativeSourceMap, string rootNamespace,
         CancellationToken cancellationToken)
     {
-        if (input.Symbol.DeclaringSyntax is { } syntax && AkcssSemanticFacts.FindContextualModuleMember(syntax) != null)
+        if (input.Symbol.DeclaringSyntax is { } syntax &&
+            (AkcssSemanticFacts.FindContextualModuleMember(syntax) != null ||
+             !AkcssNativePlanner.GetDeferredApplyDiagnostics(input.Symbol, input.SemanticModel, cancellationToken).IsEmpty))
         {
             var nativeInput = new Akbura.Language.CodeGeneration.AkcssGenerationInput(input.Symbol, input.SemanticModel,
                 input.SourcePath, input.ModuleIdentity, input.UsingDirectives);

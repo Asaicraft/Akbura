@@ -29,7 +29,8 @@ internal readonly ref struct MarkupServiceProviderWriter
             return false;
         }
 
-        var writeNameScope = context.IsConditionalNameScope || includeNameScope && !string.IsNullOrEmpty(context.NameScopeExpression);
+        var writeNameScope = !context.UsesTemplateServices &&
+            (context.IsConditionalNameScope || includeNameScope && !string.IsNullOrEmpty(context.NameScopeExpression));
         if (writeNameScope)
         {
             if (retainedFactory)
@@ -45,7 +46,9 @@ internal readonly ref struct MarkupServiceProviderWriter
         }
 
         _writer
-            .Write("CreateMarkupServiceProvider(targetObject: ")
+            .Write(context.UsesTemplateServices
+                ? "global::Akbura.Markup.AkburaControlTemplateServices.Create(targetObject: "
+                : "CreateMarkupServiceProvider(targetObject: ")
             .Write(context.TargetObjectExpression)
             .Write(", targetProperty: ");
 
@@ -67,6 +70,15 @@ internal readonly ref struct MarkupServiceProviderWriter
             _writer
                 .Write(", fallbackServiceProvider: ")
                 .Write(context.FallbackServiceProviderExpression!);
+        }
+
+        if (context.TemplatedParentExpression is { } parent)
+        {
+            _writer.Write(", templatedParent: ").Write(parent);
+        }
+        if (context.UsesTemplateServices && context.NameScopeExpression is { } scope)
+        {
+            _writer.Write(", nameScope: ").Write(scope);
         }
 
         _writer.Write(")");

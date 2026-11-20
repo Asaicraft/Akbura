@@ -18,6 +18,8 @@ internal sealed class AkburaMarkupServiceProvider :
     IXamlTypeResolver,
     IAvaloniaXamlIlEagerParentStackProvider
 {
+    private static readonly IAvaloniaXamlIlControlTemplateProvider s_controlTemplateProvider = new ControlTemplateProvider();
+    private readonly bool? _isControlTemplate;
     private readonly IServiceProvider? _fallbackServiceProvider;
     private readonly IReadOnlyDictionary<string, Type>? _knownTypes;
 
@@ -30,7 +32,8 @@ internal sealed class AkburaMarkupServiceProvider :
         IReadOnlyList<object> directParentsStack,
         IAvaloniaXamlIlEagerParentStackProvider? parentProvider = null,
         IServiceProvider? fallbackServiceProvider = null,
-        IReadOnlyDictionary<string, Type>? knownTypes = null)
+        IReadOnlyDictionary<string, Type>? knownTypes = null,
+        bool? isControlTemplate = null)
     {
         ArgumentNullException.ThrowIfNull(targetObject);
         ArgumentNullException.ThrowIfNull(targetProperty);
@@ -51,6 +54,7 @@ internal sealed class AkburaMarkupServiceProvider :
         ParentProvider = parentProvider;
 
         _fallbackServiceProvider = fallbackServiceProvider;
+        _isControlTemplate = isControlTemplate;
         _knownTypes = knownTypes;
     }
 
@@ -99,6 +103,11 @@ internal sealed class AkburaMarkupServiceProvider :
     public object? GetService(Type serviceType)
     {
         ArgumentNullException.ThrowIfNull(serviceType);
+
+        if (serviceType == typeof(IAvaloniaXamlIlControlTemplateProvider) && _isControlTemplate.HasValue)
+        {
+            return _isControlTemplate.Value ? s_controlTemplateProvider : null;
+        }
 
         if (serviceType == typeof(IServiceProvider))
         {
@@ -188,4 +197,5 @@ internal sealed class AkburaMarkupServiceProvider :
             $"Unable to resolve XAML type '{qualifiedTypeName}'.",
             nameof(qualifiedTypeName));
     }
+    private sealed class ControlTemplateProvider : IAvaloniaXamlIlControlTemplateProvider { }
 }

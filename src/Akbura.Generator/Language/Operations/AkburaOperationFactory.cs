@@ -213,6 +213,9 @@ internal sealed class AkburaOperationFactory : IOperationFactory
         }
     }
 
+    internal static MarkupContentOperation? CreateMarkupContentOperationForTemplate(BoundMarkupComponent component, IOperationFactory factory) =>
+        ((AkburaOperationFactory)factory).CreateMarkupContentOperation(component);
+
     private MarkupContentOperation? CreateMarkupContentOperation(
         BoundMarkupComponent boundNode)
     {

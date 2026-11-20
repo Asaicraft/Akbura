@@ -1,4 +1,6 @@
 using Akbura.Language;
+using Akbura.Language.Binder;
+using Akbura.Language.CodeGeneration;
 using Akbura.Language.Symbols;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis;
@@ -196,6 +198,8 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
             projectOptions.RootNamespace,
             projectOptions.ProjectDirectory);
         var semanticModel = akburaCompilation.GetSemanticModel(semanticHost);
+        var nativeSourceMap = new Akbura.Language.CodeGeneration.AkcssGenerationSourceMap(
+            componentSyntaxTrees, akcssSyntaxTrees, projectOptions.ProjectDirectory);
         var mappedSyntaxTrees = new List<AkburaSyntaxTree>(
             componentSyntaxTrees.Length + akcssSyntaxTrees.Length);
         mappedSyntaxTrees.AddRange(componentSyntaxTrees);
@@ -235,8 +239,10 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
                         projectOptions.RootNamespace,
                         moduleIdentity);
                 sourceMap.RegisterModule(module);
+                nativeSourceMap.RegisterModule(module);
                 inlineAkcssInputs.Add(new AkcssGenerationInput(
                     module,
+                    model,
                     sourcePath,
                     moduleIdentity,
                     model.GetAkcssCSharpUsingDirectives(module)));
@@ -260,6 +266,7 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
 
             externalAkcssInputs[index] = new AkcssGenerationInput(
                 symbol,
+                akburaCompilation.GetSemanticModel(syntaxTree),
                 sourcePath,
                 sourcePath,
                 semanticModel.GetAkcssCSharpUsingDirectives(symbol));
@@ -269,6 +276,7 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
                     projectOptions.RootNamespace,
                     sourcePath);
             sourceMap.RegisterModule(symbol);
+            nativeSourceMap.RegisterModule(symbol);
         }
 
         var componentResults = new GeneratedSource?[sourceComponents.Length];
@@ -290,14 +298,14 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
                     return;
                 }
 
-                var source = ComponentGenerator.Generate(
-                    input.Symbol,
-                    input.SemanticModel,
-                    input.SourcePath,
-                    akcssModuleTypeNames);
+                var nativeStyles = AkcssInlineStylesPlan.Create(input.Symbol, akcssModuleTypeNames);
+                var source = nativeStyles.IsEmpty
+                    ? SourceText.From(ComponentGenerator.Generate(input.Symbol, input.SemanticModel,
+                        input.SourcePath, akcssModuleTypeNames), Encoding.UTF8)
+                    : ComponentDocumentWriter.Generate(input.Symbol, input.SemanticModel,
+                        input.SourcePath, akcssModuleTypeNames, context.CancellationToken);
                 componentResults[index] = new GeneratedSource(
-                    ComponentGenerator.GetHintName(input.Symbol, input.SourcePath),
-                    SourceText.From(source, Encoding.UTF8));
+                    ComponentGenerator.GetHintName(input.Symbol, input.SourcePath), source);
             });
 
         Parallel.For(
@@ -315,20 +323,14 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
                     return;
                 }
 
-                var source = AkcssGenerator.Generate(
-                    input.Symbol,
-                    sourceMap,
-                    input.SourcePath,
-                    projectOptions.RootNamespace,
-                    input.ModuleIdentity,
-                    input.UsingDirectives);
+                var source = GenerateAkcss(input, sourceMap, nativeSourceMap, projectOptions.RootNamespace, context.CancellationToken);
 
                 akcssResults[index] = new GeneratedSource(
                     AkcssGenerator.GetHintName(
                         input.Symbol,
                         input.SourcePath,
                         input.ModuleIdentity),
-                    SourceText.From(source, Encoding.UTF8));
+                    source);
             });
 
         Parallel.For(
@@ -342,19 +344,13 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
             index =>
             {
                 var input = inlineAkcssInputs[index];
-                var source = AkcssGenerator.Generate(
-                    input.Symbol,
-                    sourceMap,
-                    input.SourcePath,
-                    projectOptions.RootNamespace,
-                    input.ModuleIdentity,
-                    input.UsingDirectives);
+                var source = GenerateAkcss(input, sourceMap, nativeSourceMap, projectOptions.RootNamespace, context.CancellationToken);
                 inlineAkcssResults[index] = new GeneratedSource(
                     AkcssGenerator.GetHintName(
                         input.Symbol,
                         input.SourcePath,
                         input.ModuleIdentity),
-                    SourceText.From(source, Encoding.UTF8));
+                    source);
             });
 
         AddGeneratedSources(context, componentResults);
@@ -379,6 +375,21 @@ public sealed class AkburaCsGenerator : IIncrementalGenerator
                 context.ReportDiagnostic(CreateDiagnostic(syntaxTree, diagnostic));
             }
         }
+    }
+
+    private static SourceText GenerateAkcss(in AkcssGenerationInput input, AkcssGenerationSourceMap sourceMap,
+        Akbura.Language.CodeGeneration.AkcssGenerationSourceMap nativeSourceMap, string rootNamespace,
+        CancellationToken cancellationToken)
+    {
+        if (input.Symbol.DeclaringSyntax is { } syntax && AkcssSemanticFacts.FindContextualModuleMember(syntax) != null)
+        {
+            var nativeInput = new Akbura.Language.CodeGeneration.AkcssGenerationInput(input.Symbol, input.SemanticModel,
+                input.SourcePath, input.ModuleIdentity, input.UsingDirectives);
+            return AkcssDocumentWriter.Generate(nativeInput, nativeSourceMap, rootNamespace, cancellationToken);
+        }
+
+        return SourceText.From(AkcssGenerator.Generate(input.Symbol, sourceMap, input.SourcePath,
+            rootNamespace, input.ModuleIdentity, input.UsingDirectives), Encoding.UTF8);
     }
 
     private static void AddGeneratedSources(
@@ -562,6 +573,7 @@ internal readonly record struct ComponentGenerationInput(
 
 internal readonly record struct AkcssGenerationInput(
     IAkcssModuleSymbol Symbol,
+    AkburaSemanticModel SemanticModel,
     string SourcePath,
     string ModuleIdentity,
     ImmutableArray<Microsoft.CodeAnalysis.CSharp.Syntax.UsingDirectiveSyntax> UsingDirectives);

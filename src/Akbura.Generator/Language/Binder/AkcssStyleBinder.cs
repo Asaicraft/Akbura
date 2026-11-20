@@ -582,6 +582,11 @@ internal sealed partial class AkcssStyleBinder : Binder
                 convertedValue = thickness;
                 valueType = new CSharpSymbolDefinition(expectedType);
                 activeBinding = CSharpBindingResult.Empty;
+                if (validateNative && thickness is AkcssThicknessExpressionValue expressions)
+                {
+                    activeBinding = BindContextualThickness(expressions, context, expectedType);
+                    valueOperation = activeBinding.OperationDefinition;
+                }
             }
             else if (isThicknessPropertyType && isThicknessTuple)
             {
@@ -644,6 +649,20 @@ internal sealed partial class AkcssStyleBinder : Binder
 
         return new AkcssSetterData(property, valueType, valueOperation, activeBinding.Conversion, valueKind,
             requiresBrushConversion, convertedValue, propertyKind, diagnostics.ToImmutable());
+    }
+
+    private CSharpBindingResult BindContextualThickness(AkcssThicknessExpressionValue value,
+        AkcssBindingContext context, ITypeSymbol expectedType)
+    {
+        var sides = ReferenceEquals(value.Left, value.Right) && ReferenceEquals(value.Top, value.Bottom)
+            ? new[] { value.Left, value.Top }
+            : new[] { value.Left, value.Top, value.Right, value.Bottom };
+        var arguments = CSharpSyntaxFactory.SeparatedList(sides.Select(static item =>
+            CSharpSyntaxFactory.Argument(item.WithoutTrivia())));
+        var expression = CSharpSyntaxFactory.ObjectCreationExpression(
+            CSharpSyntaxFactory.ParseTypeName("global::Avalonia.Thickness"),
+            CSharpSyntaxFactory.ArgumentList(arguments), initializer: null);
+        return SemanticModel.BindAkcssExpression(expression, context, expectedType);
     }
 
     private static AkcssSetterPropertyKind GetAkcssSetterPropertyKind(AkburaPropertySymbol? property)

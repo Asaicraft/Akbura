@@ -108,6 +108,14 @@ internal readonly ref partial struct ComponentScopeWriter
     private void WriteForeachRegion(in ComponentPlan plan, in ComponentForeachPlan region,
         in MarkupExtensionWriteContext context, string changed, string cursor)
     {
+        if (context.UsesTemplateServices)
+        {
+            var items = GetTemplateForeachItems(region.Id);
+            WriteTemplateForeach(plan, region, context, items);
+            _writer.Write(cursor).Write(".AdvanceDynamicRegion(").Write(items).WriteLine(".Count);");
+            return;
+        }
+
         var name = "__foreachRegion" + region.Id;
         _writer.Write("var ").Write(name).Write(" = ");
         WriteForeachRegionAccess(plan, region);
@@ -117,6 +125,48 @@ internal readonly ref partial struct ComponentScopeWriter
         // membership or order. Pending frames still commit through the owner frame.
         _writer.Write(changed).Write(" |= ").Write(name).WriteLine(".ChildrenChanged;");
         _writer.Write(cursor).Write(".AdvanceDynamicRegion(").Write(name).WriteLine(".Children.Count);");
+    }
+
+    private static string GetTemplateForeachItems(int id) => "__templateForeachItems" + id;
+
+    private void WriteTemplateForeach(in ComponentPlan plan, in ComponentForeachPlan region,
+        in MarkupExtensionWriteContext context, string items)
+    {
+        var operation = region.Operation;
+        var index = operation.IndexVariableName;
+        var count = index + "Count";
+        var nameScope = "__templateForeachNameScope" + region.Id;
+        _writer.Write("var ").Write(count).WriteLine(" = 0;");
+        _writer.Write("foreach (");
+        var types = new CSharpValueWriter(_writer);
+        types.WriteTypeNameWithNullableAnnotation(operation.IterationType.Symbol as ITypeSymbol);
+        _writer.Write(" ");
+        types.WriteIdentifier(operation.IterationVariableName);
+        _writer.Write(" in ").Write(CSharpProbeBuilder.GetMarkupLoopCodeGenerationSyntax(operation.Source)!.ToString())
+            .WriteLine(")");
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.Write("var ").Write(index).Write(" = ").Write(count).WriteLine("++;");
+        if (!operation.Key.IsDefault)
+        {
+            _writer.Write("_ = ").Write(CSharpProbeBuilder.GetMarkupLoopCodeGenerationSyntax(operation.Key)!.ToString()).WriteLine(";");
+        }
+
+        _writer.Write("var ").Write(nameScope).WriteLine(" = new global::Avalonia.Controls.NameScope();");
+        _writer.WriteLine("try");
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        WriteForeachBody(plan, region, operation.Body, context, items, nameScope);
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
+        _writer.WriteLine("finally");
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.Write(nameScope).WriteLine(".Complete();");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
     }
 
     private void WriteForeachRender(in ComponentPlan plan, in ComponentForeachPlan region,
@@ -288,13 +338,19 @@ internal readonly ref partial struct ComponentScopeWriter
     }
 
     private void WriteForeachBody(in ComponentPlan plan, in ComponentForeachPlan region,
-        IEnumerable<MarkupForeachBodyItem> body, in MarkupExtensionWriteContext context, string frame)
+        IEnumerable<MarkupForeachBodyItem> body, in MarkupExtensionWriteContext context, string frame, string? templateNameScope = null)
     {
         foreach (var item in body)
         {
             if (item.ForeachOperation is { } nested)
             {
                 var child = FindForeachPlan(plan, nested.Syntax);
+                if (templateNameScope != null)
+                {
+                    WriteTemplateForeach(plan, child, context, frame);
+                    continue;
+                }
+
                 var name = "__foreachRegion" + child.Id;
                 _writer.Write("var ").Write(name).Write(" = ").Write(frame).Write(".GetForeachRegion<");
                 WriteForeachTypes(plan, child);
@@ -310,9 +366,9 @@ internal readonly ref partial struct ComponentScopeWriter
             else if (item.Syntax is MarkupCodeStatementSyntax statement)
             {
                 var raw = statement.GetRawCSharpStatement();
-                if (raw is CSharp.BreakStatementSyntax)
+                if (templateNameScope is null && raw is CSharp.BreakStatementSyntax)
                     _writer.WriteLine("return global::Akbura.HotReload.LoopFlow.Break;");
-                else if (raw is CSharp.ContinueStatementSyntax)
+                else if (templateNameScope is null && raw is CSharp.ContinueStatementSyntax)
                     _writer.WriteLine("return global::Akbura.HotReload.LoopFlow.Continue;");
                 else
                     _writer.WriteLine(CSharpProbeBuilder.RewriteMarkupLoopIdentifiers(statement, raw).ToString());
@@ -322,7 +378,7 @@ internal readonly ref partial struct ComponentScopeWriter
                 _writer.Write("if (").Write(CSharpProbeBuilder.GetMarkupLoopCodeGenerationSyntax(item.Code)!.ToString()).WriteLine(")");
                 _writer.WriteLine("{");
                 _writer.CurrentIndent += _writer.TabSize;
-                WriteForeachBody(plan, region, item.Body, context, frame);
+                WriteForeachBody(plan, region, item.Body, context, frame, templateNameScope);
                 _writer.CurrentIndent -= _writer.TabSize;
                 _writer.WriteLine("}");
                 if (!item.ElseBody.IsDefaultOrEmpty)
@@ -330,14 +386,14 @@ internal readonly ref partial struct ComponentScopeWriter
                     _writer.WriteLine("else");
                     _writer.WriteLine("{");
                     _writer.CurrentIndent += _writer.TabSize;
-                    WriteForeachBody(plan, region, item.ElseBody, context, frame);
+                    WriteForeachBody(plan, region, item.ElseBody, context, frame, templateNameScope);
                     _writer.CurrentIndent -= _writer.TabSize;
                     _writer.WriteLine("}");
                 }
             }
             else
             {
-                WriteForeachEmits(plan, region, item.Content, context, frame);
+                WriteForeachEmits(plan, region, item.Content, context, frame, templateNameScope);
             }
         }
     }
@@ -352,7 +408,7 @@ internal readonly ref partial struct ComponentScopeWriter
     }
 
     private void WriteForeachEmits(in ComponentPlan plan, in ComponentForeachPlan region,
-        IEnumerable<MarkupChildContent> content, in MarkupExtensionWriteContext context, string frame)
+        IEnumerable<MarkupChildContent> content, in MarkupExtensionWriteContext context, string frame, string? templateNameScope)
     {
         foreach (var child in content)
         {
@@ -365,7 +421,7 @@ internal readonly ref partial struct ComponentScopeWriter
                         _writer.Write("if (").Write(CSharpProbeBuilder.GetMarkupLoopCodeGenerationSyntax(branch.Condition)!.ToString()).WriteLine(")");
                     _writer.WriteLine("{");
                     _writer.CurrentIndent += _writer.TabSize;
-                    WriteForeachEmits(plan, region, branch.Content, context, frame);
+                    WriteForeachEmits(plan, region, branch.Content, context, frame, templateNameScope);
                     _writer.CurrentIndent -= _writer.TabSize;
                     _writer.WriteLine("}");
                     if (branchId < conditional.Branches.Length - 1) _writer.Write("else ");
@@ -377,17 +433,52 @@ internal readonly ref partial struct ComponentScopeWriter
                 {
                     if (root.Syntax == element.Element)
                     {
-                        WriteForeachRoot(plan, root, context, frame);
+                        if (templateNameScope != null)
+                        {
+                            WriteTemplateForeachRoot(plan, root, context, frame, templateNameScope);
+                        }
+                        else
+                        {
+                            WriteForeachRoot(plan, root, context, frame);
+                        }
                         break;
                     }
                 }
             }
             else if (child.Syntax is MarkupInlineExpressionSyntax inline)
             {
-                _writer.Write(frame).Write(".Emit(").Write(CSharpProbeBuilder.RewriteMarkupLoopIdentifiers(inline,
+                _writer.Write(frame).Write(templateNameScope is null ? ".Emit(" : ".Add(").Write(CSharpProbeBuilder.RewriteMarkupLoopIdentifiers(inline,
                     AkburaSemanticModel.ParseInlineExpression(inline.Expression)!).ToString()).WriteLine(");");
             }
         }
+    }
+
+    private void WriteTemplateForeachRoot(in ComponentPlan plan, in ComponentForeachRootPlan root,
+        in MarkupExtensionWriteContext inherited, string items, string nameScope)
+    {
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        if (root.Key is { IsIterationKey: false } key)
+        {
+            _writer.Write("_ = ").Write(CSharpProbeBuilder.GetMarkupLoopCodeGenerationSyntax(key.ValueOperation)!.ToString())
+                .WriteLine(";");
+        }
+
+        ref readonly var element = ref plan.Elements.ItemRef(root.ElementId);
+        var context = new ComponentScopeWriteContext(inherited.IntermediateRootExpression,
+            inherited.BaseUriExpression, inherited.FallbackServiceProviderExpression, nameScope, root.ScopeId,
+            MarkupParentStackTraversalKind.ControlTemplateHierarchy, plan.Elements.AsSpan(), plan.ElementReferences.AsSpan(),
+            templatedParentExpression: inherited.TemplatedParentExpression, usesTemplateServices: true);
+        WriteLocalInitialState(plan, plan.Scopes.ItemRef(root.ScopeId), context);
+        if (element.IsControl)
+        {
+            _writer.Write("global::Avalonia.Controls.NameScope.SetNameScope(").Write(element.Identifier)
+                .Write(", ").Write(nameScope).WriteLine(");");
+        }
+
+        _writer.Write(items).Write(".Add(").Write(element.Identifier).WriteLine(");");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
     }
 
     private void WriteForeachRoot(in ComponentPlan plan, in ComponentForeachRootPlan root,

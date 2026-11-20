@@ -61,13 +61,6 @@ internal static class AkcssDocumentWriter
 
         try
         {
-            if (plan.Unsupported is { } unsupported)
-            {
-                var line = input.SemanticModel!.SyntaxTree.Text.Lines.GetLineFromPosition(unsupported.Span.Start).LineNumber + 1;
-                var path = Microsoft.CodeAnalysis.CSharp.SyntaxFactory.Literal(plan.SourcePath).Text;
-                return SourceText.From($"#line {line} {path}\n#error {unsupported.Code} {unsupported.Message}\n#line default\n", Encoding.UTF8);
-            }
-
 #if STATS
             using var emissionMeasurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpEmission);
 #endif
@@ -77,6 +70,14 @@ internal static class AkcssDocumentWriter
                 hotReload: generationMode == ComponentGenerationMode.DebugStructural);
 
             WriteHeader(writer, input);
+
+            if (plan.Native is { } native)
+            {
+                foreach (var diagnostic in native.Diagnostics)
+                {
+                    AkcssNativeWriter.WriteDiagnostic(writer, sourceMap, diagnostic);
+                }
+            }
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -104,12 +105,17 @@ internal static class AkcssDocumentWriter
                 generationMode,
                 cancellationToken);
 
-            writer.CurrentIndent -= writer.TabSize;
-            writer.WriteLine("}");
+            var moduleTypeName = "global::" + plan.GeneratedNamespace + "." + plan.GeneratedTypeName;
+            var nativeWriter = plan.Native is { } nativePlan ? new AkcssNativeWriter(writer, sourceMap, nativePlan, moduleTypeName) : null;
+            nativeWriter?.WriteModule(plan.Native!);
 
             writer.CurrentIndent -= writer.TabSize;
             writer.WriteLine("}");
 
+            writer.CurrentIndent -= writer.TabSize;
+            writer.WriteLine("}");
+
+            nativeWriter?.WriteFacade(plan.Native!, moduleTypeName, input.SemanticModel!);
             cancellationToken.ThrowIfCancellationRequested();
 
 #if STATS

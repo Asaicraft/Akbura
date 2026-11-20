@@ -93,7 +93,7 @@ internal readonly struct AkcssModulePlan
         bool isInlined,
         PooledImmutableList<AkcssSymbolGenerationPlan> symbols,
         PooledImmutableList<AkcssRuntimeStylePlan> runtimeStyles,
-        AkburaSemanticDiagnostic? unsupported = null)
+        AkcssNativeModulePlan? native = null)
     {
         SourcePath = sourcePath;
         ModuleIdentity = moduleIdentity;
@@ -103,7 +103,7 @@ internal readonly struct AkcssModulePlan
         IsInlined = isInlined;
         Symbols = symbols;
         RuntimeStyles = runtimeStyles;
-        Unsupported = unsupported;
+        Native = native;
     }
 
     public string SourcePath { get; }
@@ -122,7 +122,7 @@ internal readonly struct AkcssModulePlan
 
     public PooledImmutableList<AkcssRuntimeStylePlan> RuntimeStyles { get; }
 
-    public AkburaSemanticDiagnostic? Unsupported { get; }
+    public AkcssNativeModulePlan? Native { get; }
 
     internal void ReturnToPool()
     {

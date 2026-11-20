@@ -16,6 +16,7 @@ internal enum MarkupParentStackTraversalKind : byte
     ExactScope,
     FullHierarchy,
     RuntimeStorageRoot,
+    ControlTemplateHierarchy,
 }
 
 /// <summary>
@@ -149,8 +150,8 @@ internal readonly ref struct MarkupParentStackWriter
     {
         _writer.Write("new global::System.Object[] { ");
 
-        var hasValue = plan.ScopeId == 0 ||
-            plan.TraversalKind == MarkupParentStackTraversalKind.FullHierarchy;
+        var hasValue = plan.TraversalKind != MarkupParentStackTraversalKind.ControlTemplateHierarchy &&
+            (plan.ScopeId == 0 || plan.TraversalKind == MarkupParentStackTraversalKind.FullHierarchy);
 
         if (hasValue)
         {

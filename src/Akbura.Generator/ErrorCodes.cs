@@ -48,6 +48,7 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_AkcssTemplateBinding = nameof(AKBURA_SEMANTIC_AkcssTemplateBinding);
     public const string AKBURA_SEMANTIC_AkcssBaseTheme = nameof(AKBURA_SEMANTIC_AkcssBaseTheme);
     public const string AKBURA_SEMANTIC_AkcssSetter = nameof(AKBURA_SEMANTIC_AkcssSetter);
+    public const string AKBURA_GENERATION_AkcssExport = nameof(AKBURA_GENERATION_AkcssExport);
     public const string AKBURA_GENERATION_AkcssUnsupported = nameof(AKBURA_GENERATION_AkcssUnsupported);
     public const string AKBURA_SEMANTIC_InaccessibleMember = nameof(AKBURA_SEMANTIC_InaccessibleMember);
     public const string AKBURA_SEMANTIC_MarkupComponentNotFound = nameof(AKBURA_SEMANTIC_MarkupComponentNotFound);

@@ -243,17 +243,19 @@ public sealed partial class AkcssSemanticTests : SemanticArchitectureTestBase
     }
 
     [Fact]
-    public void ValidSemanticsDoNotClaimRuntimeGeneration()
+    public void LegacyApplicationsKeepTheNativeFragmentGenerationBoundary()
     {
-        var fixture = Bind(Controls + "Border TextBlock { FontSize: 14d; }");
+        var fixture = Bind(Controls + "@utilities { Button.example { ^ /template/ ContentPresenter { Opacity: 0.8d; } } }");
         Assert.Empty(fixture.Model.GetSemanticDiagnostics(fixture.Root));
         var module = Assert.IsAssignableFrom<IAkcssModuleSymbol>(fixture.Model.GetDeclaredSymbol(fixture.Root));
         var input = new AkcssGenerationInput(module, fixture.Model, "Styles.akcss", "Styles.akcss", []);
         var plan = AkcssModulePlanner.Create(input, "Demo");
         try
         {
-            Assert.Equal(ErrorCodes.AKBURA_GENERATION_AkcssUnsupported, plan.Unsupported?.Code);
-            Assert.True(plan.Symbols.IsEmpty);
+            var diagnostic = Assert.Single(plan.Native!.Diagnostics);
+            Assert.Equal(ErrorCodes.AKBURA_GENERATION_AkcssUnsupported, diagnostic.Code);
+            Assert.Contains("legacy class or utility", diagnostic.Message);
+            Assert.Single(plan.Symbols);
         }
         finally
         {

@@ -13,6 +13,11 @@ namespace Akbura.Language;
 
 internal abstract partial class AkburaSemanticModel
 {
+    internal IMarkupContentOperation? GetControlTemplateContentOperation(Syntax.MarkupElementSyntax element) =>
+        BindingSession.BindSemanticSyntax(element) is BoundTree.BoundMarkupComponent component
+            ? AkburaOperationFactory.CreateMarkupContentOperationForTemplate(component, _operationFactory)
+            : null;
+
     internal CSharpBindingResult BindAkcssExpression(
         CSharp.ExpressionSyntax expression, AkcssBindingContext context, ITypeSymbol? expectedType = null) =>
         BindAkcssExpressionCore(expression, context.Owner, context.ExpressionReceiver, expectedType);
@@ -50,7 +55,19 @@ internal abstract partial class AkburaSemanticModel
 
     internal bool TryBindAkcssAmxValue(
         CSharp.ExpressionSyntax expression, AkcssBindingContext context, ITypeSymbol expectedType,
-        CSharpBindingResult originalBinding, out CSharpBindingResult valueBinding, out AkcssAmxInvocationValue value)
+        CSharpBindingResult originalBinding, out CSharpBindingResult valueBinding, out AkcssAmxInvocationValue value) =>
+        TryBindAkcssAmxValue(expression, expectedType, originalBinding,
+            (candidate, target) => BindAkcssExpression(candidate, context, target), out valueBinding, out value);
+
+    internal bool TryBindTemplateAmxValue(Syntax.MarkupAttributeSyntax attribute,
+        CSharp.ExpressionSyntax expression, ITypeSymbol expectedType, CSharpBindingResult originalBinding,
+        out CSharpBindingResult valueBinding, out AkcssAmxInvocationValue value) =>
+        TryBindAkcssAmxValue(expression, expectedType, originalBinding,
+            (candidate, target) => BindMarkupAttributeExpression(attribute, candidate, target), out valueBinding, out value);
+
+    private bool TryBindAkcssAmxValue(CSharp.ExpressionSyntax expression, ITypeSymbol expectedType,
+        CSharpBindingResult originalBinding, Func<CSharp.ExpressionSyntax, ITypeSymbol?, CSharpBindingResult> bind,
+        out CSharpBindingResult valueBinding, out AkcssAmxInvocationValue value)
     {
         value = default;
         valueBinding = originalBinding;
@@ -67,7 +84,7 @@ internal abstract partial class AkburaSemanticModel
 
         var binding = ReferenceEquals(expression, invocation)
             ? originalBinding
-            : BindAkcssExpression(invocation, context);
+            : bind(invocation, null);
         var method = GetRealAkcssAmxMethod(binding.Symbol as IMethodSymbol, out var kind);
         if (method is null)
         {
@@ -93,12 +110,12 @@ internal abstract partial class AkburaSemanticModel
             var typedName = CSharpFactory.GenericName(name.Identifier,
                 CSharpFactory.TypeArgumentList(CSharpFactory.SingletonSeparatedList(typeName))).WithTriviaFrom(name);
             var typedExpression = invocation.ReplaceNode(name, typedName);
-            valueBinding = BindAkcssExpression(typedExpression, context, expectedType);
+            valueBinding = bind(typedExpression, expectedType);
             method = GetRealAkcssAmxMethod(GetInvocation(valueBinding)?.TargetMethod, out kind);
         }
         else
         {
-            valueBinding = BindAkcssExpression(invocation, context, expectedType);
+            valueBinding = bind(invocation, expectedType);
             if (GetRealAkcssAmxMethod(GetInvocation(valueBinding)?.TargetMethod, out var reboundKind) is { } rebound)
             {
                 method = rebound;
@@ -130,7 +147,7 @@ internal abstract partial class AkburaSemanticModel
         {
             candidateKind = AkcssAmxInvocationKind.None;
             if (candidate is not { IsStatic: true, Arity: 1 } ||
-                Compilation.CSharpCompilation.GetTypeByMetadataName("Akbura.Amx") is not { } amx ||
+                Compilation.CSharpCompilation.GetTypeByMetadataName("Akbura.Amx") is not { ContainingAssembly.Name: "Akbura" } amx ||
                 !SymbolEqualityComparer.Default.Equals(candidate.ContainingType, amx))
             {
                 return null;

@@ -456,7 +456,10 @@
   <data name="AKBURA_SEMANTIC_AkcssSetter" xml:space="preserve">
     <value>{0}</value>
   </data>
+  <data name="AKBURA_GENERATION_AkcssExport" xml:space="preserve">
+    <value>{0}</value>
+  </data>
   <data name="AKBURA_GENERATION_AkcssUnsupported" xml:space="preserve">
-    <value>Runtime generation for {0} is deferred. The construct is available for semantic analysis.</value>
+    <value>{0}</value>
   </data>
 </root>

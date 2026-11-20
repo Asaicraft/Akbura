@@ -203,14 +203,18 @@ internal readonly ref struct DeferredContentWriter
         var end = PropertyWriteEnd.None;
         if (!structural)
         {
-            end = propertyWriter.WriteStart(content.Destination, targetExpression);
+            end = propertyWriter.WriteStart(content.Destination, targetExpression, parentContext.IsControlTemplate);
             if (end == PropertyWriteEnd.None)
             {
                 return false;
             }
         }
 
-        if (conditionalRoot)
+        if (targetContext.UsesTemplateServices)
+        {
+            WriteStandaloneTemplateFactory(plan, deferred, targetContext);
+        }
+        else if (conditionalRoot)
         {
             WriteConditionalRootFactory(plan, deferred);
         }
@@ -231,6 +235,33 @@ internal readonly ref struct DeferredContentWriter
             _writer.WriteLine();
         }
         return true;
+    }
+
+    private void WriteStandaloneTemplateFactory(in ComponentPlan plan, in ComponentDeferredContentPlan deferred,
+        in MarkupExtensionWriteContext parentContext)
+    {
+        ref readonly var scope = ref plan.Scopes.ItemRef(deferred.ScopeId);
+        var root = plan.Elements.ItemRef(plan.ScopeRootElementIds[scope.Roots.Start]).Identifier;
+        var suffix = deferred.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var services = "__nativeDeferredServices" + suffix;
+        var nameScope = "__nativeDeferredNames" + suffix;
+        _writer.Write("global::Akbura.Markup.AkburaControlTemplateServices.CreateDeferredContent<");
+        new CSharpValueWriter(_writer).WriteTypeName(deferred.ResultType);
+        _writer.Write(">(").Write(services).WriteLine(" =>");
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.Write("var ").Write(nameScope).Write(" = (global::Avalonia.Controls.INameScope?)")
+            .Write(services).WriteLine(".GetService(typeof(global::Avalonia.Controls.INameScope)) ?? new global::Avalonia.Controls.NameScope();");
+        var context = new ComponentScopeWriteContext(root, parentContext.BaseUriExpression, services, nameScope,
+            scope.Id, MarkupParentStackTraversalKind.ExactScope, plan.Elements.AsSpan(), plan.ElementReferences.AsSpan(),
+            usesTemplateServices: true);
+        new ComponentScopeWriter(_writer, in _bindingEnvironment, _sourceMap, _ownerTypeName, _generationMode)
+            .WriteLocalInitialState(plan, scope, context);
+        _writer.Write("return ").Write(root).WriteLine(";");
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.Write("}, ");
+        new MarkupServiceProviderWriter(_writer).Write(parentContext);
+        _writer.Write(")");
     }
 
     private void WriteConditionalRootFactory(in ComponentPlan plan, in ComponentDeferredContentPlan deferred)

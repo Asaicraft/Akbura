@@ -177,7 +177,9 @@ internal sealed partial class AkcssStyleBinder
                     break;
                 case AkcssNameSelectorSyntax name:
                     predicates.Add(new AkcssSelectorPredicate(AkcssPredicateKind.Name, name, name.Name.Identifier.ValueText));
-                    if (components.Count == 1 && sourceTemplate is not null &&
+                    if (sourceTemplate is not null &&
+                        !components.Any(static component => component is AkcssTypeSelectorSyntax) &&
+                        components.OfType<AkcssNameSelectorSyntax>().Count() == 1 &&
                         sourceTemplate.NameScope.FindUniqueRootDeclaration(name.Name.Identifier.ValueText) is { } part &&
                         sourceTemplate.Theme.DefinitionModel.GetSymbolInfo(part.Element).Symbol is IMarkupComponentSymbol
                             { ComponentType: { } partType })

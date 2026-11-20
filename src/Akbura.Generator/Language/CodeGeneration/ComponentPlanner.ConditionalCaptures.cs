@@ -23,7 +23,7 @@ internal static partial class ComponentPlanner
 
             var declarations = new Dictionary<CSharpExpressionSyntax, ImmutableArray<CSharpLocalSymbol>>();
             var captures = new Dictionary<(int Region, int Branch, string Key), PendingConditionalCapture>();
-            foreach (var syntax in _component.DeclarationSyntax.DescendantNodes())
+            foreach (var syntax in _component!.DeclarationSyntax.DescendantNodes())
             {
                 var scopeId = GetRenderCaptureScopeId(syntax);
                 if (scopeId < 0)

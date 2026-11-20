@@ -19,6 +19,7 @@ internal sealed class ComponentWriter : IDisposable
     private readonly ComponentPlan _plan;
     private readonly ComponentMemberPlan _memberPlan;
     private readonly ComponentHotReloadPlan _hotReloadPlan;
+    private readonly AkcssInlineStylesPlan _nativeStyles;
     private readonly ComponentGenerationMode _generationMode;
     private readonly BindingWriterEnvironment _bindingEnvironment;
     private readonly BindingWriterEnvironment _stateBindingEnvironment;
@@ -67,6 +68,7 @@ internal sealed class ComponentWriter : IDisposable
                 nameof(component));
         }
 
+        _nativeStyles = AkcssInlineStylesPlan.Create(component, akcssModuleTypeNames);
         _bindingEnvironment = BindingWriterEnvironment.Create(semanticModel, component);
         var probeCompilation = semanticModel.Compilation.CSharpProbeCompilation;
         _stateBindingEnvironment = BindingWriterEnvironment.Create(
@@ -809,7 +811,8 @@ internal sealed class ComponentWriter : IDisposable
             _sourceMap,
             _ownerTypeName,
             _resourcePath,
-            _generationMode);
+            _generationMode,
+            _nativeStyles);
     }
 
     private static string NormalizeResourcePath(string resourcePath)

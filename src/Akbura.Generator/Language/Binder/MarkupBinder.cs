@@ -1030,6 +1030,16 @@ internal sealed partial class MarkupBinder : Binder
                 dynamicExpression = expression;
                 valueKind = MarkupAttributeValueKind.DynamicExpression;
                 valueBinding = SemanticModel.BindMarkupAttributeExpression(markupAttribute, expression, targetType);
+                if (targetType != null && AkcssSemanticFacts.FindTemplate(markupAttribute) != null &&
+                    SemanticModel.TryBindTemplateAmxValue(markupAttribute, expression, targetType, valueBinding,
+                        out var resourceBinding, out var resource))
+                {
+                    valueBinding = resourceBinding;
+                    if (resource.Kind != AkcssAmxInvocationKind.None)
+                    {
+                        convertedValue = resource;
+                    }
+                }
                 if (assignsCollectionSource &&
                     !HasImplicitConversion(valueBinding, targetType) &&
                     IsEnumerableSource(valueBinding.Conversion.SourceType ?? valueBinding.TypeSymbol))

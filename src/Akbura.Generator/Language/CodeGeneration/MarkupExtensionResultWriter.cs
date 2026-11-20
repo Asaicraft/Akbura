@@ -132,20 +132,22 @@ internal readonly ref struct RuntimeMarkupExtensionResultWriter
         MarkupExtensionValue extension,
         in MarkupExtensionWriteContext context)
     {
-        WriteStart(target);
+        WriteStart(target, context.UsesTemplateServices);
 
         var extensionWriter = new MarkupExtensionWriter(_writer, in _environment);
         extensionWriter.Write(extension, context);
 
-        WriteEnd();
+        WriteEnd(context);
     }
 
-    public void WriteStart(in AvaloniaPropertyWriteTarget target)
+    public void WriteStart(in AvaloniaPropertyWriteTarget target, bool useTemplateServices = false)
     {
         EnsureValidTarget(target);
 
         _writer
-            .Write("ApplyMarkupExtensionResult(")
+            .Write(useTemplateServices
+                ? "global::Akbura.Markup.AkburaControlTemplateServices.ApplyMarkupExtensionResult("
+                : "ApplyMarkupExtensionResult(")
             .Write("(global::Avalonia.AvaloniaObject)")
             .Write(target.TargetExpression)
             .Write(", ");
@@ -154,8 +156,12 @@ internal readonly ref struct RuntimeMarkupExtensionResultWriter
         _writer.Write(", ");
     }
 
-    public void WriteEnd()
+    public void WriteEnd(in MarkupExtensionWriteContext context = default)
     {
+        if (context.UsesTemplateServices)
+        {
+            _writer.Write(context.IsControlTemplate ? ", true" : ", false");
+        }
         _writer.Write(");");
     }
 

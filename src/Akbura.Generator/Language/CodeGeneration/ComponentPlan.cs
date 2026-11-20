@@ -49,6 +49,7 @@ internal enum ComponentElementScopeKind : byte
     DataTemplate,
     ConditionalBranch,
     ForeachIteration,
+    ControlTemplate,
 }
 
 [Flags]

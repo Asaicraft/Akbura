@@ -94,7 +94,7 @@ internal readonly ref struct TemplateWriter
                 .WriteStructuralValueStart(plan, content, factoryIdentity);
             if (!structural)
             {
-                end = propertyWriter.WriteStart(content.Destination, targetExpression);
+                end = propertyWriter.WriteStart(content.Destination, targetExpression, parentContext.IsControlTemplate);
                 if (end == PropertyWriteEnd.None)
                 {
                     return false;
@@ -201,7 +201,7 @@ internal readonly ref struct TemplateWriter
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
 
-        var traversalKind = string.IsNullOrEmpty(parentContext.FallbackServiceProviderExpression)
+        var traversalKind = !parentContext.UsesTemplateServices && string.IsNullOrEmpty(parentContext.FallbackServiceProviderExpression)
             ? MarkupParentStackTraversalKind.FullHierarchy
             : MarkupParentStackTraversalKind.ExactScope;
         var scopeContext = new ComponentScopeWriteContext(
@@ -212,7 +212,7 @@ internal readonly ref struct TemplateWriter
             template.ScopeId,
             traversalKind,
             plan.Elements.AsSpan(),
-            plan.ElementReferences.AsSpan());
+            plan.ElementReferences.AsSpan(), usesTemplateServices: parentContext.UsesTemplateServices);
         var scopeWriter = new ComponentScopeWriter(
             _writer,
             in _bindingEnvironment,

@@ -871,7 +871,7 @@ internal static class AkcssExpressionGenerator
         return count;
     }
 
-    private static string CreateColorExpression(AkcssColorValue value)
+    internal static string CreateColorExpression(AkcssColorValue value)
     {
         var pooled = PooledStringBuilder.GetInstance();
         var builder = pooled.Builder;
@@ -889,7 +889,7 @@ internal static class AkcssExpressionGenerator
         return pooled.ToStringAndFree();
     }
 
-    private static string CreateThicknessExpression(AkcssThicknessValue value)
+    internal static string CreateThicknessExpression(AkcssThicknessValue value)
     {
         var pooled = PooledStringBuilder.GetInstance();
         var builder = pooled.Builder;
@@ -928,7 +928,7 @@ internal static class AkcssExpressionGenerator
         return pooled.ToStringAndFree();
     }
 
-    private static string WrapSolidColorBrush(string expression)
+    internal static string WrapSolidColorBrush(string expression)
     {
         var pooled = PooledStringBuilder.GetInstance();
         var builder = pooled.Builder;

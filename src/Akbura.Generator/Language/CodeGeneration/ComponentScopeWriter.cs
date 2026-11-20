@@ -14,6 +14,7 @@ internal readonly ref partial struct ComponentScopeWriter
     private readonly ComponentGenerationSourceMap _sourceMap;
     private readonly string _ownerTypeName;
     private readonly ComponentGenerationMode _generationMode;
+    private readonly Action<ComponentElementPlan>? _writeElementConfiguration;
 
     public ComponentScopeWriter(
         CodeWriter writer,
@@ -21,7 +22,8 @@ internal readonly ref partial struct ComponentScopeWriter
         ComponentGenerationSourceMap sourceMap,
         string ownerTypeName,
         ComponentGenerationMode generationMode =
-            ComponentGenerationMode.ReleaseDirect)
+            ComponentGenerationMode.ReleaseDirect,
+        Action<ComponentElementPlan>? writeElementConfiguration = null)
     {
         Debug.Assert(writer != null);
         Debug.Assert(sourceMap != null);
@@ -32,6 +34,7 @@ internal readonly ref partial struct ComponentScopeWriter
         _sourceMap = sourceMap!;
         _ownerTypeName = ownerTypeName;
         _generationMode = generationMode;
+        _writeElementConfiguration = writeElementConfiguration;
     }
 
     public void WriteComponentInitialState(
@@ -924,7 +927,7 @@ internal readonly ref partial struct ComponentScopeWriter
                     }
                 }
 
-                return writer.WriteProperty(plan, content, isFirstUpdate);
+                return writer.WriteProperty(plan, content, isFirstUpdate, context.IsControlTemplate);
             }
 
             case ComponentContentValueKind.DeferredContent:

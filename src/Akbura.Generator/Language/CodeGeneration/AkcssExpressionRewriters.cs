@@ -23,16 +23,19 @@ internal sealed class AkcssFullyQualifiedExpressionRewriter : CSharpSyntaxRewrit
         new(static () => new AkcssFullyQualifiedExpressionRewriter(), 16);
 
     private SemanticModel _semanticModel = null!;
+    private IReadOnlyDictionary<IParameterSymbol, string>? _parameters;
 
     private AkcssFullyQualifiedExpressionRewriter()
     {
     }
 
-    public static AkcssFullyQualifiedExpressionRewriter GetInstance(SemanticModel semanticModel)
+    public static AkcssFullyQualifiedExpressionRewriter
+        GetInstance(SemanticModel semanticModel, IReadOnlyDictionary<IParameterSymbol, string>? parameters = null)
     {
         var rewriter = s_pool.Allocate();
 
         rewriter._semanticModel = semanticModel;
+        rewriter._parameters = parameters;
 
         return rewriter;
     }
@@ -40,6 +43,7 @@ internal sealed class AkcssFullyQualifiedExpressionRewriter : CSharpSyntaxRewrit
     public void Free()
     {
         _semanticModel = null!;
+        _parameters = null;
 
         s_pool.Free(this);
     }
@@ -76,7 +80,7 @@ internal sealed class AkcssFullyQualifiedExpressionRewriter : CSharpSyntaxRewrit
             var methodExpression = CSharpSyntaxFactory.ParseExpression(
                 AkcssExpressionGenerator.GetMetadataTypeName(method.ContainingType) +
                 "." +
-                AkcssExpressionGenerator.EscapeIdentifier(method.Name));
+                (Visit(memberAccess.Name)?.WithoutTrivia().ToString() ?? AkcssExpressionGenerator.EscapeIdentifier(method.Name)));
 
             var invocation = CSharpSyntaxFactory.InvocationExpression(
                 methodExpression,
@@ -137,6 +141,10 @@ internal sealed class AkcssFullyQualifiedExpressionRewriter : CSharpSyntaxRewrit
     {
         var alias = _semanticModel.GetAliasInfo(node);
         var symbol = alias?.Target ?? _semanticModel.GetSymbolInfo(node).Symbol;
+        if (symbol is IParameterSymbol parameter && _parameters?.TryGetValue(parameter, out var local) == true)
+        {
+            return CSharpSyntaxFactory.IdentifierName(local).WithTriviaFrom(node);
+        }
 
         if (symbol is ITypeSymbol type &&
             node.Parent is not Microsoft.CodeAnalysis.CSharp.Syntax.QualifiedNameSyntax &&
@@ -160,6 +168,29 @@ internal sealed class AkcssFullyQualifiedExpressionRewriter : CSharpSyntaxRewrit
         }
 
         return base.VisitIdentifierName(node);
+    }
+
+    public override SyntaxNode? VisitGenericName(Microsoft.CodeAnalysis.CSharp.Syntax.GenericNameSyntax node)
+    {
+        var memberName = node.Parent is CSharpMemberAccessExpressionSyntax access && ReferenceEquals(access.Name, node);
+        if (!memberName && node.Parent is not Microsoft.CodeAnalysis.CSharp.Syntax.QualifiedNameSyntax &&
+            node.Parent is not CSharpAliasQualifiedNameSyntax)
+        {
+            var symbol = _semanticModel.GetSymbolInfo(node).Symbol;
+            if (symbol is ITypeSymbol type)
+            {
+                return CSharpSyntaxFactory.ParseName(AkcssExpressionGenerator.GetMetadataTypeName(type)).WithTriviaFrom(node);
+            }
+
+            if (symbol is { IsStatic: true, ContainingType: { } owner })
+            {
+                var name = base.VisitGenericName(node)!.WithoutTrivia().ToFullString();
+                return CSharpSyntaxFactory.ParseExpression(
+                    AkcssExpressionGenerator.GetMetadataTypeName(owner) + "." + name).WithTriviaFrom(node);
+            }
+        }
+
+        return base.VisitGenericName(node);
     }
 
     public override SyntaxNode? VisitPredefinedType(

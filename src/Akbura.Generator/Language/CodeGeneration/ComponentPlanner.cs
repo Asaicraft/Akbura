@@ -81,9 +81,18 @@ internal static partial class ComponentPlanner
         return planner.Create();
     }
 
+    internal static ComponentPlan CreateControlTemplate(AkcssTemplateContext template)
+    {
+        var model = template.Theme.DefinitionModel;
+        var environment = MarkupExtensionResultEnvironment.Create(model);
+        using var planner = new Planner(null, model, ImmutableDictionary<AkburaSyntax, string>.Empty,
+            in environment, ComponentGenerationMode.ReleaseDirect);
+        return planner.CreateControlTemplate(template.Root);
+    }
+
     private ref partial struct Planner
     {
-        private readonly IAkburaComponentSymbol _component;
+        private readonly IAkburaComponentSymbol? _component;
         private readonly AkburaSemanticModel _semanticModel;
         private readonly IReadOnlyDictionary<AkburaSyntax, string> _akcssModuleTypeNames;
         private readonly CSharpCompilation _compilation;
@@ -133,13 +142,14 @@ internal static partial class ComponentPlanner
         private int _nextRuntimeStorageId;
         private readonly Dictionary<int, int> _localRuntimeStorageCounts;
 
-        public Planner(IAkburaComponentSymbol component, AkburaSemanticModel semanticModel, IReadOnlyDictionary<AkburaSyntax, string> akcssModuleTypeNames, in MarkupExtensionResultEnvironment resultEnvironment, ComponentGenerationMode generationMode)
+        public Planner(IAkburaComponentSymbol? component, AkburaSemanticModel semanticModel, IReadOnlyDictionary<AkburaSyntax, string> akcssModuleTypeNames, in MarkupExtensionResultEnvironment resultEnvironment, ComponentGenerationMode generationMode)
         {
             _component = component;
             _semanticModel = semanticModel;
             _akcssModuleTypeNames = akcssModuleTypeNames;
             _compilation = semanticModel.Compilation.CSharpCompilation;
-            _bindingEnvironment = BindingWriterEnvironment.Create(semanticModel, component);
+            _bindingEnvironment = component is null ? BindingWriterEnvironment.Create(_compilation, withinType: null)
+                : BindingWriterEnvironment.Create(semanticModel, component);
             _resultEnvironment = resultEnvironment;
             _generationMode = generationMode;
             _controlType = _compilation.GetTypeByMetadataName("Avalonia.Controls.Control");
@@ -155,7 +165,7 @@ internal static partial class ComponentPlanner
                 id: 0,
                 parentScopeId: -1,
                 ownerElementId: -1,
-                ComponentElementScopeKind.Component));
+                component is null ? ComponentElementScopeKind.ControlTemplate : ComponentElementScopeKind.Component));
             _propertyElements = ArrayBuilder<ComponentPropertyElementPlan>.GetInstance();
             _deferredContents = ArrayBuilder<ComponentDeferredContentPlan>.GetInstance();
             _templates = ArrayBuilder<ComponentTemplatePlan>.GetInstance();
@@ -196,7 +206,7 @@ internal static partial class ComponentPlanner
 
         public ComponentPlan Create()
         {
-            foreach (var root in _component.DeclarationSyntax.Members.OfType<MarkupRootSyntax>())
+            foreach (var root in _component!.DeclarationSyntax.Members.OfType<MarkupRootSyntax>())
             {
                 if (TryBuildElement(root.Element, parentId: -1, default, isRoot: true, out var rootId))
                 {
@@ -204,17 +214,34 @@ internal static partial class ComponentPlanner
                 }
             }
 
+            return CompletePlan();
+        }
+
+        public ComponentPlan CreateControlTemplate(MarkupElementSyntax root)
+        {
+            if (TryBuildElement(root, parentId: -1, default, isRoot: true, out var rootId))
+            {
+                _rootElementIds.Add(rootId);
+            }
+            return CompletePlan();
+        }
+
+        private ComponentPlan CompletePlan()
+        {
             LowerFirstUpdateActions();
             LowerContent();
-            LowerConditionalCaptures();
-            LowerRenderStatements();
+            if (_component != null)
+            {
+                LowerConditionalCaptures();
+                LowerRenderStatements();
+            }
             BuildScopeIndex();
 
-            var owner = new ComponentPlanBufferOwner(CreateAkcssPlan());
+            var owner = new ComponentPlanBufferOwner(_component is null ? default : CreateAkcssPlan());
 
             try
             {
-                var lifecycle = CreateLifecyclePlan(owner.Akcss);
+                var lifecycle = _component is null ? default : CreateLifecyclePlan(owner.Akcss);
 
                 CapturePlanBuffers(ref owner);
 
@@ -292,16 +319,16 @@ internal static partial class ComponentPlanner
 
         private PooledImmutableList<ComponentElementPlan> CreateElementPlans(in AkcssComponentActivatorPlan akcss)
         {
-            Debug.Assert(akcss.Elements.Length == _elements.Count);
+            Debug.Assert(_component is null || akcss.Elements.Length == _elements.Count);
 
             using var elements = ImmutableArrayBuilder<ComponentElementPlan>.Rent(_elements.Count);
 
             for (var i = 0; i < _elements.Count; i++)
             {
                 var element = _elements[i];
-                var elementAkcss = akcss.Elements[i];
+                var elementAkcss = _component is null ? default : akcss.Elements[i];
 
-                Debug.Assert(elementAkcss.ElementId == i);
+                Debug.Assert(_component is null || elementAkcss.ElementId == i);
 
                 elements.Add(new ComponentElementPlan(
                     element.Id,
@@ -621,10 +648,10 @@ internal static partial class ComponentPlanner
 
         private void LowerRenderStatements()
         {
-            var members = _component.DeclarationSyntax.Members;
+            var members = _component!.DeclarationSyntax.Members;
             var captureReferences = CreateRenderCaptureReferences();
             var capturedFunctions = ComponentRenderLocalFunctionFacts.GetCapturedFunctions(
-                _component.DeclarationSyntax);
+                _component!.DeclarationSyntax);
 
             for (var i = 0; i < members.Count; i++)
             {
@@ -712,6 +739,10 @@ internal static partial class ComponentPlanner
 
             var type = GetElementType(syntax, symbol);
             var scope = context.GetEffectiveScope();
+            if (scope.ScopeId == 0 && _component is null)
+            {
+                scope = new EffectiveScope(0, -1, ComponentElementScopeKind.ControlTemplate, isDeferred: false);
+            }
             var nameOperation = FindNameOperation(symbol);
             elementId = _elements.Count;
             var explicitKey = nameOperation?.NameSymbol?.Name;
@@ -726,7 +757,7 @@ internal static partial class ComponentPlanner
             var identifier = usesRuntimeStorage
                 ? CreateRuntimeStorageExpression(type, runtimeStorageId,
                     _pendingScopes[runtimeStorageRootScopeId].Kind == ComponentElementScopeKind.ForeachIteration)
-                : nameOperation?.NameSymbol is { } name
+                : _component != null && nameOperation?.NameSymbol is { } name
                     ? EscapeIdentifier(name.IdentifierText)
                     : "__element" + elementId.ToString(CultureInfo.InvariantCulture);
 
@@ -751,7 +782,7 @@ internal static partial class ComponentPlanner
                     isComponentRuntimeStorage: usesRuntimeStorage && runtimeStorageRootScopeId == 0));
             }
 
-            var contentOperation = _semanticModel.GetOperation(syntax) as IMarkupContentOperation;
+            var contentOperation = GetContentOperation(syntax);
             var implicitBoundary = CreateImplicitBoundary(
                 elementId,
                 syntax,
@@ -812,7 +843,7 @@ internal static partial class ComponentPlanner
 
                 var propertySymbol = _semanticModel.GetSymbolInfo(content.Element).Symbol;
                 if (propertySymbol is not AkburaPropertySymbol property ||
-                    _semanticModel.GetOperation(content.Element) is not IMarkupContentOperation propertyOperation)
+                    GetContentOperation(content.Element) is not { } propertyOperation)
                 {
                     continue;
                 }
@@ -864,6 +895,10 @@ internal static partial class ComponentPlanner
                 isRoot,
                 nameOperation != null,
                 scope);
+            if (_component is null)
+            {
+                flags |= ComponentElementFlags.IsLocal;
+            }
             flags = usesRuntimeStorage ? flags | ComponentElementFlags.UsesRuntimeStorage :
                 flags & ~ComponentElementFlags.UsesRuntimeStorage;
             if (runtimeStorageRootScopeId > 0)
@@ -893,6 +928,10 @@ internal static partial class ComponentPlanner
                 runtimeStorageRootScopeId: runtimeStorageRootScopeId);
             return true;
         }
+
+        private IMarkupContentOperation? GetContentOperation(MarkupElementSyntax syntax) => _component is null
+            ? _semanticModel.GetControlTemplateContentOperation(syntax)
+            : _semanticModel.GetOperation(syntax) as IMarkupContentOperation;
 
         private PendingPropertyElementPlan BuildPropertyElement(int ownerElementId, MarkupElementSyntax syntax, AkburaPropertySymbol property, IMarkupContentOperation operation, TraversalContext inheritedContext)
         {
@@ -1181,7 +1220,7 @@ internal static partial class ComponentPlanner
         private bool HasUnsupportedNativeTemplateCaptures(MarkupElementSyntax boundary)
         {
             HashSet<string>? unsupportedRenderLocals = null;
-            foreach (var member in _component.DeclarationSyntax.Members)
+            foreach (var member in _component?.DeclarationSyntax.Members ?? default)
             {
                 if (member is not CSharpStatementSyntax statement)
                 {
@@ -1616,7 +1655,7 @@ internal static partial class ComponentPlanner
         private void LowerRoutedEvent(IMarkupRoutedEventBindingOperation operation)
         {
             var handlerExpression = GetEventHandlerExpression(operation);
-            var refreshClosure = ComponentRenderLocalFunctionFacts.RequiresFreshClosure(
+            var refreshClosure = _component != null && ComponentRenderLocalFunctionFacts.RequiresFreshClosure(
                 _component.DeclarationSyntax, handlerExpression);
             ComponentRoutedEventPlan plan;
 
@@ -1685,7 +1724,7 @@ internal static partial class ComponentPlanner
                 IsDirectCommandReference(operation),
                 GetCommandAwaitableResultType(operation),
                 operation.TargetKind,
-                ComponentRenderLocalFunctionFacts.RequiresFreshClosure(
+                _component != null && ComponentRenderLocalFunctionFacts.RequiresFreshClosure(
                     _component.DeclarationSyntax, handler.ToFullString()));
             if (!plan.IsValid)
             {
@@ -2174,6 +2213,7 @@ internal static partial class ComponentPlanner
         private ImmutableDictionary<string, string> GetExpressionStateAccessors()
         {
             if (_expressionStateAccessors != null) return _expressionStateAccessors;
+            if (_component is null) return ImmutableDictionary<string, string>.Empty;
             var members = ComponentMemberPlanner.Create(_component, _semanticModel);
             try
             {
@@ -2268,7 +2308,7 @@ internal static partial class ComponentPlanner
                 return default;
             }
 
-            var binding = _generationMode.UsesStructuralRuntime()
+            var binding = _component is null || _generationMode.UsesStructuralRuntime()
                 ? BindingWritePlan.CreateInline(
                     in _bindingEnvironment,
                     extension,
@@ -2295,7 +2335,8 @@ internal static partial class ComponentPlanner
         private int TryAddPropertySubscription(in PendingPropertyWritePlan pending)
         {
             var operation = pending.Operation;
-            if (operation.ValueSyntax is not MarkupDynamicAttributeValueSyntax ||
+            if (operation.ConvertedValue is AkcssAmxInvocationValue ||
+                operation.ValueSyntax is not MarkupDynamicAttributeValueSyntax ||
                 operation.ValueOperation.IsDefault ||
                 operation.Property is not { } property ||
                 property.Type.Symbol is not ITypeSymbol valueType)
@@ -2348,13 +2389,13 @@ internal static partial class ComponentPlanner
             };
         }
 
-        private static string? GetNameScopeCapability(int scopeId)
+        private string? GetNameScopeCapability(int scopeId)
         {
             Debug.Assert(scopeId >= 0);
 
             // BindingWritePlan only tests whether a name scope will be available.
             // The concrete expression is supplied by MarkupExtensionWriteContext.
-            return scopeId == 0 ? null : "__nameScope";
+            return scopeId == 0 && _component != null ? null : "__nameScope";
         }
 
         private ComponentElementFlags GetElementFlags(ITypeSymbol type, bool isRoot, bool hasName, in EffectiveScope scope)
@@ -2986,6 +3027,7 @@ internal static partial class ComponentPlanner
         public int OwnerElementId { get; }
         public ComponentElementScopeKind Kind { get; }
         public bool IsDeferred { get; }
-        public bool IsLocal => ScopeId > 0 && Kind != ComponentElementScopeKind.ConditionalBranch;
+        public bool IsLocal => Kind == ComponentElementScopeKind.ControlTemplate ||
+            ScopeId > 0 && Kind != ComponentElementScopeKind.ConditionalBranch;
     }
 }

@@ -21,10 +21,8 @@ internal static class AkcssModulePlanner
         CancellationToken cancellationToken = default)
     {
         var module = input.Module;
-        var unsupported = module.DeclaringSyntax is { } syntax && AkcssSemanticFacts.FindContextualModuleMember(syntax) is { } member
-            ? new AkburaSemanticDiagnostic(member, ErrorCodes.AKBURA_GENERATION_AkcssUnsupported, [member.Kind.ToString()])
-            : null;
-        var moduleSymbols = unsupported is null ? module.AkcssSymbols : ImmutableArray<IAkcssSymbol>.Empty;
+        var native = AkcssNativePlanner.Create(input, cancellationToken);
+        var moduleSymbols = module.AkcssSymbols;
 
         using var symbols = ImmutableArrayBuilder<AkcssSymbolGenerationPlan>.Rent(moduleSymbols.Length);
 
@@ -96,7 +94,7 @@ internal static class AkcssModulePlanner
                 module.IsInlined,
                 pooledSymbols,
                 pooledRuntimeStyles,
-                unsupported);
+                native);
         }
         catch
         {

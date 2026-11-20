@@ -20,7 +20,7 @@ internal static partial class ComponentPlanner
             }
 
             var references = new Dictionary<string, HashSet<int>>(StringComparer.Ordinal);
-            foreach (var syntax in _component.DeclarationSyntax.DescendantNodes())
+            foreach (var syntax in _component!.DeclarationSyntax.DescendantNodes())
             {
                 var scopeId = GetRenderCaptureScopeId(syntax);
                 if (scopeId < 0)

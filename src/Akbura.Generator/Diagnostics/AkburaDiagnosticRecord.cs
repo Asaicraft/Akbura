@@ -10,6 +10,7 @@ public enum AkburaDiagnosticKind : byte
     Syntax,
     Semantic,
     Infrastructure,
+    Generation,
 }
 
 [Flags]

@@ -257,6 +257,23 @@ Built-in Styles									</span>
 </code></pre>
 <p>Built-in styles are type-aware. A utility is available only when its target type is compatible with the control on which it is used. For example, padding utilities target controls that expose a <code>Padding</code> property, while margin utilities work with every Avalonia <code>Control</code>.</p>
 <p>Most built-in values come from dynamic Avalonia resources such as <code>--spacing</code>, <code>--color-blue-500</code>, <code>--radius-md</code>, and <code>--shadow-lg</code>. Applications can replace these resources to customize the theme without redefining each utility.</p>
+<h2 id="align-a-control-by-axis">Align a control by axis<a class="header-anchor" href="javascript:;" onclick="location.hash='#align-a-control-by-axis'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Use <code>self-x-*</code> to set horizontal alignment and <code>self-y-*</code> to set vertical alignment. Both accept <code>start</code>, <code>center</code>, <code>end</code>, <code>stretch</code>, and <code>auto</code>. As with <code>self-auto</code>, the <code>auto</code> suffix uses Avalonia's <code>Stretch</code> value.</p>
+<pre><code class="language-akbura">&lt;Button self-x-center self-y-end Content=&quot;Continue&quot; /&gt;
+</code></pre>
+<h2 id="button-presenter-utilities">Button presenter utilities<a class="header-anchor" href="javascript:;" onclick="location.hash='#button-presenter-utilities'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Use <code>presenter-*</code> markup utilities to style the <code>ContentPresenter</code> named <code>PART_ContentPresenter</code> in a button template. The Fluent theme uses this part. Custom templates can opt in by using the same part name.</p>
+<pre><code class="language-akbura">using Avalonia.Controls;
+using Akbura.Markup;
+using Akbura.Styles.akcss;
+
+&lt;Button Content=&quot;Continue&quot;
+        presenter-bg-blue-500
+        ${hover}:presenter-bg-blue-700
+        presenter-border-2 presenter-border-blue-600
+        presenter-rounded-md presenter-padding-8 presenter-text-white /&gt;
+</code></pre>
+<p>Colors, named radii, and shadows use the shared theme resources. <code>presenter-padding-8</code> sets eight device-independent pixels on each side.</p>
 <h2 id="categories">Categories<a class="header-anchor" href="javascript:;" onclick="location.hash='#categories'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <ul>
 <li><a href="akcss/spacing">Margin and padding</a></li>
@@ -284,6 +301,16 @@ Built-in Styles									</span>
 								On This Page
 							</h5>
 							<ul class="text-slate-700 text-sm leading-6">
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#align-a-control-by-axis'" data-id="align-a-control-by-axis" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Align a control by axis
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#button-presenter-utilities'" data-id="button-presenter-utilities" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Button presenter utilities
+										</span>
+									</li>
 									<li class="group text-gray-800 hover:text-gray-900">
 										<span v-hash="'#categories'" data-id="categories" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
 											Categories

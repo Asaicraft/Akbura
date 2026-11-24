@@ -1,4 +1,5 @@
 using Akbura.AvaloniaEdit;
+using Akbura.Markup;
 using Akbura.Styles.akcss;
 using Avalonia.Automation;
 using Avalonia.Controls;
@@ -29,25 +30,36 @@ namespace Akbura.Playground;
             HorizontalContentAlignment: HorizontalAlignment.Stretch;
             VerticalContentAlignment: VerticalAlignment.Stretch;
         }
+
+        GridSplitter.split-rows {
+            ResizeDirection: GridResizeDirection.Rows;
+        }
+
+        GridSplitter.split-columns {
+            ResizeDirection: GridResizeDirection.Columns;
+        }
     }
 }
 
 <Border bg-slate-100>
-    <Grid m-4 ColumnDefinitions="*,8,*">
-        <ThemeVariantScope RequestedThemeVariant={ThemeVariant.Dark}>
+    <Grid ColumnDefinitions="*,8,*"
+          RowDefinitions="3*,12,2*"
+          m-2 ${sm}:m-3 ${md}:m-4>
+        <ThemeVariantScope RequestedThemeVariant={ThemeVariant.Dark}
+                           col-span-3 ${sm}:col-span-1 ${sm}:row-span-3>
             <Border bg-slate-900 rounded-xl overflow-hidden>
                 <Grid RowDefinitions="Auto,*">
                     <Border px-3 py-2 bg-slate-800>
-                        <Grid ColumnDefinitions="*,*" gap-x-2>
+                        <Row Columns="2" gap-x-2>
                             <ComboBox x.Name="ExampleSelector"
                                       w-full
                                       AutomationProperties.Name="Example"
                                       PlaceholderText="Example" />
                             <ComboBox x.Name="FileSelector"
-                                      col-1 w-full
+                                      w-full
                                       AutomationProperties.Name="File"
                                       PlaceholderText="File" />
-                        </Grid>
+                        </Row>
                     </Border>
                     <AkburaCodeEditor x.Name="SourceEditor"
                                       row-1
@@ -61,9 +73,12 @@ namespace Akbura.Playground;
             </Border>
         </ThemeVariantScope>
 
-        <GridSplitter col-1 bg-transparent self-stretch ResizeDirection="Columns" />
+        <GridSplitter row-1 col-span-3 split-rows
+                      ${sm}:row-0 ${sm}:col-1 ${sm}:col-span-1 ${sm}:row-span-3 ${sm}:split-columns
+                      bg-transparent self-stretch />
 
-        <Border col-2
+        <Border row-2 col-span-3
+                ${sm}:row-0 ${sm}:col-2 ${sm}:col-span-1 ${sm}:row-span-3
                 bg-slate-50
                 border-slate-200
                 border-1

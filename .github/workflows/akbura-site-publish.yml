@@ -11,9 +11,23 @@ on:
     paths:
       - "src/AkburaDocs/**"
       - "src/Akbura.FeatureGallery/**"
+      - "src/Playground/**"
+      - "src/Akbura/**"
+      - "src/Akbura.Generator/**"
+      - "src/Akbura.BlackSilence/**"
+      - "src/Akbura.Build.Tasks/**"
+      - "src/Workspaces/Akbura.Workspaces/**"
+      - "Directory.Build.props"
+      - "Directory.Packages.props"
+      - "global.json"
       - "eng/Prepare-FeatureGallerySite.mjs"
       - "eng/FeatureGalleryRouting.test.mjs"
+      - "eng/Prepare-PlaygroundSite.mjs"
       - ".github/workflows/akbura-site-publish.yml"
+
+concurrency:
+  group: akbura-website
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -109,6 +123,20 @@ jobs:
           test -d ./src/AkburaDocs/dist/Gallery/_framework
           test -f ./src/AkburaDocs/dist/Gallery/browser-router.js
           test -f ./src/AkburaDocs/dist/Gallery/gallery-config.js
+
+      - name: Publish Playground
+        run: |
+          dotnet publish \
+            ./src/Playground/Akbura.Playground.Browser/Akbura.Playground.Browser.csproj \
+            --configuration Release \
+            -p:WasmEnableThreads=true \
+            --output "$RUNNER_TEMP/playground"
+
+      - name: Add Playground to site
+        run: |
+          mkdir -p ./src/AkburaDocs/dist/Playground
+          cp -a "$RUNNER_TEMP/playground/wwwroot/." ./src/AkburaDocs/dist/Playground/
+          node eng/Prepare-PlaygroundSite.mjs ./src/AkburaDocs/dist/Playground/
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4.1.0

@@ -4,6 +4,7 @@ using Akbura.Pools;
 using Akbura.Workspaces;
 using Akbura.Workspaces.Projects;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using AvaloniaEdit.Document;
@@ -56,6 +57,10 @@ public sealed partial class PlaygroundView : AkburaControl
         ExampleSelector.SelectionChanged += ExampleChanged;
         ExampleSelector.SelectedIndex = 0;
         SourceEditor.TextChanged += SourceChanged;
+        if (OperatingSystem.IsBrowser())
+        {
+            SourceEditor.TextArea.TextView.AddHandler(InputElement.TappedEvent, FocusEditorOnTouch, handledEventsToo: true);
+        }
         _previewTimer.Tick += PreviewTimerTick;
     }
 
@@ -247,6 +252,14 @@ public sealed partial class PlaygroundView : AkburaControl
             {
                 _bindingRequest = null;
             }
+        }
+    }
+
+    private void FocusEditorOnTouch(object? sender, TappedEventArgs e)
+    {
+        if (e.Pointer.Type == PointerType.Touch && !SourceEditor.IsReadOnly)
+        {
+            SourceEditor.TextArea.Focus(NavigationMethod.Pointer);
         }
     }
 

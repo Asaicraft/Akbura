@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-pages-isolation="false">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
     <title>Akbura Playground</title>
     <style>
         html, body, #out {
@@ -33,13 +33,29 @@
     <div id="out"></div>
     <p id="startup" role="status">Loading Akbura Playground…</p>
     <script type="module">
+        import { enableMobileTextInput } from './mobile-text-input.js';
+
         const startup = document.getElementById('startup');
 
         try {
-            const { dotnet } = await import('./_framework/dotnet.js');
-            const runtime = await dotnet.create();
-            await runtime.runMain(runtime.getConfig().mainAssemblyName, []);
-            startup.remove();
+            if (document.documentElement.dataset.pagesIsolation === 'true' && !crossOriginIsolated) {
+                const serviceWorker = navigator.serviceWorker;
+                const workerUrl = new URL('./pages-isolation.js', document.baseURI);
+                if (!serviceWorker || serviceWorker.controller?.scriptURL === workerUrl.href) {
+                    throw new Error('This browser could not enable cross-origin isolation for Playground.');
+                }
+
+                startup.textContent = 'Enabling browser threads…';
+                await serviceWorker.register(workerUrl);
+                await serviceWorker.ready;
+                location.reload();
+            } else {
+                enableMobileTextInput(document.getElementById('out'));
+                const { dotnet } = await import('./_framework/dotnet.js');
+                const runtime = await dotnet.create();
+                await runtime.runMain(runtime.getConfig().mainAssemblyName, []);
+                startup.remove();
+            }
         } catch (error) {
             startup.textContent = 'Akbura Playground could not start. See the browser console.';
             console.error(error);

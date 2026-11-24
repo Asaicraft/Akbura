@@ -18,7 +18,8 @@ internal sealed partial class AkcssUsingDirectiveSyntax
                 "An AKCSS module import cannot be converted to a C# using directive.");
         }
 
-        return CSharpSyntaxFactory.UsingDirective(
-            CSharpSyntaxFactory.ParseName(Name.ToFullString().Trim()));
+        var text = Name.ToFullString().Trim();
+        var usings = CSharpSyntaxFactory.ParseCompilationUnit("using " + text + ";").Usings;
+        return usings.Count == 1 ? usings[0] : CSharpSyntaxFactory.UsingDirective(CSharpSyntaxFactory.ParseName(text));
     }
 }

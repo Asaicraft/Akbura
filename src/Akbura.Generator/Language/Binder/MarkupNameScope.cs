@@ -12,12 +12,12 @@ namespace Akbura.Language.Binder;
 
 internal sealed class MarkupNameScope
 {
-    private readonly MarkupRootSyntax _root;
+    private readonly AkburaSyntax _root;
     private readonly MarkupTemplateContentResolver _templateContentResolver;
     private readonly ImmutableArray<Scope> _scopes;
 
     private MarkupNameScope(
-        MarkupRootSyntax root,
+        AkburaSyntax root,
         MarkupTemplateContentResolver templateContentResolver,
         ImmutableArray<Scope> scopes,
         ImmutableArray<MarkupNameDeclaration> declarations)
@@ -31,14 +31,15 @@ internal sealed class MarkupNameScope
     public ImmutableArray<MarkupNameDeclaration> Declarations { get; }
 
     public static MarkupNameScope Create(
-        MarkupRootSyntax root,
+        AkburaSyntax root,
         MarkupTemplateContentResolver templateContentResolver)
     {
         using var declarations = ImmutableArrayBuilder<MarkupNameDeclaration>.Rent();
         var scopes = new Dictionary<AkburaSyntax, ScopeBuilder>();
         scopes.Add(root, new ScopeBuilder(root));
 
-        foreach (var element in root.Element.DescendantNodesAndSelf().OfType<MarkupElementSyntax>())
+        var elements = root is MarkupRootSyntax markupRoot ? markupRoot.Element.DescendantNodesAndSelf() : root.DescendantNodes();
+        foreach (var element in elements.OfType<MarkupElementSyntax>())
         {
             if (element.StartTag == null)
             {
@@ -64,13 +65,16 @@ internal sealed class MarkupNameScope
                 var declaration = MarkupNameDeclaration.Create(
                     element,
                     attachedAttribute,
+                    owner,
                     originalDeclaration: null);
+
                 if (declaration.IsValid &&
                     scope.DeclarationsByName.TryGetValue(declaration.Name, out var originalDeclaration))
                 {
                     declaration = MarkupNameDeclaration.Create(
                         element,
                         attachedAttribute,
+                        owner,
                         originalDeclaration);
                 }
                 else if (declaration.IsValid)
@@ -178,18 +182,39 @@ internal sealed class MarkupNameScope
     }
 
     private static AkburaSyntax FindScopeOwner(AkburaSyntax syntax,
-        MarkupTemplateContentResolver templates, MarkupRootSyntax root)
+        MarkupTemplateContentResolver templates, AkburaSyntax root)
     {
         var templateOwner = templates.GetLocalNameScopeOwner(syntax);
         for (var current = syntax; current != null; current = current.Parent)
         {
-            if (current is MarkupBlockSyntax or MarkupCodeBlockSyntax || ReferenceEquals(current, templateOwner))
+            if (ReferenceEquals(current, root) || current is MarkupBlockSyntax or MarkupCodeBlockSyntax || ReferenceEquals(current, templateOwner))
             {
                 return current;
             }
         }
 
         return root;
+    }
+
+    internal MarkupNameDeclaration? FindUniqueRootDeclaration(string name)
+    {
+        MarkupNameDeclaration? match = null;
+        foreach (var declaration in Declarations)
+        {
+            if (declaration.Name != name || !ReferenceEquals(GetScopeOwner(declaration.Element), _root))
+            {
+                continue;
+            }
+
+            if (match is not null || !declaration.IsValid)
+            {
+                return null;
+            }
+
+            match = declaration;
+        }
+
+        return match;
     }
 
     public bool TryGetDeclaration(

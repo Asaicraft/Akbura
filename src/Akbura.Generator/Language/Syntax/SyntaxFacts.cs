@@ -48,7 +48,12 @@ public static partial class SyntaxFacts
             kind == SyntaxKind.AkcssApplyDirectiveSyntax ||
             kind == SyntaxKind.AkcssInterceptDirectiveSyntax ||
             kind == SyntaxKind.AkcssIfDirectiveSyntax ||
-            kind == SyntaxKind.AkcssPseudoBlockSyntax;
+            kind == SyntaxKind.AkcssPseudoBlockSyntax ||
+            kind == SyntaxKind.AkcssTemplateDirectiveSyntax ||
+            kind == SyntaxKind.AkcssIncludeDirectiveSyntax ||
+            kind == SyntaxKind.AkcssTemplateBindDirectiveSyntax ||
+            kind == SyntaxKind.AkcssBasedOnDirectiveSyntax ||
+            kind == SyntaxKind.AkcssNestedStyleRuleSyntax;
     }
 
     public static bool IsHexDigit(char c)

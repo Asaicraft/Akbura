@@ -179,9 +179,9 @@ internal sealed partial class MarkupBinder : Binder
     {
         for (var current = ScopeDesignator; current != null; current = current.Parent)
         {
-            if (current is MarkupRootSyntax markupRoot)
+            if (current is MarkupRootSyntax or MarkupBlockSyntax { Parent: AkcssTemplateDirectiveSyntax })
             {
-                return SemanticModel.BindingSession.GetMarkupNameScope(markupRoot);
+                return SemanticModel.BindingSession.GetMarkupNameScope(current);
             }
         }
 
@@ -280,9 +280,22 @@ internal sealed partial class MarkupBinder : Binder
             }
         }
 
+        var hasAkcssConfiguration = false;
         foreach (var content in markupElement.Body)
         {
+            if (content is MarkupIncludeDirectiveSyntax or MarkupTemplateBindDirectiveSyntax)
+            {
+                hasAkcssConfiguration = true;
+                continue;
+            }
+
             childrenBuilder.Add(SemanticModel.BindingSession.BindSemanticSyntax(content));
+        }
+
+        if (hasAkcssConfiguration && AkcssSemanticFacts.FindOwner(markupElement) is { } declaration &&
+            SemanticModel.GetBinder(declaration, BinderUsage.Akcss) is AkcssStyleBinder akcssBinder)
+        {
+            childrenBuilder.AddRange(akcssBinder.BindAkcssElementConfigurations(markupElement, declaration));
         }
 
         var contentSetter = propertySymbol == null
@@ -1017,6 +1030,16 @@ internal sealed partial class MarkupBinder : Binder
                 dynamicExpression = expression;
                 valueKind = MarkupAttributeValueKind.DynamicExpression;
                 valueBinding = SemanticModel.BindMarkupAttributeExpression(markupAttribute, expression, targetType);
+                if (targetType != null && AkcssSemanticFacts.FindTemplate(markupAttribute) != null &&
+                    SemanticModel.TryBindTemplateAmxValue(markupAttribute, expression, targetType, valueBinding,
+                        out var resourceBinding, out var resource))
+                {
+                    valueBinding = resourceBinding;
+                    if (resource.Kind != AkcssAmxInvocationKind.None)
+                    {
+                        convertedValue = resource;
+                    }
+                }
                 if (assignsCollectionSource &&
                     !HasImplicitConversion(valueBinding, targetType) &&
                     IsEnumerableSource(valueBinding.Conversion.SourceType ?? valueBinding.TypeSymbol))

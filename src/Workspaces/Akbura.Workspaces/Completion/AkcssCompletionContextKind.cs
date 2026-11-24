@@ -14,4 +14,12 @@ public enum AkcssCompletionContextKind
     ApplyItem,
     AkcssModuleName,
     SelectorSnippet,
+    IncludeName,
+    BaseTheme,
+    TemplateBindingProperty,
+    TemplatePart,
+    PseudoClass,
+    TemplateTraversal,
+    TemplateMarkupBody,
+    IncludeArgument,
 }

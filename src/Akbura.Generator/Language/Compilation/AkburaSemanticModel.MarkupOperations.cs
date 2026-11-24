@@ -1646,12 +1646,12 @@ internal partial class AkburaSemanticModel
     {
         for (var current = markupAttribute.Parent; current != null; current = current.Parent)
         {
-            if (current is not MarkupRootSyntax markupRoot)
+            if (current is not (MarkupRootSyntax or MarkupBlockSyntax { Parent: AkcssTemplateDirectiveSyntax }))
             {
                 continue;
             }
 
-            var nameScope = BindingSession.GetMarkupNameScope(markupRoot);
+            var nameScope = BindingSession.GetMarkupNameScope(current);
 
             if (nameScope.TryGetVisibleDeclaredSymbol(
                     this,
@@ -1665,6 +1665,12 @@ internal partial class AkburaSemanticModel
                     return true;
                 }
 
+                elementType = null!;
+                return false;
+            }
+
+            if (current is MarkupBlockSyntax)
+            {
                 elementType = null!;
                 return false;
             }
@@ -4075,8 +4081,13 @@ internal partial class AkburaSemanticModel
             return false;
         }
 
+        if (SyntaxTree.GetRootSyntax() is not AkburaDocumentSyntax document)
+        {
+            return false;
+        }
+
         var commandName = receiver.Identifier.ValueText;
-        foreach (var member in SyntaxTree.GetRoot().Members)
+        foreach (var member in document.Members)
         {
             if (member is not CommandDeclarationSyntax commandDeclaration)
             {
@@ -4126,7 +4137,7 @@ internal partial class AkburaSemanticModel
 
         var probeClass = CreateMarkupHandlerProbeType(membersBuilder.ToImmutable());
 
-        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
+        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass, GetMarkupCSharpUsingDirectives(markupAttribute));
         return BindingSession
             .GetCSharpProbeBinder(GetMarkupBindingScope(markupAttribute), BinderUsage.Markup)
             .BindReturnExpression(compilationUnit, isBindingPath: false);
@@ -4161,7 +4172,7 @@ internal partial class AkburaSemanticModel
 
         var probeClass = CreateMarkupHandlerProbeType(membersBuilder.ToImmutable());
 
-        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
+        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass, GetMarkupCSharpUsingDirectives(markupAttribute));
         return BindingSession
             .GetCSharpProbeBinder(GetMarkupBindingScope(markupAttribute), BinderUsage.Markup)
             .BindExpressionStatement(compilationUnit, isBindingPath: false);
@@ -4197,7 +4208,7 @@ internal partial class AkburaSemanticModel
         AddMarkupAttributeProbeMembers(membersBuilder, probeScope);
         membersBuilder.Add(method);
         var compilationUnit = CreateCSharpProbeCompilationUnit(
-            CreateMarkupHandlerProbeType(membersBuilder.ToImmutable()));
+            CreateMarkupHandlerProbeType(membersBuilder.ToImmutable()), GetMarkupCSharpUsingDirectives(markupAttribute));
         return BindingSession
             .GetCSharpProbeBinder(GetMarkupBindingScope(markupAttribute), BinderUsage.Markup)
             .BindMethodBlock(compilationUnit, "__AkburaCommandHandlerProbe");
@@ -4230,7 +4241,7 @@ internal partial class AkburaSemanticModel
 
         var probeClass = CreateMarkupHandlerProbeType(membersBuilder.ToImmutable());
 
-        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
+        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass, GetMarkupCSharpUsingDirectives(markupAttribute));
         return BindingSession
             .GetCSharpProbeBinder(GetMarkupBindingScope(markupAttribute), BinderUsage.Markup)
             .BindExpressionStatement(compilationUnit, isBindingPath: false);
@@ -4262,7 +4273,7 @@ internal partial class AkburaSemanticModel
 
         var probeClass = CreateMarkupHandlerProbeType(membersBuilder.ToImmutable());
 
-        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
+        var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass, GetMarkupCSharpUsingDirectives(markupAttribute));
         return BindingSession
             .GetCSharpProbeBinder(GetMarkupBindingScope(markupAttribute), BinderUsage.Markup)
             .BindMethodBlock(compilationUnit, "__AkburaEventHandlerProbe");
@@ -4281,7 +4292,7 @@ internal partial class AkburaSemanticModel
 
     private CSharp.ClassDeclarationSyntax CreateMarkupHandlerProbeType(ImmutableArray<CSharp.MemberDeclarationSyntax> members)
     {
-        var componentName = SyntaxTree.ComponentName;
+        var componentName = SyntaxTree.Kind == SyntaxTreeKind.Component ? SyntaxTree.ComponentName : string.Empty;
         var declaration = CSharpSyntaxFactory.ClassDeclaration(
                 string.IsNullOrWhiteSpace(componentName)
                     ? "__AkburaSemanticProbe"
@@ -4445,7 +4456,7 @@ internal partial class AkburaSemanticModel
 
         var compilationUnit = CreateCSharpProbeCompilationUnit(probeClass);
         return BindingSession
-            .GetCSharpProbeBinder(SyntaxTree.GetRoot(), BinderUsage.Markup)
+            .GetCSharpProbeBinder(SyntaxTree.GetRootSyntax(), BinderUsage.Markup)
             .BindReturnExpression(compilationUnit, isBindingPath: true);
     }
 
@@ -4497,13 +4508,18 @@ internal partial class AkburaSemanticModel
             }
         }
 
-        return SyntaxTree.GetRoot();
+        return SyntaxTree.GetRootSyntax();
     }
 
     private ImmutableArray<CSharp.MemberDeclarationSyntax> CreateMarkupAttributeProbeFields()
     {
+        if (SyntaxTree.GetRootSyntax() is not AkburaDocumentSyntax document)
+        {
+            return [];
+        }
+
         using var builder = ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
-        foreach (var member in SyntaxTree.GetRoot().Members)
+        foreach (var member in document.Members)
         {
             switch (member.Kind)
             {

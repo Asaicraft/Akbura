@@ -16,8 +16,8 @@ internal sealed class BindingSession
     private readonly AkburaSemanticModel _semanticModel;
     private readonly BinderFactory _binderFactory;
     private readonly ConcurrentCache<BinderCacheKey, Binder> _blockBinderCache;
-    private ImmutableDictionary<MarkupRootSyntax, MarkupNameScope> _markupNameScopes =
-        ImmutableDictionary<MarkupRootSyntax, MarkupNameScope>.Empty;
+    private ImmutableDictionary<AkburaSyntax, MarkupNameScope> _markupNameScopes =
+        ImmutableDictionary<AkburaSyntax, MarkupNameScope>.Empty;
 
     public BindingSession(AkburaSemanticModel semanticModel)
     {
@@ -44,7 +44,7 @@ internal sealed class BindingSession
 
     public int CachedBinderCount => _binderFactory.CachedBinderCount;
 
-    internal MarkupNameScope GetMarkupNameScope(MarkupRootSyntax root)
+    internal MarkupNameScope GetMarkupNameScope(AkburaSyntax root)
     {
         return ImmutableInterlocked.GetOrAdd(
             ref _markupNameScopes,
@@ -147,9 +147,10 @@ internal sealed class BindingSession
 
         return _semanticModel.GetBoundNode( 
             syntax,
-            () => ShouldUseMemberSemanticModel(syntax)
-                ? _semanticModel.GetMemberSemanticModel(syntax).BindOperationSyntax(syntax)
-                : GetOperationBinder(syntax).BindOperationSyntax(syntax));
+            () => TryBindContextualAkcssMember(syntax, out var contextual) ? contextual :
+                ShouldUseMemberSemanticModel(syntax)
+                    ? _semanticModel.GetMemberSemanticModel(syntax).BindOperationSyntax(syntax)
+                    : GetOperationBinder(syntax).BindOperationSyntax(syntax));
     }
 
     public BoundNode BindSemanticSyntax(AkburaSyntax syntax)
@@ -161,9 +162,48 @@ internal sealed class BindingSession
 
         return _semanticModel.GetBoundNode(
             syntax,
-            () => ShouldUseMemberSemanticModel(syntax)
-                ? _semanticModel.GetMemberSemanticModel(syntax).BindSemanticSyntax(syntax)
-                : GetSemanticBinder(syntax).BindSemanticSyntax(syntax));
+            () => TryBindContextualAkcssMember(syntax, out var contextual) ? contextual :
+                ShouldUseMemberSemanticModel(syntax)
+                    ? _semanticModel.GetMemberSemanticModel(syntax).BindSemanticSyntax(syntax)
+                    : GetSemanticBinder(syntax).BindSemanticSyntax(syntax));
+    }
+
+    private bool TryBindContextualAkcssMember(AkburaSyntax syntax, out BoundNode bound)
+    {
+        bound = null!;
+        var host = syntax is AkcssIncludeSyntax or AkcssTemplateBindSyntax ? syntax.Parent : syntax;
+        if (host is MarkupIncludeDirectiveSyntax or MarkupTemplateBindDirectiveSyntax)
+        {
+            if (host.Parent is MarkupElementSyntax element)
+            {
+                BindSemanticSyntax(element);
+                return _semanticModel.TryGetCachedBoundNode(syntax, out bound);
+            }
+
+            if (AkcssSemanticFacts.FindOwner(host) is { } declaration &&
+                GetBinder(declaration, BinderUsage.Akcss) is AkcssStyleBinder binder)
+            {
+                bound = binder.BindMisplacedAkcssMarkupConfiguration(host, declaration);
+                return true;
+            }
+
+            return false;
+        }
+
+        if (syntax is not (AkcssBodyMemberSyntax or AkcssIncludeSyntax or AkcssTemplateBindSyntax or AkcssMixinParameterSyntax) &&
+            syntax is not CSharpExpressionSyntax { Parent: AkcssMixinArgumentListSyntax })
+        {
+            return false;
+        }
+
+        if (AkcssSemanticFacts.FindOwner(syntax) is not { } owner ||
+            !AkcssSemanticFacts.IsSourceDeclaration(owner) && !AkcssSemanticFacts.HasContextualBody(owner))
+        {
+            return false;
+        }
+
+        BindSemanticSyntax(owner);
+        return _semanticModel.TryGetCachedBoundNode(syntax, out bound);
     }
 
     private bool IsCurrentSemanticModelSyntax(AkburaSyntax syntax)
@@ -231,7 +271,18 @@ internal sealed class BindingSession
                 AkburaSyntaxKind.MarkupPrefixedAttributeSyntax or
                 AkburaSyntaxKind.TailwindFlagAttributeSyntax or
                 AkburaSyntaxKind.TailwindFullAttributeSyntax => BinderUsage.Markup,
-            AkburaSyntaxKind.AkcssAssignmentSyntax or
+            AkburaSyntaxKind.AkcssDocumentSyntax or
+                AkburaSyntaxKind.AkcssDocumentSyntax or
+                AkburaSyntaxKind.InlineAkcssBlockSyntax or
+                AkburaSyntaxKind.AkcssSelectorRuleSyntax or
+                AkburaSyntaxKind.AkcssThemeDeclarationSyntax or
+                AkburaSyntaxKind.AkcssMixinDeclarationSyntax or
+                AkburaSyntaxKind.AkcssStyleRuleSyntax or
+                AkburaSyntaxKind.AkcssUtilityDeclarationSyntax or
+                AkburaSyntaxKind.AkcssSelectorRuleSyntax or
+                AkburaSyntaxKind.AkcssThemeDeclarationSyntax or
+                AkburaSyntaxKind.AkcssMixinDeclarationSyntax or
+                AkburaSyntaxKind.AkcssAssignmentSyntax or
                 AkburaSyntaxKind.AkcssIfDirectiveSyntax or
                 AkburaSyntaxKind.AkcssApplyDirectiveSyntax or
                 AkburaSyntaxKind.AkcssInterceptDirectiveSyntax => BinderUsage.Akcss,

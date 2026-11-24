@@ -24,6 +24,7 @@ internal readonly ref struct ComponentLifecycleWriter
     private readonly string _ownerTypeName;
     private readonly string _resourcePath;
     private readonly ComponentGenerationMode _generationMode;
+    private readonly AkcssInlineStylesPlan _nativeStyles;
 
     public ComponentLifecycleWriter(
         CodeWriter writer,
@@ -32,7 +33,8 @@ internal readonly ref struct ComponentLifecycleWriter
         string ownerTypeName,
         string resourcePath,
         ComponentGenerationMode generationMode =
-            ComponentGenerationMode.ReleaseDirect)
+            ComponentGenerationMode.ReleaseDirect,
+        AkcssInlineStylesPlan nativeStyles = default)
     {
         Debug.Assert(writer != null);
         Debug.Assert(sourceMap != null);
@@ -45,6 +47,7 @@ internal readonly ref struct ComponentLifecycleWriter
         _ownerTypeName = ownerTypeName;
         _resourcePath = resourcePath;
         _generationMode = generationMode;
+        _nativeStyles = nativeStyles;
     }
 
     public bool WriteSupportFields(in ComponentPlan plan)
@@ -78,6 +81,13 @@ internal readonly ref struct ComponentLifecycleWriter
                 }
 
                 WriteFallbackRootField();
+                wroteAny = true;
+            }
+
+            if (!_nativeStyles.IsEmpty)
+            {
+                if (wroteAny) _writer.WriteLine();
+                _nativeStyles.WriteField(_writer);
                 wroteAny = true;
             }
 
@@ -135,6 +145,7 @@ internal readonly ref struct ComponentLifecycleWriter
         _writer.WriteLine("{");
         _writer.CurrentIndent += _writer.TabSize;
 
+        _nativeStyles.WriteInstallation(_writer);
         if (plan.Lifecycle.UsesFallbackRoot)
         {
             WriteFallbackFirstUpdate();

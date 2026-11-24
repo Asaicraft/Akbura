@@ -1,8 +1,7 @@
 using Akbura.Language;
-using Akbura.Language.Syntax;
-#if STATS
 using Akbura.Language.CodeGeneration;
-#endif
+using Akbura.Language.Symbols;
+using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;
@@ -54,6 +53,23 @@ internal static class AkburaDiagnosticEngine
                 cancellationToken.ThrowIfCancellationRequested();
                 Add(ref result, CreateSemanticRecord(tree, semanticModel, diagnostic));
             }
+
+            if (tree is AkcssSyntaxTree && semanticModel.GetDeclaredSymbol(root) is IAkcssModuleSymbol module)
+            {
+                AddAkcssGenerationDiagnostics(module, semanticModel, ref result, cancellationToken);
+            }
+            else if (tree is ComponentSyntaxTree componentTree &&
+                componentTree.GetRoot().Members.Any(static member => member is InlineAkcssBlockSyntax) &&
+                semanticModel.GetDeclaredSymbol(root) is IAkburaComponentSymbol component)
+            {
+                foreach (var inline in component.AkcssModules)
+                {
+                    if (inline.IsInlined)
+                    {
+                        AddAkcssGenerationDiagnostics(inline, semanticModel, ref result, cancellationToken);
+                    }
+                }
+            }
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -68,13 +84,45 @@ internal static class AkburaDiagnosticEngine
         return unique.ToImmutableArrayUnsafe();
     }
 
+    private static void AddAkcssGenerationDiagnostics(IAkcssModuleSymbol module, AkburaSemanticModel model,
+        ref List<AkburaDiagnosticRecord>? result, CancellationToken cancellationToken)
+    {
+        if (AkcssNativePlanner.Create(module, model, cancellationToken) is not { } plan)
+        {
+            return;
+        }
+
+        foreach (var diagnostic in plan.Diagnostics)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (diagnostic.Code is ErrorCodes.AKBURA_GENERATION_AkcssUnsupported or ErrorCodes.AKBURA_GENERATION_AkcssExport)
+            {
+                Add(ref result, CreateSemanticRecord(model.SyntaxTree, model, diagnostic, AkburaDiagnosticKind.Generation));
+            }
+        }
+    }
+
     internal static AkburaDiagnosticRecord CreateSemanticRecord(
         AkburaSyntaxTree tree,
         AkburaSemanticModel semanticModel,
-        AkburaSemanticDiagnostic diagnostic)
+        AkburaSemanticDiagnostic diagnostic,
+        AkburaDiagnosticKind kind = AkburaDiagnosticKind.Semantic)
     {
         var owner = GetSourceOwner(tree, semanticModel, diagnostic.Syntax);
-        var record = CreateRecord(owner.Tree, diagnostic, diagnostic.Span, AkburaDiagnosticKind.Semantic);
+        var record = CreateRecord(owner.Tree, diagnostic, diagnostic.Span, kind);
+        if (!diagnostic.RelatedSyntax.IsEmpty)
+        {
+            var related = ImmutableArray.CreateBuilder<AkburaDiagnosticLocation>(diagnostic.RelatedSyntax.Length);
+            foreach (var syntax in diagnostic.RelatedSyntax)
+            {
+                var relatedOwner = GetSourceOwner(tree, semanticModel, syntax);
+                var span = ClampSpan(syntax.Span.Start, syntax.Span.Length, relatedOwner.Tree.Text.Length);
+                related.Add(new AkburaDiagnosticLocation(relatedOwner.Tree.FilePath, span,
+                    relatedOwner.Tree.Text.Lines.GetLinePositionSpan(span)));
+            }
+
+            record = record with { AdditionalLocations = related.MoveToImmutable() };
+        }
         if (owner.ModuleIdentity != null)
         {
             return record with { Properties = record.Properties.Add("akbura.module-identity", owner.ModuleIdentity) };

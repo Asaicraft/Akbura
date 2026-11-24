@@ -36,6 +36,10 @@ internal sealed class MarkupForeachOperation : IMarkupForeachOperation
             {
                 conditional.SetParent(this);
             }
+            else if (child is AkcssContextualOperation contextual)
+            {
+                contextual.SetParent(this);
+            }
             else if (child is CSharpOperation code)
             {
                 code.SetParent(this);

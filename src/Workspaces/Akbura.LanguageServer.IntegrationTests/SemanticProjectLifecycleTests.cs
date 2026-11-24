@@ -245,7 +245,8 @@ public sealed partial class SemanticProjectLifecycleTests
 
         public static async Task<LanguageServerFixture> CreateAsync(
             bool failWatcherRegistration,
-            bool supportsSemanticTokensRefresh)
+            bool supportsSemanticTokensRefresh,
+            bool supportsPullDiagnostics = false)
         {
             var repositoryRoot = FindRepositoryRoot();
             var pipeName = "akbura-semantic-lsp-" +
@@ -313,8 +314,14 @@ public sealed partial class SemanticProjectLifecycleTests
                     RootUri = fixture.WorkspaceUri.AbsoluteUri,
                     Capabilities = new InitializeClientCapabilities
                     {
+                        TextDocument = supportsPullDiagnostics
+                            ? new TextDocumentClientCapabilities { Diagnostic = new DiagnosticClientCapabilities() }
+                            : null,
                         Workspace = new WorkspaceClientCapabilities
                         {
+                            Diagnostics = supportsPullDiagnostics
+                                ? new DiagnosticWorkspaceClientCapabilities { RefreshSupport = true }
+                                : null,
                             DidChangeWatchedFiles =
                                 new DidChangeWatchedFilesClientCapabilities
                                 {
@@ -365,7 +372,12 @@ public sealed partial class SemanticProjectLifecycleTests
             var diagnosticsPublished = Notifications.ExpectDiagnostics(
                 uri.AbsoluteUri,
                 version);
-            await _rpc.NotifyWithParameterObjectAsync(
+            await SendChangeAsync(uri, source, version);
+            await diagnosticsPublished.WaitAsync(CancellationToken);
+        }
+
+        public Task SendChangeAsync(Uri uri, string source, int version) =>
+            _rpc.NotifyWithParameterObjectAsync(
                 LspMethods.DidChange,
                 new DidChangeTextDocumentParams
                 {
@@ -382,8 +394,6 @@ public sealed partial class SemanticProjectLifecycleTests
                         },
                     ],
                 });
-            await diagnosticsPublished.WaitAsync(CancellationToken);
-        }
 
         public Task NotifyWatchedFileChangedAsync(Uri uri)
         {
@@ -565,21 +575,26 @@ public sealed partial class SemanticProjectLifecycleTests
 
         private readonly ConcurrentDictionary<
             (string Uri, int Version),
-            TaskCompletionSource<bool>> _diagnosticWaiters = new();
+            DiagnosticWaiter> _diagnosticWaiters = new();
         private readonly ConcurrentQueue<ShowMessageParams> _messages = new();
         private int _projectLoadBeginCount;
         private int _projectLoadEndCount;
+        private int _semanticTokensRefreshCount;
+        private int _diagnosticRefreshCount;
+
+        private sealed record DiagnosticWaiter(Func<Diagnostic[], bool> Accept, TaskCompletionSource<bool> Completion);
 
         public ClientNotifications(bool failWatcherRegistration)
         {
             _failWatcherRegistration = failWatcherRegistration;
         }
 
-        public Task ExpectDiagnostics(string uri, int version)
+        public Task ExpectDiagnostics(string uri, int version, Func<Diagnostic[], bool>? accept = null)
         {
             var completion = new TaskCompletionSource<bool>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
-            if (!_diagnosticWaiters.TryAdd((uri, version), completion))
+            var waiter = new DiagnosticWaiter(accept ?? (static _ => true), completion);
+            if (!_diagnosticWaiters.TryAdd((uri, version), waiter))
             {
                 throw new InvalidOperationException(
                     $"Diagnostics waiter already exists for " +
@@ -595,6 +610,18 @@ public sealed partial class SemanticProjectLifecycleTests
         public TaskCompletionSource<bool>
             SemanticTokensRefreshRequested { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int SemanticTokensRefreshCount => Volatile.Read(ref _semanticTokensRefreshCount);
+
+        public int DiagnosticRefreshCount => Volatile.Read(ref _diagnosticRefreshCount);
+
+        public async Task WaitForRefreshAsync(int semanticTokens, int diagnostics, CancellationToken cancellationToken)
+        {
+            while (SemanticTokensRefreshCount < semanticTokens || DiagnosticRefreshCount < diagnostics)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(20), cancellationToken);
+            }
+        }
 
         public int ProjectLoadBeginCount =>
             Volatile.Read(ref _projectLoadBeginCount);
@@ -634,7 +661,15 @@ public sealed partial class SemanticProjectLifecycleTests
         [JsonRpcMethod(LspMethods.SemanticTokensRefresh)]
         public object? RefreshSemanticTokens()
         {
+            Interlocked.Increment(ref _semanticTokensRefreshCount);
             SemanticTokensRefreshRequested.TrySetResult(true);
+            return null;
+        }
+
+        [JsonRpcMethod(LspMethods.DiagnosticRefresh)]
+        public object? RefreshDiagnostics()
+        {
+            Interlocked.Increment(ref _diagnosticRefreshCount);
             return null;
         }
 
@@ -644,11 +679,11 @@ public sealed partial class SemanticProjectLifecycleTests
         public void PublishDiagnostics(PublishDiagnosticsParams parameters)
         {
             if (parameters.Version is { } version &&
-                _diagnosticWaiters.TryRemove(
-                    (parameters.Uri, version),
-                    out var completion))
+                _diagnosticWaiters.TryGetValue((parameters.Uri, version), out var waiter) &&
+                waiter.Accept(parameters.Diagnostics) &&
+                _diagnosticWaiters.TryRemove((parameters.Uri, version), out _))
             {
-                completion.TrySetResult(true);
+                waiter.Completion.TrySetResult(true);
             }
         }
 

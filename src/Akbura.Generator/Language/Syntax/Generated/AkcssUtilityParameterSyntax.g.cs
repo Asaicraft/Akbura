@@ -266,7 +266,7 @@ namespace Akbura.Language.Syntax
             => (SimpleNameSyntax)GetRed(ref _paramName, 3)!;
 
         public SyntaxToken CloseParen
-            => new(this, this.Green.CloseParen, GetChildPositionFromEnd(1), GetChildIndex(4));
+            => new(this, this.Green.CloseParen, GetChildPositionFromEnd(4), GetChildIndex(4));
 
         public AkcssUtilityParameterSyntax UpdateAkcssUtilityParameterSyntax(
             SyntaxToken minus,

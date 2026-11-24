@@ -7,7 +7,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Perfolizer.Horology;
 using System.Collections.Immutable;
 using BlackSilenceGenerator = Akbura.BlackSilence.AkburaBlackSilenceGenerator;
-using FuriosoGenerator = Akbura.Furioso.AkburaCsGenerator;
 
 namespace Akbura.Benchmarks;
 
@@ -26,25 +25,17 @@ public class FeatureGalleryIncrementalBenchmarks
     [ParamsAllValues]
     public FeatureGalleryIncrementalScenario Scenario { get; set; }
 
-    [GlobalSetup(Target = nameof(Furioso))]
-    public void SetupFurioso() => Setup(static () => new FuriosoGenerator());
-
-    [GlobalSetup(Target = nameof(BlackSilence))]
-    public void SetupBlackSilence() => Setup(static () => new BlackSilenceGenerator());
-
-    [Benchmark(Baseline = true)]
-    public int Furioso() => _session.ApplyNextEdit();
-
-    [Benchmark]
-    public int BlackSilence() => _session.ApplyNextEdit();
-
-    private void Setup(Func<IIncrementalGenerator> generatorFactory)
+    [GlobalSetup]
+    public void Setup()
     {
         var project = s_project.Value;
         var inputs = FeatureGalleryIncrementalScenarioFactory.Create(project, Scenario);
-        _session = new FeatureGalleryIncrementalSession(project, inputs, generatorFactory);
+        _session = new FeatureGalleryIncrementalSession(project, inputs);
         _session.ValidateAndPrime(Scenario);
     }
+
+    [Benchmark]
+    public int BlackSilence() => _session.ApplyNextEdit();
 }
 
 public sealed class FeatureGalleryIncrementalBenchmarkConfig : ManualConfig
@@ -68,17 +59,14 @@ public sealed class FeatureGalleryIncrementalBenchmarkConfig : ManualConfig
 
 internal sealed class FeatureGalleryIncrementalSession(
     FeatureGalleryBenchmarkProject project,
-    FeatureGalleryIncrementalInputs inputs,
-    Func<IIncrementalGenerator> generatorFactory)
+    FeatureGalleryIncrementalInputs inputs)
 {
     private GeneratorDriver _driver = null!;
     private bool _modified;
 
     public void ValidateAndPrime(FeatureGalleryIncrementalScenario scenario)
     {
-        // Validation is outside timing, but uses the same inputs and publication
-        // policy as timing. Compare each generator against its own fresh output:
-        // Furioso and BlackSilence intentionally emit different implementations.
+        // Validate incremental and fresh output with the same inputs and publication policy.
         var original = Capture(CreateDriver(inputs.OriginalFiles), inputs.OriginalCompilation);
         var modified = Capture(original.Driver.ReplaceAdditionalTexts(inputs.ModifiedFiles), inputs.ModifiedCompilation);
         var freshModified = Capture(CreateDriver(inputs.ModifiedFiles), inputs.ModifiedCompilation);
@@ -129,7 +117,7 @@ internal sealed class FeatureGalleryIncrementalSession(
     private GeneratorDriver CreateDriver(ImmutableArray<AdditionalText> files)
     {
         return CSharpGeneratorDriver.Create(
-            generators: [generatorFactory().AsSourceGenerator()],
+            generators: [new BlackSilenceGenerator().AsSourceGenerator()],
             additionalTexts: files,
             parseOptions: project.ParseOptions,
             optionsProvider: new DiagnosticBenchmarkOptionsProvider(inputs.Snapshot.OptionsProvider, "Publish"),

@@ -184,6 +184,7 @@
     },
     "akcss": {
       "patterns": [
+        { "include": "source.akcss#templateMarkup" },
         {
           "match": "(?<![A-Za-z0-9_])\\.[A-Za-z_][A-Za-z0-9_-]*",
           "name": "entity.other.attribute-name.class.akbura"

@@ -26,7 +26,7 @@ internal readonly ref struct ComponentContentWriter
     public bool WriteProperty(
         in ComponentPlan component,
         in ComponentPropertyContentPlan plan,
-        bool isFirstUpdate)
+        bool isFirstUpdate, bool isControlTemplate = false)
     {
         var value = isFirstUpdate
             ? plan.FirstUpdateValue
@@ -42,7 +42,7 @@ internal readonly ref struct ComponentContentWriter
 
         using var mapping = _mappings.WriteStart(plan.Syntax);
         var propertyWriter = new PropertyWriter(_writer);
-        var end = propertyWriter.WriteStart(plan.Destination, targetExpression);
+        var end = propertyWriter.WriteStart(plan.Destination, targetExpression, isControlTemplate);
         if (end == PropertyWriteEnd.None || !WriteValue(component, value))
         {
             return false;

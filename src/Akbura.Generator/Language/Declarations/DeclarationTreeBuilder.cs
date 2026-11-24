@@ -127,6 +127,23 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
             node);
     }
 
+    public override SingleNamespaceOrTypeDeclaration VisitAkcssThemeDeclarationSyntax(AkcssThemeDeclarationSyntax node) =>
+        CreateLeafDeclaration(DeclarationKind.AkcssTheme, node.Name.Identifier.ValueText, node);
+
+    public override SingleNamespaceOrTypeDeclaration VisitAkcssMixinDeclarationSyntax(AkcssMixinDeclarationSyntax node)
+    {
+        using var parameters = ImmutableArrayBuilder<SingleTypeDeclaration>.Rent(node.Parameters.Parameters.Count);
+        foreach (var parameter in node.Parameters.Parameters)
+        {
+            parameters.Add(CreateLeafDeclaration(DeclarationKind.AkcssMixinParameter, parameter.Name.Identifier.ValueText, parameter));
+        }
+
+        return CreateLeafDeclaration(DeclarationKind.AkcssMixin, node.Name.Identifier.ValueText, node, parameters.ToImmutable());
+    }
+
+    public override SingleNamespaceOrTypeDeclaration VisitAkcssSelectorRuleSyntax(AkcssSelectorRuleSyntax node) =>
+        CreateLeafDeclaration(DeclarationKind.AkcssSelectorRule, string.Empty, node);
+
     private RootSingleNamespaceDeclaration CreateAkburaRootDeclaration(AkburaDocumentSyntax root)
     {
         var component = CreateComponentDeclaration(root);
@@ -194,9 +211,9 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
         var children = ArrayBuilder<SingleTypeDeclaration>.GetInstance();
         foreach (var member in members)
         {
-            if (member is AkcssStyleRuleSyntax styleRule)
+            if (member is AkcssStyleRuleSyntax or AkcssThemeDeclarationSyntax or AkcssMixinDeclarationSyntax or AkcssSelectorRuleSyntax)
             {
-                children.Add((SingleTypeDeclaration)Visit(styleRule)!);
+                children.Add((SingleTypeDeclaration)Visit(member)!);
             }
             else if (member is AkcssUtilitiesSectionSyntax utilitiesSection)
             {
@@ -224,7 +241,8 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
     private SingleTypeDeclaration CreateLeafDeclaration(
         DeclarationKind kind,
         string name,
-        AkburaSyntax syntax)
+        AkburaSyntax syntax,
+        ImmutableArray<SingleTypeDeclaration> children = default)
     {
         return new SingleTypeDeclaration(
             kind,
@@ -235,7 +253,7 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
             syntax: syntax,
             nameLocation: new SourceLocation(syntax),
             memberNames: s_emptyMemberNames,
-            children: ImmutableArray<SingleTypeDeclaration>.Empty,
+            children: children.IsDefault ? ImmutableArray<SingleTypeDeclaration>.Empty : children,
             diagnostics: GetDiagnostics(syntax),
             quickAttributes: QuickAttributes.None);
     }
@@ -368,6 +386,14 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
                         AddMemberName(
                             builder,
                             styleRule.Selector.ToFullString().Trim());
+                    }
+                    else if (member is AkcssThemeDeclarationSyntax theme)
+                    {
+                        AddMemberName(builder, theme.Name.Identifier.ValueText);
+                    }
+                    else if (member is AkcssMixinDeclarationSyntax mixin)
+                    {
+                        AddMemberName(builder, mixin.Name.Identifier.ValueText);
                     }
                     else if (member is AkcssUtilitiesSectionSyntax utilitiesSection)
                     {
@@ -636,6 +662,38 @@ internal sealed class DeclarationTreeBuilder : SyntaxVisitor<SingleNamespaceOrTy
         {
             Add(DeclarationKind.AkcssUtility, node.Selector.Name.ToFullString().Trim(), node);
         }
+
+        public override void VisitAkcssThemeDeclarationSyntax(AkcssThemeDeclarationSyntax node)
+        {
+            using var templates = ImmutableArrayBuilder<Declaration>.Rent();
+            foreach (var member in node.Members)
+            {
+                if (member is AkcssTemplateDirectiveSyntax template)
+                {
+                    using var content = ImmutableArrayBuilder<Declaration>.Rent();
+                    CollectMarkupContentDeclarations(template.Body.Content, content);
+                    templates.Add(new SingleSyntaxDeclaration(DeclarationKind.AkcssTemplate,
+                        string.Empty, template.Body, _syntaxTree, _akcssSyntaxTree, content.ToImmutable()));
+                }
+            }
+
+            Add(DeclarationKind.AkcssTheme, node.Name.Identifier.ValueText, node, templates.ToImmutable());
+        }
+
+        public override void VisitAkcssMixinDeclarationSyntax(AkcssMixinDeclarationSyntax node)
+        {
+            using var parameters = ImmutableArrayBuilder<Declaration>.Rent(node.Parameters.Parameters.Count);
+            foreach (var parameter in node.Parameters.Parameters)
+            {
+                parameters.Add(new SingleSyntaxDeclaration(DeclarationKind.AkcssMixinParameter,
+                    parameter.Name.Identifier.ValueText, parameter, _syntaxTree, _akcssSyntaxTree));
+            }
+
+            Add(DeclarationKind.AkcssMixin, node.Name.Identifier.ValueText, node, parameters.ToImmutable());
+        }
+
+        public override void VisitAkcssSelectorRuleSyntax(AkcssSelectorRuleSyntax node) =>
+            Add(DeclarationKind.AkcssSelectorRule, string.Empty, node);
 
         public override void VisitAkcssUtilitiesSectionSyntax(AkcssUtilitiesSectionSyntax node)
         {

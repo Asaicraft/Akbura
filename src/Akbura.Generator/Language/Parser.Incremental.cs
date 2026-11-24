@@ -169,6 +169,7 @@ internal sealed partial class Parser
         }
 
         var mode = _mode;
+        ResetLookaheadForLexerModeChange();
         _mode = Lexer.LexerMode.InAkcss;
 
         try
@@ -189,6 +190,7 @@ internal sealed partial class Parser
         }
         finally
         {
+            ResetLookaheadForLexerModeChange();
             _mode = mode;
         }
     }
@@ -221,6 +223,12 @@ internal sealed partial class Parser
             return member;
         }
 
+        var keyword = PeekAkcssDirectiveKeyword(incremental: true);
+        if (keyword is SyntaxKind.ThemeKeyword or SyntaxKind.MixinKeyword)
+        {
+            return ParseAkcssNamedDeclaration(keyword, incremental: true);
+        }
+
         if (PeekIncrementalTokenKind() == SyntaxKind.AtToken &&
             PeekIncrementalTokenKind(1) == SyntaxKind.UsingKeyword)
         {
@@ -233,7 +241,7 @@ internal sealed partial class Parser
             return ParseIncrementalAkcssUtilitiesSectionSyntaxCore();
         }
 
-        return ParseIncrementalAkcssStyleRuleSyntaxCore();
+        return ParseAkcssSelectorRule(incremental: true);
     }
 
     private GreenAkcssUsingDirectiveSyntax ParseIncrementalAkcssUsingDirectiveSyntaxCore()
@@ -255,32 +263,6 @@ internal sealed partial class Parser
             semicolon);
     }
 
-    private GreenAkcssStyleRuleSyntax ParseIncrementalAkcssStyleRuleSyntaxCore()
-    {
-        if (TryReadReusableIncrementalNode<GreenAkcssStyleRuleSyntax>(out var rule))
-        {
-            return rule;
-        }
-
-        var selector = ParseIncrementalAkcssStyleSelectorSyntax();
-        var openBrace = ReadRequiredIncrementalToken(SyntaxKind.OpenBraceToken);
-        var members = ParseIncrementalAkcssBodyMemberList();
-        var closeBrace = ReadRequiredIncrementalToken(SyntaxKind.CloseBraceToken);
-
-        return GreenSyntaxFactory.AkcssStyleRuleSyntax(selector, openBrace, members, closeBrace);
-    }
-
-    private GreenAkcssStyleSelectorSyntax ParseIncrementalAkcssStyleSelectorSyntax()
-    {
-        if (TryReadReusableIncrementalNode<GreenAkcssStyleSelectorSyntax>(out var selector))
-        {
-            return selector;
-        }
-
-        var (openParen, targetType, closeParen, dotToken, name) = ParseIncrementalAkcssStyleSelectorParts();
-        return GreenSyntaxFactory.AkcssStyleSelectorSyntax(openParen, targetType, closeParen, dotToken, name);
-    }
-
     private GreenAkcssUtilitiesSectionSyntax ParseIncrementalAkcssUtilitiesSectionSyntaxCore()
     {
         if (TryReadReusableIncrementalNode<GreenAkcssUtilitiesSectionSyntax>(out var section))
@@ -295,8 +277,10 @@ internal sealed partial class Parser
 
         try
         {
-            while (PeekIncrementalTokenKind() is not (SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken))
+            while (PeekIncrementalTokenKind() is not (SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken) &&
+                !IsAkcssTopLevelDirectiveStart(incremental: true))
             {
+                _cancellationToken.ThrowIfCancellationRequested();
                 utilities.Add(ParseIncrementalAkcssUtilityDeclarationSyntax());
             }
 
@@ -322,12 +306,7 @@ internal sealed partial class Parser
             return utility;
         }
 
-        var selector = ParseIncrementalAkcssUtilitySelectorSyntax();
-        var openBrace = ReadRequiredIncrementalToken(SyntaxKind.OpenBraceToken);
-        var members = ParseIncrementalAkcssBodyMemberList();
-        var closeBrace = ReadRequiredIncrementalToken(SyntaxKind.CloseBraceToken);
-
-        return GreenSyntaxFactory.AkcssUtilityDeclarationSyntax(selector, openBrace, members, closeBrace);
+        return ParseAkcssUtilityBody(ParseIncrementalAkcssUtilitySelectorSyntax(), incremental: true);
     }
 
     private GreenAkcssUtilitySelectorSyntax ParseIncrementalAkcssUtilitySelectorSyntax()
@@ -389,8 +368,9 @@ internal sealed partial class Parser
 
         try
         {
-            while (PeekIncrementalTokenKind() is not (SyntaxKind.EndOfFileToken or SyntaxKind.CloseBraceToken))
+            while (!IsAkcssBodyEnd(incremental: true))
             {
+                _cancellationToken.ThrowIfCancellationRequested();
                 members.Add(ParseIncrementalAkcssBodyMemberSyntax());
             }
 
@@ -407,6 +387,11 @@ internal sealed partial class Parser
         if (TryReadReusableAkcssBodyMember(out var member))
         {
             return member;
+        }
+
+        if (ParseNewAkcssBodyMember(incremental: true) is { } newMember)
+        {
+            return newMember;
         }
 
         if (PeekIncrementalTokenKind() == SyntaxKind.AtToken &&
@@ -444,7 +429,7 @@ internal sealed partial class Parser
 
         var propertyName = ParseIncrementalAkcssCSharpTypeUntil(SyntaxKind.ColonToken);
         var colon = ReadRequiredIncrementalToken(SyntaxKind.ColonToken);
-        var expression = ParseIncrementalAkcssExpressionUntilSemicolonOrCloseBrace();
+        var expression = ParseIncrementalAkcssExpression();
         var semicolon = PeekIncrementalTokenKind() == SyntaxKind.SemicolonToken
             ? ReadRequiredIncrementalToken(SyntaxKind.SemicolonToken)
             : null;
@@ -512,7 +497,7 @@ internal sealed partial class Parser
         var atToken = ReadRequiredIncrementalToken(SyntaxKind.AtToken);
         var ifKeyword = ReadRequiredIncrementalToken(SyntaxKind.IfKeyword);
         var openParen = ReadRequiredIncrementalToken(SyntaxKind.OpenParenToken);
-        var condition = ParseIncrementalAkcssExpressionUntil(SyntaxKind.CloseParenToken);
+        var condition = ParseIncrementalAkcssExpression();
         var closeParen = ReadRequiredIncrementalToken(SyntaxKind.CloseParenToken);
         var openBrace = ReadRequiredIncrementalToken(SyntaxKind.OpenBraceToken);
         var members = ParseIncrementalAkcssBodyMemberList();
@@ -591,25 +576,6 @@ internal sealed partial class Parser
         GreenSyntaxToken? OpenParen,
         GreenCSharpTypeSyntax? TargetType,
         GreenSyntaxToken? CloseParen,
-        GreenSyntaxToken? DotToken,
-        GreenSimpleNameSyntax? Name) ParseIncrementalAkcssStyleSelectorParts()
-    {
-        var (openParen, targetType, closeParen) = ParseIncrementalAkcssOptionalSelectorTarget();
-
-        if (PeekIncrementalTokenKind() == SyntaxKind.DotToken)
-        {
-            var dotToken = ReadRequiredIncrementalToken(SyntaxKind.DotToken);
-            var name = ParseIncrementalAkcssSimpleName();
-            return (openParen, targetType, closeParen, dotToken, name);
-        }
-
-        return (openParen, targetType, closeParen, null, null);
-    }
-
-    private (
-        GreenSyntaxToken? OpenParen,
-        GreenCSharpTypeSyntax? TargetType,
-        GreenSyntaxToken? CloseParen,
         GreenSyntaxToken DotToken,
         GreenSimpleNameSyntax Name) ParseIncrementalAkcssUtilitySelectorParts()
     {
@@ -660,7 +626,8 @@ internal sealed partial class Parser
                PeekIncrementalTokenKind() != terminator)
         {
             if (terminator == SyntaxKind.ColonToken &&
-                PeekIncrementalTokenKind() is SyntaxKind.SemicolonToken or SyntaxKind.CloseBraceToken)
+                (PeekIncrementalTokenKind() is SyntaxKind.SemicolonToken or SyntaxKind.CloseBraceToken ||
+                    IsAkcssNamedDeclarationStart(incremental: true)))
             {
                 break;
             }
@@ -695,21 +662,10 @@ internal sealed partial class Parser
         return ParseAkcssSimpleName();
     }
 
-    private GreenCSharpExpressionSyntax ParseIncrementalAkcssExpressionUntilSemicolonOrCloseBrace()
-    {
-        return ParseIncrementalAkcssExpressionUntil(
-            SyntaxKind.SemicolonToken,
-            SyntaxKind.CloseBraceToken);
-    }
-
-    private GreenCSharpExpressionSyntax ParseIncrementalAkcssExpressionUntil(
-        SyntaxKind firstTerminator,
-        SyntaxKind? secondTerminator = null)
-    {
-        return TryReadReusableIncrementalNode<GreenCSharpExpressionSyntax>(out var expression)
+    private GreenCSharpExpressionSyntax ParseIncrementalAkcssExpression() =>
+        TryReadReusableIncrementalNode<GreenCSharpExpressionSyntax>(out var expression)
             ? expression
-            : ParseAkcssExpressionUntil(firstTerminator, secondTerminator);
-    }
+            : ParseAkcssExpression();
 
     private bool TryParseIncrementalMarkupRootSyntax(out GreenMarkupRootSyntax markup)
     {
@@ -774,6 +730,10 @@ internal sealed partial class Parser
                         candidateEndTag = pendingEndTag;
                         pendingEndTag = null;
                     }
+                    else if (_inAkcssTemplate && PeekIncrementalTokenKind() == SyntaxKind.CloseBraceToken)
+                    {
+                        break;
+                    }
                     else if (PeekIncrementalTokenKind() == SyntaxKind.LessSlashToken)
                     {
                         candidateEndTag = ParseIncrementalMarkupEndTagSyntax();
@@ -817,7 +777,8 @@ internal sealed partial class Parser
                 openTags.Pop();
             }
 
-            return GreenSyntaxFactory.MarkupElementSyntax(startTag, body.ToList(), endTag);
+            return DiagnoseUnclosedAkcssTemplateElement(
+                GreenSyntaxFactory.MarkupElementSyntax(startTag, body.ToList(), endTag));
         }
         finally
         {
@@ -840,13 +801,7 @@ internal sealed partial class Parser
         {
             GreenNode? skippedSyntax = null;
 
-            while (PeekIncrementalTokenKind()
-                   is not (
-                       SyntaxKind.EndOfFileToken or
-                       SyntaxKind.GreaterThanToken or
-                       SyntaxKind.SlashGreaterToken or
-                       SyntaxKind.LessThanToken or
-                       SyntaxKind.LessSlashToken))
+            while (!IsMarkupStartTagBoundary(PeekIncrementalTokenKind()))
             {
                 if (!IsIncrementalMarkupAttributeStart())
                 {
@@ -904,6 +859,12 @@ internal sealed partial class Parser
         ref GreenMarkupEndTagSyntax? pendingEndTag)
     {
         _markupCurrentContentTagDepth = openTags.Count;
+        var templateDirective = PeekAkcssTemplateMarkupDirective(incremental: true);
+        if (templateDirective != SyntaxKind.None)
+        {
+            return ParseAkcssTemplateMarkupDirective(templateDirective, incremental: true);
+        }
+
         if (IsMarkupForeachDirectiveStart(incremental: true))
         {
             if (TryReadReusableIncrementalNode<GreenMarkupForeachStatementSyntax>(out var reusableLoop))
@@ -941,9 +902,18 @@ internal sealed partial class Parser
 
     private GreenMarkupTextLiteralSyntax ParseIncrementalMarkupTextLiteralSyntax(bool inConditionalBlock = false)
     {
-        return TryReadReusableIncrementalNode<GreenMarkupTextLiteralSyntax>(out var text)
-            ? text
-            : ParseMarkupTextLiteralSyntax(inConditionalBlock);
+        if (TryReadReusableIncrementalNode<GreenMarkupTextLiteralSyntax>(out var text))
+        {
+            return text;
+        }
+
+        text = ParseMarkupTextLiteralSyntax(inConditionalBlock);
+        if (_inAkcssTemplate)
+        {
+            ResetLookaheadForLexerModeChange();
+        }
+
+        return text;
     }
 
     private GreenMarkupAttributeSyntax ParseIncrementalMarkupAttributeSyntax()
@@ -2103,9 +2073,11 @@ internal sealed partial class Parser
 
         var savedPosition = _lexer.TextWindow.Position;
         var blended = _blender.ReadNode(_mode);
-        if (blended.Node?.Green is not TNode green ||
+        var oldNode = blended.Node;
+        if (oldNode?.Green is not TNode green ||
             !CanReuseIncrementalNode(green) ||
-            !CanReuseMarkupConditionalNode(green))
+            !CanReuseMarkupConditionalNode(green) ||
+            !CanReuseAkcssTemplateContext(oldNode))
         {
             _lexer.TextWindow.Reset(savedPosition);
             return false;

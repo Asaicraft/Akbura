@@ -18,7 +18,9 @@ internal readonly ref struct ComponentScopeWriteContext
         MarkupParentStackTraversalKind parentStackTraversalKind,
         ReadOnlySpan<ComponentElementPlan> elements,
         ReadOnlySpan<BindingElementReference> elementReferences,
-        bool isConditionalNameScope = false)
+        bool isConditionalNameScope = false,
+        string? templatedParentExpression = null,
+        bool usesTemplateServices = false)
     {
         IntermediateRootExpression = intermediateRootExpression;
         BaseUriExpression = baseUriExpression;
@@ -29,6 +31,8 @@ internal readonly ref struct ComponentScopeWriteContext
         Elements = elements;
         ElementReferences = elementReferences;
         IsConditionalNameScope = isConditionalNameScope;
+        TemplatedParentExpression = templatedParentExpression;
+        UsesTemplateServices = usesTemplateServices;
     }
 
     public string IntermediateRootExpression { get; }
@@ -43,6 +47,10 @@ internal readonly ref struct ComponentScopeWriteContext
 
     public bool IsConditionalNameScope { get; }
 
+    public string? TemplatedParentExpression { get; }
+
+    public bool UsesTemplateServices { get; }
+
     public MarkupParentStackTraversalKind ParentStackTraversalKind { get; }
 
     public ReadOnlySpan<ComponentElementPlan> Elements { get; }
@@ -53,7 +61,8 @@ internal readonly ref struct ComponentScopeWriteContext
     {
         return new ComponentScopeWriteContext(IntermediateRootExpression, BaseUriExpression,
             FallbackServiceProviderExpression, nameScopeExpression, ScopeId, ParentStackTraversalKind,
-            Elements, ElementReferences, isConditionalNameScope: true);
+            Elements, ElementReferences, isConditionalNameScope: true,
+            TemplatedParentExpression, UsesTemplateServices);
     }
 
     public MarkupExtensionWriteContext ForElement(int elementId)
@@ -77,7 +86,7 @@ internal readonly ref struct ComponentScopeWriteContext
             NameScopeExpression,
             ScopeId,
             ElementReferences,
-            IsConditionalNameScope);
+            IsConditionalNameScope, TemplatedParentExpression, UsesTemplateServices);
     }
 
 }

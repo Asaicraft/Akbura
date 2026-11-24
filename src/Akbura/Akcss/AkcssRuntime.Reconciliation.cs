@@ -47,7 +47,7 @@ internal static partial class AkcssRuntime
         {
             throw new InvalidOperationException("An AKCSS cascade cannot be replaced during reconciliation.");
         }
-        runtime.SetStyles(styles);
+        runtime.SetStylesFromProperty(styles);
     }
 
     internal static void RestoreDescriptors(object target, ImmutableArray<AkcssStyleActivator> styles,
@@ -65,6 +65,7 @@ internal static partial class AkcssRuntime
     {
         private ImmutableArray<AkcssActivatorDescriptor> _descriptors;
         private bool _isPublishing;
+        private bool _stylesPropertySet;
         private bool _isReconciling;
         private CascadeTransition? _activeTransition;
         private HashSet<AkcssPropertyContribution>? _pendingContributions;
@@ -155,6 +156,33 @@ internal static partial class AkcssRuntime
             }
         }
 
+        public void SetStylesFromProperty(ImmutableArray<AkcssStyleActivator> styles)
+        {
+            var previous = _styles;
+            var previousSet = _stylesPropertySet;
+            try
+            {
+                SetStyles(styles);
+                _stylesPropertySet = _target is Control control && control.IsSet(AkburaControl.AkcssStylesProperty);
+            }
+            catch (Exception failure) when (previous.Any(AkcssNativeApplications.HasNativeBody) ||
+                styles.Any(AkcssNativeApplications.HasNativeBody))
+            {
+                if (_styles == previous)
+                {
+                    try
+                    {
+                        PublishStyles(previousSet || !previous.IsEmpty);
+                    }
+                    catch (Exception rollback)
+                    {
+                        throw new AggregateException("AKCSS property update and restoration failed.", failure, rollback);
+                    }
+                }
+                throw;
+            }
+        }
+
         private void PublishStyles(bool isSet = true)
         {
             if (_target is not Control control)
@@ -177,6 +205,7 @@ internal static partial class AkcssRuntime
                 {
                     throw new InvalidOperationException("AKCSS styles changed while publishing a reconciliation.");
                 }
+                _stylesPropertySet = isSet;
             }
             finally
             {

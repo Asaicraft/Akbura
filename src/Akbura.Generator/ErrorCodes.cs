@@ -42,6 +42,14 @@ internal static class ErrorCodes
     public const string AKBURA_SEMANTIC_DuplicateCommandParameter = nameof(AKBURA_SEMANTIC_DuplicateCommandParameter);
     public const string AKBURA_SEMANTIC_CommandResultIsAwaitable = nameof(AKBURA_SEMANTIC_CommandResultIsAwaitable);
     public const string AKBURA_SEMANTIC_DuplicateAkcssSymbol = nameof(AKBURA_SEMANTIC_DuplicateAkcssSymbol);
+    public const string AKBURA_SEMANTIC_AkcssSelector = nameof(AKBURA_SEMANTIC_AkcssSelector);
+    public const string AKBURA_SEMANTIC_AkcssMixin = nameof(AKBURA_SEMANTIC_AkcssMixin);
+    public const string AKBURA_SEMANTIC_AkcssTemplate = nameof(AKBURA_SEMANTIC_AkcssTemplate);
+    public const string AKBURA_SEMANTIC_AkcssTemplateBinding = nameof(AKBURA_SEMANTIC_AkcssTemplateBinding);
+    public const string AKBURA_SEMANTIC_AkcssBaseTheme = nameof(AKBURA_SEMANTIC_AkcssBaseTheme);
+    public const string AKBURA_SEMANTIC_AkcssSetter = nameof(AKBURA_SEMANTIC_AkcssSetter);
+    public const string AKBURA_GENERATION_AkcssExport = nameof(AKBURA_GENERATION_AkcssExport);
+    public const string AKBURA_GENERATION_AkcssUnsupported = nameof(AKBURA_GENERATION_AkcssUnsupported);
     public const string AKBURA_SEMANTIC_InaccessibleMember = nameof(AKBURA_SEMANTIC_InaccessibleMember);
     public const string AKBURA_SEMANTIC_MarkupComponentNotFound = nameof(AKBURA_SEMANTIC_MarkupComponentNotFound);
     public const string AKBURA_SEMANTIC_MarkupPropertyNotFound = nameof(AKBURA_SEMANTIC_MarkupPropertyNotFound);

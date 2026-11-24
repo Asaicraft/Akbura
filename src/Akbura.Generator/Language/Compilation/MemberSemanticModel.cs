@@ -224,6 +224,11 @@ internal abstract class MemberSemanticModel : AkburaSemanticModel
 
         public override void DefaultVisit(BoundNode node)
         {
+            if (node is BoundAkcssContextual { Context.Inclusion: not null })
+            {
+                return;
+            }
+
             if (ShouldAddNode(node))
             {
                 _map.Add(node.Syntax, node);

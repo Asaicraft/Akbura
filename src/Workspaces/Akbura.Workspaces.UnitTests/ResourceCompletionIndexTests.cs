@@ -423,6 +423,28 @@ public sealed class ResourceCompletionIndexTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ResourceKeysAreAvailableInAkcssTemplateMarkup(bool inline)
+    {
+        var compilation = CreateApplicationCompilation();
+        using var workspace = CreateWorkspace(compilation);
+        SynchronizeResources(workspace, compilation, ("App.axaml", Application("<SolidColorBrush x:Key=\"AccentBrush\" />")));
+        const string template = "@using Avalonia.Controls; @theme Border T { @template { <Border Background=${StaticResource \"Accent|Bru\"} /> } }";
+        var marked = inline ? "@akcss { " + template + " } <Avalonia.Controls.Border />" : template;
+        var position = marked.IndexOf('|');
+        var text = SourceText.From(marked.Remove(position, 1));
+        var context = workspace.OpenOrChangeDocumentContext(new Uri(inline ? "C:/Project/View.akbura" : "C:/Project/Theme.akcss"), text);
+        var syntax = AkburaSyntacticDocument.Create(context.Document);
+        var service = workspace.LanguageServices.Completion;
+        var completion = service.GetCompletions(syntax, context, position);
+        var key = Assert.Single(completion.Items, candidate => candidate.DisplayText == "AccentBrush");
+        Assert.Equal("AccentBru", text.ToString(completion.ApplicableSpan));
+        var change = service.GetCompletionChange(syntax, context, position, key);
+        Assert.Contains("${StaticResource \"AccentBrush\"}", text.WithChanges(change.Changes).ToString());
+    }
+
+    [Theory]
     [InlineData(
         "<Border Background=${StaticResourceExtension Accent|} />")]
     [InlineData(

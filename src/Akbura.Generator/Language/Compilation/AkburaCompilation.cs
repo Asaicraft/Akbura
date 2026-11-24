@@ -34,7 +34,9 @@ internal sealed partial class AkburaCompilation
         string,
         ImmutableArray<IAkcssModuleSymbol>>
         _akcssModuleLookup = new(StringComparer.Ordinal);
-    private CSharpCompilation? _lazyCSharpProbeCompilation;
+    private ProbeCompilation? _lazyProbeCompilation;
+
+    private sealed record ProbeCompilation(CSharpCompilation Compilation, AkcssPublicExports Exports);
 
     public AkburaCompilation(
         CSharpCompilation csharpCompilation,
@@ -125,32 +127,50 @@ internal sealed partial class AkburaCompilation
     }
     public CSharpCompilation CSharpCompilation { get; }
 
-    internal CSharpCompilation CSharpProbeCompilation
+    internal CSharpCompilation CSharpProbeCompilation => GetProbeCompilation().Compilation;
+
+    internal AkcssPublicExports AkcssPublicExports => GetProbeCompilation().Exports;
+
+    private ProbeCompilation GetProbeCompilation()
     {
-        get
+        var cached = Volatile.Read(ref _lazyProbeCompilation);
+        if (cached != null)
         {
-            var compilation = Volatile.Read(
-                ref _lazyCSharpProbeCompilation);
-            if (compilation != null)
-            {
-                return compilation;
-            }
+            return cached;
+        }
 
 #if STATS
-            using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeCompilation);
+        using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.CSharpProbeCompilation);
 #endif
-            compilation =
-                AkburaComponentProbeCompilationBuilder.Build(
-                    CSharpCompilation,
-                    SyntaxTrees,
-                    RootNamespace,
-                    ProjectDirectory);
-            return Interlocked.CompareExchange(
-                       ref _lazyCSharpProbeCompilation,
-                       compilation,
-                       comparand: null) ??
-                   compilation;
+        var compilation = AkburaComponentProbeCompilationBuilder.Build(
+            CSharpCompilation, SyntaxTrees, RootNamespace, ProjectDirectory);
+        var exports = AkcssPublicExports.Create(compilation, AkcssSyntaxTrees);
+        var result = new ProbeCompilation(exports.AddProbeDeclarations(compilation), exports);
+        return Interlocked.CompareExchange(ref _lazyProbeCompilation, result, comparand: null) ?? result;
+    }
+
+    internal AkcssThemeSymbol? FindSourceAkcssTheme(Microsoft.CodeAnalysis.ISymbol? symbol)
+    {
+        if (symbol is not Microsoft.CodeAnalysis.IPropertySymbol { IsStatic: true })
+        {
+            return null;
         }
+
+        if (AkcssPublicExports.FindSourceTheme(this, symbol) is { } theme)
+        {
+            return theme;
+        }
+
+        foreach (var reference in CompilationReferences)
+        {
+            var compilation = reference.Compilation;
+            if (compilation.AkcssPublicExports.FindSourceTheme(compilation, symbol) is { } referencedTheme)
+            {
+                return referencedTheme;
+            }
+        }
+
+        return null;
     }
 
     public ImmutableArray<AkburaSyntaxTree> SyntaxTrees => _syntaxAndDeclarations.SyntaxTrees;

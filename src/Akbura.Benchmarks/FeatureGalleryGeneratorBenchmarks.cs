@@ -3,7 +3,6 @@ using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using FuriosoGenerator = Akbura.Furioso.AkburaCsGenerator;
 using BlackSilenceGenerator = Akbura.BlackSilence.AkburaBlackSilenceGenerator;
 
 namespace Akbura.Benchmarks;
@@ -26,7 +25,6 @@ public class FeatureGalleryGeneratorBenchmarks
         new(FeatureGalleryBenchmarkProject.Load);
 
     private FeatureGalleryBenchmarkProject _project = null!;
-    private Func<IIncrementalGenerator> _generatorFactory = null!;
     private CSharpCompilation _benchmarkCompilation = null!;
     private GeneratorDriver _driver = null!;
 
@@ -38,45 +36,8 @@ public class FeatureGalleryGeneratorBenchmarks
         FeatureGalleryGeneratorScenario.CSharpCompilationEdit)]
     public FeatureGalleryGeneratorScenario Scenario { get; set; }
 
-    [GlobalSetup(Target = nameof(Furioso))]
-    public void GlobalSetupFurioso()
-    {
-        _generatorFactory = static () => new FuriosoGenerator();
-        GlobalSetupCore();
-    }
-
-    [GlobalSetup(Target = nameof(BlackSilence))]
-    public void GlobalSetupBlackSilence()
-    {
-        _generatorFactory = static () => new BlackSilenceGenerator();
-        GlobalSetupCore();
-    }
-
-    [IterationSetup(Target = nameof(Furioso))]
-    public void IterationSetupFurioso()
-    {
-        IterationSetupCore();
-    }
-
-    [IterationSetup(Target = nameof(BlackSilence))]
-    public void IterationSetupBlackSilence()
-    {
-        IterationSetupCore();
-    }
-
-    [Benchmark(Baseline = true)]
-    public int Furioso()
-    {
-        return RunGenerator();
-    }
-
-    [Benchmark]
-    public int BlackSilence()
-    {
-        return RunGenerator();
-    }
-
-    private void GlobalSetupCore()
+    [GlobalSetup]
+    public void GlobalSetup()
     {
         _project = s_project.Value;
         _benchmarkCompilation = _project.Compilation;
@@ -95,7 +56,8 @@ public class FeatureGalleryGeneratorBenchmarks
         }
     }
 
-    private void IterationSetupCore()
+    [IterationSetup]
+    public void IterationSetup()
     {
         switch (Scenario)
         {
@@ -158,7 +120,8 @@ public class FeatureGalleryGeneratorBenchmarks
         _benchmarkCompilation = _project.CreateCSharpEditCompilation();
     }
 
-    private int RunGenerator()
+    [Benchmark]
+    public int BlackSilence()
     {
         var driver = _driver.RunGenerators(_benchmarkCompilation);
         var result = driver.GetRunResult();
@@ -182,18 +145,8 @@ public class FeatureGalleryGeneratorBenchmarks
 
     private GeneratorDriver CreateDriver(FeatureGalleryBenchmarkSnapshot snapshot)
     {
-        return CreateDriver(_generatorFactory(), snapshot);
-    }
-
-    private GeneratorDriver CreateDriver(
-        IIncrementalGenerator generator,
-        FeatureGalleryBenchmarkSnapshot snapshot)
-    {
         return CSharpGeneratorDriver.Create(
-            generators:
-            [
-                generator.AsSourceGenerator(),
-            ],
+            generators: [new BlackSilenceGenerator().AsSourceGenerator()],
             additionalTexts: snapshot.AdditionalTexts,
             parseOptions: _project.ParseOptions,
             optionsProvider: snapshot.OptionsProvider,
@@ -205,9 +158,8 @@ public class FeatureGalleryGeneratorBenchmarks
     private void ValidateGenerator()
     {
         var snapshot = _project.CreateSnapshot();
-        var generator = _generatorFactory();
-        var generatorName = generator.GetType().Name;
-        var driver = CreateDriver(generator, snapshot);
+        const string generatorName = nameof(Akbura.BlackSilence.AkburaBlackSilenceGenerator);
+        var driver = CreateDriver(snapshot);
 
         driver = driver.RunGeneratorsAndUpdateCompilation(
             _project.Compilation,

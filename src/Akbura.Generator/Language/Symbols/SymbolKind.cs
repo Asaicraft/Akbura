@@ -27,4 +27,8 @@ public enum SymbolKind
     CSharpSymbol,
     MarkupLoopIndex,
     Error,
+    AkcssSelectorRule,
+    AkcssTheme,
+    AkcssMixin,
+    AkcssMixinParameter,
 }

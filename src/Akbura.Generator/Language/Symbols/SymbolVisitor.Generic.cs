@@ -38,6 +38,14 @@ internal abstract class SymbolVisitor<TResult>
 
     public virtual TResult VisitAkcss(IAkcssSymbol symbol) => DefaultVisit(symbol);
 
+    public virtual TResult VisitAkcssSelectorRule(AkcssSelectorRuleSymbol symbol) => DefaultVisit(symbol);
+
+    public virtual TResult VisitAkcssTheme(AkcssThemeSymbol symbol) => DefaultVisit(symbol);
+
+    public virtual TResult VisitAkcssMixin(AkcssMixinSymbol symbol) => DefaultVisit(symbol);
+
+    public virtual TResult VisitAkcssMixinParameter(AkcssMixinParameterSymbol symbol) => DefaultVisit(symbol);
+
     public virtual TResult VisitTailwindUtility(ITailwindUtilitySymbol symbol) => VisitAkcss(symbol);
 
     public virtual TResult VisitTailwindUtilityParameter(ITailwindUtilityParameterSymbol symbol) => DefaultVisit(symbol);

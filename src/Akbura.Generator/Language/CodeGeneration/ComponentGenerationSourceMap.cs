@@ -6,9 +6,9 @@ namespace Akbura.Language.CodeGeneration;
 
 internal sealed class ComponentGenerationSourceMap
 {
-    private readonly ComponentSyntaxTree _syntaxTree;
+    private readonly AkburaSyntaxTree _syntaxTree;
 
-    public ComponentGenerationSourceMap(ComponentSyntaxTree syntaxTree)
+    public ComponentGenerationSourceMap(AkburaSyntaxTree syntaxTree)
     {
         _syntaxTree = syntaxTree ?? throw new System.ArgumentNullException(nameof(syntaxTree));
     }

@@ -24,6 +24,37 @@ internal partial class AkburaSemanticModel
 {
     private const string MarkupInlineReferenceProbeMethodName = "__AkburaMarkupInlineReferenceProbe";
 
+    internal ImmutableArray<CSharpSymbolReference> GetAkcssCSharpSymbolReferences(CSharpExpressionSyntax expression)
+    {
+        if (!AkcssSemanticFacts.IsEmbeddedExpression(expression) ||
+            !EmbeddedCSharpSyntaxFacts.TryGetExpression(expression, out var source, out var hostSpan) ||
+            hostSpan.IsEmpty || GetAkcssEditorContext(expression) is not { } context)
+        {
+            return [];
+        }
+
+        var projection = CreateAkcssCSharpCompletionProjection(expression, relativePosition: 0);
+        var semantic = CreateReferenceProbeSemanticModel(projection.Root, out var tree);
+        var probe = tree.GetRoot().GetAnnotatedNodes(projection.ActiveAnnotation).SingleOrDefault();
+        if (probe is null || probe.FullSpan.Length != source.FullSpan.Length)
+        {
+            return [];
+        }
+
+        var parameters = new Dictionary<string, AkburaSymbol>(StringComparer.Ordinal);
+        if (context.Owner is AkcssMixinSymbol mixin)
+        {
+            foreach (var parameter in mixin.Parameters)
+            {
+                parameters[parameter.Name] = parameter;
+            }
+        }
+
+        return CollectCSharpSymbolReferences(semantic,
+            [new CSharpReferenceTarget(source, probe, hostSpan.Start - source.FullSpan.Start)],
+            parameters, new Dictionary<string, AkburaSymbol>(StringComparer.Ordinal));
+    }
+
     public ImmutableArray<CSharpSymbolReference> GetCSharpSymbolReferences(StateDeclarationSyntax declaration)
     {
         if (declaration == null)
@@ -1052,7 +1083,7 @@ internal partial class AkburaSemanticModel
             isMethodGroup);
     }
 
-    private static void AddCSharpSymbolReference(
+    private void AddCSharpSymbolReference(
         SemanticModel semanticModel,
         ImmutableArrayBuilder<CSharpSymbolReference> references,
         HashSet<string> seenReferences,
@@ -1100,12 +1131,9 @@ internal partial class AkburaSemanticModel
             return;
         }
 
-        var akburaSymbol = symbol == null
-            ? null
-            : TryGetReferencedAkburaSymbol(
-                symbol,
-                akburaSymbolsByName,
-                akburaSymbolsByCommandTypeName);
+        AkburaSymbol? akburaSymbol = symbol is null ? null :
+            Compilation.FindSourceAkcssTheme(symbol) ??
+            TryGetReferencedAkburaSymbol(symbol, akburaSymbolsByName, akburaSymbolsByCommandTypeName);
         if (akburaSymbol == null &&
             symbol != null)
         {
@@ -1268,7 +1296,7 @@ internal partial class AkburaSemanticModel
             return MatchesProjectedSymbolOrigin(
                 local,
                 symbol,
-                allowUnannotated: true)
+                allowUnannotated: symbol is not AkcssMixinParameterSymbol)
                     ? symbol
                     : null;
         }

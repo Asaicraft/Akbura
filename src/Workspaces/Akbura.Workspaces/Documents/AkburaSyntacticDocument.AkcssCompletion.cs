@@ -1,4 +1,5 @@
 using Akbura.Language;
+using Akbura.Language.Binder;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -53,10 +54,13 @@ public sealed partial class AkburaSyntacticDocument
         var declaration = FindContainingAkcssDeclaration(
             root,
             position);
-        var owner = FindContainingAkcssBodyOwner(
-            declaration,
-            position) ?? declaration;
+        var contextual = GetContextualAkcssCompletion(root, declaration, position);
+        if (!contextual.IsDefault || GetAkcssMarkupTemplate(position) is not null)
+        {
+            return contextual;
+        }
 
+        var owner = FindContainingAkcssBodyOwner(declaration, position) ?? declaration;
         if (TryGetAkcssAttachedPropertyExpressionContext(
                 declaration,
                 owner,
@@ -133,8 +137,9 @@ public sealed partial class AkburaSyntacticDocument
         }
 
         var line = Text.Lines.GetLineFromPosition(position);
-        var linePrefix = Text.ToString(
-            TextSpan.FromBounds(line.Start, position));
+        var lineStart = owner is not null && TryGetAkcssBraces(owner, out var openBrace, out _)
+            ? Math.Max(line.Start, openBrace.Span.End) : line.Start;
+        var linePrefix = Text.ToString(TextSpan.FromBounds(lineStart, position));
         var trimmedLinePrefix = linePrefix.TrimStart();
 
         if (declaration != null)
@@ -144,7 +149,7 @@ public sealed partial class AkburaSyntacticDocument
                     StringComparison.Ordinal))
             {
                 var textualItemSpan = GetTextualAkcssApplyItemSpan(
-                    line.Start,
+                    lineStart,
                     position);
                 return CreateAkcssContext(
                     AkcssCompletionContextKind.ApplyItem,
@@ -154,7 +159,7 @@ public sealed partial class AkburaSyntacticDocument
             }
 
             var colon = FindAkcssAssignmentColon(
-                line.Start,
+                lineStart,
                 position);
             if (colon >= 0)
             {
@@ -165,7 +170,7 @@ public sealed partial class AkburaSyntacticDocument
                     owner,
                     declaration,
                     propertyName: GetTextualAkcssPropertyName(
-                        line.Start,
+                        lineStart,
                         colon));
             }
 
@@ -358,13 +363,17 @@ public sealed partial class AkburaSyntacticDocument
         AkburaSyntax root,
         int position)
     {
-        return root.DescendantNodes()
-            .Where(static node => node is
-                AkcssStyleRuleSyntax or
-                AkcssUtilityDeclarationSyntax)
-            .Where(node => IsInsideAkcssBody(node, position))
-            .OrderByDescending(static node => node.FullSpan.Start)
-            .FirstOrDefault();
+        AkburaSyntax? declaration = null;
+        foreach (var node in root.DescendantNodesAtPosition(position))
+        {
+            if ((AkcssSemanticFacts.IsSourceDeclaration(node) || node is AkcssStyleRuleSyntax or AkcssUtilityDeclarationSyntax) &&
+                IsInsideAkcssBody(node, position) && (declaration is null || node.FullSpan.Start > declaration.FullSpan.Start))
+            {
+                declaration = node;
+            }
+        }
+
+        return declaration;
     }
 
     private AkburaSyntax? FindContainingAkcssBodyOwner(
@@ -376,13 +385,17 @@ public sealed partial class AkburaSyntacticDocument
             return null;
         }
 
-        return declaration.DescendantNodes()
-            .Where(static node => node is
-                AkcssIfDirectiveSyntax or
-                AkcssPseudoBlockSyntax)
-            .Where(node => IsInsideAkcssBody(node, position))
-            .OrderByDescending(static node => node.FullSpan.Start)
-            .FirstOrDefault();
+        AkburaSyntax? owner = null;
+        foreach (var node in declaration.DescendantNodesAtPosition(position))
+        {
+            if (node is (AkcssIfDirectiveSyntax or AkcssPseudoBlockSyntax or AkcssNestedStyleRuleSyntax) &&
+                IsInsideAkcssBody(node, position) && (owner is null || node.FullSpan.Start > owner.FullSpan.Start))
+            {
+                owner = node;
+            }
+        }
+
+        return owner;
     }
 
     private AkcssApplyDirectiveSyntax? FindContainingAkcssApply(
@@ -417,28 +430,9 @@ public sealed partial class AkburaSyntacticDocument
         AkburaSyntax node,
         int position)
     {
-        SyntaxToken openBrace;
-        SyntaxToken closeBrace;
-        switch (node)
+        if (!TryGetAkcssBraces(node, out var openBrace, out var closeBrace))
         {
-            case AkcssStyleRuleSyntax style:
-                openBrace = style.OpenBrace;
-                closeBrace = style.CloseBrace;
-                break;
-            case AkcssUtilityDeclarationSyntax utility:
-                openBrace = utility.OpenBrace;
-                closeBrace = utility.CloseBrace;
-                break;
-            case AkcssIfDirectiveSyntax ifDirective:
-                openBrace = ifDirective.OpenBrace;
-                closeBrace = ifDirective.CloseBrace;
-                break;
-            case AkcssPseudoBlockSyntax pseudoBlock:
-                openBrace = pseudoBlock.OpenBrace;
-                closeBrace = pseudoBlock.CloseBrace;
-                break;
-            default:
-                return false;
+            return false;
         }
 
         if (openBrace.IsMissing || position < openBrace.Span.End)
@@ -455,6 +449,23 @@ public sealed partial class AkburaSyntacticDocument
             openBrace.Span.End,
             node.Span.End - Math.Max(1, closeBrace.Span.Length));
         return position <= closeStart;
+    }
+
+    private static bool TryGetAkcssBraces(AkburaSyntax node, out SyntaxToken open, out SyntaxToken close)
+    {
+        (open, close) = node switch
+        {
+            AkcssStyleRuleSyntax style => (style.OpenBrace, style.CloseBrace),
+            AkcssUtilityDeclarationSyntax utility => (utility.OpenBrace, utility.CloseBrace),
+            AkcssIfDirectiveSyntax condition => (condition.OpenBrace, condition.CloseBrace),
+            AkcssPseudoBlockSyntax pseudo => (pseudo.OpenBrace, pseudo.CloseBrace),
+            AkcssThemeDeclarationSyntax theme => (theme.OpenBrace, theme.CloseBrace),
+            AkcssMixinDeclarationSyntax mixin => (mixin.OpenBrace, mixin.CloseBrace),
+            AkcssSelectorRuleSyntax rule => (rule.OpenBrace, rule.CloseBrace),
+            AkcssNestedStyleRuleSyntax nested => (nested.OpenBrace, nested.CloseBrace),
+            _ => default,
+        };
+        return open.RawKind != 0;
     }
 
     private static bool IsBeforeAkcssMemberEnd(
@@ -496,7 +507,7 @@ public sealed partial class AkburaSyntacticDocument
         var start = position;
         while (start > 0 &&
                (char.IsLetterOrDigit(Text[start - 1]) ||
-                Text[start - 1] is '_' or '@'))
+                Text[start - 1] is '_' or '@' or '-'))
         {
             start--;
         }

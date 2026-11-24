@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
+using Avalonia.Threading;
 using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Globalization;
@@ -18,6 +19,7 @@ public abstract class AkcssUtilityValueSource
 {
     private Action? _changed;
     private AkcssValueEqualityPolicy _equalityPolicy;
+    private bool _dispatchNativeUpdates;
 
     private protected AkcssUtilityValueSource(
         bool recreateOnRefresh,
@@ -31,11 +33,15 @@ public abstract class AkcssUtilityValueSource
 
     internal object? Value { get; private protected set; }
 
+    internal long ValueVersion { get; private set; }
+
     internal bool RecreateOnRefresh { get; }
 
     internal bool HasBindingPriorityMetadata { get; }
 
     internal BindingPriority BindingPriority { get; private protected set; }
+
+    internal bool HasBindingPriorityValue { get; private set; }
 
     /// <summary>
     /// Selects an equality contract before attachment. ImmutableScalar never invokes
@@ -65,9 +71,10 @@ public abstract class AkcssUtilityValueSource
     /// </summary>
     public static TValue Identity<TValue>(TValue value) => value;
 
-    internal void Attach(object target, Action changed)
+    internal void Attach(object target, Action changed, bool dispatchNativeUpdates = false)
     {
         _changed = changed ?? throw new ArgumentNullException(nameof(changed));
+        _dispatchNativeUpdates = dispatchNativeUpdates;
         AttachCore(target);
     }
 
@@ -75,10 +82,18 @@ public abstract class AkcssUtilityValueSource
     {
         if (RecreateOnRefresh)
         {
+            var previousValue = Value;
+            var wasReady = HasValue;
+            var version = ValueVersion;
             DetachCore(target);
             HasValue = false;
             Value = null;
+            HasBindingPriorityValue = false;
             AttachCore(target);
+            if (wasReady && HasValue && AkcssValueEquality.IsEquivalent(previousValue, Value, _equalityPolicy))
+            {
+                ValueVersion = version;
+            }
         }
     }
 
@@ -92,6 +107,7 @@ public abstract class AkcssUtilityValueSource
         {
             HasValue = false;
             Value = null;
+            HasBindingPriorityValue = false;
             _changed = null;
         }
     }
@@ -104,12 +120,14 @@ public abstract class AkcssUtilityValueSource
         }
         HasValue = true;
         Value = value;
+        ValueVersion++;
         _changed?.Invoke();
     }
 
     private protected void SetBindingPriority(BindingPriority priority)
     {
         BindingPriority = AkcssBindingPriority.Validate(priority);
+        HasBindingPriorityValue = true;
     }
 
     private protected void ClearValue()
@@ -119,6 +137,7 @@ public abstract class AkcssUtilityValueSource
         Value = null;
         if (changed)
         {
+            ValueVersion++;
             _changed?.Invoke();
         }
     }
@@ -332,6 +351,20 @@ public abstract class AkcssUtilityValueSource
         return property.Value;
     }
 
+    private static readonly ConcurrentDictionary<(Type Owner, int Slot), Lazy<AttachedProperty<object?>>> s_templateProperties = new();
+
+    /// <summary>Gets the argument binding slot of an application in a generated control template.</summary>
+    public static AttachedProperty<object?> GetTargetProperty(Type ownerType, int slotId)
+    {
+        ArgumentNullException.ThrowIfNull(ownerType);
+        ArgumentOutOfRangeException.ThrowIfNegative(slotId);
+#pragma warning disable AVP1001 // Each owner-and-slot pair is registered once by the cache.
+        return s_templateProperties.GetOrAdd((ownerType, slotId), static key =>
+            new Lazy<AttachedProperty<object?>>(() => AvaloniaProperty.RegisterAttached<Control, object?>(
+                "__AkcssTemplateValue" + key.Slot.ToString(CultureInfo.InvariantCulture), key.Owner))).Value;
+#pragma warning restore AVP1001
+    }
+
     private sealed class DirectValueSource<TValue>
         : AkcssUtilityValueSource
     {
@@ -505,10 +538,17 @@ public abstract class AkcssUtilityValueSource
             public void OnNext(TSource value)
             {
                 var source = Volatile.Read(ref _owner);
-                if (source != null)
+                if (source is null)
                 {
-                    source.SetValue(source._converter(value));
+                    return;
                 }
+                if (source._dispatchNativeUpdates && !Dispatcher.UIThread.CheckAccess())
+                {
+                    // Delivery checks the same subscription again after reaching the UI thread.
+                    Dispatcher.UIThread.Post(() => OnNext(value));
+                    return;
+                }
+                source.SetValue(source._converter(value));
             }
 
             public void OnError(Exception error)

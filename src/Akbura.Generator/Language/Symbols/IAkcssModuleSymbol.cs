@@ -11,6 +11,8 @@ internal interface IAkcssModuleSymbol : ISymbol
 
     ImmutableArray<IAkcssSymbol> AkcssSymbols { get; }
 
+    ImmutableArray<IAkcssDeclarationOwner> Declarations { get; }
+
     string? Path { get; }
 
     AkburaSyntax? DeclaringSyntax { get; }

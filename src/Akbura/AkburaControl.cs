@@ -77,7 +77,10 @@ public abstract partial class AkburaControl : Control, IComponentTree
     /// </summary>
     public static void SetAkcssStyles(
         Control control,
-        ImmutableArray<AkcssStyleActivator> styles)
+        ImmutableArray<AkcssStyleActivator> styles) =>
+        SetInitialAkcssStyles(control, styles, deferUntilAttached: false);
+
+    private static void SetInitialAkcssStyles(Control control, ImmutableArray<AkcssStyleActivator> styles, bool deferUntilAttached)
     {
         ArgumentNullException.ThrowIfNull(control);
 
@@ -86,9 +89,29 @@ public abstract partial class AkburaControl : Control, IComponentTree
             throw new InvalidOperationException("AkcssStyles has already been set.");
         }
 
-        control.SetValue(
-            AkcssStylesProperty,
-            ValidateAkcssStyles(styles));
+        var validated = ValidateAkcssStyles(styles);
+        if (deferUntilAttached)
+        {
+            AkcssRuntime.DeferTemplateStyles(control);
+        }
+        control.SetValue(AkcssStylesProperty, validated);
+    }
+
+    /// <summary>
+    /// Attaches a generated template element's cascade when it joins the visual tree.
+    /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Browsable(false)]
+    public static void SetAkcssTemplateStyles(object target, ImmutableArray<AkcssStyleActivator> styles)
+    {
+        if (target is Control control)
+        {
+            SetInitialAkcssStyles(control, styles, deferUntilAttached: true);
+        }
+        else
+        {
+            SetAkcssStyles(target, styles);
+        }
     }
 
     /// <summary>

@@ -38,6 +38,9 @@ internal sealed partial class AkcssModuleBinder : Binder
         return GetDeclaredSymbols();
     }
 
+    public override BoundNode BindOperationSyntax(AkburaSyntax syntax) =>
+        syntax is InlineAkcssBlockSyntax or AkcssDocumentSyntax ? BindAkcssModuleSyntax(syntax) : base.BindOperationSyntax(syntax);
+
     public override BoundNode BindSemanticSyntax(AkburaSyntax syntax)
     {
         return syntax.Kind switch
@@ -97,6 +100,9 @@ internal sealed partial class AkcssModuleBinder : Binder
             switch (member.Kind)
             {
                 case AkburaSyntaxKind.AkcssStyleRuleSyntax:
+                case AkburaSyntaxKind.AkcssSelectorRuleSyntax:
+                case AkburaSyntaxKind.AkcssThemeDeclarationSyntax:
+                case AkburaSyntaxKind.AkcssMixinDeclarationSyntax:
                     childrenBuilder.Add(SemanticModel.BindingSession.BindSemanticSyntax(member));
                     break;
 
@@ -150,7 +156,9 @@ internal sealed partial class AkcssModuleBinder : Binder
         symbols = SemanticModel.DeclarationSymbols.GetDeclaredSymbols(
             Declaration!,
             DeclarationKind.AkcssStyle,
-            DeclarationKind.AkcssUtility);
+            DeclarationKind.AkcssUtility,
+            DeclarationKind.AkcssTheme,
+            DeclarationKind.AkcssMixin);
 
         ImmutableInterlocked.InterlockedInitialize(ref _lazyDeclaredSymbols, symbols);
         return _lazyDeclaredSymbols;

@@ -71,6 +71,14 @@ internal static class AkcssDocumentWriter
 
             WriteHeader(writer, input);
 
+            if (plan.Native is { } native)
+            {
+                foreach (var diagnostic in native.Diagnostics)
+                {
+                    AkcssNativeWriter.WriteDiagnostic(writer, sourceMap, diagnostic);
+                }
+            }
+
             cancellationToken.ThrowIfCancellationRequested();
 
             moduleWriter.WriteAssemblyReference(plan);
@@ -97,12 +105,17 @@ internal static class AkcssDocumentWriter
                 generationMode,
                 cancellationToken);
 
-            writer.CurrentIndent -= writer.TabSize;
-            writer.WriteLine("}");
+            var moduleTypeName = "global::" + plan.GeneratedNamespace + "." + plan.GeneratedTypeName;
+            var nativeWriter = plan.Native is { } nativePlan ? new AkcssNativeWriter(writer, sourceMap, nativePlan, moduleTypeName) : null;
+            nativeWriter?.WriteModule(plan.Native!);
 
             writer.CurrentIndent -= writer.TabSize;
             writer.WriteLine("}");
 
+            writer.CurrentIndent -= writer.TabSize;
+            writer.WriteLine("}");
+
+            nativeWriter?.WriteFacade(plan.Native!, moduleTypeName, input.SemanticModel!);
             cancellationToken.ThrowIfCancellationRequested();
 
 #if STATS

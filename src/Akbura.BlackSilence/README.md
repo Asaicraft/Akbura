@@ -16,5 +16,3 @@ The `Akbura` package configures BlackSilence to publish diagnostics and automati
 ```
 
 Set `AkburaBlackSilenceDiagnostics` to `Shadow` to compute diagnostics without publishing them, or to `Off` to disable diagnostic computation. Direct programmatic use of the generator remains in `Shadow` mode when no MSBuild property is supplied.
-
-Furioso is retained as a compatibility baseline for tests and benchmarks; it is not the compiler shipped by the `Akbura` package.

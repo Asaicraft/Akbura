@@ -110,6 +110,18 @@ internal sealed partial class CSharpProbeBinder : Binder
                 semanticModel.GetConversion(probeExpression)));
     }
 
+    internal CSharpBindingResult BindOptionalParameterDefault(
+        CSharp.CompilationUnitSyntax compilationUnit, SyntaxAnnotation annotation, ITypeSymbol expectedType)
+    {
+        var syntaxTree = CreateSyntaxTree(compilationUnit);
+        var semanticModel = CreateSemanticModel(syntaxTree);
+        var parameter = syntaxTree.GetRoot().GetAnnotatedNodes(annotation).OfType<CSharp.ParameterSyntax>().Single();
+        var expression = parameter.Default!.Value;
+        var binding = BindExpression(semanticModel, expression, isBindingPath: true, diagnosticSyntax: parameter);
+        return binding.WithConversion(Conversions.ClassifyConversion(
+            binding.TypeSymbol, expectedType, semanticModel.GetConversion(expression)));
+    }
+
     public BoundExpression BindExpression(
         AkburaSyntax syntax,
         CSharp.ExpressionSyntax expression,
@@ -479,7 +491,9 @@ internal sealed partial class CSharpProbeBinder : Binder
 #if STATS
         using var measurement = GenerationStatistics.Measure(GenerationStatisticStage.ProbeSyntaxConstruction);
 #endif
-        var componentName = SemanticModel.SyntaxTree.ComponentName;
+        var componentName = SemanticModel.SyntaxTree.Kind == SyntaxTreeKind.Component
+            ? SemanticModel.SyntaxTree.ComponentName
+            : string.Empty;
         var componentTypeInfo = AkburaComponentTypeResolver.Resolve(
             CSharpCompilation,
             SemanticModel.GetAkburaComponentMetadataName(SemanticModel.SyntaxTree));
@@ -525,9 +539,7 @@ internal sealed partial class CSharpProbeBinder : Binder
                 usingDirectives.IsDefault
                     ? SemanticModel.GetCSharpUsingDirectives()
                     : usingDirectives));
-        var namespaceName = SemanticModel.GetAkburaNamespaceText(
-            SemanticModel.SyntaxTree.GetRoot(),
-            SemanticModel.SyntaxTree);
+        var namespaceName = SemanticModel.GetMarkupDocumentNamespace();
         if (namespaceName.Length == 0)
         {
             return compilationUnit.WithMembers(
@@ -714,7 +726,8 @@ internal sealed partial class CSharpProbeBinder : Binder
         RoslynSemanticModel semanticModel,
         CSharp.ExpressionSyntax expression,
         bool isBindingPath,
-        bool suppressTopLevelConversionDiagnostic = false)
+        bool suppressTopLevelConversionDiagnostic = false,
+        SyntaxNode? diagnosticSyntax = null)
     {
         TypeInfo typeInfo;
         SymbolInfo symbolInfo;
@@ -736,7 +749,7 @@ internal sealed partial class CSharpProbeBinder : Binder
         }
         var diagnostics = GetProbeDiagnostics(
             semanticModel,
-            expression,
+            diagnosticSyntax ?? expression,
             suppressTopLevelConversionDiagnostic);
         var typeSymbol = typeInfo.Type ?? typeInfo.ConvertedType;
         if (ContainsErrorType(typeSymbol))

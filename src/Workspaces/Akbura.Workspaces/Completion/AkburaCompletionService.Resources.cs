@@ -6,6 +6,8 @@ using Akbura.Workspaces.Resources;
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
 using System.Text;
+using Microsoft.CodeAnalysis.Text;
+using CSharpSyntaxFactory = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Akbura.Workspaces.Completion;
 
@@ -16,7 +18,7 @@ internal sealed partial class AkburaCompletionService
 
     private static bool IsAvaloniaResourceKeyContext(AkburaDocumentContext? semanticContext, AkburaResourceKeyCompletionContext context)
     {
-        if (semanticContext == null)
+        if (semanticContext == null || context.Extension is null)
         {
             return false;
         }
@@ -30,6 +32,32 @@ internal sealed partial class AkburaCompletionService
         return semanticExtension != null &&
             semanticModel.IsAvaloniaResourceMarkupExtensionForCompletion(
                 semanticExtension);
+    }
+
+    private static bool TryGetCSharpResourceKeyContext(
+        AkburaSyntacticDocument document, AkburaDocumentContext? context, int position,
+        out AkburaResourceKeyCompletionContext resource, CancellationToken cancellationToken)
+    {
+        resource = default;
+        if (context is null || !document.TryGetEmbeddedCSharpContext(position, out var fragment, cancellationToken) ||
+            fragment.Kind != AkburaCSharpCompletionContextKind.Expression ||
+            !document.Text.ToString(fragment.HostSpan).Contains("\""))
+        {
+            return false;
+        }
+
+        var model = context.Project.Compilation.GetSemanticModel(context.Document.SyntaxTree);
+        var node = model.FindAkcssEditorSyntax(fragment.OwnerSpan, fragment.OwnerKind);
+        var expression = node is MarkupExpressionBindingSyntax binding ? binding.Expression : node as CSharpExpressionSyntax;
+        if (expression is null || !model.TryGetAmxResourceKey(expression, position, out var span, out var expectedType, cancellationToken))
+        {
+            return false;
+        }
+
+        var prefix = document.Text.ToString(TextSpan.FromBounds(span.Start, position));
+        var literal = CSharpSyntaxFactory.ParseToken("\"" + prefix + "\"");
+        resource = new AkburaResourceKeyCompletionContext(span, literal.ContainsDiagnostics ? prefix : literal.ValueText, expectedType);
+        return true;
     }
 
     private AkburaCompletionResult CreateResourceKeyResult(AkburaDocumentContext? semanticContext, AkburaResourceKeyCompletionContext context, CancellationToken cancellationToken)
@@ -222,6 +250,11 @@ internal sealed partial class AkburaCompletionService
 
     private static ITypeSymbol? GetExpectedResourceType(AkburaSemanticModel semanticModel, AkburaResourceKeyCompletionContext context, CancellationToken cancellationToken)
     {
+        if (context.Extension is null)
+        {
+            return context.ExpectedType;
+        }
+
         var semanticRoot = semanticModel.SyntaxTree.GetRootSyntax();
         var semanticNode = semanticRoot.FindToken(
             context.Extension.OpenBrace.Span.End).Parent;
@@ -322,7 +355,8 @@ internal sealed partial class AkburaCompletionService
 
         return new AkburaCompletionItem(
             candidate.Key,
-            GetResourceInsertion(candidate.Key, context.Quote),
+            context.Extension is null ? Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(candidate.Key, quote: false) :
+                GetResourceInsertion(candidate.Key, context.Quote),
             AkburaCompletionKind.Resource,
             description,
             descriptionFactory: null,

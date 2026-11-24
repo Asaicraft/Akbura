@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Operations;
 using Microsoft.CodeAnalysis;
 using System.Diagnostics;
@@ -46,10 +47,10 @@ internal readonly ref struct ComponentPropertyWriter
         {
             case ComponentPropertyValueKind.Constant:
             case ComponentPropertyValueKind.CSharpExpression:
-                WriteCSharpValue(component, plan, targetExpression);
+                WriteCSharpValue(component, plan, targetExpression, context);
                 break;
             case ComponentPropertyValueKind.ElementReference:
-                WriteElementReference(component, plan, targetExpression);
+                WriteElementReference(component, plan, targetExpression, context.IsControlTemplate);
                 break;
             case ComponentPropertyValueKind.MarkupExtensionValue:
             case ComponentPropertyValueKind.MarkupBinding:
@@ -351,11 +352,17 @@ internal readonly ref struct ComponentPropertyWriter
     private void WriteCSharpValue(
         in ComponentPlan component,
         in ComponentPropertyWritePlan plan,
-        string target)
+        string target,
+        in MarkupExtensionWriteContext context)
     {
         ref readonly var value = ref GetCSharpValue(component, plan.PayloadIndex);
+        if (context.UsesTemplateServices && value.ConvertedValue is AkcssAmxInvocationValue resource)
+        {
+            WriteTemplateResource(plan.Destination, target, resource, context);
+            return;
+        }
         var propertyWriter = new PropertyWriter(_writer);
-        var end = propertyWriter.WriteStart(plan.Destination, target);
+        var end = propertyWriter.WriteStart(plan.Destination, target, context.IsControlTemplate);
 
         if (plan.ValueKind == ComponentPropertyValueKind.Constant)
         {
@@ -369,16 +376,54 @@ internal readonly ref struct ComponentPropertyWriter
         propertyWriter.WriteEnd(end);
     }
 
+    private void WriteTemplateResource(in PropertyWritePlan destination, string target, AkcssAmxInvocationValue resource,
+        in MarkupExtensionWriteContext context)
+    {
+        if (!destination.HasAvaloniaPropertyTarget ||
+            resource.Key.Operation is not { SemanticModel: { } model, Syntax: Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax key })
+        {
+            return;
+        }
+
+        var targetContext = context.WithTarget(target, destination.TargetProperty);
+        var writeTarget = CreateTarget(destination, target);
+        var binding = new BindingBaseResultWriter(_writer, in _environment);
+        var result = new RuntimeMarkupExtensionResultWriter(_writer, in _environment);
+        if (resource.Kind == AkcssAmxInvocationKind.DynamicResource)
+        {
+            binding.WriteStart(writeTarget);
+            _writer.Write("new global::Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension(");
+        }
+        else if (resource.Kind == AkcssAmxInvocationKind.StaticResource)
+        {
+            result.WriteStart(writeTarget, useTemplateServices: true);
+            _writer.Write("new global::Avalonia.Markup.Xaml.MarkupExtensions.StaticResourceExtension(");
+        }
+        else
+        {
+            return;
+        }
+
+        _writer.Write(AkcssNativeExpression.Format(key, model)).Write(").ProvideValue(");
+        new MarkupServiceProviderWriter(_writer).Write(targetContext);
+        _writer.Write(")");
+        if (resource.Kind == AkcssAmxInvocationKind.DynamicResource)
+            binding.WriteEnd();
+        else
+            result.WriteEnd(context);
+    }
+
     private void WriteElementReference(
         in ComponentPlan component,
         in ComponentPropertyWritePlan plan,
-        string target)
+        string target,
+        bool isControlTemplate)
     {
         Debug.Assert((uint)plan.PayloadIndex < (uint)component.Elements.Length);
 
         ref readonly var element = ref component.Elements.ItemRef(plan.PayloadIndex);
         var propertyWriter = new PropertyWriter(_writer);
-        var end = propertyWriter.WriteStart(plan.Destination, target);
+        var end = propertyWriter.WriteStart(plan.Destination, target, isControlTemplate);
         _writer.Write(element.Identifier);
         propertyWriter.WriteEnd(end);
     }
@@ -390,7 +435,7 @@ internal readonly ref struct ComponentPropertyWriter
         in MarkupExtensionWriteContext context)
     {
         var propertyWriter = new PropertyWriter(_writer);
-        var end = propertyWriter.WriteStart(plan.Destination, target);
+        var end = propertyWriter.WriteStart(plan.Destination, target, context.IsControlTemplate);
         var writer = new MarkupExtensionWriter(_writer, in _environment);
         writer.Write(GetMarkupExtension(component, plan.PayloadIndex).Extension, context);
         propertyWriter.WriteEnd(end);
@@ -414,7 +459,7 @@ internal readonly ref struct ComponentPropertyWriter
         _writer.WriteLine("    !global::System.Object.ReferenceEquals(__markupResult, global::Avalonia.Data.BindingOperations.DoNothing))");
         using var assignmentScope = _writer.BuildScope();
         var propertyWriter = new PropertyWriter(_writer);
-        var end = propertyWriter.WriteStart(plan.Destination, target);
+        var end = propertyWriter.WriteStart(plan.Destination, target, context.IsControlTemplate);
         _writer.Write("(");
         new CSharpValueWriter(_writer).WriteTypeName(plan.Destination.ClrProperty!.Type);
         _writer.Write(")__markupResult!");

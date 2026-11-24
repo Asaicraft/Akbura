@@ -221,16 +221,24 @@ internal sealed class DidChangeHandler :
                     await context.Services.Diagnostics
                         .PublishSyntacticAsync(document, token)
                         .ConfigureAwait(false);
-                    if (documentId != null)
+                    if (documentId != null &&
+                        (current.SyntacticDocument.ContainsAkcss || syntactic.ContainsAkcss))
                     {
-                        await context.Services.Diagnostics
-                            .PublishSemanticAsync(
-                                current.Uri,
-                                token)
+                        await context.Services.Diagnostics.RefreshChangedProjectsAsync(context.Solution, token)
                             .ConfigureAwait(false);
+                        if (next.ClientCapabilities.SupportsSemanticTokensRefresh)
+                        {
+                            await context.Services.Client.RequestAsync<object?, object?>(
+                                LspMethods.SemanticTokensRefresh, parameters: null, token).ConfigureAwait(false);
+                        }
+                    }
+                    else if (documentId != null)
+                    {
+                        await context.Services.Diagnostics.PublishSemanticAsync(current.Uri, token).ConfigureAwait(false);
                     }
                 }));
     }
+
 }
 
 internal sealed class DidCloseHandler :

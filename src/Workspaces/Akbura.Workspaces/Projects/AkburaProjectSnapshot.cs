@@ -224,6 +224,7 @@ public sealed class AkburaProjectSnapshot
         }
 
         AkburaCompilation compilation;
+        var documents = Documents;
 
         if (string.Equals(
                 Context.RootNamespace,
@@ -239,8 +240,15 @@ public sealed class AkburaProjectSnapshot
         }
         else
         {
+            var updated = Documents.ToBuilder();
+            foreach (var document in Documents.Values)
+            {
+                updated[document.Id] = document.WithProjectIdentity(context.RootNamespace, context.ProjectDirectory);
+            }
+
+            documents = updated.ToImmutable();
             var componentTrees =
-                Documents.Values
+                documents.Values
                     .Select(
                         static document =>
                             document.SyntaxTree)
@@ -251,7 +259,7 @@ public sealed class AkburaProjectSnapshot
                     .ToImmutableArray();
 
             var akcssTrees =
-                Documents.Values
+                documents.Values
                     .Select(
                         static document =>
                             document.SyntaxTree)
@@ -273,7 +281,7 @@ public sealed class AkburaProjectSnapshot
             VersionStamp.Create(),
             context,
             compilation,
-            Documents,
+            documents,
             ResourceDocuments);
     }
 

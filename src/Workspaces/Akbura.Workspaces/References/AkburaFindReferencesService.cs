@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
@@ -55,78 +56,87 @@ internal sealed class AkburaFindReferencesService :
         var lookupPosition = position == context.Document.Text.Length
             ? position - 1
             : position;
-        var sourceOccurrences = GetOccurrences(
-            context,
-            cancellationToken);
-        var target = sourceOccurrences
-            .Where(occurrence =>
-                occurrence.Span.Contains(lookupPosition))
-            .OrderBy(occurrence => occurrence.Span.Length)
-            .ThenByDescending(occurrence => occurrence.IsDeclaration)
-            .FirstOrDefault();
+        SemanticOccurrence? target = null;
+        foreach (var occurrence in GetOccurrences(context, cancellationToken))
+        {
+            if (occurrence.Span.Contains(lookupPosition) &&
+                (target is null || occurrence.Span.Length < target.Span.Length ||
+                 occurrence.Span.Length == target.Span.Length && occurrence.IsDeclaration && !target.IsDeclaration))
+            {
+                target = occurrence;
+            }
+        }
 
-        if (target == null)
+        if (target == null ||
+            target.Key.Kind == AkburaSymbolKind.AkcssTemplatePart &&
+            HasConflictingAkcssBinding(context, target.Span, target.Key, cancellationToken))
         {
             return EmptyResult();
         }
 
         using var locations =
             ImmutableArrayBuilder<AkburaReferenceLocation>.Rent();
-        var seen = new HashSet<ReferenceLocationIdentity>();
-
-        foreach (var project in context.Solution.Projects.Values)
+        var seen = PooledHashSet<ReferenceLocationIdentity>.GetInstance();
+        try
         {
-            foreach (var document in project.Documents.Values)
+            foreach (var project in context.Solution.Projects.Values)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                var documentContext = new AkburaDocumentContext(
-                    context.Solution,
-                    project,
-                    document);
-                foreach (var occurrence in GetOccurrences(
-                             documentContext,
-                             cancellationToken))
+                foreach (var document in project.Documents.Values)
                 {
-                    if (occurrence.Key != target.Key ||
-                        !includeDeclaration &&
-                        occurrence.IsDeclaration)
-                    {
-                        continue;
-                    }
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                    AddLocation(
-                        locations,
-                        seen,
-                        new AkburaReferenceLocation(
-                            occurrence.Uri,
-                            occurrence.Span,
-                            occurrence.IsDeclaration,
-                            occurrence.IsWrite));
+                    var documentContext = new AkburaDocumentContext(
+                        context.Solution,
+                        project,
+                        document);
+                    foreach (var occurrence in GetOccurrences(
+                                 documentContext,
+                                 cancellationToken))
+                    {
+                        if (occurrence.Key != target.Key ||
+                            !includeDeclaration &&
+                            occurrence.IsDeclaration)
+                        {
+                            continue;
+                        }
+
+                        AddLocation(
+                            locations,
+                            seen,
+                            new AkburaReferenceLocation(
+                                occurrence.Uri,
+                                occurrence.Span,
+                                occurrence.IsDeclaration,
+                                occurrence.IsWrite));
+                    }
                 }
             }
-        }
 
-        if (includeDeclaration &&
-            target.Key.Kind is not (AkburaSymbolKind.MarkupLoopLocal or AkburaSymbolKind.MarkupLoopIndex) &&
-            target.RoslynSymbol is { } csharpSymbol)
+            if (includeDeclaration &&
+                target.Key.Kind is not (AkburaSymbolKind.MarkupLoopLocal or AkburaSymbolKind.MarkupLoopIndex or AkburaSymbolKind.AkcssTheme) &&
+                target.RoslynSymbol is { } csharpSymbol)
+            {
+                AddCSharpDeclarations(
+                    csharpSymbol,
+                    locations,
+                    seen,
+                    cancellationToken);
+            }
+
+            return new AkburaReferenceResult(
+                target.Key,
+                target.Name,
+                locations.AsEnumerable()
+                    .OrderBy(static location =>
+                        location.Uri.AbsoluteUri,
+                        StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(static location => location.Span.Start)
+                    .ToImmutableArray());
+        }
+        finally
         {
-            AddCSharpDeclarations(
-                csharpSymbol,
-                locations,
-                seen,
-                cancellationToken);
+            seen.Free();
         }
-
-        return new AkburaReferenceResult(
-            target.Key,
-            target.Name,
-            locations.AsEnumerable()
-                .OrderBy(static location =>
-                    location.Uri.AbsoluteUri,
-                    StringComparer.OrdinalIgnoreCase)
-                .ThenBy(static location => location.Span.Start)
-                .ToImmutableArray());
     }
 
     public ImmutableArray<AkburaDocumentHighlight> GetHighlights(
@@ -185,6 +195,32 @@ internal sealed class AkburaFindReferencesService :
         return _cache.GetOrAdd(key, occurrences);
     }
 
+    internal bool HasConflictingAkcssBinding(AkburaDocumentContext context, TextSpan span, AkburaSymbolKey key,
+        CancellationToken cancellationToken)
+    {
+        if (GetOccurrences(context, cancellationToken).Any(
+            static (item, target) => item.Key != target.key && item.Span == target.span, (key, span)))
+        {
+            return true;
+        }
+
+        if (key.Kind != AkburaSymbolKind.AkcssTemplatePart)
+        {
+            return false;
+        }
+
+        var root = context.Document.SyntaxTree.GetRootSyntax();
+        var selector = root.FindTokenInternal(span.Start).Parent?.FirstAncestorOrSelf<AkcssNameSelectorSyntax>();
+        if (selector is null)
+        {
+            return false;
+        }
+
+        var model = context.Project.Compilation.GetSemanticModel(context.Document.SyntaxTree);
+        return _akcssReferenceResolver.GetContextualReferences(model, selector, cancellationToken)
+            .Any(static reference => reference.Symbol is null);
+    }
+
     private ImmutableArray<SemanticOccurrence> CollectOccurrences(
         AkburaDocumentContext context,
         CancellationToken cancellationToken)
@@ -200,6 +236,15 @@ internal sealed class AkburaFindReferencesService :
         foreach (var node in root.DescendantNodesAndSelf())
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            var contextualReferences = _akcssReferenceResolver.GetContextualReferences(semanticModel, node, cancellationToken);
+            foreach (var reference in contextualReferences)
+            {
+                var declaration = reference.Kind is AkcssReferenceKind.ThemeDeclaration or AkcssReferenceKind.MixinDeclaration or
+                    AkcssReferenceKind.MixinParameter or AkcssReferenceKind.TemplatePartDeclaration;
+                AddResolvedReference(context, reference, declaration, builder, seen,
+                    isWrite: reference.Kind == AkcssReferenceKind.TemplateBindingDestination);
+            }
 
             switch (node)
             {
@@ -306,12 +351,10 @@ internal sealed class AkburaFindReferencesService :
                     break;
 
                 case MarkupAttributeSyntax attribute:
-                    AddMarkupAttribute(
-                        context,
-                        semanticModel,
-                        attribute,
-                        builder,
-                        seen);
+                    if (!contextualReferences.Any(static reference => reference.Kind == AkcssReferenceKind.TemplatePartDeclaration))
+                    {
+                        AddMarkupAttribute(context, semanticModel, attribute, builder, seen);
+                    }
                     AddCSharpReferences(
                         context,
                         semanticModel.GetCSharpSymbolReferences(attribute),

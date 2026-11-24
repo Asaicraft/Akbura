@@ -104,6 +104,8 @@ internal static class ComponentDocumentWriter
             codeWriter,
             semanticModel);
 
+        componentWriter.WriteAkcssDiagnostics();
+
         var hasNamespace = !string.IsNullOrWhiteSpace(component.NamespaceName);
 
         if (hasNamespace)

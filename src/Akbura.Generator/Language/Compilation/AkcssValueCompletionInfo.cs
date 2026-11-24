@@ -7,14 +7,14 @@ namespace Akbura.Language;
 internal readonly struct AkcssValueCompletionInfo
 {
     public AkcssValueCompletionInfo(
-        IAkcssSymbol containingSymbol,
+        IAkcssDeclarationOwner containingSymbol,
         AkburaPropertySymbol property)
     {
         ContainingSymbol = containingSymbol;
         Property = property;
     }
 
-    public IAkcssSymbol ContainingSymbol { get; }
+    public IAkcssDeclarationOwner ContainingSymbol { get; }
 
     public AkburaPropertySymbol Property { get; }
 

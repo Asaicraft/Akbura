@@ -15,6 +15,43 @@ internal sealed class AkcssSymbolDisplayService
                 SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers |
                 SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
+    public string FormatTheme(AkcssThemeSymbol theme) =>
+        $"theme {FormatType(theme.TargetType.Symbol as ITypeSymbol, theme.TargetType.Name)} {theme.Name}";
+
+    public string FormatMixin(AkcssMixinSymbol mixin)
+    {
+        var pooled = PooledStringBuilder.GetInstance();
+        try
+        {
+            var builder = pooled.Builder;
+            builder.Append("mixin ").Append(FormatType(mixin.TargetType.Symbol as ITypeSymbol, mixin.TargetType.Name))
+                .Append(' ').Append(mixin.Name).Append('(');
+            for (var i = 0; i < mixin.Parameters.Length; i++)
+            {
+                if (i > 0)
+                {
+                    builder.Append(", ");
+                }
+
+                builder.Append(FormatParameter(mixin.Parameters[i]));
+            }
+
+            return builder.Append(')').ToString();
+        }
+        finally
+        {
+            pooled.Free();
+        }
+    }
+
+    public string FormatParameter(AkcssMixinParameterSymbol parameter)
+    {
+        var type = FormatType(parameter.Type.Symbol as ITypeSymbol, parameter.Type.Name);
+        var name = parameter.DeclarationSyntax.Name.Identifier.Text;
+        var defaultValue = parameter.DeclarationSyntax.Default?.Expression.ToFullString().Trim();
+        return defaultValue is null ? $"{type} {name}" : $"{type} {name} = {defaultValue}";
+    }
+
     public string FormatProperty(AkburaPropertySymbol property)
     {
         var type = FormatType(

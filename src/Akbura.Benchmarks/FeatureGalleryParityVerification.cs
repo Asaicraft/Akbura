@@ -8,7 +8,6 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using BlackSilenceGenerator = Akbura.BlackSilence.AkburaBlackSilenceGenerator;
-using FuriosoGenerator = Akbura.Furioso.AkburaCsGenerator;
 
 namespace Akbura.Benchmarks;
 
@@ -24,7 +23,7 @@ internal static class FeatureGalleryParityVerification
         if (args.Contains("--help", StringComparer.Ordinal))
         {
             Console.WriteLine("--black-silence-verify-parity [--output artifacts/black-silence-parity]");
-            Console.WriteLine("Validates real FeatureGallery compilations, generator identities, and all five incremental/fresh scenarios. No timing or STATS requirement.");
+            Console.WriteLine("Validates real FeatureGallery compilations, generated type identities, and all five incremental/fresh scenarios. No timing or STATS requirement.");
             return true;
         }
 
@@ -49,18 +48,18 @@ internal static class FeatureGalleryParityVerification
         var project = FeatureGalleryBenchmarkProject.Load();
         var report = new VerificationReport(project.ProjectDirectory, project.AdditionalFileCount);
 
-        Console.WriteLine("Furioso / BlackSilence: checking generated compilations and component/AKCSS metadata identities...");
+        Console.WriteLine("Checking the generated BlackSilence compilation and metadata identities...");
         try
         {
-            report.Compatibility = VerifyCompatibility(project);
-            Console.WriteLine($"  {(report.Compatibility.Passed ? "PASS" : "FAIL")}: " +
-                $"components {report.Compatibility.FuriosoComponents.Length}/{report.Compatibility.BlackSilenceComponents.Length}, " +
-                $"AKCSS carriers {report.Compatibility.FuriosoAkcss.Length}/{report.Compatibility.BlackSilenceAkcss.Length}.");
-            PrintDifferences(report.Compatibility.Differences);
+            report.Generation = VerifyGeneratedContract(project);
+            Console.WriteLine($"  {(report.Generation.Passed ? "PASS" : "FAIL")}: " +
+                $"components {report.Generation.Types.Components.Length}, " +
+                $"AKCSS carriers {report.Generation.Types.Akcss.Length}.");
+            PrintDifferences(report.Generation.Differences);
         }
         catch (Exception exception)
         {
-            report.Failures.Add("Generator compatibility: " + exception);
+            report.Failures.Add("Generated contract: " + exception);
             Console.WriteLine("  FAIL: " + exception.Message);
         }
 
@@ -86,35 +85,23 @@ internal static class FeatureGalleryParityVerification
         Console.WriteLine(report.Passed ? "FeatureGallery parity verification passed." : "FeatureGallery parity verification FAILED. See the artifact for every difference.");
     }
 
-    private static CompatibilityResult VerifyCompatibility(FeatureGalleryBenchmarkProject project)
+    private static GeneratedContractResult VerifyGeneratedContract(FeatureGalleryBenchmarkProject project)
     {
         var snapshot = project.CreateSnapshot();
-        var furioso = RunGenerator(CreateDriver(project, snapshot, snapshot.AdditionalTexts, new FuriosoGenerator()), project.Compilation);
-        var blackSilence = RunGenerator(CreateDriver(project, snapshot, snapshot.AdditionalTexts, new BlackSilenceGenerator()), project.Compilation);
-        var furiosoTypes = GetGeneratedTypes(furioso);
-        var blackSilenceTypes = GetGeneratedTypes(blackSilence);
+        var run = RunGenerator(CreateDriver(project, snapshot, snapshot.AdditionalTexts), project.Compilation);
+        var types = GetGeneratedTypes(run);
         var differences = new List<string>();
-        AddDifferences("Component metadata types", furiosoTypes.Components, blackSilenceTypes.Components, differences);
-        AddDifferences("AKCSS carrier metadata types", furiosoTypes.Akcss, blackSilenceTypes.Akcss, differences);
-        AddDifferences("Generated hints (including infrastructure)", furioso.Sources.Keys, blackSilence.Sources.Keys, differences);
-        AddDiagnosticDifferences(furioso.CanonicalDiagnostics, blackSilence.CanonicalDiagnostics, differences);
-
-        if (furiosoTypes.Components.Length == 0 || furiosoTypes.Akcss.Length == 0 ||
-            blackSilenceTypes.Components.Length == 0 || blackSilenceTypes.Akcss.Length == 0)
+        if (types.Components.Length == 0 || types.Akcss.Length == 0)
         {
-            differences.Add("At least one generator did not expose both component and AKCSS carrier types.");
+            differences.Add("Expected both component and AKCSS carrier types.");
         }
 
-        return new CompatibilityResult(
-            furiosoTypes.Components,
-            blackSilenceTypes.Components,
-            furiosoTypes.Akcss,
-            blackSilenceTypes.Akcss,
-            furiosoTypes.InfrastructureHints,
-            blackSilenceTypes.InfrastructureHints,
-            furioso.Diagnostics,
-            blackSilence.Diagnostics,
-            differences.ToArray());
+        if (!run.Sources.ContainsKey(Akbura.BlackSilence.HotReloadServiceWriter.HintName))
+        {
+            differences.Add("Expected the project hot reload service.");
+        }
+
+        return new GeneratedContractResult(types, run.Diagnostics, differences.ToArray());
     }
 
     private static ScenarioResult VerifyScenario(FeatureGalleryBenchmarkProject project, FeatureGalleryGeneratorScenario scenario)
@@ -128,7 +115,7 @@ internal static class FeatureGalleryParityVerification
         var snapshot = project.CreateSnapshot(editTarget);
         var files = snapshot.AdditionalTexts;
         var compilation = project.Compilation;
-        var driver = CreateDriver(project, snapshot, files, new BlackSilenceGenerator());
+        var driver = CreateDriver(project, snapshot, files);
 
         if (scenario != FeatureGalleryGeneratorScenario.ColdGeneration)
         {
@@ -153,7 +140,7 @@ internal static class FeatureGalleryParityVerification
         var incremental = RunGenerator(driver, compilation);
         // A fresh driver receives the exact same current files, options and C# input.
         // New virtual paths here would invalidate both source mappings and the proof.
-        var fresh = RunGenerator(CreateDriver(project, snapshot, files, new BlackSilenceGenerator()), compilation);
+        var fresh = RunGenerator(CreateDriver(project, snapshot, files), compilation);
         var differences = new List<string>();
         AddDifferences("Generated hints", fresh.Sources.Keys, incremental.Sources.Keys, differences);
 
@@ -188,11 +175,10 @@ internal static class FeatureGalleryParityVerification
     private static GeneratorDriver CreateDriver(
         FeatureGalleryBenchmarkProject project,
         FeatureGalleryBenchmarkSnapshot snapshot,
-        ImmutableArray<AdditionalText> files,
-        IIncrementalGenerator generator)
+        ImmutableArray<AdditionalText> files)
     {
         return CSharpGeneratorDriver.Create(
-            generators: [generator.AsSourceGenerator()],
+            generators: [new BlackSilenceGenerator().AsSourceGenerator()],
             additionalTexts: files,
             parseOptions: project.ParseOptions,
             optionsProvider: new DiagnosticPublishOptionsProvider(snapshot.OptionsProvider));
@@ -349,7 +335,7 @@ internal static class FeatureGalleryParityVerification
             actualCounts.TryGetValue(diagnostic, out var actualCount);
             if (expectedCount != actualCount)
             {
-                differences.Add($"Diagnostic count expected/Furioso {expectedCount}, actual/BlackSilence {actualCount}: {diagnostic}");
+                differences.Add($"Diagnostic count fresh {expectedCount}, incremental {actualCount}: {diagnostic}");
             }
         }
     }
@@ -358,12 +344,12 @@ internal static class FeatureGalleryParityVerification
     {
         foreach (var missing in expected.Except(actual, StringComparer.Ordinal).Order(StringComparer.Ordinal))
         {
-            differences.Add(label + " only in expected/Furioso: " + missing);
+            differences.Add(label + " only in fresh: " + missing);
         }
 
         foreach (var added in actual.Except(expected, StringComparer.Ordinal).Order(StringComparer.Ordinal))
         {
-            differences.Add(label + " only in actual/BlackSilence: " + added);
+            differences.Add(label + " only in incremental: " + added);
         }
     }
 
@@ -402,14 +388,14 @@ internal static class FeatureGalleryParityVerification
         markdown.AppendLine("Result: " + (report.Passed ? "PASS" : "FAIL"));
         markdown.AppendLine();
         markdown.AppendLine("Real MSBuild-loaded FeatureGallery inputs. Every checked generated compilation must have zero errors; warnings and hidden diagnostics remain part of incremental/fresh parity.");
-        markdown.AppendLine("Furioso/BlackSilence compatibility compares top-level component and AKCSS carrier metadata identities, not private nested helper types or source-text formatting. Every generated hint, including infrastructure, is accounted for; hint differences fail verification and are reported.");
-        markdown.AppendLine("Both cross-generator and incremental/fresh comparisons check every diagnostic channel, multiplicity, original/mapped location, descriptor metadata and semantic property. Only akbura.origin, akbura.kind, akbura.logical-id and akbura.document-version are excluded as transport metadata; raw properties remain in the JSON report. Descriptor message templates may differ, but their formatted invariant messages must match exactly.");
+        markdown.AppendLine("Cold generation resolves top-level component and AKCSS carrier metadata identities and checks for the project hot reload service.");
+        markdown.AppendLine("Incremental/fresh comparisons check every diagnostic channel, multiplicity, original/mapped location, descriptor metadata and semantic property. Only akbura.origin, akbura.kind, akbura.logical-id and akbura.document-version are excluded as transport metadata; raw properties remain in the JSON report. Descriptor message templates may differ, but their formatted invariant messages must match exactly.");
         markdown.AppendLine("Each incremental/fresh comparison uses the same current AdditionalFile paths/text/options and C# compilation, with a fresh BlackSilence driver as reference. Sources are compared ordinally, not by hashes. Diagnostics are explicitly enabled in Publish mode. This command does not measure performance.");
         markdown.AppendLine();
-        if (report.Compatibility is { } compatibility)
+        if (report.Generation is { } generation)
         {
-            markdown.AppendLine($"Furioso/BlackSilence: {(compatibility.Passed ? "PASS" : "FAIL")}; component types {compatibility.FuriosoComponents.Length}/{compatibility.BlackSilenceComponents.Length}; AKCSS carriers {compatibility.FuriosoAkcss.Length}/{compatibility.BlackSilenceAkcss.Length}.");
-            WriteDifferences(compatibility.Differences);
+            markdown.AppendLine($"Generated contract: {(generation.Passed ? "PASS" : "FAIL")}, {generation.Types.Components.Length} component types, {generation.Types.Akcss.Length} AKCSS carriers.");
+            WriteDifferences(generation.Differences);
         }
 
         foreach (var scenario in report.Scenarios)
@@ -474,15 +460,9 @@ internal static class FeatureGalleryParityVerification
         }
     }
     private sealed record GeneratedTypes(string[] Components, string[] Akcss, string[] InfrastructureHints);
-    private sealed record CompatibilityResult(
-        string[] FuriosoComponents,
-        string[] BlackSilenceComponents,
-        string[] FuriosoAkcss,
-        string[] BlackSilenceAkcss,
-        string[] FuriosoInfrastructureHints,
-        string[] BlackSilenceInfrastructureHints,
-        string[] FuriosoDiagnostics,
-        string[] BlackSilenceDiagnostics,
+    private sealed record GeneratedContractResult(
+        GeneratedTypes Types,
+        string[] Diagnostics,
         string[] Differences)
     {
         public bool Passed => Differences.Length == 0;
@@ -503,14 +483,14 @@ internal static class FeatureGalleryParityVerification
 
     private sealed class VerificationReport(string projectDirectory, int additionalFileCount)
     {
-        public int SchemaVersion => 1;
+        public int SchemaVersion => 2;
         public DateTimeOffset CreatedUtc { get; } = DateTimeOffset.UtcNow;
         public string ProjectDirectory { get; } = projectDirectory;
         public int AdditionalFileCount { get; } = additionalFileCount;
-        public CompatibilityResult? Compatibility { get; set; }
+        public GeneratedContractResult? Generation { get; set; }
         public List<ScenarioResult> Scenarios { get; } = [];
         public List<string> Failures { get; } = [];
-        public bool Passed => Compatibility?.Passed == true && Failures.Count == 0 &&
+        public bool Passed => Generation?.Passed == true && Failures.Count == 0 &&
             Scenarios.Count == Enum.GetValues<FeatureGalleryGeneratorScenario>().Length && Scenarios.All(static scenario => scenario.Passed);
     }
 }

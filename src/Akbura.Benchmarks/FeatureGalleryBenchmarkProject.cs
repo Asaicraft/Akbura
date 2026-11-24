@@ -234,8 +234,7 @@ internal sealed class FeatureGalleryBenchmarkProject
             return false;
         }
 
-        return value.IndexOf("Akbura.Furioso", StringComparison.OrdinalIgnoreCase) >= 0 ||
-            value.IndexOf("Akbura.BlackSilence", StringComparison.OrdinalIgnoreCase) >= 0;
+        return value.Contains("Akbura.BlackSilence", StringComparison.OrdinalIgnoreCase);
     }
 
     private static ImmutableArray<FeatureGallerySourceFile> LoadSourceFiles(

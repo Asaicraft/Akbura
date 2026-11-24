@@ -16,6 +16,7 @@ internal sealed class MarkupNameDeclaration
     private MarkupNameDeclaration(
         MarkupElementSyntax element,
         MarkupAttachedPropertyAttributeSyntax attribute,
+        AkburaSyntax scopeOwner,
         string name,
         string identifierText,
         string sourceText,
@@ -24,6 +25,7 @@ internal sealed class MarkupNameDeclaration
     {
         Element = element;
         Attribute = attribute;
+        ScopeOwner = scopeOwner;
         Name = name;
         IdentifierText = identifierText;
         SourceText = sourceText;
@@ -34,6 +36,8 @@ internal sealed class MarkupNameDeclaration
     public MarkupElementSyntax Element { get; }
 
     public MarkupAttachedPropertyAttributeSyntax Attribute { get; }
+
+    public AkburaSyntax ScopeOwner { get; }
 
     public string Name { get; }
 
@@ -50,6 +54,7 @@ internal sealed class MarkupNameDeclaration
     public static MarkupNameDeclaration Create(
         MarkupElementSyntax element,
         MarkupAttachedPropertyAttributeSyntax attribute,
+        AkburaSyntax scopeOwner,
         MarkupNameDeclaration? originalDeclaration)
     {
         var value = AkburaSemanticModel.GetMarkupAttributeValue(attribute);
@@ -59,6 +64,7 @@ internal sealed class MarkupNameDeclaration
             return new MarkupNameDeclaration(
                 element,
                 attribute,
+                scopeOwner,
                 string.Empty,
                 string.Empty,
                 sourceText,
@@ -73,6 +79,7 @@ internal sealed class MarkupNameDeclaration
             return new MarkupNameDeclaration(
                 element,
                 attribute,
+                scopeOwner,
                 string.Empty,
                 identifierText,
                 identifierText,
@@ -87,6 +94,7 @@ internal sealed class MarkupNameDeclaration
             return new MarkupNameDeclaration(
                 element,
                 attribute,
+                scopeOwner,
                 string.Empty,
                 identifierText,
                 identifierText,
@@ -98,6 +106,7 @@ internal sealed class MarkupNameDeclaration
         return new MarkupNameDeclaration(
             element,
             attribute,
+            scopeOwner,
             name,
             identifierName.Identifier.Text,
             identifierText,
@@ -130,7 +139,10 @@ internal sealed class MarkupNameDeclaration
             IdentifierText,
             type,
             Attribute,
-            Element);
+            Element,
+            ScopeOwner,
+            semanticModel.SyntaxTree.FilePath);
+
         return Interlocked.CompareExchange(ref _lazySymbol, created, comparand: null) ?? created;
     }
 
@@ -141,11 +153,11 @@ internal sealed class MarkupNameDeclaration
             MarkupNameDeclarationFailure.InvalidIdentifier => new AkburaSemanticDiagnostic(
                 (AkburaSyntax?)Attribute.Value ?? Attribute,
                 ErrorCodes.AKBURA_SEMANTIC_MarkupNameInvalid,
-                ImmutableArray.Create<object?>(SourceText)),
+                [SourceText]),
             MarkupNameDeclarationFailure.Duplicate => new AkburaSemanticDiagnostic(
                 Attribute,
                 ErrorCodes.AKBURA_SEMANTIC_MarkupNameDuplicate,
-                ImmutableArray.Create<object?>(IdentifierText)),
+                [IdentifierText]),
             _ => null,
         };
     }

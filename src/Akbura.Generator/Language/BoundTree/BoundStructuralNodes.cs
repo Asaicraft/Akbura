@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using System.Collections.Immutable;
@@ -154,10 +155,14 @@ internal sealed class BoundAkcssStyle : BoundNode
         BinderType binder,
         AkburaSymbolInfo symbolInfo,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default,
-        ImmutableArray<BoundNode> children = default)
+        ImmutableArray<BoundNode> children = default,
+        AkcssBindingContext? context = null)
         : base(BoundKind.AkcssStyle, syntax, binder, symbolInfo, diagnostics, children)
     {
+        Context = context;
     }
+
+    public AkcssBindingContext? Context { get; }
 
     public new AkcssStyleRuleSyntax Syntax => (AkcssStyleRuleSyntax)base.Syntax;
 
@@ -181,10 +186,14 @@ internal sealed class BoundAkcssUtility : BoundNode
         BinderType binder,
         AkburaSymbolInfo symbolInfo,
         ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default,
-        ImmutableArray<BoundNode> children = default)
+        ImmutableArray<BoundNode> children = default,
+        AkcssBindingContext? context = null)
         : base(BoundKind.AkcssUtility, syntax, binder, symbolInfo, diagnostics, children)
     {
+        Context = context;
     }
+
+    public AkcssBindingContext? Context { get; }
 
     public new AkcssUtilityDeclarationSyntax Syntax => (AkcssUtilityDeclarationSyntax)base.Syntax;
 

@@ -735,7 +735,7 @@ public sealed class WorkspaceSyntacticDocumentTests
         AkburaCSharpCompletionContextKind.Type,
         "dou ")]
     [InlineData(
-        "@intercept MyAkcssSty|;",
+        "Control.card { @intercept MyAkcssSty|; }",
         AkburaCSharpCompletionContextKind.Type,
         "MyAkcssSty")]
     [InlineData(
@@ -751,7 +751,7 @@ public sealed class WorkspaceSyntacticDocumentTests
         AkburaCSharpCompletionContextKind.Expression,
         "")]
     [InlineData(
-        "@intercept |;",
+        "Control.card { @intercept |; }",
         AkburaCSharpCompletionContextKind.Type,
         "")]
     [InlineData(

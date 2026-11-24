@@ -41,8 +41,7 @@ internal sealed partial class AkcssStyleBinder : Binder
 
     public override ImmutableArray<AkburaSymbol> GetDeclaredSymbolsForScope(AkburaSyntax scopeDesignator)
     {
-        if (!OwnsScope(scopeDesignator) ||
-            Declaration?.Kind != DeclarationKind.AkcssUtility)
+        if (!OwnsScope(scopeDesignator) || Declaration?.Kind is not (DeclarationKind.AkcssUtility or DeclarationKind.AkcssMixin))
         {
             return base.GetDeclaredSymbolsForScope(scopeDesignator);
         }
@@ -54,6 +53,11 @@ internal sealed partial class AkcssStyleBinder : Binder
     {
         return syntax.Kind switch
         {
+            AkburaSyntaxKind.AkcssSelectorRuleSyntax or
+                AkburaSyntaxKind.AkcssThemeDeclarationSyntax or
+                AkburaSyntaxKind.AkcssMixinDeclarationSyntax => BindAkcssSourceDeclaration(syntax),
+            AkburaSyntaxKind.AkcssStyleRuleSyntax or
+                AkburaSyntaxKind.AkcssUtilityDeclarationSyntax => BindAkcssStyleSyntax(syntax),
             AkburaSyntaxKind.AkcssAssignmentSyntax =>
                 BindAkcssPropertySetter(Unsafe.As<AkcssAssignmentSyntax>(syntax)),
             AkburaSyntaxKind.AkcssIfDirectiveSyntax =>
@@ -73,6 +77,9 @@ internal sealed partial class AkcssStyleBinder : Binder
             AkburaSyntaxKind.AkcssStyleRuleSyntax or
                 AkburaSyntaxKind.AkcssUtilityDeclarationSyntax =>
                 BindAkcssStyleSyntax(syntax),
+            AkburaSyntaxKind.AkcssSelectorRuleSyntax or
+                AkburaSyntaxKind.AkcssThemeDeclarationSyntax or
+                AkburaSyntaxKind.AkcssMixinDeclarationSyntax => BindAkcssSourceDeclaration(syntax),
             AkburaSyntaxKind.AkcssAssignmentSyntax or
                 AkburaSyntaxKind.AkcssIfDirectiveSyntax or
                 AkburaSyntaxKind.AkcssApplyDirectiveSyntax or
@@ -231,15 +238,15 @@ internal sealed partial class AkcssStyleBinder : Binder
     {
         var symbolInfo = SemanticModel.GetDeclarationSymbolInfo(styleRule);
         var symbol = symbolInfo.Symbol as IAkcssSymbol;
-        var children = symbol == null
-            ? ImmutableArray<BoundNode>.Empty
-            : CastBoundNodes(BindAkcssOperations(styleRule.Members, symbol));
+        var context = symbol is null ? null : CreateAkcssContext(symbol);
+        var children = context is null ? ImmutableArray<BoundNode>.Empty : BindLegacyAkcssBody(styleRule, styleRule.Members, context, symbol!);
         var boundStyle = new BoundAkcssStyle(
             styleRule,
             this,
             symbolInfo,
             SemanticModel.GetCachedSemanticDiagnostics(styleRule),
-            children);
+            children,
+            context);
         SemanticModel.SetCachedBoundNode(styleRule, boundStyle);
         return boundStyle;
     }
@@ -248,15 +255,15 @@ internal sealed partial class AkcssStyleBinder : Binder
     {
         var symbolInfo = SemanticModel.GetDeclarationSymbolInfo(utilityDeclaration);
         var symbol = symbolInfo.Symbol as IAkcssSymbol;
-        var children = symbol == null
-            ? ImmutableArray<BoundNode>.Empty
-            : CastBoundNodes(BindAkcssOperations(utilityDeclaration.Members, symbol));
+        var context = symbol is null ? null : CreateAkcssContext(symbol);
+        var children = context is null ? ImmutableArray<BoundNode>.Empty : BindLegacyAkcssBody(utilityDeclaration, utilityDeclaration.Members, context, symbol!);
         var boundUtility = new BoundAkcssUtility(
             utilityDeclaration,
             this,
             symbolInfo,
             SemanticModel.GetCachedSemanticDiagnostics(utilityDeclaration),
-            children);
+            children,
+            context);
         SemanticModel.SetCachedBoundNode(utilityDeclaration, boundUtility);
         return boundUtility;
     }
@@ -436,16 +443,28 @@ internal sealed partial class AkcssStyleBinder : Binder
         AkcssAssignmentSyntax assignment,
         IAkcssSymbol containingSymbol)
     {
-        var diagnosticsBag = BindingDiagnosticBag.GetInstance();
+        var data = BindAkcssSetter(assignment, CreateAkcssContext(containingSymbol), validateNative: false);
+        SemanticModel.SetSemanticDiagnostics(assignment, data.Diagnostics);
+        return new BoundAkcssPropertySetter(assignment, this, containingSymbol, data.Property, data.ValueType,
+            data.Value, data.Conversion, data.ValueKind, data.RequiresBrushConversion, data.ConvertedValue,
+            data.Diagnostics, data.Property is null || data.ValueKind == AkcssPropertyValueKind.Error || !data.Diagnostics.IsEmpty);
+    }
 
-        var property = SemanticModel.ResolveAkcssPropertyWithDiagnostics(
-            assignment,
-            containingSymbol,
-            diagnosticsBag);
+    private AkcssSetterData BindAkcssSetter(AkcssAssignmentSyntax assignment, AkcssBindingContext context, bool validateNative = true)
+    {
+        if (context.IsMixinDefinition && context.PropertyReceiver.IsDefault &&
+            assignment.PropertyName.ToFullString().IndexOf('.') < 0)
+        {
+            return new AkcssSetterData(null, default, default, default, AkcssPropertyValueKind.CSharpExpression,
+                false, null, AkcssSetterPropertyKind.Unresolved, [], IsDeferred: true);
+        }
+
+        using var diagnostics = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+        var property = SemanticModel.ResolveAkcssProperty(assignment, context, diagnostics, validateNative);
         var expression = ParseAkcssAssignmentExpression(assignment);
         var binding = expression == null
             ? CSharpBindingResult.Empty
-            : SemanticModel.BindAkcssExpression(expression, containingSymbol);
+            : SemanticModel.BindAkcssExpression(expression, context);
 
         var valueType = binding.TypeSymbol == null
             ? default
@@ -463,7 +482,7 @@ internal sealed partial class AkcssStyleBinder : Binder
             {
                 if (TryGetAkcssColorIdentifierText(expression, out var colorName))
                 {
-                    if (SemanticModel.TryBindAvaloniaNamedColor(colorName, containingSymbol, out var namedColorBinding))
+                    if (SemanticModel.TryBindAvaloniaNamedColor(colorName, context.Owner, out var namedColorBinding, context.ExpressionReceiver))
                     {
                         valueKind = AkcssPropertyValueKind.ColorLiteral;
                         convertedValue = new CSharpSymbolDefinition(namedColorBinding.Symbol!);
@@ -477,7 +496,7 @@ internal sealed partial class AkcssStyleBinder : Binder
                     else
                     {
                         valueKind = AkcssPropertyValueKind.Error;
-                        diagnosticsBag.Add(SemanticModel.CreateAkcssInvalidColorDiagnostic(
+                        diagnostics.Add(SemanticModel.CreateAkcssInvalidColorDiagnostic(
                             assignment,
                             colorName,
                             property.Name));
@@ -495,7 +514,7 @@ internal sealed partial class AkcssStyleBinder : Binder
                             valueType = new CSharpSymbolDefinition(colorType);
                         }
                     }
-                    else if (SemanticModel.TryBindAvaloniaNamedColor(colorText, containingSymbol, out var namedColorBinding))
+                    else if (SemanticModel.TryBindAvaloniaNamedColor(colorText, context.Owner, out var namedColorBinding, context.ExpressionReceiver))
                     {
                         valueKind = AkcssPropertyValueKind.ColorLiteral;
                         convertedValue = new CSharpSymbolDefinition(namedColorBinding.Symbol!);
@@ -509,7 +528,7 @@ internal sealed partial class AkcssStyleBinder : Binder
                     else
                     {
                         valueKind = AkcssPropertyValueKind.Error;
-                        diagnosticsBag.Add(SemanticModel.CreateAkcssInvalidColorDiagnostic(
+                        diagnostics.Add(SemanticModel.CreateAkcssInvalidColorDiagnostic(
                             assignment,
                             colorText,
                             property.Name));
@@ -527,8 +546,9 @@ internal sealed partial class AkcssStyleBinder : Binder
                 SemanticModel.TryBindExpectedTypeStaticMember(
                     expression,
                     expectedType,
-                    containingSymbol,
-                    out var expectedTypeMemberBinding))
+                    context.Owner,
+                    out var expectedTypeMemberBinding,
+                    context.ExpressionReceiver))
             {
                 convertedValue = expectedTypeMemberBinding.Symbol == null
                     ? null
@@ -541,7 +561,7 @@ internal sealed partial class AkcssStyleBinder : Binder
                     : new CSharpSymbolDefinition(expectedTypeMemberBinding.TypeSymbol);
             }
             else if (valueKind == AkcssPropertyValueKind.CSharpExpression &&
-                     SemanticModel.TryAcceptExpectedTypeCastExpression(expression, expectedType, containingSymbol))
+                     SemanticModel.TryAcceptExpectedTypeCastExpression(expression, expectedType, context.Owner))
             {
                 valueType = new CSharpSymbolDefinition(expectedType);
                 activeBinding = CSharpBindingResult.Empty;
@@ -562,30 +582,40 @@ internal sealed partial class AkcssStyleBinder : Binder
                 convertedValue = thickness;
                 valueType = new CSharpSymbolDefinition(expectedType);
                 activeBinding = CSharpBindingResult.Empty;
+                if (validateNative && thickness is AkcssThicknessExpressionValue expressions)
+                {
+                    activeBinding = BindContextualThickness(expressions, context, expectedType);
+                    valueOperation = activeBinding.OperationDefinition;
+                }
             }
             else if (isThicknessPropertyType && isThicknessTuple)
             {
                 valueKind = AkcssPropertyValueKind.Error;
-                diagnosticsBag.Add(SemanticModel.CreateAkcssInvalidThicknessDiagnostic(
+                diagnostics.Add(SemanticModel.CreateAkcssInvalidThicknessDiagnostic(
                     assignment,
                     assignment.Expression.ToFullString().Trim(),
                     property.Name));
             }
 
             if (valueKind == AkcssPropertyValueKind.CSharpExpression &&
-                SemanticModel.TryCreateAkcssAmxInvocationValue(expression, out var amxInvocation))
+                SemanticModel.TryBindAkcssAmxValue(expression, context, expectedType, binding, out var resourceBinding, out var resource))
             {
-                valueKind = AkcssPropertyValueKind.AmxInvocation;
-                convertedValue = amxInvocation;
+                activeBinding = resourceBinding;
+                valueOperation = resourceBinding.OperationDefinition;
+                valueType = resourceBinding.TypeSymbol is { } resourceType ? new CSharpSymbolDefinition(resourceType) : valueType;
+                if (resource.Kind != AkcssAmxInvocationKind.None)
+                {
+                    valueKind = AkcssPropertyValueKind.AmxInvocation;
+                    convertedValue = resource;
+                }
             }
-
-            if (valueKind == AkcssPropertyValueKind.CSharpExpression &&
+            else if (valueKind == AkcssPropertyValueKind.CSharpExpression &&
                 !hasExpectedTypeBinding &&
                 !requiresBrushConversion)
             {
                 activeBinding = SemanticModel.BindAkcssExpression(
                     expression,
-                    containingSymbol,
+                    context,
                     expectedType);
                 valueOperation = activeBinding.OperationDefinition;
                 valueType = activeBinding.TypeSymbol == null
@@ -596,36 +626,71 @@ internal sealed partial class AkcssStyleBinder : Binder
 
         if (valueKind != AkcssPropertyValueKind.Error)
         {
-            using var diagnosticsBuilder = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
-            SemanticModel.AddAkcssExpressionDiagnostics(
-                    assignment,
-                    activeBinding,
-                    diagnosticsBuilder);
+            SemanticModel.AddAkcssExpressionDiagnostics(assignment, activeBinding, diagnostics);
             SemanticModel.AddAkcssValueConversionDiagnostics(
-                    assignment,
-                    property,
-                    valueKind,
-                    requiresBrushConversion,
-                    activeBinding,
-                    diagnosticsBuilder);
-            diagnosticsBag.AddRange(diagnosticsBuilder.ToImmutable());
+                assignment, property, valueKind, requiresBrushConversion, activeBinding, diagnostics);
         }
 
-        var diagnostics = SemanticModel.SetSemanticDiagnostics(assignment, diagnosticsBag);
+        var propertyKind = GetAkcssSetterPropertyKind(property);
+        if (validateNative && context.OwningElement is null &&
+            context.StructuralParent.Kind is AkcssStyleParentKind.Style or AkcssStyleParentKind.Theme)
+        {
+            if (propertyKind == AkcssSetterPropertyKind.Clr)
+            {
+                diagnostics.Add(CreateContextDiagnostic(assignment.PropertyName, context, ErrorCodes.AKBURA_SEMANTIC_AkcssSetter,
+                    $"Native style setters require an Avalonia property. '{property!.Name}' is a CLR property."));
+            }
+            else if (propertyKind == AkcssSetterPropertyKind.Direct && context.HasActivator)
+            {
+                diagnostics.Add(CreateContextDiagnostic(assignment.PropertyName, context, ErrorCodes.AKBURA_SEMANTIC_AkcssSetter,
+                    $"The direct property '{property!.Name}' cannot be set by an activated style."));
+            }
+        }
 
-        return new BoundAkcssPropertySetter(
-            assignment,
-            this,
-            containingSymbol,
-            property,
-            valueType,
-            valueOperation,
-            activeBinding.Conversion,
-            valueKind,
-            requiresBrushConversion,
-            convertedValue,
-            diagnostics,
-            property == null || valueKind == AkcssPropertyValueKind.Error || diagnostics.Length > 0);
+        return new AkcssSetterData(property, valueType, valueOperation, activeBinding.Conversion, valueKind,
+            requiresBrushConversion, convertedValue, propertyKind, diagnostics.ToImmutable());
+    }
+
+    private CSharpBindingResult BindContextualThickness(AkcssThicknessExpressionValue value,
+        AkcssBindingContext context, ITypeSymbol expectedType)
+    {
+        var sides = ReferenceEquals(value.Left, value.Right) && ReferenceEquals(value.Top, value.Bottom)
+            ? new[] { value.Left, value.Top }
+            : new[] { value.Left, value.Top, value.Right, value.Bottom };
+        var arguments = CSharpSyntaxFactory.SeparatedList(sides.Select(static item =>
+            CSharpSyntaxFactory.Argument(item.WithoutTrivia())));
+        var expression = CSharpSyntaxFactory.ObjectCreationExpression(
+            CSharpSyntaxFactory.ParseTypeName("global::Avalonia.Thickness"),
+            CSharpSyntaxFactory.ArgumentList(arguments), initializer: null);
+        return SemanticModel.BindAkcssExpression(expression, context, expectedType);
+    }
+
+    private static AkcssSetterPropertyKind GetAkcssSetterPropertyKind(AkburaPropertySymbol? property)
+    {
+        if (property is null)
+        {
+            return AkcssSetterPropertyKind.Unresolved;
+        }
+
+        if (property.IsAttachedProperty)
+        {
+            return AkcssSetterPropertyKind.Attached;
+        }
+
+        if (property.AvaloniaPropertyDefinition.Symbol is not IFieldSymbol field)
+        {
+            return AkcssSetterPropertyKind.Clr;
+        }
+
+        for (var type = field.Type as INamedTypeSymbol; type is not null; type = type.BaseType)
+        {
+            if (type.Name is "DirectProperty" or "DirectPropertyBase")
+            {
+                return AkcssSetterPropertyKind.Direct;
+            }
+        }
+
+        return AkcssSetterPropertyKind.Styled;
     }
 
     private static ImmutableArray<BoundNode> CastBoundNodes(ImmutableArray<BoundAkcssOperation> operations)
@@ -686,7 +751,7 @@ internal sealed partial class AkcssStyleBinder : Binder
         AkburaSyntax syntax,
         BindingDiagnosticBag diagnostics)
     {
-        if (Declaration?.Kind != DeclarationKind.AkcssUtility)
+        if (Declaration?.Kind is not (DeclarationKind.AkcssUtility or DeclarationKind.AkcssMixin))
         {
             return;
         }
@@ -706,7 +771,9 @@ internal sealed partial class AkcssStyleBinder : Binder
             return symbols;
         }
 
-        symbols = SemanticModel.DeclarationSymbols.GetTailwindUtilityParameters(Declaration!);
+        symbols = Declaration!.Kind == DeclarationKind.AkcssMixin
+            ? SemanticModel.DeclarationSymbols.GetDeclaredSymbols(Declaration, DeclarationKind.AkcssMixinParameter)
+            : SemanticModel.DeclarationSymbols.GetTailwindUtilityParameters(Declaration);
 
         ImmutableInterlocked.InterlockedInitialize(ref _lazyDeclaredSymbols, symbols);
         return _lazyDeclaredSymbols;

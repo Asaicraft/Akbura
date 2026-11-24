@@ -45,7 +45,7 @@ internal sealed class TailwindUtilitySymbol : Symbol, ITailwindUtilitySymbol
 
     public string? ClassName => null;
 
-    AkburaSyntax IAkcssSymbol.DeclarationSyntax => DeclarationSyntax;
+    AkburaSyntax IAkcssDeclarationOwner.DeclarationSyntax => DeclarationSyntax;
 
     public AkcssUtilityDeclarationSyntax DeclarationSyntax { get; }
 

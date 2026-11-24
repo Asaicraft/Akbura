@@ -137,8 +137,9 @@ internal readonly ref struct AkcssActivatorWriter
         var indent = _writer.CurrentIndent;
 
         _writer.Write("global::Akbura.AkburaControl.");
-        _writer.WriteLine(
-            _generationMode.UsesStructuralRuntime()
+        _writer.WriteLine(context.UsesTemplateServices
+            ? "SetAkcssTemplateStyles("
+            : _generationMode.UsesStructuralRuntime()
                 ? "ReplaceAkcssStylesForHotReload("
                 : "SetAkcssStyles(");
         _writer.CurrentIndent = indent + 4;
@@ -728,7 +729,7 @@ internal readonly ref struct AkcssActivatorWriter
         in MarkupExtensionWriteContext context)
     {
         var targetProperty = MarkupTargetPropertyPlan.CreateExpression(
-            GetTargetPropertyExpression(slot));
+            GetTargetPropertyExpression(slot, context.UsesTemplateServices));
         return new MarkupExtensionWriteContext(
             targetObjectExpression: "__target",
             targetProperty: targetProperty,
@@ -738,7 +739,9 @@ internal readonly ref struct AkcssActivatorWriter
             fallbackServiceProviderExpression: context.FallbackServiceProviderExpression,
             nameScopeExpression: context.NameScopeExpression,
             scopeId: context.ScopeId,
-            elementReferences: context.ElementReferences);
+            elementReferences: context.ElementReferences,
+            templatedParentExpression: context.TemplatedParentExpression,
+            usesTemplateServices: context.UsesTemplateServices);
     }
 
     private void WriteActivator(
@@ -749,7 +752,7 @@ internal readonly ref struct AkcssActivatorWriter
         switch (activator.Kind)
         {
             case AkcssActivatorKind.Class:
-                if (_generationMode.UsesStructuralRuntime())
+                if (_generationMode.UsesStructuralRuntime() || context.UsesTemplateServices)
                 {
                     WriteClassActivator(plan.ClassCaches[activator.Index]);
                 }
@@ -790,7 +793,7 @@ internal readonly ref struct AkcssActivatorWriter
         _writer.Write("sourceOrder: ").WriteIntegerLiteral(_forIdentity ? 0 : candidate.SourceOrder).WriteLine(",");
         _writer.Write("applications: ");
 
-        if (_generationMode.UsesStructuralRuntime())
+        if (_generationMode.UsesStructuralRuntime() || context.UsesTemplateServices)
         {
             ref readonly var cache = ref GetApplicationCache(
                 plan,
@@ -1058,7 +1061,7 @@ internal readonly ref struct AkcssActivatorWriter
         _writer.Write(">(");
         WriteMarkupExtensionFactory(componentPlan, plan, context);
         _writer.Write(", ");
-        WriteTargetPropertyReference(slot);
+        WriteTargetPropertyReference(slot, context.UsesTemplateServices);
         WriteObjectConverter(plan.ExpectedType, useNullForgivingOperator: true);
         WriteRecreateOnRefresh(plan.RecreateOnRefresh);
     }
@@ -1151,7 +1154,7 @@ internal readonly ref struct AkcssActivatorWriter
 
         var slot = GetSlot(componentPlan, plan.MarkupExtensionSlotId);
 
-        if (plan.UseFactoryMethod &&
+        if (plan.UseFactoryMethod && !context.UsesTemplateServices &&
             !_generationMode.UsesStructuralRuntime())
         {
             if (!slot.NeedsFactoryMethod)
@@ -1331,8 +1334,14 @@ internal readonly ref struct AkcssActivatorWriter
         }
     }
 
-    private string GetTargetPropertyExpression(in AkcssMarkupExtensionSlotPlan slot)
+    private string GetTargetPropertyExpression(in AkcssMarkupExtensionSlotPlan slot, bool usesTemplateServices = false)
     {
+        if (usesTemplateServices)
+        {
+            return "global::Akbura.Akcss.AkcssUtilityValueSource.GetTargetProperty(typeof(" + _ownerTypeName + "), " +
+                slot.Syntax.SpanStart.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")";
+        }
+
         if (!_generationMode.UsesStructuralRuntime())
         {
             return slot.PropertyName;
@@ -1345,8 +1354,8 @@ internal readonly ref struct AkcssActivatorWriter
             ")";
     }
 
-    private void WriteTargetPropertyReference(in AkcssMarkupExtensionSlotPlan slot)
+    private void WriteTargetPropertyReference(in AkcssMarkupExtensionSlotPlan slot, bool usesTemplateServices)
     {
-        _writer.Write(GetTargetPropertyExpression(slot));
+        _writer.Write(GetTargetPropertyExpression(slot, usesTemplateServices));
     }
 }

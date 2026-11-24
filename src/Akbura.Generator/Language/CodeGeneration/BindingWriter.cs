@@ -7,6 +7,7 @@ using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
+using System.Linq;
 
 namespace Akbura.Language.CodeGeneration;
 
@@ -117,6 +118,24 @@ internal readonly struct BindingWriterEnvironment
     {
         if (_withinType != null)
         {
+            var assembly = _compilation.Assembly;
+            if (symbol.ContainingAssembly is { } origin &&
+                !SymbolEqualityComparer.Default.Equals(origin, assembly) &&
+                origin.Identity.Equals(assembly.Identity))
+            {
+                // C# probes bind source members in a derived compilation.
+                // Roslyn requires the corresponding symbol from this compilation.
+                var id = DocumentationCommentId.CreateDeclarationId(symbol.OriginalDefinition);
+                var localSymbol = id == null ? null : DocumentationCommentId.GetSymbolsForDeclarationId(id, _compilation)
+                    .FirstOrDefault(candidate => SymbolEqualityComparer.Default.Equals(candidate.ContainingAssembly, assembly));
+                if (localSymbol == null)
+                {
+                    return false;
+                }
+
+                symbol = localSymbol;
+            }
+
             return _compilation.IsSymbolAccessibleWithin(symbol, _withinType);
         }
 

@@ -13,6 +13,9 @@
       "include": "#strings"
     },
     {
+      "include": "#templateMarkup"
+    },
+    {
       "include": "#directives"
     },
     {
@@ -101,16 +104,59 @@
         }
       ]
     },
+    "templateMarkup": {
+      "name": "meta.template.akcss",
+      "begin": "(@template)\\s*(\\{)",
+      "end": "\\}",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.directive.akcss"
+        },
+        "2": {
+          "name": "punctuation.section.block.begin.akcss"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "source.akbura#markup"
+        },
+        {
+          "include": "#directives"
+        },
+        {
+          "include": "#strings"
+        }
+      ]
+    },
     "directives": {
       "patterns": [
         {
-          "match": "@(?:using|utilities|apply|if|intercept|akcss)\\b",
+          "match": "@(?:using|utilities|apply|if|intercept|akcss|theme|mixin|include|template-bind|template|based-on)\\b",
           "name": "keyword.control.directive.akcss"
         }
       ]
     },
     "selectors": {
       "patterns": [
+        {
+          "match": "/template/",
+          "name": "keyword.control.selector.akcss"
+        },
+        {
+          "match": "\\^",
+          "name": "keyword.operator.selector.akcss"
+        },
+        {
+          "match": "#[A-Za-z_][A-Za-z0-9_-]*",
+          "name": "entity.other.attribute-name.id.akcss"
+        },
+        {
+          "match": ":(?:focus|focus-visible|focus-within|pointerover|pressed|disabled)\\b",
+          "name": "entity.other.attribute-name.pseudo-class.akcss"
+        },
         {
           "match": "(^|[\\s,>])([A-Z][A-Za-z0-9_.]*)(?=\\.)",
           "captures": {

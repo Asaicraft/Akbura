@@ -253,7 +253,7 @@ namespace Akbura.Language.Syntax
         }
 
         public SyntaxToken CloseBrace
-            => new(this, this.Green.CloseBrace, GetChildPositionFromEnd(1), GetChildIndex(3));
+            => new(this, this.Green.CloseBrace, GetChildPositionFromEnd(3), GetChildIndex(3));
 
         public AkcssStyleRuleSyntax UpdateAkcssStyleRuleSyntax(
             AkcssStyleSelectorSyntax selector,

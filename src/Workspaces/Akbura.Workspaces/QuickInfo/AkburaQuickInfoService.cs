@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
@@ -158,6 +159,12 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
                     continue;
                 }
 
+                if (symbolReference.AkburaSymbol is AkcssThemeSymbol theme)
+                {
+                    return new AkburaQuickInfo(symbolReference.SourceSpan, AkburaQuickInfoKind.Symbol,
+                        _display.FormatTheme(theme), [theme.DefinitionModel.SyntaxTree.FilePath]);
+                }
+
                 var signature = symbolReference.AkburaSymbol is { Language: SymbolLanguage.CSharp }
                     ? GetCSharpSignature(symbolReference.CSharpDefinition.Symbol)
                     : symbolReference.AkburaSymbol?.ToDisplayString() ??
@@ -198,8 +205,30 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
                 ImmutableArray<string>.Empty);
         }
 
+        if (reference.TemplateBinding is { } binding)
+        {
+            var parent = reference.Context?.ActiveTemplate?.TemplatedParentType.Symbol as ITypeSymbol;
+            var receiver = reference.Context?.PropertyReceiver.Symbol as ITypeSymbol;
+            var source = reference.HasAmbiguousTemplateSource
+                ? "Templated parent varies by include"
+                : binding.Source is null ? "Templated parent deferred"
+                : parent is null ? _display.FormatProperty(binding.Source) : _display.FormatType(parent) + "." + binding.Source.Name;
+            var destination = binding.Destination is null ? "Destination unresolved" :
+                (receiver is null ? _display.FormatProperty(binding.Destination) : _display.FormatType(receiver) + "." + binding.Destination.Name);
+            return new AkburaQuickInfo(reference.SourceSpan, AkburaQuickInfoKind.Property, source + " → " + destination,
+                ["One-way template binding.", "Uses Avalonia template priority and target conversion."]);
+        }
+
         return reference.Symbol switch
         {
+            AkcssThemeSymbol theme => new AkburaQuickInfo(reference.SourceSpan, AkburaQuickInfoKind.Symbol,
+                _display.FormatTheme(theme), [theme.DefinitionModel.SyntaxTree.FilePath]),
+            AkcssMixinSymbol mixin => new AkburaQuickInfo(reference.SourceSpan, AkburaQuickInfoKind.Symbol,
+                _display.FormatMixin(mixin), [mixin.DefinitionModel.SyntaxTree.FilePath]),
+            AkcssMixinParameterSymbol parameter => new AkburaQuickInfo(reference.SourceSpan, AkburaQuickInfoKind.Symbol,
+                _display.FormatParameter(parameter), ["Mixin parameter"]),
+            IMarkupNameSymbol name when AkcssSemanticFacts.FindTemplate(name.DeclarationSyntax) is not null =>
+                new AkburaQuickInfo(reference.SourceSpan, AkburaQuickInfoKind.Symbol, name.ToDisplayString(), ["Template part", name.FilePath]),
             AkburaPropertySymbol property => CreateProperty(reference, property),
             ITailwindUtilityParameterSymbol parameter =>
                 CreateParameter(reference, parameter),
@@ -208,6 +237,8 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
             IAkcssModuleSymbol module =>
                 CreateModule(reference, module, cancellationToken),
             IAkcssSymbol style => CreateStyle(reference, style),
+            _ when reference.CSharpDefinition.Symbol is { } csharp && GetCSharpSignature(csharp) is { } signature =>
+                new AkburaQuickInfo(reference.SourceSpan, AkburaQuickInfoKind.Symbol, signature, []),
             _ => null,
         };
     }
@@ -216,11 +247,10 @@ internal sealed class AkburaQuickInfoService : IAkburaQuickInfoService
         AkcssResolvedReference reference,
         AkburaPropertySymbol property)
     {
-        return new AkburaQuickInfo(
-            reference.SourceSpan,
-            AkburaQuickInfoKind.Property,
-            _display.FormatProperty(property),
-            [AkcssSymbolDisplayService.GetPropertyKind(property)]);
+        var kind = AkcssSymbolDisplayService.GetPropertyKind(property);
+        var receiver = reference.Context?.PropertyReceiver.Symbol as ITypeSymbol;
+        return new AkburaQuickInfo(reference.SourceSpan, AkburaQuickInfoKind.Property, _display.FormatProperty(property),
+            receiver is null ? [kind] : [kind, "Selected receiver " + _display.FormatType(receiver)]);
     }
 
     private AkburaQuickInfo CreateStyle(

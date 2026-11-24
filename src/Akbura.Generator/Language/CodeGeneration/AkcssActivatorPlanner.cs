@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -82,6 +83,26 @@ internal static partial class AkcssActivatorPlanner
         return planner.Create(elements);
     }
 
+    internal static bool UsesNativeApplications(IAkburaComponentSymbol component, AkburaSemanticModel model)
+    {
+        foreach (var element in component.DeclarationSyntax.DescendantNodes().OfType<MarkupElementSyntax>())
+        {
+            if (element.StartTag?.Attributes.Any(static attribute => attribute is TailwindAttributeSyntax or
+                    MarkupPlainAttributeSyntax { Name.Identifier.ValueText: "class" }) == true &&
+                model.GetSymbolInfo(element).Symbol is IMarkupComponentSymbol markup &&
+                markup.AttributeOperations.Any(static operation => operation switch
+                {
+                    ITailwindUtilityAttributeOperation utility => utility.Utilities.Any(AkcssSemanticFacts.HasNativeApplication),
+                    IMarkupPropertySetterOperation property => property.AppliedAkcssSymbols.Any(AkcssSemanticFacts.HasNativeApplication),
+                    _ => false,
+                }))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private ref partial struct Planner
     {
         private readonly AkburaSemanticModel _semanticModel;
@@ -105,6 +126,7 @@ internal static partial class AkcssActivatorPlanner
         private ImmutableArrayBuilder<AkcssUtilityCandidatePlan> _candidates;
         private ImmutableArrayBuilder<AkcssUtilityValueSourcePlan> _valueSources;
         private ImmutableArrayBuilder<AkcssMarkupExtensionSlotPlan> _slots;
+        private ImmutableArray<AkburaSemanticDiagnostic>.Builder? _diagnostics;
 
         public Planner(
             AkburaSemanticModel semanticModel,
@@ -132,6 +154,7 @@ internal static partial class AkcssActivatorPlanner
             _candidates = ImmutableArrayBuilder<AkcssUtilityCandidatePlan>.Rent();
             _valueSources = ImmutableArrayBuilder<AkcssUtilityValueSourcePlan>.Rent();
             _slots = ImmutableArrayBuilder<AkcssMarkupExtensionSlotPlan>.Rent();
+            _diagnostics = null;
         }
 
         public AkcssComponentActivatorPlan Create(ReadOnlySpan<AkcssActivatorElementInput> elements)
@@ -150,7 +173,8 @@ internal static partial class AkcssActivatorPlanner
                 _candidates.ToPooledImmutableList(),
                 _valueSources.ToPooledImmutableList(),
                 _slots.ToPooledImmutableList(),
-                _bindingPriorityType);
+                _bindingPriorityType,
+                _diagnostics?.ToImmutable() ?? []);
         }
 
         public void Dispose()
@@ -173,6 +197,7 @@ internal static partial class AkcssActivatorPlanner
                 ? ImmutableArray<IMarkupAttributeOperation>.Empty
                 : element.Symbol.AttributeOperations;
             var isControlTarget = IsControlElement(element.Type);
+            var precedence = new NativePrefixPolicies();
 
             for (var sourceOrder = 0; sourceOrder < operations.Length; sourceOrder++)
             {
@@ -184,12 +209,16 @@ internal static partial class AkcssActivatorPlanner
 
                 if (operation is IMarkupPropertySetterOperation propertySetter)
                 {
-                    AddAppliedClasses(propertySetter);
+                    AddAppliedClasses(propertySetter, isControlTarget);
                 }
 
                 if (operation is ITailwindUtilityAttributeOperation utilityOperation)
                 {
-                    AddUtilityCandidate(element, utilityOperation, sourceOrder, isControlTarget);
+                    if (!utilityOperation.Utilities.Any(AkcssSemanticFacts.HasNativeApplication) ||
+                        ValidateNativeUtility(utilityOperation, isControlTarget, ref precedence))
+                    {
+                        AddUtilityCandidate(element, utilityOperation, sourceOrder, isControlTarget);
+                    }
                 }
             }
 
@@ -203,13 +232,83 @@ internal static partial class AkcssActivatorPlanner
                     _slots.Count - slotStart)));
         }
 
-        private void AddAppliedClasses(IMarkupPropertySetterOperation operation)
+        private bool ValidateNativeUtility(ITailwindUtilityAttributeOperation operation, bool isControlTarget,
+            ref NativePrefixPolicies policies)
+        {
+            if (!isControlTarget)
+            {
+                return ReportNativeError(operation.Syntax, "A native AKCSS utility requires an Avalonia Control application target.");
+            }
+
+            var priority = operation.BindingPriority;
+            var styleTrigger = _bindingPriorityType?.GetMembers("StyleTrigger").OfType<IFieldSymbol>().FirstOrDefault()?.ConstantValue;
+            if (priority.Source == TailwindUtilityBindingPrioritySource.Constant &&
+                (styleTrigger is not int value || value != priority.ConstantValue))
+            {
+                return ReportNativeError(operation.Syntax, "Native AKCSS utilities require StyleTrigger binding priority.");
+            }
+
+            var variant = operation.Variant;
+            if (!variant.IsPrefixed)
+            {
+                return true;
+            }
+
+            if (variant.ConflictGroup is not { } group)
+            {
+                if (policies.Group != null || variant.UnprefixedPrecedence != TailwindUtilityUnprefixedPrecedence.SourceOrder)
+                {
+                    return ReportNativeError(operation.Syntax, "Ungrouped native AKCSS prefixes require a common SourceOrder policy.");
+                }
+                policies.HasUngrouped = true;
+                return true;
+            }
+
+            var mode = variant.UnprefixedPrecedence;
+            if (policies.HasUngrouped || double.IsNaN(variant.Order) || double.IsInfinity(variant.Order) ||
+                mode is not (TailwindUtilityUnprefixedPrecedence.Above or TailwindUtilityUnprefixedPrecedence.Below) ||
+                policies.Group != null && (policies.Group != group || policies.Precedence != mode))
+            {
+                return ReportNativeError(operation.Syntax,
+                    "Native AKCSS prefixes require one group with a uniform Above or Below policy and finite order.");
+            }
+            policies.Group = group;
+            policies.Precedence = mode;
+            return true;
+        }
+
+        private bool ReportNativeError(AkburaSyntax? syntax, string message)
+        {
+            if (syntax != null)
+            {
+                (_diagnostics ??= ImmutableArray.CreateBuilder<AkburaSemanticDiagnostic>()).Add(AkcssNativePlanner.Error(syntax, message));
+            }
+            return false;
+        }
+
+        private struct NativePrefixPolicies
+        {
+            public string? Group;
+            public TailwindUtilityUnprefixedPrecedence Precedence;
+            public bool HasUngrouped;
+        }
+
+        private void AddAppliedClasses(IMarkupPropertySetterOperation operation, bool isControlTarget)
         {
             var styles = operation.AppliedAkcssSymbols;
             for (var i = 0; i < styles.Length; i++)
             {
+                if (!isControlTarget && AkcssSemanticFacts.HasNativeApplication(styles[i]))
+                {
+                    ReportNativeError(operation.Syntax, "A native AKCSS class requires an Avalonia Control application target.");
+                    continue;
+                }
                 if (!TryCreateStyleReference(styles[i], out var reference))
                 {
+                    if (AkcssSemanticFacts.HasNativeApplication(styles[i]))
+                    {
+                        ReportNativeError(operation.Syntax, $"The runtime definition of native AKCSS class '{styles[i].Name}' is unavailable.");
+                    }
                     continue;
                 }
 
@@ -249,6 +348,10 @@ internal static partial class AkcssActivatorPlanner
                 if (TryCreateStyleReference(utility, out var reference))
                 {
                     applications.Add(new AkcssUtilityApplicationPlan(utility, reference));
+                }
+                else if (AkcssSemanticFacts.HasNativeApplication(utility))
+                {
+                    ReportNativeError(operation.Syntax, $"The runtime definition of native AKCSS utility '{utility.Name}' is unavailable.");
                 }
             }
 
@@ -674,6 +777,22 @@ internal static partial class AkcssActivatorPlanner
                 return true;
             }
 
+            var compilation = _semanticModel.Compilation;
+            if (declarationSyntax is InlineAkcssBlockSyntax && _semanticModel.SyntaxTree is ComponentSyntaxTree componentTree &&
+                _semanticModel.GetDeclaredSymbol(componentTree.GetRoot()) is IAkburaComponentSymbol component)
+            {
+                for (var index = 0; index < component.AkcssModules.Length; index++)
+                {
+                    if (ReferenceEquals(component.AkcssModules[index].DeclaringSyntax, declarationSyntax))
+                    {
+                        var path = AkburaGenerationCatalogBuilder.GetSourcePath(componentTree, compilation.ProjectDirectory);
+                        var identity = AkburaGenerationCatalogBuilder.GetInlineAkcssModuleIdentity(path, index);
+                        typeName = AkcssGeneratedModuleNames.GetFullyQualifiedTypeName(compilation.RootNamespace, identity);
+                        return true;
+                    }
+                }
+            }
+
             if (string.IsNullOrWhiteSpace(module.Path))
             {
                 typeName = string.Empty;
@@ -690,7 +809,7 @@ internal static partial class AkcssActivatorPlanner
                 }
 
                 var sourcePath = GetAkcssSourcePath(syntaxTree, _semanticModel.Compilation);
-                typeName = AkcssGeneratedModuleNames.GetFullyQualifiedTypeName(sourcePath);
+                typeName = AkcssGeneratedModuleNames.GetFullyQualifiedTypeName(compilation.RootNamespace, sourcePath);
                 return true;
             }
 

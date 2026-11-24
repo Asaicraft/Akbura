@@ -376,7 +376,8 @@ internal readonly struct AkcssComponentActivatorPlan
         PooledImmutableList<AkcssUtilityCandidatePlan> candidates,
         PooledImmutableList<AkcssUtilityValueSourcePlan> valueSources,
         PooledImmutableList<AkcssMarkupExtensionSlotPlan> markupExtensionSlots,
-        INamedTypeSymbol? bindingPriorityType)
+        INamedTypeSymbol? bindingPriorityType,
+        ImmutableArray<AkburaSemanticDiagnostic> diagnostics = default)
     {
         Elements = elements;
         Activators = activators;
@@ -387,6 +388,7 @@ internal readonly struct AkcssComponentActivatorPlan
         ValueSources = valueSources;
         MarkupExtensionSlots = markupExtensionSlots;
         BindingPriorityType = bindingPriorityType;
+        Diagnostics = diagnostics.IsDefault ? [] : diagnostics;
     }
 
     public PooledImmutableList<AkcssElementActivatorPlan> Elements { get; }
@@ -406,6 +408,8 @@ internal readonly struct AkcssComponentActivatorPlan
     public PooledImmutableList<AkcssMarkupExtensionSlotPlan> MarkupExtensionSlots { get; }
 
     public INamedTypeSymbol? BindingPriorityType { get; }
+
+    public ImmutableArray<AkburaSemanticDiagnostic> Diagnostics { get; }
 
     public bool IsEmpty => Activators.IsEmpty;
 

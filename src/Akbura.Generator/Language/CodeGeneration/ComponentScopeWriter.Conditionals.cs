@@ -41,7 +41,7 @@ internal readonly ref partial struct ComponentScopeWriter
             }
         }
 
-        WriteConditionalStyleDeclarations(plan, content.Items);
+        WriteConditionalElementDeclarations(plan, content.Items, context.UsesTemplateServices);
 
         WriteConditionalActivations(plan, content.Items, context, changed, cursor);
         var isDynamic = false;
@@ -71,11 +71,11 @@ internal readonly ref partial struct ComponentScopeWriter
         _writer.CurrentIndent += _writer.TabSize;
         if (content.Collection.IsValid)
         {
-            WriteConditionalCollection(plan, content);
+            WriteConditionalCollection(plan, content, context.UsesTemplateServices);
         }
         else
         {
-            WriteConditionalScalar(plan, content);
+            WriteConditionalScalar(plan, content, context.IsControlTemplate);
         }
 
         _writer.CurrentIndent -= _writer.TabSize;
@@ -233,7 +233,9 @@ internal readonly ref partial struct ComponentScopeWriter
     private void WriteConditionalBranchState(in ComponentPlan plan, in ComponentScopePlan scope,
         in MarkupExtensionWriteContext inherited, bool styleAlreadyDeclared = true)
     {
-        var traversalKind = MarkupParentStackTraversalKind.FullHierarchy;
+        var traversalKind = inherited.UsesTemplateServices
+            ? MarkupParentStackTraversalKind.ControlTemplateHierarchy
+            : MarkupParentStackTraversalKind.FullHierarchy;
         if (scope.Kind is ComponentElementScopeKind.DataTemplate or ComponentElementScopeKind.DeferredContent ||
             scope.OwnerElementId >= 0 && plan.Elements.ItemRef(scope.OwnerElementId).RuntimeStorageRootScopeId > 0)
         {
@@ -257,7 +259,14 @@ internal readonly ref partial struct ComponentScopeWriter
         var context = new ComponentScopeWriteContext(intermediateRoot,
             inherited.BaseUriExpression, inherited.FallbackServiceProviderExpression,
             inherited.NameScopeExpression, scope.Id, traversalKind,
-            plan.Elements.AsSpan(), plan.ElementReferences.AsSpan(), inherited.IsConditionalNameScope);
+            plan.Elements.AsSpan(), plan.ElementReferences.AsSpan(), inherited.IsConditionalNameScope,
+            inherited.TemplatedParentExpression, inherited.UsesTemplateServices);
+        if (inherited.UsesTemplateServices)
+        {
+            WriteTemplateConditionalBranch(plan, scope, context);
+            return;
+        }
+
         WriteStyleElementCreation(plan, scope, styleAlreadyDeclared);
         WriteConditionalCallbackRefresh(plan, scope);
         for (var i = scope.Elements.Length - 1; i >= 0; i--)
@@ -341,12 +350,12 @@ internal readonly ref partial struct ComponentScopeWriter
         }
     }
 
-    private void WriteConditionalCollection(in ComponentPlan plan, in ComponentConditionalContentPlan content)
+    private void WriteConditionalCollection(in ComponentPlan plan, in ComponentConditionalContentPlan content, bool isStandaloneTemplate)
     {
         ref readonly var owner = ref plan.Elements.ItemRef(content.OwnerElementId);
         if (!owner.UsesRuntimeStorage)
         {
-            WriteConditionalInlineCollection(plan, content);
+            WriteConditionalInlineItems(plan, content, content.Items, isStandaloneTemplate);
             return;
         }
 
@@ -443,12 +452,8 @@ internal readonly ref partial struct ComponentScopeWriter
         _writer.Write(" == ").WriteIntegerLiteral(branchId).WriteLine(")");
     }
 
-    private void WriteConditionalInlineCollection(in ComponentPlan plan, in ComponentConditionalContentPlan content)
-    {
-        WriteConditionalInlineItems(plan, content, content.Items);
-    }
-
-    private void WriteConditionalInlineItems(in ComponentPlan plan, in ComponentConditionalContentPlan content, ComponentPlanRange items)
+    private void WriteConditionalInlineItems(in ComponentPlan plan, in ComponentConditionalContentPlan content,
+        ComponentPlanRange items, bool isStandaloneTemplate)
     {
         for (var i = 0; i < items.Length; i++)
         {
@@ -457,8 +462,16 @@ internal readonly ref partial struct ComponentScopeWriter
             if (item.Value.Kind == ComponentContentValueKind.Foreach)
             {
                 _writer.Write("foreach (var __foreachChild in ");
-                WriteForeachRegionAccess(plan, plan.ForeachRegions.ItemRef(item.Value.Index));
-                _writer.WriteLine(".Children)");
+                if (isStandaloneTemplate)
+                {
+                    _writer.Write(GetTemplateForeachItems(item.Value.Index));
+                }
+                else
+                {
+                    WriteForeachRegionAccess(plan, plan.ForeachRegions.ItemRef(item.Value.Index));
+                    _writer.Write(".Children");
+                }
+                _writer.WriteLine(")");
                 _writer.WriteLine("{");
                 _writer.CurrentIndent += _writer.TabSize;
                 var writer = new CollectionWriter(_writer);
@@ -477,7 +490,7 @@ internal readonly ref partial struct ComponentScopeWriter
                     WriteConditionalBranchTest(plan, region.Id, branch);
                     _writer.WriteLine("{");
                     _writer.CurrentIndent += _writer.TabSize;
-                    WriteConditionalInlineItems(plan, content, region.Branches[branch].Items);
+                    WriteConditionalInlineItems(plan, content, region.Branches[branch].Items, isStandaloneTemplate);
                     _writer.CurrentIndent -= _writer.TabSize;
                     _writer.WriteLine("}");
                 }
@@ -505,11 +518,43 @@ internal readonly ref partial struct ComponentScopeWriter
         }
     }
 
-    private void WriteConditionalStyleDeclarations(in ComponentPlan plan, ComponentPlanRange items)
+    private void WriteTemplateConditionalBranch(in ComponentPlan plan, in ComponentScopePlan scope,
+        in ComponentScopeWriteContext context)
+    {
+        WriteLocalContentStates(plan, scope, styleOnly: false);
+        var elementWriter = new ElementWriter(_writer, _sourceMap);
+        for (var index = 0; index < scope.Elements.Length; index++)
+        {
+            ref readonly var element = ref plan.Elements.ItemRef(GetScopeElementId(plan, scope, index));
+            elementWriter.WriteCreation(element, alreadyDeclared: true);
+            elementWriter.WriteBeginInit(element);
+        }
+
+        var initialized = new bool[plan.Elements.Length];
+        for (var index = 0; index < scope.Elements.Length; index++)
+        {
+            WriteElementAssignments(plan, GetScopeElementId(plan, scope, index),
+                context, initialized, ComponentAssignmentPhase.LocalInitial);
+        }
+
+        WriteEndInit(plan, scope);
+        WriteApplyReplacedStyles(plan, scope);
+    }
+
+    private void WriteConditionalElementDeclarations(in ComponentPlan plan, ComponentPlanRange items, bool isStandaloneTemplate)
     {
         for (var i = 0; i < items.Length; i++)
         {
             var value = plan.ContentItems.ItemRef(items.Start + i).Value;
+            if (isStandaloneTemplate && value.Kind == ComponentContentValueKind.Foreach)
+            {
+                var output = plan.ForeachRegions.ItemRef(value.Index).Operation.OutputType.Symbol;
+                _writer.Write("var ").Write(GetTemplateForeachItems(value.Index))
+                    .Write(" = new global::System.Collections.Generic.List<");
+                new CSharpValueWriter(_writer).WriteTypeNameWithNullableAnnotation(output as Microsoft.CodeAnalysis.ITypeSymbol);
+                _writer.WriteLine(">();");
+            }
+
             if (value.Kind != ComponentContentValueKind.Conditional)
             {
                 continue;
@@ -521,14 +566,14 @@ internal readonly ref partial struct ComponentScopeWriter
                 for (var j = 0; j < scope.Elements.Length; j++)
                 {
                     ref readonly var element = ref plan.Elements.ItemRef(GetScopeElementId(plan, scope, j));
-                    if (element.IsStyleSubtree)
+                    if (isStandaloneTemplate || element.IsStyleSubtree)
                     {
                         new CSharpValueWriter(_writer).WriteTypeName(element.Type);
                         _writer.Write(" ").Write(element.Identifier).WriteLine(" = null!;");
                     }
                 }
 
-                WriteConditionalStyleDeclarations(plan, branch.Items);
+                WriteConditionalElementDeclarations(plan, branch.Items, isStandaloneTemplate);
             }
         }
     }
@@ -610,7 +655,7 @@ internal readonly ref partial struct ComponentScopeWriter
         }
     }
 
-    private void WriteConditionalScalar(in ComponentPlan plan, in ComponentConditionalContentPlan content)
+    private void WriteConditionalScalar(in ComponentPlan plan, in ComponentConditionalContentPlan content, bool isControlTemplate)
     {
         var name = "__conditionalValue" + content.Id + "Result";
         _writer.Write("object? ").Write(name).WriteLine(" = null;");
@@ -619,7 +664,7 @@ internal readonly ref partial struct ComponentScopeWriter
         if (!owner.UsesRuntimeStorage)
         {
             var property = new PropertyWriter(_writer);
-            var end = property.WriteStart(content.Property, owner.Identifier);
+            var end = property.WriteStart(content.Property, owner.Identifier, isControlTemplate);
             _writer.Write("(");
             new CSharpValueWriter(_writer).WriteTypeNameWithNullableAnnotation(content.Property.ClrProperty?.Type);
             _writer.Write(")").Write(name);

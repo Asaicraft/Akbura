@@ -1,6 +1,7 @@
 using Akbura.Language;
 using Akbura.Language.Syntax;
 using Akbura.Workspaces.Documents;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Akbura.Workspaces.Completion;
@@ -15,11 +16,24 @@ internal readonly struct AkburaResourceKeyCompletionContext
         ApplicableSpan = applicableSpan;
         Prefix = prefix;
         Quote = quote;
+        ExpectedType = null;
     }
 
     public string ExtensionName { get; }
 
-    public MarkupExtensionSyntax Extension { get; }
+    public AkburaResourceKeyCompletionContext(TextSpan applicableSpan, string prefix, ITypeSymbol? expectedType)
+    {
+        ExtensionName = string.Empty;
+        Extension = null;
+        ApplicableSpan = applicableSpan;
+        Prefix = prefix;
+        Quote = '"';
+        ExpectedType = expectedType;
+    }
+
+    public MarkupExtensionSyntax? Extension { get; }
+
+    public ITypeSymbol? ExpectedType { get; }
 
     public TextSpan ApplicableSpan { get; }
 
@@ -38,8 +52,7 @@ internal static class AkburaResourceKeyCompletionFacts
         }
         context = default;
 
-        if ((uint)position > (uint)document.Text.Length ||
-            document.SyntaxTree.Kind == SyntaxTreeKind.Akcss)
+        if ((uint)position > (uint)document.Text.Length)
         {
             return false;
         }

@@ -67,6 +67,9 @@ internal sealed class MemberSemanticModelFactory
                 case AkburaSyntaxKind.AkcssDocumentSyntax:
                 case AkburaSyntaxKind.AkcssStyleRuleSyntax:
                 case AkburaSyntaxKind.AkcssUtilityDeclarationSyntax:
+                case AkburaSyntaxKind.AkcssSelectorRuleSyntax:
+                case AkburaSyntaxKind.AkcssThemeDeclarationSyntax:
+                case AkburaSyntaxKind.AkcssMixinDeclarationSyntax:
                 case AkburaSyntaxKind.AkcssAssignmentSyntax:
                 case AkburaSyntaxKind.AkcssIfDirectiveSyntax:
                 case AkburaSyntaxKind.AkcssApplyDirectiveSyntax:
@@ -161,7 +164,10 @@ internal sealed class MemberSemanticModelFactory
                 syntaxKind is AkburaSyntaxKind.InlineAkcssBlockSyntax or
                     AkburaSyntaxKind.AkcssDocumentSyntax or
                     AkburaSyntaxKind.AkcssStyleRuleSyntax or
-                    AkburaSyntaxKind.AkcssUtilityDeclarationSyntax,
+                    AkburaSyntaxKind.AkcssUtilityDeclarationSyntax or
+                    AkburaSyntaxKind.AkcssSelectorRuleSyntax or
+                    AkburaSyntaxKind.AkcssThemeDeclarationSyntax or
+                    AkburaSyntaxKind.AkcssMixinDeclarationSyntax,
             _ => syntaxKind == AkburaSyntaxKind.AkburaDocumentSyntax,
         };
     }

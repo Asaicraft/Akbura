@@ -25,21 +25,42 @@ internal abstract partial class AkburaSemanticModel
                 "The AKCSS expression could not be parsed as C#.");
         }
 
-        var containingSymbol = GetAkcssCompletionContainingSymbol(
-            expressionSyntax);
-        var targetType = GetAkcssCompletionExpectedType(
-            expressionSyntax,
-            containingSymbol);
-        var annotation = new SyntaxAnnotation(
-            "AkburaCSharpCompletionTarget");
+        var context = GetAkcssEditorContext(expressionSyntax) ??
+            throw new InvalidOperationException("The AKCSS expression has no containing declaration.");
+        var targetType = GetAkcssExpressionExpectedType(expressionSyntax, context);
+        var receiver = expressionSyntax.Parent is AkcssBasedOnDirectiveSyntax or AkcssMixinParameterDefaultSyntax
+            ? default : context.ExpressionReceiver;
+        return CreateAkcssExpressionProjection(expressionSyntax, expression, context, receiver, targetType, relativePosition);
+    }
+
+    internal CSharpProbeProjection CreateAkcssEmptyIncludeArgumentProjection(AkcssMixinArgumentListSyntax list, int relativePosition)
+    {
+        if (list.Parent is not AkcssIncludeSyntax include ||
+            !EmbeddedCSharpSyntaxFacts.TryGetEmptyIncludeArgumentSpan(list, out var span) ||
+            GetAkcssEditorContext(include) is not { } context)
+        {
+            throw new InvalidOperationException("The AKCSS include has no available argument context.");
+        }
+
+        var text = list.ToFullString().Substring(span.Start - list.FullSpan.Start, span.Length);
+        var expression = CSharpSyntaxFactory.ParseExpression(text);
+        return CreateAkcssExpressionProjection(list, expression, context, context.ExpressionReceiver,
+            GetAkcssIncludeParameterType(include, index: 0), relativePosition);
+    }
+
+    private CSharpProbeProjection CreateAkcssExpressionProjection(AkburaSyntax site, CSharp.ExpressionSyntax expression,
+        AkcssBindingContext context, CSharpSymbolDefinition receiver, ITypeSymbol? targetType, int relativePosition)
+    {
+        var annotation = new SyntaxAnnotation("AkburaCSharpCompletionTarget");
         var annotatedExpression = expression
             .WithAdditionalAnnotations(annotation);
         var root = CreateAkcssExpressionProbe(
             annotatedExpression,
-            containingSymbol,
+            context.Owner,
             targetType,
             includeCompletionMembers: true,
-            completionScope: expressionSyntax);
+            completionScope: site,
+            effectiveReceiver: receiver);
         return CSharpProbeBuilder.CreateProjection(
             root,
             annotatedExpression,
@@ -108,79 +129,6 @@ internal abstract partial class AkburaSemanticModel
             annotatedName,
             annotation,
             relativePosition);
-    }
-
-    private IAkcssSymbol GetAkcssCompletionContainingSymbol(
-        AkburaSyntax syntax)
-    {
-        for (var current = syntax.Parent;
-             current != null;
-             current = current.Parent)
-        {
-            if (current is not (AkcssStyleRuleSyntax or
-                    AkcssUtilityDeclarationSyntax))
-            {
-                continue;
-            }
-
-            if (TryGetAkcssCompletionContainingSymbol(
-                    current,
-                    out var containingSymbol))
-            {
-                return containingSymbol;
-            }
-
-            break;
-        }
-
-        throw new InvalidOperationException(
-            "The AKCSS completion expression has no containing declaration.");
-    }
-
-    private ITypeSymbol? GetAkcssCompletionExpectedType(
-        CSharpExpressionSyntax expressionSyntax,
-        IAkcssSymbol containingSymbol)
-    {
-        if (expressionSyntax.Parent is AkcssIfDirectiveSyntax)
-        {
-            return Compilation.CSharpCompilation.GetSpecialType(
-                SpecialType.System_Boolean);
-        }
-
-        if (expressionSyntax.Parent is not
-                AkcssAssignmentSyntax assignment)
-        {
-            return null;
-        }
-
-        for (var current = assignment.Parent;
-             current != null;
-             current = current.Parent)
-        {
-            if (current is not (AkcssStyleRuleSyntax or
-                    AkcssUtilityDeclarationSyntax))
-            {
-                continue;
-            }
-
-            if (TryGetAkcssValueCompletionInfo(
-                    current.FullSpan,
-                    assignment.PropertyName.ToFullString(),
-                    out var info))
-            {
-                return info.ExpectedType;
-            }
-
-            break;
-        }
-
-        using var diagnostics =
-            ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
-        return ResolveAkcssProperty(
-                assignment,
-                containingSymbol,
-                diagnostics)
-            ?.Type.Symbol as ITypeSymbol;
     }
 
     private ImmutableArray<CSharp.UsingDirectiveSyntax>

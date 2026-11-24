@@ -37,6 +37,46 @@ partial class AkburaSyntax
             || (childSpan.Length == 0 && span.IntersectsWith(childSpan));
     }
 
+    // A caret can belong to both children at a boundary, including missing nodes.
+    internal DescendantNodesAtPositionEnumerable DescendantNodesAtPosition(int position) => new(this, position);
+
+    internal readonly struct DescendantNodesAtPositionEnumerable(AkburaSyntax node, int position)
+    {
+        public Enumerator GetEnumerator() => new(node, position);
+
+        public struct Enumerator : IDisposable
+        {
+            private ChildSyntaxListEnumeratorStack _stack;
+            private readonly int _position;
+
+            internal Enumerator(AkburaSyntax node, int position)
+            {
+                _position = position;
+                _stack = new ChildSyntaxListEnumeratorStack(
+                    node.FullSpan.IntersectsWith(position) ? node : null, descendIntoChildren: null);
+            }
+
+            public AkburaSyntax Current { get; private set; } = null!;
+
+            public bool MoveNext()
+            {
+                while (_stack.IsNotEmpty)
+                {
+                    if (_stack.TryGetNextAsNodeAtPosition(_position) is { } node)
+                    {
+                        _stack.PushChildren(node);
+                        Current = node;
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            public readonly void Dispose() => _stack.Dispose();
+        }
+    }
+
     private struct ChildSyntaxListEnumeratorStack : IDisposable
     {
         private static readonly ObjectPool<ChildSyntaxList.Enumerator[]> s_stackPool = new(() => new ChildSyntaxList.Enumerator[16]);
@@ -44,9 +84,9 @@ partial class AkburaSyntax
         private ChildSyntaxList.Enumerator[]? _stack;
         private int _stackPtr;
 
-        public ChildSyntaxListEnumeratorStack(AkburaSyntax startingNode, Func<AkburaSyntax, bool>? descendIntoChildren)
+        public ChildSyntaxListEnumeratorStack(AkburaSyntax? startingNode, Func<AkburaSyntax, bool>? descendIntoChildren)
         {
-            if (descendIntoChildren == null || descendIntoChildren(startingNode))
+            if (startingNode is not null && (descendIntoChildren == null || descendIntoChildren(startingNode)))
             {
                 _stack = s_stackPool.Allocate();
                 _stackPtr = 0;
@@ -85,6 +125,27 @@ partial class AkburaSyntax
                 if (IsInSpan(in span, nodeValue.FullSpan))
                 {
                     return nodeValue;
+                }
+            }
+
+            _stackPtr--;
+            return null;
+        }
+
+        public AkburaSyntax? TryGetNextAsNodeAtPosition(int position)
+        {
+            AkburaDebug.Assert(_stack is not null);
+            while (_stack[_stackPtr].TryMoveNextAndGetCurrentAsNode() is { } node)
+            {
+                var span = node.FullSpan;
+                if (position < span.Start)
+                {
+                    break;
+                }
+
+                if (position <= span.End)
+                {
+                    return node;
                 }
             }
 

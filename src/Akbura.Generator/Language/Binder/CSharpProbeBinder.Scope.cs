@@ -762,7 +762,7 @@ internal sealed partial class CSharpProbeBinder
             .WithModifiers(modifiers);
     }
 
-    private static bool TryCreateProjectedSymbolAnnotation(
+    internal static bool TryCreateProjectedSymbolAnnotation(
         AkburaSymbol symbol,
         string name,
         out SyntaxAnnotation annotation)
@@ -816,6 +816,9 @@ internal sealed partial class CSharpProbeBinder
                 return true;
             case ICommandSymbol command:
                 span = command.DeclarationSyntax.Name.Span;
+                return true;
+            case AkcssMixinParameterSymbol parameter:
+                span = parameter.DeclarationSyntax.Name.Span;
                 return true;
             case ITailwindUtilityParameterSymbol
                 {

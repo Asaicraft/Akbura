@@ -22,6 +22,7 @@ internal enum PropertyWriteEnd : byte
     None,
     Assignment,
     Invocation,
+    TemplateInvocation,
 }
 
 /// <summary>
@@ -268,7 +269,7 @@ internal readonly ref struct PropertyWriter
 
     public PropertyWriteEnd WriteStart(
         in PropertyWritePlan plan,
-        string targetExpression)
+        string targetExpression, bool isControlTemplate = false)
     {
         Debug.Assert(!string.IsNullOrEmpty(targetExpression));
 
@@ -276,6 +277,12 @@ internal readonly ref struct PropertyWriter
         {
             Debug.Fail("An invalid property write reached code generation.");
             return PropertyWriteEnd.None;
+        }
+
+        if (isControlTemplate && plan.AvaloniaProperty is IFieldSymbol field && IsStyledProperty(field.Type))
+        {
+            WriteAvaloniaProperty(plan, targetExpression);
+            return PropertyWriteEnd.TemplateInvocation;
         }
 
         if (plan.AssignsCollectionSource)
@@ -306,6 +313,10 @@ internal readonly ref struct PropertyWriter
                 _writer.Write(");");
                 return;
 
+            case PropertyWriteEnd.TemplateInvocation:
+                _writer.Write(", global::Avalonia.Data.BindingPriority.Template);");
+                return;
+
             case PropertyWriteEnd.None:
                 return;
 
@@ -313,6 +324,18 @@ internal readonly ref struct PropertyWriter
                 Debug.Fail("Unknown property-write ending.");
                 return;
         }
+    }
+
+    private static bool IsStyledProperty(ITypeSymbol type)
+    {
+        for (var current = type as INamedTypeSymbol; current != null; current = current.BaseType)
+        {
+            if (current.Name == "StyledProperty" && current.ContainingNamespace.ToDisplayString() == "Avalonia")
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private PropertyWriteEnd WriteClrProperty(

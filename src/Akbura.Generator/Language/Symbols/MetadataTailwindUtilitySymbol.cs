@@ -66,6 +66,8 @@ internal sealed class MetadataTailwindUtilitySymbol : Symbol, ITailwindUtilitySy
 
     public bool HasErrors => _data.HasErrors;
 
+    public bool HasNativeBody => _data.HasNativeBody;
+
     public ImmutableArray<string> ObservedProperties => _data.ObservedProperties;
 
     public ImmutableArray<AttributeData> OperationAttributes =>

@@ -26,6 +26,14 @@ internal static partial class AkcssRuntime
         runtime.SetStyles(styles.IsDefault ? [] : styles);
     }
 
+    internal static void DeferTemplateStyles(Control target)
+    {
+        if (!target.IsAttachedToVisualTree())
+        {
+            s_targets.GetValue(target, static value => new TargetRuntime(value)).DeferUntilAttached();
+        }
+    }
+
     public static ImmutableArray<AkcssStyleActivator> GetStyles(object target)
     {
         ArgumentNullException.ThrowIfNull(target);
@@ -62,6 +70,8 @@ internal static partial class AkcssRuntime
         private bool _isDetached;
         private bool _applyPending;
         private bool _isRestoringSources;
+        private bool _nativePending;
+        private AkcssNativeApplications? _nativeApplications;
 
         public TargetRuntime(object target)
         {
@@ -75,8 +85,23 @@ internal static partial class AkcssRuntime
 
         public ImmutableArray<AkcssStyleActivator> Styles => _styles;
 
+        public void DeferUntilAttached() => _isDetached = true;
+
         public void SetStyles(ImmutableArray<AkcssStyleActivator> styles)
         {
+            var previous = _styles;
+            var previousDescriptors = _descriptors;
+            var hasNative = _nativeApplications != null ||
+                previous.Any(AkcssNativeApplications.HasNativeBody) || styles.Any(AkcssNativeApplications.HasNativeBody);
+            if (hasNative)
+            {
+                if (_isChanging || _isApplying)
+                {
+                    throw new InvalidOperationException("A native AKCSS cascade cannot be replaced during a cascade update.");
+                }
+                AkcssNativeApplications.Validate(_target, styles);
+            }
+
             _descriptors = default;
             _isChanging = true;
             _applyPending = false;
@@ -90,17 +115,32 @@ internal static partial class AkcssRuntime
                 if (!_isDetached)
                 {
                     Subscribe();
+                    if (hasNative)
+                    {
+                        ReconcileNativeApplications();
+                    }
                 }
             }
             catch (Exception failure)
             {
-                try
+                var failures = new List<Exception> { failure };
+                AttemptCleanup(DisposeAllSubscriptions, failures);
+                if (hasNative)
                 {
-                    DisposeSubscriptions();
+                    _styles = previous;
+                    _descriptors = previousDescriptors;
+                    _conflictIndex = new(StringComparer.Ordinal);
+                    _pendingConflictKeys.Clear();
+                    _nativePending = false;
+                    if (!_isDetached)
+                    {
+                        AttemptCleanup(SubscribeAll, failures);
+                        AttemptCleanup(ExecuteStyles, failures);
+                    }
                 }
-                catch (Exception cleanup)
+                if (failures.Count > 1)
                 {
-                    throw new AggregateException("AKCSS application and cleanup failed.", failure, cleanup);
+                    throw new AggregateException("AKCSS application and restoration failed.", failures);
                 }
                 throw;
             }
@@ -111,12 +151,24 @@ internal static partial class AkcssRuntime
 
             if (!_isDetached)
             {
-                RequestApply();
+                _applyPending = true;
+                ApplyPendingCandidates();
             }
+        }
+
+        private void SubscribeAll() => Subscribe();
+
+        private void DisposeAllSubscriptions() => DisposeSubscriptions();
+
+        private static void AttemptCleanup(Action action, List<Exception> failures)
+        {
+            try { action(); }
+            catch (Exception error) { failures.Add(error); }
         }
 
         public void RequestApply()
         {
+            _nativePending |= _nativeApplications != null || _styles.Any(AkcssNativeApplications.HasNativeBody);
             _applyPending = true;
             ApplyPendingCandidates();
         }
@@ -157,6 +209,7 @@ internal static partial class AkcssRuntime
                     if (style is AkcssUtilityCandidateActivator candidate)
                     {
                         candidate.Refresh(_target);
+                        _nativePending |= candidate.HasNativeBody;
                         if (candidate.RefreshFrameCondition())
                         {
                             RequestApplyCandidate(candidate);
@@ -186,15 +239,24 @@ internal static partial class AkcssRuntime
         {
         }
 
-        private void Subscribe()
+        private void Subscribe(bool keepNative = false)
         {
+            HashSet<AkcssUtilityCandidateActivator>? native = null;
             foreach (var style in _styles)
             {
                 if (style is AkcssUtilityCandidateActivator candidate)
                 {
-                    candidate.Attach(
-                        _target,
-                        RequestApplyCandidate);
+                    if (!candidate.HasNativeBody || !keepNative && (native ??= new()).Add(candidate))
+                    {
+                        candidate.Attach(
+                            _target,
+                            RequestApplyCandidate);
+                    }
+                    continue;
+                }
+
+                if (AkcssNativeApplications.HasNativeBody(style))
+                {
                     continue;
                 }
 
@@ -208,7 +270,10 @@ internal static partial class AkcssRuntime
         {
             for (var index = _styles.Length - 1; index >= 0; index--)
             {
-                _styles[index].Reset(_target);
+                if (_styles[index] is not AkcssClassActivator { Class: IAkcssNativeStyleProvider })
+                {
+                    _styles[index].Reset(_target);
+                }
             }
         }
 
@@ -239,19 +304,19 @@ internal static partial class AkcssRuntime
                     continue;
                 }
 
-                if (style.Condition)
+                if (!AkcssNativeApplications.HasNativeBody(style) && style.Condition)
                 {
                     style.Execute(_target);
                 }
             }
         }
 
-        private void DisposeSubscriptions()
+        private void DisposeSubscriptions(bool keepNative = false)
         {
             List<Exception>? failures = null;
             foreach (var style in _styles)
             {
-                if (style is AkcssUtilityCandidateActivator candidate)
+                if (style is AkcssUtilityCandidateActivator candidate && (!keepNative || !candidate.HasNativeBody))
                 {
                     try
                     {
@@ -298,6 +363,7 @@ internal static partial class AkcssRuntime
             {
                 return;
             }
+            _nativePending |= candidate.HasNativeBody;
             if (_applyPending)
             {
                 return;
@@ -327,7 +393,11 @@ internal static partial class AkcssRuntime
             {
                 while (!_isDetached && _activeTransition == null && _updateDepth == 0)
                 {
-                    if (_applyPending)
+                    if (_nativePending)
+                    {
+                        ReconcileNativeApplications();
+                    }
+                    else if (_applyPending)
                     {
                         _applyPending = false;
                         _pendingConflictKeys.Clear();
@@ -375,6 +445,20 @@ internal static partial class AkcssRuntime
             finally
             {
                 _isApplying = false;
+            }
+        }
+
+        private void ReconcileNativeApplications()
+        {
+            _nativePending = false;
+            if (_nativeApplications != null || _styles.Any(AkcssNativeApplications.HasNativeBody))
+            {
+                var native = _nativeApplications ??= new();
+                native.Reconcile(_target, _styles);
+                if (native.IsEmpty)
+                {
+                    _nativeApplications = null;
+                }
             }
         }
 
@@ -455,12 +539,13 @@ internal static partial class AkcssRuntime
             object? sender,
             VisualTreeAttachmentEventArgs args)
         {
+            var keepNative = !_isDetached;
             _isDetached = false;
             _isChanging = true;
             try
             {
-                DisposeSubscriptions();
-                Subscribe();
+                DisposeSubscriptions(keepNative);
+                Subscribe(keepNative);
             }
             catch
             {
@@ -481,8 +566,19 @@ internal static partial class AkcssRuntime
         {
             _isDetached = true;
             _applyPending = false;
+            _nativePending = false;
             _pendingConflictKeys.Clear();
             List<Exception>? failures = null;
+            var native = _nativeApplications;
+            _nativeApplications = null;
+            try
+            {
+                native?.Clear(_target);
+            }
+            catch (Exception failure)
+            {
+                (failures ??= []).Add(failure);
+            }
             try
             {
                 DisposeSubscriptions();

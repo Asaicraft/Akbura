@@ -4,7 +4,9 @@ summary: Typed, reactive styles for Akbura components and Avalonia controls.
 order: 1
 ---
 
-AKCSS is Akbura's typed styling language. It complements Avalonia styles with C# expressions, reactive dependencies, typed property binding, and component-local style files.
+AKCSS is Akbura's typed styling language. It complements Avalonia styles with C# expressions, reactive dependencies, typed property binding, and component-local style files. AKCSS also generates [native Avalonia styles and control themes](./native-styles-and-themes) with reusable control templates.
+
+Utilities and named classes can apply [native fragments](./native-application-fragments) to an individual control.
 
 ## Your first reactive style
 

@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Pools;
 using System.Diagnostics;
@@ -36,6 +37,12 @@ internal readonly ref struct AkcssStyleWriter
             plan.Symbol.IsIntercepted)
         {
             return false;
+        }
+
+        if (AkcssSemanticFacts.HasNativeApplication(plan.Symbol))
+        {
+            WriteNativeClass(module, plan);
+            return true;
         }
 
         var identifierValues = ArrayBuilder<AkcssIdentifierValue>.GetInstance();
@@ -81,6 +88,28 @@ internal readonly ref struct AkcssStyleWriter
             expansionPath.Free();
             identifierValues.Free();
         }
+    }
+
+    private void WriteNativeClass(in AkcssModulePlan module, in AkcssSymbolGenerationPlan plan)
+    {
+        WriteAttributes(module.IsInlined, plan.Symbol);
+        _writer.Write("private sealed class ");
+        AkcssGeneratedNameWriter.WriteStyleTypeName(_writer, plan.SymbolIndex);
+        _writer.Write(" : ").Write(RuntimeClassType);
+        if (plan.NativeApplication != null)
+        {
+            _writer.Write(", ").Write(AkcssNativeWriter.ApplicationProvider);
+        }
+        _writer.WriteLine();
+        _writer.WriteLine("{");
+        _writer.CurrentIndent += _writer.TabSize;
+        _writer.WriteLine("public override void Update(object target) => throw new global::System.NotSupportedException(\"Apply the native AKCSS class through a cascade.\");");
+        if (plan.NativeApplication is { } application)
+        {
+            new AkcssNativeWriter(_writer, _sourceMap, module.Native!, module.GeneratedTypeName).WriteApplicationBody(application);
+        }
+        _writer.CurrentIndent -= _writer.TabSize;
+        _writer.WriteLine("}");
     }
 
     private void WriteAttributes(bool isInlined, IAkcssSymbol symbol)

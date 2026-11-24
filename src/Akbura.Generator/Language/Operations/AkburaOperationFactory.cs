@@ -22,15 +22,26 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             throw new ArgumentNullException(nameof(createCSharpOperationSymbolMapper));
     }
 
-    public IOperation? CreateOperation(BoundNode boundNode)
+    public IOperation? CreateOperation(BoundNode boundNode) => CreateOperation(boundNode, includeLegacyAkcssStructure: false);
+
+    private IOperation? CreateOperation(BoundNode boundNode, bool includeLegacyAkcssStructure)
     {
         if (boundNode == null)
         {
             throw new ArgumentNullException(nameof(boundNode));
         }
 
+        if (boundNode is BoundAkcssContextual contextual)
+        {
+            return CreateAkcssContextualOperation(contextual);
+        }
+
         return boundNode.Kind switch
         {
+            BoundKind.MarkupComponent when AkcssSemanticFacts.FindTemplate(boundNode.Syntax) is not null =>
+                CreateAkcssStructure(boundNode, OperationKind.MarkupElement),
+            BoundKind.MarkupContent when AkcssSemanticFacts.FindTemplate(boundNode.Syntax) is not null =>
+                CreateAkcssStructure(boundNode, OperationKind.MarkupContent),
             BoundKind.MarkupComponent => CreateMarkupContentOperation((BoundMarkupComponent)boundNode),
             BoundKind.MarkupIf => CreateMarkupIfOperation((BoundMarkupIfStatement)boundNode),
             BoundKind.MarkupForeach => CreateMarkupForeachOperation((BoundMarkupForeachStatement)boundNode),
@@ -43,6 +54,12 @@ internal sealed class AkburaOperationFactory : IOperationFactory
             BoundKind.MarkupRoutedEventBinding => CreateMarkupRoutedEventBindingOperation((BoundMarkupRoutedEventBinding)boundNode),
             BoundKind.MarkupWhitespaceDirective => CreateMarkupWhitespaceDirectiveOperation((BoundMarkupWhitespaceDirective)boundNode),
             BoundKind.TailwindUtilityAttribute => CreateTailwindUtilityAttributeOperation((BoundTailwindUtilityAttribute)boundNode),
+            BoundKind.AkcssModule when AkcssSemanticFacts.FindContextualModuleMember(boundNode.Syntax) is not null =>
+                CreateAkcssStructure(boundNode, OperationKind.AkcssBlock),
+            BoundKind.AkcssStyle when includeLegacyAkcssStructure || AkcssSemanticFacts.HasContextualBody(boundNode.Syntax) =>
+                CreateAkcssStructure(boundNode, OperationKind.AkcssStyleRule, ((BoundAkcssStyle)boundNode).Context),
+            BoundKind.AkcssUtility when includeLegacyAkcssStructure || AkcssSemanticFacts.HasContextualBody(boundNode.Syntax) =>
+                CreateAkcssStructure(boundNode, OperationKind.AkcssUtilityDeclaration, ((BoundAkcssUtility)boundNode).Context),
             BoundKind.AkcssPropertySetter => CreateAkcssPropertySetterOperation((BoundAkcssPropertySetter)boundNode),
             BoundKind.AkcssIf => CreateAkcssIfOperation((BoundAkcssIf)boundNode),
             BoundKind.AkcssApply => CreateAkcssApplyOperation((BoundAkcssApply)boundNode),
@@ -196,6 +213,9 @@ internal sealed class AkburaOperationFactory : IOperationFactory
         }
     }
 
+    internal static MarkupContentOperation? CreateMarkupContentOperationForTemplate(BoundMarkupComponent component, IOperationFactory factory) =>
+        ((AkburaOperationFactory)factory).CreateMarkupContentOperation(component);
+
     private MarkupContentOperation? CreateMarkupContentOperation(
         BoundMarkupComponent boundNode)
     {
@@ -218,35 +238,44 @@ internal sealed class AkburaOperationFactory : IOperationFactory
         {
             AddLoopCSharpOperation(key.Expression, node.Key, children);
         }
-        var body = CreateMarkupForeachBody(node.Body, children);
+        var structuralChildren = AkcssSemanticFacts.FindTemplate(node.Syntax) is not null
+            ? node.Children.Where(static child => child is BoundMarkupContent or BoundMarkupIfStatement or BoundAkcssContextual)
+                .ToDictionary(static child => child.Syntax)
+            : null;
+        var body = CreateMarkupForeachBody(node.Body, children, structuralChildren);
         return new(node.Syntax, node.Source, node.IterationType, node.OutputType, node.Key, node.KeySyntax, body,
             children.ToImmutable(), node.HasErrors);
     }
 
     private ImmutableArray<MarkupForeachBodyItem> CreateMarkupForeachBody(
-        ImmutableArray<BoundMarkupForeachBodyItem> items, ImmutableArrayBuilder<IOperation> children)
+        ImmutableArray<BoundMarkupForeachBodyItem> items, ImmutableArrayBuilder<IOperation> children,
+        Dictionary<AkburaSyntax, BoundNode>? structuralChildren)
     {
         using var body = ImmutableArrayBuilder<MarkupForeachBodyItem>.Rent(items.Length);
         foreach (var item in items)
         {
             AddLoopCSharpOperation(item.Syntax, item.Code, children);
-            var nestedBody = CreateMarkupForeachBody(item.Body, children);
-            var alternative = CreateMarkupForeachBody(item.ElseBody, children);
+            var nestedBody = CreateMarkupForeachBody(item.Body, children, structuralChildren);
+            var alternative = CreateMarkupForeachBody(item.ElseBody, children, structuralChildren);
             IMarkupForeachOperation? loop = null;
             if (item.ForeachStatement != null)
             {
                 loop = CreateMarkupForeachOperation(item.ForeachStatement);
                 children.Add(loop);
             }
-            foreach (var child in item.Content)
+            if (structuralChildren != null && structuralChildren.TryGetValue(item.Syntax, out var bound) &&
+                CreateOperation(bound) is { } operation)
             {
-                if (child.ConditionalOperation != null)
+                children.Add(operation);
+            }
+            else
+            {
+                foreach (var child in item.Content)
                 {
-                    children.Add(child.ConditionalOperation);
-                }
-                else if (child.ForeachOperation != null)
-                {
-                    children.Add(child.ForeachOperation);
+                    if (((IOperation?)child.ConditionalOperation ?? child.ForeachOperation) is { } controlFlow)
+                    {
+                        children.Add(controlFlow);
+                    }
                 }
             }
             body.Add(new(item.Syntax, item.Code, item.Content, nestedBody, alternative, loop));
@@ -267,6 +296,7 @@ internal sealed class AkburaOperationFactory : IOperationFactory
 
     private MarkupIfOperation CreateMarkupIfOperation(BoundMarkupIfStatement node)
     {
+        var inAkcssTemplate = AkcssSemanticFacts.FindTemplate(node.Syntax) is not null;
         using var branches = ImmutableArrayBuilder<MarkupConditionalBranch>.Rent(node.Branches.Length);
         using var children = ImmutableArrayBuilder<IOperation>.Rent();
         foreach (var branch in node.Branches)
@@ -280,11 +310,24 @@ internal sealed class AkburaOperationFactory : IOperationFactory
                 children.Add(condition);
             }
 
-            foreach (var child in branch.Content)
+            if (inAkcssTemplate)
             {
-                if (child.ConditionalOperation != null)
+                foreach (var child in branch.Children)
                 {
-                    children.Add(child.ConditionalOperation);
+                    if (CreateOperation(child) is { } branchOperation)
+                    {
+                        children.Add(branchOperation);
+                    }
+                }
+            }
+            else
+            {
+                foreach (var child in branch.Content)
+                {
+                    if (child.ConditionalOperation is { } conditional)
+                    {
+                        children.Add(conditional);
+                    }
                 }
             }
         }
@@ -292,9 +335,20 @@ internal sealed class AkburaOperationFactory : IOperationFactory
         var operation = new MarkupIfOperation(node.Syntax, branches.ToImmutable(), children.ToImmutable(), node.HasErrors);
         foreach (var child in operation.Children)
         {
-            if (child is CSharpOperation csharp)
+            switch (child)
             {
-                csharp.SetParent(operation);
+                case CSharpOperation csharp:
+                    csharp.SetParent(operation);
+                    break;
+                case AkcssContextualOperation contextual:
+                    contextual.SetParent(operation);
+                    break;
+                case MarkupIfOperation conditional when inAkcssTemplate:
+                    conditional.SetParent(operation);
+                    break;
+                case MarkupForeachOperation loop when inAkcssTemplate:
+                    loop.SetParent(operation);
+                    break;
             }
         }
 
@@ -458,6 +512,80 @@ internal sealed class AkburaOperationFactory : IOperationFactory
                 boundNode.ConditionOperation,
                 mapper),
             boundNode.ConditionExpressionBinding);
+    }
+
+    private AkcssContextualOperation CreateAkcssContextualOperation(BoundAkcssContextual node)
+    {
+        var kind = node.Kind switch
+        {
+            BoundKind.AkcssSelectorRule => OperationKind.AkcssSelectorRule,
+            BoundKind.AkcssNestedRule => OperationKind.AkcssNestedRule,
+            BoundKind.AkcssTheme => OperationKind.AkcssTheme,
+            BoundKind.AkcssMixin => OperationKind.AkcssMixin,
+            BoundKind.AkcssMixinParameter => OperationKind.AkcssMixinParameter,
+            BoundKind.AkcssMixinArgument => OperationKind.AkcssMixinArgument,
+            BoundKind.AkcssContextualSetter => OperationKind.AkcssAssignment,
+            BoundKind.AkcssContextualIf => OperationKind.AkcssIf,
+            BoundKind.AkcssContextualApply => OperationKind.AkcssApply,
+            BoundKind.AkcssInclude => OperationKind.AkcssInclude,
+            BoundKind.AkcssTemplate => OperationKind.AkcssTemplate,
+            BoundKind.AkcssTemplateBinding => OperationKind.AkcssTemplateBinding,
+            BoundKind.AkcssBasedOn => OperationKind.AkcssBasedOn,
+            _ => OperationKind.Error,
+        };
+        var definition = node.Data switch
+        {
+            AkcssSetterData setter => setter.Value,
+            AkcssConditionData condition => condition.Condition.OperationDefinition,
+            AkcssMixinParameterData { Default: { } value } => value.Binding.OperationDefinition,
+            AkcssMixinArgumentData value => value.Argument.Binding.OperationDefinition,
+            AkcssBaseThemeData baseTheme => baseTheme.ExternalTheme.OperationDefinition,
+            _ => default,
+        };
+        return CreateAkcssStructure(node, kind, node.Context, node.Data, definition);
+    }
+
+    private AkcssContextualOperation CreateAkcssStructure(
+        BoundNode node, OperationKind kind, AkcssBindingContext? context = null, AkcssBoundData? data = null,
+        CSharpOperationDefinition definition = default)
+    {
+        using var children = ImmutableArrayBuilder<IOperation>.Rent();
+        if (context is not null && CreateCSharpOperationTree(node.Syntax, definition, CreateAkcssContextMapper(context)) is { } expression)
+        {
+            children.Add(expression);
+        }
+
+        foreach (var child in node.Children)
+        {
+            if (CreateOperation(child, includeLegacyAkcssStructure: node is BoundAkcssModule) is { } operation)
+            {
+                children.Add(operation);
+            }
+        }
+
+        return new AkcssContextualOperation(kind, node.Syntax, context, data, node.SymbolInfo.Symbol, definition,
+            children.ToImmutable(), node.Diagnostics, node.HasErrors);
+    }
+
+    private static Func<RoslynSymbol, ISymbol?> CreateAkcssContextMapper(AkcssBindingContext context)
+    {
+        var fallback = context.DefinitionModel.CreateCSharpOperationSymbolMapper(context.Definition, context.Owner as IAkcssSymbol);
+        return symbol =>
+        {
+            if (context.Owner is AkcssMixinSymbol mixin && symbol is Microsoft.CodeAnalysis.IParameterSymbol
+                { ContainingSymbol.Name: "__AkburaSemanticProbe" } parameter)
+            {
+                foreach (var candidate in mixin.Parameters)
+                {
+                    if (candidate.Name == parameter.Name)
+                    {
+                        return candidate;
+                    }
+                }
+            }
+
+            return fallback(symbol);
+        };
     }
 
     private AkcssPropertySetterOperation CreateAkcssPropertySetterOperation(

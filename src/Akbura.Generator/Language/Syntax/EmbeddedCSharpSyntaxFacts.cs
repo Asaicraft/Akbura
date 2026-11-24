@@ -28,7 +28,15 @@ internal static class EmbeddedCSharpSyntaxFacts
         // while retaining skipped C# trivia used during incomplete input.
         var tokensFullSpan = syntax.Tokens.FullSpan;
         var expressionFullSpan = expression.FullSpan;
-        if (expressionFullSpan.End > tokensFullSpan.Length)
+        // AKCSS list expressions still belong to the original Roslyn list.
+        var relativeStart = syntax.Parent switch
+        {
+            AkcssMixinArgumentListSyntax when expression.Parent is CSharp.ArgumentSyntax argument =>
+                expressionFullSpan.Start - argument.FullSpan.Start,
+            AkcssMixinParameterDefaultSyntax => 0,
+            _ => expressionFullSpan.Start,
+        };
+        if (relativeStart < 0 || relativeStart + expressionFullSpan.Length > tokensFullSpan.Length)
         {
             hostSpan = default;
             return false;
@@ -64,8 +72,22 @@ internal static class EmbeddedCSharpSyntaxFacts
         }
 
         hostSpan = new TextSpan(
-            tokensFullSpan.Start + expressionFullSpan.Start,
+            tokensFullSpan.Start + relativeStart,
             expressionFullSpan.Length);
+        return true;
+    }
+
+    public static bool TryGetEmptyIncludeArgumentSpan(AkcssMixinArgumentListSyntax list, out TextSpan span)
+    {
+        var start = list.OpenParen.Span.End;
+        var end = list.CloseParen.IsMissing ? list.FullSpan.End : list.CloseParen.Span.Start;
+        if (list.OpenParen.IsMissing || list.Arguments.Count != 0 || end < start)
+        {
+            span = default;
+            return false;
+        }
+
+        span = TextSpan.FromBounds(start, end);
         return true;
     }
 

@@ -29,7 +29,7 @@ internal abstract class Symbol : ISymbol
 
     public virtual string MetadataName => Name;
 
-    public ISymbol? ContainingSymbol { get; }
+    public virtual ISymbol? ContainingSymbol { get; }
 
     public virtual ISymbol OriginalDefinition => this;
 

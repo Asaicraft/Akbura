@@ -1,4 +1,7 @@
+using Akbura.Collections;
+using AkcssMixinSymbol = Akbura.Language.Symbols.AkcssMixinSymbol;
 using Akbura.Pools;
+using Akbura.Workspaces.Navigation;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -13,6 +16,8 @@ namespace Akbura.Workspaces.SignatureHelp;
 internal sealed class AkburaSignatureHelpService :
     IAkburaSignatureHelpService
 {
+    private static readonly AkcssSymbolDisplayService s_akcssDisplay = new();
+
     public AkburaSignatureHelp? GetSignatureHelp(
         AkburaSyntacticDocument document,
         AkburaDocumentContext? semanticContext,
@@ -28,8 +33,58 @@ internal sealed class AkburaSignatureHelpService :
             throw new ArgumentOutOfRangeException(nameof(position));
         }
 
-        if (semanticContext == null ||
-            !document.TryGetEmbeddedCSharpContext(
+        var normalized = AkburaSemanticContextNormalizer.Normalize(document, semanticContext, cancellationToken).Context;
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        return GetCSharpSignatureHelp(document, normalized, position, cancellationToken) ??
+            GetMixinSignatureHelp(document, normalized, position, cancellationToken);
+    }
+
+    private static AkburaSignatureHelp? GetMixinSignatureHelp(
+        AkburaSyntacticDocument document, AkburaDocumentContext context, int position, CancellationToken cancellationToken)
+    {
+        if (document.GetAkcssIncludeAtPosition(position) is not { } site ||
+            site.Arguments.OpenParen.IsMissing || position < site.Arguments.OpenParen.Span.End ||
+            !site.Arguments.CloseParen.IsMissing && position > site.Arguments.CloseParen.Span.Start)
+        {
+            return null;
+        }
+
+        var model = context.Project.Compilation.GetSemanticModel(context.Document.SyntaxTree);
+        if (model.FindAkcssEditorSyntax(site.FullSpan, site.Kind) is not Akbura.Language.Syntax.AkcssIncludeSyntax include)
+        {
+            return null;
+        }
+
+        var mixins = model.LookupAkcssSourceDeclarations<AkcssMixinSymbol>(include, include.Name.Identifier.ValueText);
+        if (mixins.Length != 1)
+        {
+            return null;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var mixin = mixins[0];
+        var parameters = mixin.Parameters.SelectAsArray(static parameter =>
+            new AkburaSignatureParameter(s_akcssDisplay.FormatParameter(parameter), null));
+        var arguments = site.Arguments.Arguments;
+        var active = 0;
+        while (active < arguments.SeparatorCount && arguments.GetSeparator(active).Span.End <= position)
+        {
+            active++;
+        }
+
+        var signature = new AkburaSignatureInformation(s_akcssDisplay.FormatMixin(mixin),
+            mixin.DefinitionModel.SyntaxTree.FilePath, parameters);
+        return new AkburaSignatureHelp(site.Arguments.Span, [signature], 0, active);
+    }
+
+    private static AkburaSignatureHelp? GetCSharpSignatureHelp(
+        AkburaSyntacticDocument document, AkburaDocumentContext semanticContext, int position, CancellationToken cancellationToken)
+    {
+        if (!document.TryGetEmbeddedCSharpContext(
                 position,
                 out var embeddedContext,
                 cancellationToken) ||

@@ -42,6 +42,11 @@ internal readonly ref partial struct ComponentScopeWriter
             WriteOrderedAssignments(plan, element, context, actualPhase, initialized, scopeContext, phase);
         }
 
+        if (phase == ComponentAssignmentPhase.LocalInitial)
+        {
+            _writeElementConfiguration?.Invoke(element);
+        }
+
         if (phase != ComponentAssignmentPhase.Update || element.IsStyleSubtree)
         {
             WriteSetStyles(plan, elementId, element.Identifier, context);

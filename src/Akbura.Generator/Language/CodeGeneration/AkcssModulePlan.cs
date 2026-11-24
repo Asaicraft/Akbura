@@ -27,13 +27,15 @@ internal readonly struct AkcssSymbolGenerationPlan
         int runtimeStyleIndex,
         IAkcssSymbol symbol,
         AkcssSymbolGenerationKind kind,
-        bool hasErrors)
+        bool hasErrors,
+        AkcssNativeApplicationPlan? nativeApplication = null)
     {
         SymbolIndex = symbolIndex;
         RuntimeStyleIndex = runtimeStyleIndex;
         Symbol = symbol;
         Kind = kind;
         HasErrors = hasErrors;
+        NativeApplication = nativeApplication;
     }
 
     public int SymbolIndex { get; }
@@ -49,6 +51,8 @@ internal readonly struct AkcssSymbolGenerationPlan
     public AkcssSymbolGenerationKind Kind { get; }
 
     public bool HasErrors { get; }
+
+    public AkcssNativeApplicationPlan? NativeApplication { get; }
 
     public bool EmitsRuntimeStyle => RuntimeStyleIndex >= 0;
 }
@@ -92,7 +96,8 @@ internal readonly struct AkcssModulePlan
         string metadataName,
         bool isInlined,
         PooledImmutableList<AkcssSymbolGenerationPlan> symbols,
-        PooledImmutableList<AkcssRuntimeStylePlan> runtimeStyles)
+        PooledImmutableList<AkcssRuntimeStylePlan> runtimeStyles,
+        AkcssNativeModulePlan? native = null)
     {
         SourcePath = sourcePath;
         ModuleIdentity = moduleIdentity;
@@ -102,6 +107,7 @@ internal readonly struct AkcssModulePlan
         IsInlined = isInlined;
         Symbols = symbols;
         RuntimeStyles = runtimeStyles;
+        Native = native;
     }
 
     public string SourcePath { get; }
@@ -119,6 +125,8 @@ internal readonly struct AkcssModulePlan
     public PooledImmutableList<AkcssSymbolGenerationPlan> Symbols { get; }
 
     public PooledImmutableList<AkcssRuntimeStylePlan> RuntimeStyles { get; }
+
+    public AkcssNativeModulePlan? Native { get; }
 
     internal void ReturnToPool()
     {

@@ -19,6 +19,7 @@ internal sealed class ComponentWriter : IDisposable
     private readonly ComponentPlan _plan;
     private readonly ComponentMemberPlan _memberPlan;
     private readonly ComponentHotReloadPlan _hotReloadPlan;
+    private readonly AkcssInlineStylesPlan _nativeStyles;
     private readonly ComponentGenerationMode _generationMode;
     private readonly BindingWriterEnvironment _bindingEnvironment;
     private readonly BindingWriterEnvironment _stateBindingEnvironment;
@@ -67,6 +68,7 @@ internal sealed class ComponentWriter : IDisposable
                 nameof(component));
         }
 
+        _nativeStyles = AkcssInlineStylesPlan.Create(component, akcssModuleTypeNames);
         _bindingEnvironment = BindingWriterEnvironment.Create(semanticModel, component);
         var probeCompilation = semanticModel.Compilation.CSharpProbeCompilation;
         _stateBindingEnvironment = BindingWriterEnvironment.Create(
@@ -131,6 +133,21 @@ internal sealed class ComponentWriter : IDisposable
     public PooledImmutableList<ComponentElementPlan> Elements => _plan.Elements;
 
     public bool HasAkcss => !_plan.Akcss.IsEmpty;
+
+    public void WriteAkcssDiagnostics()
+    {
+        if (_plan.Akcss.Diagnostics.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        foreach (var diagnostic in _plan.Akcss.Diagnostics)
+        {
+            using var mapping = new SourceMappingWriter(_writer, _sourceMap).WriteStart(diagnostic.Syntax, valueOffset: "#error ".Length);
+            _writer.Write("#error ").Write(diagnostic.Code).Write(" ")
+                .WriteLine(diagnostic.Message.Replace('\r', ' ').Replace('\n', ' '));
+        }
+    }
 
     public bool WriteComponentMembers()
     {
@@ -809,7 +826,8 @@ internal sealed class ComponentWriter : IDisposable
             _sourceMap,
             _ownerTypeName,
             _resourcePath,
-            _generationMode);
+            _generationMode,
+            _nativeStyles);
     }
 
     private static string NormalizeResourcePath(string resourcePath)

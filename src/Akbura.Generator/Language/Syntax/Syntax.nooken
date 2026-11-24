@@ -84,6 +84,13 @@ token ApplyKeyword        = "apply";
 token InterceptKeyword    = "intercept";
 token ForeachKeyword      = "foreach";
 
+token ThemeKeyword    = "theme";
+token TemplateKeyword = "template";
+token MixinKeyword    = "mixin";
+token IncludeKeyword  = "include";
+token BasedKeyword    = "based";
+token OnKeyword       = "on";
+
 [id 200]
 /*
 	Built-in literal tokens (StringLiteralToken / NumericLiteralToken / etc.)
@@ -1076,6 +1083,213 @@ node AkcssUtilityDeclarationSyntax {
 	CloseBrace: CloseBraceToken;
 }
 
+
+
+// ============================================================================
+// AKCSS THEMES, TEMPLATES, MIXINS, AND NESTED SELECTORS
+// ============================================================================
+
+[id 600]
+
+// A top-level @theme Button MyTheme { ... } with an embedded C# target type.
+node AkcssThemeDeclarationSyntax : AkcssTopLevelMember {
+	AtToken      : AtToken;
+	ThemeKeyword : ThemeKeyword;
+	TargetType   : CSharpTypeSyntax;
+	Name         : SimpleName;
+	OpenBrace    : OpenBraceToken;
+	Members      : syntaxlist<AkcssBodyMemberSyntax>;
+	CloseBrace   : CloseBraceToken;
+}
+
+// An AKCSS @template { ... } body member. The markup block owns the braces.
+node AkcssTemplateDirectiveSyntax : AkcssBodyMemberSyntax {
+	AtToken         : AtToken;
+	TemplateKeyword : TemplateKeyword;
+	Body            : MarkupBlockSyntax;
+}
+
+// A top-level @mixin Control Name(...) { ... } with an embedded C# target type.
+// Future expansion preserves member order and nested selector structure.
+// A mixin with nested rules requires an AKCSS selector context.
+node AkcssMixinDeclarationSyntax : AkcssTopLevelMember {
+	AtToken      : AtToken;
+	MixinKeyword : MixinKeyword;
+	TargetType   : CSharpTypeSyntax;
+	Name         : SimpleName;
+	Parameters   : AkcssMixinParameterListSyntax;
+	OpenBrace    : OpenBraceToken;
+	Members      : syntaxlist<AkcssBodyMemberSyntax>;
+	CloseBrace   : CloseBraceToken;
+}
+
+// The parameter list retains its parentheses even when empty.
+node AkcssMixinParameterListSyntax {
+	OpenParen  : OpenParenToken;
+	Parameters : syntaxlist<AkcssMixinParameterSyntax, CommaToken>;
+	CloseParen : CloseParenToken;
+}
+
+// An embedded C# type followed by the parameter name and an optional default clause.
+node AkcssMixinParameterSyntax {
+	Type     : CSharpTypeSyntax;
+	Name     : SimpleName;
+	Default? : AkcssMixinParameterDefaultSyntax;
+}
+
+// The optional clause keeps the equals token and its C# expression together.
+node AkcssMixinParameterDefaultSyntax {
+	Equals     : EqualsToken;
+	Expression : CSharpExpressionSyntax;
+}
+
+// Shared @include Name(...); payload for AKCSS bodies and markup content.
+node AkcssIncludeSyntax {
+	AtToken        : AtToken;
+	IncludeKeyword : IncludeKeyword;
+	Name           : SimpleName;
+	Arguments      : AkcssMixinArgumentListSyntax;
+	Semicolon      : SemicolonToken;
+}
+
+// The parentheses enclose a possibly empty list of C# expressions.
+node AkcssMixinArgumentListSyntax {
+	OpenParen  : OpenParenToken;
+	Arguments  : syntaxlist<CSharpExpressionSyntax, CommaToken>;
+	CloseParen : CloseParenToken;
+}
+
+// An AKCSS body member that includes a mixin at this position in the member list.
+node AkcssIncludeDirectiveSyntax : AkcssBodyMemberSyntax {
+	Directive : AkcssIncludeSyntax;
+}
+
+// An @include in a markup element is intended to supply that element's configuration.
+node MarkupIncludeDirectiveSyntax : MarkupStatementSyntax {
+	Directive : AkcssIncludeSyntax;
+}
+
+// Shared @template-bind Property, OtherProperty; payload.
+// Property references are C# fragments, as in AKCSS assignments.
+node AkcssTemplateBindSyntax {
+	AtToken         : AtToken;
+	TemplateKeyword : TemplateKeyword;
+	MinusToken      : MinusToken;
+	BindToken       : BindToken;
+	PropertyNames   : syntaxlist<CSharpTypeSyntax, CommaToken>;
+	Semicolon       : SemicolonToken;
+}
+
+// A deferred template-binding fragment stored in an AKCSS mixin body.
+node AkcssTemplateBindDirectiveSyntax : AkcssBodyMemberSyntax {
+	Directive : AkcssTemplateBindSyntax;
+}
+
+// Binds properties of the owning markup element to same-named properties
+// on the enclosing control template's templated parent.
+node MarkupTemplateBindDirectiveSyntax : MarkupStatementSyntax {
+	Directive : AkcssTemplateBindSyntax;
+}
+
+// The @based-on Hello.MyTheme; body member stores an embedded C# expression.
+node AkcssBasedOnDirectiveSyntax : AkcssBodyMemberSyntax {
+	AtToken      : AtToken;
+	BasedKeyword : BasedKeyword;
+	MinusToken   : MinusToken;
+	OnKeyword    : OnKeyword;
+	Expression   : CSharpExpressionSyntax;
+	Semicolon    : SemicolonToken;
+}
+
+// An AKCSS body member such as ^:pointerover /template/ ContentPresenter { ... }.
+node AkcssNestedStyleRuleSyntax : AkcssBodyMemberSyntax {
+	Selector   : AkcssSelectorSyntax;
+	OpenBrace  : OpenBraceToken;
+	Members    : syntaxlist<AkcssBodyMemberSyntax>;
+	CloseBrace : CloseBraceToken;
+}
+
+// An absolute or parent-anchored compound followed by its ordered relationships.
+node AkcssSelectorSyntax {
+	Initial : AkcssSelectorCompoundSyntax;
+	Steps   : syntaxlist<AkcssSelectorStepSyntax>;
+}
+
+// The first compound of a relative selector starts with ^ and accepts adjacent suffixes.
+node AkcssParentCompoundSelectorSyntax : AkcssSelectorCompoundSyntax {
+	Anchor     : AkcssParentSelectorSyntax;
+	Components : syntaxlist<AkcssSelectorComponentSyntax>;
+}
+
+// The ^ anchor refers to the enclosing selector context, which a mixin
+// obtains from its inclusion site during expansion.
+node AkcssParentSelectorSyntax {
+	CaretToken : CaretToken;
+}
+
+// Each /template/ step owns its punctuation and the following compound selector.
+node AkcssTemplateTraversalSyntax : AkcssSelectorStepSyntax {
+	OpenSlash       : SlashToken;
+	TemplateKeyword : TemplateKeyword;
+	CloseSlash      : SlashToken;
+	Target          : AkcssCompoundSelectorSyntax;
+}
+
+// Adjacent components such as ContentPresenter#PART_ContentPresenter form one compound.
+node AkcssCompoundSelectorSyntax : AkcssSelectorCompoundSyntax {
+	Components : syntaxlist<AkcssSelectorComponentSyntax>;
+}
+
+// A type, .class, #name, or :pseudo-class within a compound selector.
+abstract node AkcssSelectorComponentSyntax;
+
+// An embedded C# type such as ContentPresenter or (global::Controls.ContentPresenter).
+node AkcssTypeSelectorSyntax : AkcssSelectorComponentSyntax {
+	Type : CSharpTypeSyntax | AkcssParenthesizedSelectorTypeSyntax;
+}
+
+node AkcssParenthesizedSelectorTypeSyntax {
+	OpenParen  : OpenParenToken;
+	Type       : CSharpTypeSyntax;
+	CloseParen : CloseParenToken;
+}
+
+node AkcssClassSelectorSyntax : AkcssSelectorComponentSyntax {
+	DotToken : DotToken;
+	Name     : SimpleName;
+}
+
+node AkcssNameSelectorSyntax : AkcssSelectorComponentSyntax {
+	HashToken : HashToken;
+	Name      : SimpleName;
+}
+
+node AkcssPseudoClassSelectorSyntax : AkcssSelectorComponentSyntax {
+	ColonToken : ColonToken;
+	Name       : SimpleName;
+}
+
+abstract node AkcssSelectorCompoundSyntax;
+
+abstract node AkcssSelectorStepSyntax;
+
+// The separating whitespace stays in the original tokens' trivia.
+node AkcssDescendantSelectorSyntax : AkcssSelectorStepSyntax {
+	Target : AkcssCompoundSelectorSyntax;
+}
+
+node AkcssChildSelectorSyntax : AkcssSelectorStepSyntax {
+	GreaterThanToken : GreaterThanToken;
+	Target           : AkcssCompoundSelectorSyntax;
+}
+
+// A general top-level rule such as Border > TextBlock { ... }.
+node AkcssSelectorRuleSyntax : AkcssTopLevelMemberSyntax {
+	Selector   : AkcssSelectorSyntax;
+	OpenBrace  : OpenBraceToken;
+	Members    : syntaxlist<AkcssBodyMemberSyntax>;
+	CloseBrace : CloseBraceToken;
+}
 
 
 // ─────────────────────────────────────────────────────────────

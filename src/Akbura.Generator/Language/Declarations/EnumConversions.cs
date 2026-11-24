@@ -23,6 +23,14 @@ internal static partial class EnumConversions
                 return DeclarationKind.AkcssStyle;
             case SyntaxKind.AkcssUtilityDeclarationSyntax:
                 return DeclarationKind.AkcssUtility;
+            case SyntaxKind.AkcssSelectorRuleSyntax:
+                return DeclarationKind.AkcssSelectorRule;
+            case SyntaxKind.AkcssThemeDeclarationSyntax:
+                return DeclarationKind.AkcssTheme;
+            case SyntaxKind.AkcssMixinDeclarationSyntax:
+                return DeclarationKind.AkcssMixin;
+            case SyntaxKind.AkcssMixinParameterSyntax:
+                return DeclarationKind.AkcssMixinParameter;
             default:
                 return ThrowHelper.UnexpectedValue<DeclarationKind>(kind);
         }

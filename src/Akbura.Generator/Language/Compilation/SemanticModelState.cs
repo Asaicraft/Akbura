@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis;
@@ -85,7 +86,7 @@ internal sealed class SemanticModelState
 
         public void AddSymbolInfo(AkburaSyntax syntax, AkburaSymbolInfo info, bool declaration = false)
         {
-            if (!OwnsSyntax(syntax) || !IsSafeSymbol(info.Symbol))
+            if (!OwnsSyntax(syntax) || IsContextualAkcss(syntax, aggregated: false) || !IsSafeSymbol(info.Symbol))
             {
                 return;
             }
@@ -103,7 +104,7 @@ internal sealed class SemanticModelState
 
         public void AddDiagnostics(AkburaSyntax syntax, ImmutableArray<AkburaSemanticDiagnostic> diagnostics, bool aggregated = false)
         {
-            if (!OwnsSyntax(syntax))
+            if (!OwnsSyntax(syntax) || IsContextualAkcss(syntax, aggregated))
             {
                 return;
             }
@@ -134,6 +135,28 @@ internal sealed class SemanticModelState
 
         public SemanticModelState ToState() => new(this);
 
+        private static bool IsContextualAkcss(AkburaSyntax syntax, bool aggregated)
+        {
+            if (AkcssSemanticFacts.FindOwner(syntax) is { } owner &&
+                (AkcssSemanticFacts.IsSourceDeclaration(owner) || AkcssSemanticFacts.HasContextualBody(owner)))
+            {
+                return true;
+            }
+
+            if (aggregated && syntax is AkburaDocumentSyntax or AkcssDocumentSyntax or InlineAkcssBlockSyntax)
+            {
+                foreach (var child in syntax.DescendantNodes())
+                {
+                    if (AkcssSemanticFacts.IsSourceDeclaration(child) || AkcssSemanticFacts.IsContextualMember(child))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
         private bool OwnsSyntax(AkburaSyntax syntax) => ReferenceEquals(syntax.Root, SourceTree.GetRootSyntax());
 
         private bool IsSafeSymbol(AkburaSymbol? symbol)
@@ -143,7 +166,7 @@ internal sealed class SemanticModelState
                 return true;
             }
 
-            if (symbol.ContainingSymbol != null || !symbol.Locations.IsDefaultOrEmpty ||
+            if (symbol is AkcssSourceDeclarationSymbol or AkcssMixinParameterSymbol || symbol.ContainingSymbol != null || !symbol.Locations.IsDefaultOrEmpty ||
                 !symbol.DeclaringSyntaxReferences.IsDefaultOrEmpty)
             {
                 return false;

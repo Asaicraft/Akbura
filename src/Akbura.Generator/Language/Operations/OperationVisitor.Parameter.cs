@@ -39,6 +39,8 @@ internal abstract class OperationVisitor<TParameter, TResult>
         TParameter parameter) =>
         DefaultVisit(operation, parameter);
 
+    public virtual TResult? VisitAkcssContextual(AkcssContextualOperation operation, TParameter parameter) => DefaultVisit(operation, parameter);
+
     public virtual TResult? VisitAkcssIntercept(
         IAkcssInterceptOperation operation,
         TParameter parameter) =>

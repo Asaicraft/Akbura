@@ -23,7 +23,9 @@ internal readonly ref struct MarkupExtensionWriteContext
         string? nameScopeExpression,
         int scopeId,
         ReadOnlySpan<BindingElementReference> elementReferences = default,
-        bool isConditionalNameScope = false)
+        bool isConditionalNameScope = false,
+        string? templatedParentExpression = null,
+        bool usesTemplateServices = false)
         : this(
             targetObjectExpression,
             targetProperty,
@@ -34,7 +36,7 @@ internal readonly ref struct MarkupExtensionWriteContext
             nameScopeExpression,
             scopeId,
             elementReferences,
-            isConditionalNameScope)
+            isConditionalNameScope, templatedParentExpression, usesTemplateServices)
     {
     }
 
@@ -48,7 +50,9 @@ internal readonly ref struct MarkupExtensionWriteContext
         string? nameScopeExpression,
         int scopeId,
         ReadOnlySpan<BindingElementReference> elementReferences = default,
-        bool isConditionalNameScope = false)
+        bool isConditionalNameScope = false,
+        string? templatedParentExpression = null,
+        bool usesTemplateServices = false)
     {
         TargetObjectExpression = targetObjectExpression;
         TargetProperty = targetProperty;
@@ -60,6 +64,8 @@ internal readonly ref struct MarkupExtensionWriteContext
         ScopeId = scopeId;
         ElementReferences = elementReferences;
         IsConditionalNameScope = isConditionalNameScope;
+        TemplatedParentExpression = templatedParentExpression;
+        UsesTemplateServices = usesTemplateServices;
     }
 
     public string TargetObjectExpression { get; }
@@ -88,6 +94,12 @@ internal readonly ref struct MarkupExtensionWriteContext
     public int ScopeId { get; }
 
     public bool IsConditionalNameScope { get; }
+
+    public string? TemplatedParentExpression { get; }
+
+    public bool UsesTemplateServices { get; }
+
+    public bool IsControlTemplate => TemplatedParentExpression != null;
 
     public ReadOnlySpan<BindingElementReference> ElementReferences { get; }
 
@@ -118,7 +130,7 @@ internal readonly ref struct MarkupExtensionWriteContext
             NameScopeExpression,
             scopeId,
             elementReferences,
-            IsConditionalNameScope);
+            IsConditionalNameScope, TemplatedParentExpression, UsesTemplateServices);
     }
 
     internal MarkupExtensionWriteContext WithElementReferences(
@@ -139,7 +151,7 @@ internal readonly ref struct MarkupExtensionWriteContext
             NameScopeExpression,
             ScopeId,
             elementReferences,
-            IsConditionalNameScope);
+            IsConditionalNameScope, TemplatedParentExpression, UsesTemplateServices);
     }
 
     internal MarkupExtensionWriteContext WithNameScope(string nameScopeExpression)
@@ -147,7 +159,7 @@ internal readonly ref struct MarkupExtensionWriteContext
         return new MarkupExtensionWriteContext(TargetObjectExpression, TargetProperty,
             IntermediateRootExpression, BaseUriExpression, DirectParentsStack,
             FallbackServiceProviderExpression, nameScopeExpression, ScopeId,
-            ElementReferences, isConditionalNameScope: true);
+            ElementReferences, isConditionalNameScope: true, TemplatedParentExpression, UsesTemplateServices);
     }
 }
 

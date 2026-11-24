@@ -1994,6 +1994,14 @@ internal sealed partial class MarkupBinder
         ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
     {
         using var builder = ImmutableArrayBuilder<AkcssUtilityDeclarationSyntax>.Rent();
+        if (GetControlTemplateDefinitionSite() is { } site)
+        {
+            foreach (var section in GetTemplateModuleMembers(site).OfType<AkcssUtilitiesSectionSyntax>())
+            {
+                builder.AddRange(section.Utilities);
+            }
+            return builder.ToImmutable();
+        }
         AddInlineAkcssUtilityDeclarations(builder);
 
         var companion = GetCompanionAkcssSyntaxTree();
@@ -2008,6 +2016,11 @@ internal sealed partial class MarkupBinder
     private ImmutableArray<AkcssStyleRuleSyntax> GetLocalAkcssStyleDeclarations()
     {
         using var builder = ImmutableArrayBuilder<AkcssStyleRuleSyntax>.Rent();
+        if (GetControlTemplateDefinitionSite() is { } site)
+        {
+            builder.AddRange(GetTemplateModuleMembers(site).OfType<AkcssStyleRuleSyntax>());
+            return builder.ToImmutable();
+        }
         AddInlineAkcssStyleDeclarations(builder);
 
         var companion = GetCompanionAkcssSyntaxTree();
@@ -2233,8 +2246,35 @@ internal sealed partial class MarkupBinder
         return null;
     }
 
+    private AkburaSyntax? GetControlTemplateDefinitionSite()
+    {
+        var declaration = Declaration == null ? null : DeclarationFacts.GetSyntax(Declaration);
+        return declaration != null && AkcssSemanticFacts.FindTemplate(declaration) is { } template ? template : null;
+    }
+
+    private static Akbura.Language.Syntax.SyntaxList<AkcssTopLevelMemberSyntax> GetTemplateModuleMembers(AkburaSyntax site)
+    {
+        for (var node = site; node != null; node = node.Parent)
+        {
+            if (node is AkcssDocumentSyntax document)
+            {
+                return document.Members;
+            }
+            if (node is InlineAkcssBlockSyntax inline)
+            {
+                return inline.Members;
+            }
+        }
+        return default;
+    }
+
     private ImmutableArray<string> GetAkcssImportNames()
     {
+        if (GetControlTemplateDefinitionSite() is { } site)
+        {
+            return SemanticModel.GetAkcssImportNames(site);
+        }
+
         using var builder = ImmutableArrayBuilder<string>.Rent();
         foreach (var usingDirective in SemanticModel.GetAkburaUsingDirectives())
         {

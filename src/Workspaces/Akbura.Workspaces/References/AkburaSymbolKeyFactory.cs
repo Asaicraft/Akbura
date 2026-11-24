@@ -46,6 +46,25 @@ internal static class AkburaSymbolKeyFactory
             context,
             GetDeclarationSyntax(symbol));
         var original = symbol.OriginalDefinition;
+        if (original is IMarkupNameSymbol part && AkcssSemanticFacts.FindTemplate(part.DeclarationSyntax) is { } template)
+        {
+            var scope = string.Concat(part.FilePath, "|", template.Span.Start, "|", part.ScopeOwner.Span.Start, "|", part.ScopeOwner.Kind);
+            return new AkburaSymbolKey(projectId, original.MetadataName, AkburaSymbolKind.AkcssTemplatePart, scope);
+        }
+
+        if (original is AkcssSourceDeclarationSymbol owner)
+        {
+            var scope = GetAkcssModuleIdentity(owner);
+            return new AkburaSymbolKey(projectId, string.Concat(owner.Name, "|", owner.DeclarationSyntax.Span.Start),
+                MapKind(original.Kind), scope);
+        }
+
+        if (original is AkcssMixinParameterSymbol mixinParameter && mixinParameter.ContainingSymbol is AkcssMixinSymbol mixin)
+        {
+            var scope = string.Concat(GetAkcssModuleIdentity(mixin), "|", mixin.DeclarationSyntax.Span.Start);
+            return new AkburaSymbolKey(projectId, string.Concat(mixinParameter.Name, "|", mixinParameter.Ordinal), AkburaSymbolKind.AkcssMixinParameter, scope);
+        }
+
         var containing = GetContainingIdentity(
             original.ContainingSymbol);
 
@@ -60,6 +79,11 @@ internal static class AkburaSymbolKeyFactory
         AkburaDocumentContext context,
         RoslynSymbol symbol)
     {
+        if (context.Project.Compilation.FindSourceAkcssTheme(symbol) is { } theme)
+        {
+            return Create(context, theme);
+        }
+
         if (TryGetProjectedLocalOrigin(symbol, out var origin))
         {
             return new AkburaSymbolKey(context.Project.Id,
@@ -222,6 +246,8 @@ internal static class AkburaSymbolKeyFactory
                 name.DeclarationSyntax,
             ITailwindUtilityParameterSymbol parameter =>
                 parameter.DeclarationSyntax,
+            AkcssSourceDeclarationSymbol source => source.DeclarationSyntax,
+            AkcssMixinParameterSymbol mixinParameter => mixinParameter.DeclarationSyntax,
             IAkcssSymbol akcss =>
                 akcss.DeclarationSyntax,
             IAkcssModuleSymbol module =>
@@ -229,6 +255,9 @@ internal static class AkburaSymbolKeyFactory
             _ => null,
         };
     }
+
+    private static string GetAkcssModuleIdentity(AkcssSourceDeclarationSymbol source) =>
+        string.Concat(source.DefinitionModel.SyntaxTree.FilePath, "|", source.ModuleSyntax.Span.Start);
 
     private static string? GetContainingIdentity(
         NativeSymbol? symbol)
@@ -281,6 +310,8 @@ internal static class AkburaSymbolKeyFactory
                 AkburaSymbolKind.Function,
             NativeSymbolKind.UseHook =>
                 AkburaSymbolKind.Hook,
+            NativeSymbolKind.AkcssTheme => AkburaSymbolKind.AkcssTheme,
+            NativeSymbolKind.AkcssMixin => AkburaSymbolKind.AkcssMixin,
             NativeSymbolKind.AkcssModule =>
                 AkburaSymbolKind.AkcssModule,
             NativeSymbolKind.AkcssClass =>

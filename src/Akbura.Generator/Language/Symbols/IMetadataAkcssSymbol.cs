@@ -13,6 +13,8 @@ internal interface IMetadataAkcssSymbol : IAkcssSymbol
 
     bool HasErrors { get; }
 
+    bool HasNativeBody { get; }
+
     ImmutableArray<string> ObservedProperties { get; }
 
     ImmutableArray<AttributeData> OperationAttributes { get; }

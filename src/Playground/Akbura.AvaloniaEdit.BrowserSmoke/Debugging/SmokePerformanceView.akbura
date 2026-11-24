@@ -1,0 +1,17 @@
+using Avalonia.Controls;
+
+namespace Akbura.AvaloniaEdit.BrowserSmoke;
+
+<StackPanel>
+    <StackPanel Orientation="Horizontal">
+        <ComboBox x.Name="performanceSize" SelectedIndex="0" Margin="8" Width="120">
+            <ComboBoxItem Content="100 lines" />
+            <ComboBoxItem Content="1000 lines" />
+            <ComboBoxItem Content="5000 lines" />
+        </ComboBox>
+        <Button x.Name="measurePerformance" Content="Measure performance" Margin="8"
+                Click={async () => await _measure()} />
+    </StackPanel>
+    <TextBox x.Name="performanceOutput" IsVisible="False" IsReadOnly="True"
+             AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="180" />
+</StackPanel>

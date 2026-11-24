@@ -1,0 +1,24 @@
+using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Primitives.PopupPositioning;
+using AvaloniaEdit.CodeCompletion;
+
+namespace Akbura.AvaloniaEdit.Completion;
+
+<Popup x.Name="descriptionPopup"
+       Placement="AnchorAndGravity"
+       PlacementAnchor="TopRight"
+       PlacementGravity="BottomRight"
+       PlacementConstraintAdjustment={PopupPositionerConstraintAdjustment.FlipX |
+           PopupPositionerConstraintAdjustment.SlideX | PopupPositionerConstraintAdjustment.SlideY |
+           PopupPositionerConstraintAdjustment.ResizeX | PopupPositionerConstraintAdjustment.ResizeY}
+       HorizontalOffset="4"
+       IsLightDismissEnabled="False">
+    <CompletionTipContentControl>
+        <ScrollViewer MaxHeight="240">
+            <TextBlock x.Name="descriptionText"
+                       TextWrapping="Wrap"
+                       MaxWidth="360" />
+        </ScrollViewer>
+    </CompletionTipContentControl>
+</Popup>

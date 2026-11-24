@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+  <PropertyGroup>
+    <TargetFramework>net10.0-browser</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AkburaBuildTasksOutputDirectory>$(MSBuildThisFileDirectory)..\..\Akbura.Build.Tasks\bin\$(Configuration)\net10.0</AkburaBuildTasksOutputDirectory>
+    <AkburaBuildTasksAssembly>$(AkburaBuildTasksOutputDirectory)\Akbura.Build.Tasks.dll</AkburaBuildTasksAssembly>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Link SkiaSharp and HarfBuzz into the runtime for build/run as well as publish. -->
+    <WasmBuildNative>true</WasmBuildNative>
+    <!-- DeployOnBuild otherwise skips linking the development bundle that Visual Studio runs. -->
+    <WasmBuildOnlyAfterPublish>false</WasmBuildOnlyAfterPublish>
+    <!-- Keep Visual Studio's launch bundle in sync with generated native assets. -->
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+    <!-- This harness audits the interpreter path. MEF composition is not trimming-safe by default. -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <RunAOTCompilation>false</RunAOTCompilation>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' != 'Debug' and '$(Configuration)' != 'DebugStats'">
+    <DefaultItemExcludes>$(DefaultItemExcludes);Debugging\**</DefaultItemExcludes>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Browser" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <ProjectReference Include="../../Akbura.Build.Tasks/Akbura.Build.Tasks.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <ProjectReference Include="../../Akbura.BlackSilence/Akbura.BlackSilence.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" PrivateAssets="all" />
+    <ProjectReference Include="../Akbura.AvaloniaEdit/Akbura.AvaloniaEdit.csproj" />
+  </ItemGroup>
+  <Target Name="EmbedSmokeMetadata" BeforeTargets="AssignTargetPaths" DependsOnTargets="ResolveReferences;FindReferenceAssembliesForReferences">
+    <ItemGroup>
+      <_SmokeReference Include="@(ReferencePathWithRefAssemblies)" Condition="'%(ReferencePathWithRefAssemblies.Extension)' == '.dll'" />
+      <EmbeddedResource Include="@(_SmokeReference)">
+        <LogicalName>SmokeReferences.%(Filename)%(Extension)</LogicalName>
+        <WithCulture>false</WithCulture>
+      </EmbeddedResource>
+    </ItemGroup>
+    <Error Condition="'@(_SmokeReference)' == ''" Text="The browser smoke host requires the build's resolved compile-time assembly references." />
+  </Target>
+  <Import Project="../../Akbura/buildTransitive/Akbura.targets" />
+</Project>

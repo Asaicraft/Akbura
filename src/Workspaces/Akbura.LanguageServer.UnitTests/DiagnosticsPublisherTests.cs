@@ -256,6 +256,9 @@ public sealed class DiagnosticsPublisherTests
 
     private sealed class ControlledDiagnosticService(IAkburaDiagnosticService inner) : IAkburaDiagnosticService
     {
+        public AkburaDiagnosticReport GetDiagnosticReport(AkburaDocumentContext context, TextSpan requestedSpan,
+            CancellationToken cancellationToken = default) => inner.GetDiagnosticReport(context, requestedSpan, cancellationToken);
+
         public Action? BeforeSemanticReturn { get; set; }
 
         public ImmutableArray<AkburaDiagnosticSpan> GetSyntacticDiagnostics(

@@ -1,0 +1,123 @@
+using Akbura.AvaloniaEdit;
+using Akbura.Markup;
+using Akbura.Styles.akcss;
+using Avalonia.Automation;
+using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Styling;
+
+namespace Akbura.Playground;
+
+@akcss {
+    @using Avalonia;
+    @using Avalonia.Controls;
+    @using Avalonia.Layout;
+
+    @utilities {
+        Border.border-b-(double width) {
+            BorderThickness: new Thickness(0, 0, 0, width);
+        }
+
+        Border.border-t-(double width) {
+            BorderThickness: new Thickness(0, width, 0, 0);
+        }
+
+        TextBlock.self-y-center {
+            VerticalAlignment: VerticalAlignment.Center;
+        }
+
+        ContentControl.content-stretch {
+            HorizontalContentAlignment: HorizontalAlignment.Stretch;
+            VerticalContentAlignment: VerticalAlignment.Stretch;
+        }
+
+        GridSplitter.split-rows {
+            ResizeDirection: GridResizeDirection.Rows;
+        }
+
+        GridSplitter.split-columns {
+            ResizeDirection: GridResizeDirection.Columns;
+        }
+    }
+}
+
+<Border bg-slate-100>
+    <Grid ColumnDefinitions="*,8,*"
+          RowDefinitions="3*,12,2*"
+          m-2 ${sm}:m-3 ${md}:m-4>
+        <ThemeVariantScope RequestedThemeVariant={ThemeVariant.Dark}
+                           col-span-3 ${sm}:col-span-1 ${sm}:row-span-3>
+            <Border bg-slate-900 rounded-xl overflow-hidden>
+                <Grid RowDefinitions="Auto,*">
+                    <Border px-3 py-2 bg-slate-800>
+                        <Row Columns="2" gap-x-2>
+                            <ComboBox x.Name="ExampleSelector"
+                                      w-full
+                                      AutomationProperties.Name="Example"
+                                      PlaceholderText="Example" />
+                            <ComboBox x.Name="FileSelector"
+                                      w-full
+                                      AutomationProperties.Name="File"
+                                      PlaceholderText="File" />
+                        </Row>
+                    </Border>
+                    <AkburaCodeEditor x.Name="SourceEditor"
+                                      row-1
+                                      bg-slate-900
+                                      text-slate-100 text-base font-mono
+                                      IsReadOnly="True"
+                                      ShowLineNumbers="True"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Auto" />
+                </Grid>
+            </Border>
+        </ThemeVariantScope>
+
+        <GridSplitter row-1 col-span-3 split-rows
+                      ${sm}:row-0 ${sm}:col-1 ${sm}:col-span-1 ${sm}:row-span-3 ${sm}:split-columns
+                      bg-transparent self-stretch />
+
+        <Border row-2 col-span-3
+                ${sm}:row-0 ${sm}:col-2 ${sm}:col-span-1 ${sm}:row-span-3
+                bg-slate-50
+                border-slate-200
+                border-1
+                rounded-xl
+                overflow-hidden>
+            <Grid RowDefinitions="Auto,*,Auto">
+                <Border px-4 py-3
+                        bg-white
+                        border-slate-200
+                        border-b-1>
+                    <DockPanel LastChildFill="True">
+                        <TextBlock x.Name="PreviewStatus"
+                                   DockPanel.Dock="Right"
+                                   Text="Preparing editor…"
+                                   text-slate-600
+                                   self-y-center
+                                   text-xs />
+                        <TextBlock Text="Live preview"
+                                   text-slate-800
+                                   text-sm font-semibold />
+                    </DockPanel>
+                </Border>
+                <ScrollViewer row-1 VerticalScrollBarVisibility="Auto">
+                    <ContentControl x.Name="PreviewHost" content-stretch />
+                </ScrollViewer>
+                <Border x.Name="DiagnosticPanel"
+                        row-2
+                        IsVisible="False"
+                        px-4 py-3
+                        bg-orange-50
+                        border-orange-200
+                        border-t-1>
+                    <ScrollViewer max-h-33 VerticalScrollBarVisibility="Auto">
+                        <TextBlock x.Name="PreviewDiagnostics"
+                                   whitespace-normal
+                                   text-orange-900 text-sm />
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</Border>

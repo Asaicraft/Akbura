@@ -1,0 +1,11 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:playground="using:Akbura.Playground"
+        x:Class="Akbura.Playground.MainWindow"
+        Title="Akbura Playground"
+        Width="1200"
+        Height="760"
+        MinWidth="680"
+        MinHeight="420">
+    <playground:PlaygroundView />
+</Window>

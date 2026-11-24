@@ -1,0 +1,77 @@
+using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
+using Avalonia.Media;
+using Akbura.Styles.akcss;
+
+param string Title = "Purity UI";
+param string CardNumber = "1234 5678 9101 1XXX";
+param string ValidThru = "05/25";
+param string Cvv = "09X";
+
+<Viewbox self-stretch>
+    <Border w-116 h-60 rounded-2xl overflow-hidden shadow>
+        <Border.Background>
+            <LinearGradientBrush StartPoint="0%,100%" EndPoint="85%,55%">
+                <GradientStop Offset="0" Color="#313860" />
+                <GradientStop Offset="1" Color="#151928" />
+            </LinearGradientBrush>
+        </Border.Background>
+
+        <Panel>
+            <Image Source="avares://Akbura.Playground/Examples/PurityUI/Texture.png"
+                   Stretch="Fill"
+                   opacity-20
+                   pointer-events-none />
+
+            // Background decorations
+            <Canvas w-116 h-60 pointer-events-none>
+                $foreach (var width in new[] { 190d, 400d, 620d, 840d })
+                {
+                    var height = width * 6d / 7d;
+
+                    <Ellipse Canvas.Left={40d - width / 2d}
+                             Canvas.Top={-height / 2d}
+                             Width={width}
+                             Height={height}
+                             Stroke="#29FFFFFF"
+                             StrokeThickness="1"
+                             RenderTransformOrigin="50%,50%">
+                        <Ellipse.RenderTransform>
+                            <RotateTransform Angle="-13" />
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                }
+            </Canvas>
+
+            <Grid ml-8 mt-6 mr-7 mb-9 RowDefinitions="Auto, *, Auto">
+                // Header
+                <Grid row-0 ColumnDefinitions="*, Auto">
+                    <TextBlock Text={Title} text-white text-lg font-semibold VerticalAlignment="Center" />
+
+                    // Card logo
+                    <Panel col-1 w-12 h-8>
+                        <Ellipse size-8 Fill="#66FFFFFF" self-start />
+                        <Ellipse size-8 Fill="#66FFFFFF" self-end />
+                    </Panel>
+                </Grid>
+
+                // Card information
+                <StackPanel row-2 gap-4 HorizontalAlignment="Left">
+                    <TextBlock Text={CardNumber} text-white text-2xl font-bold LetterSpacing="0.4" />
+
+                    <Grid ColumnDefinitions="Auto, Auto" gap-x-10>
+                        <StackPanel>
+                            <TextBlock Text="VALID THRU" text-white FontSize="10" />
+                            <TextBlock Text={ValidThru} text-white text-sm font-bold />
+                        </StackPanel>
+
+                        <StackPanel col-1>
+                            <TextBlock Text="CVV" text-white FontSize="10" />
+                            <TextBlock Text={Cvv} text-white text-sm font-bold />
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Grid>
+        </Panel>
+    </Border>
+</Viewbox>

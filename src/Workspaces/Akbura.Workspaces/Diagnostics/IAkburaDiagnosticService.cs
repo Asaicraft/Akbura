@@ -6,6 +6,15 @@ namespace Akbura.Workspaces.Diagnostics;
 public interface IAkburaDiagnosticService
 {
     /// <summary>
+    /// Returns canonical issues without discarding foreign or locationless diagnostics,
+    /// together with the source markers belonging to this document and requested span.
+    /// </summary>
+    AkburaDiagnosticReport GetDiagnosticReport(
+        AkburaDocumentContext context,
+        TextSpan requestedSpan,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets diagnostics produced by parsing without waiting for a project or
     /// semantic model.
     /// </summary>

@@ -11,7 +11,7 @@ namespace Akbura.Workspaces;
 /// Every published solution, project and document is immutable.
 /// CPU-bound methods must be called by editor hosts from a background thread.
 /// </summary>
-public sealed class AkburaWorkspace : IDisposable
+public sealed partial class AkburaWorkspace : IDisposable
 {
     private readonly object _mutationGate = new();
     private AkburaSolutionSnapshot _currentSolution;
@@ -125,6 +125,8 @@ public sealed class AkburaWorkspace : IDisposable
                 oldSolution,
                 newSolution,
                 projectId);
+            _projectFacades.Remove(projectId);
+            _projectResolvers.Remove(projectId);
         }
 
         Changed?.Invoke(this, eventArgs);
@@ -984,6 +986,8 @@ public sealed class AkburaWorkspace : IDisposable
             Volatile.Write(
                 ref _disposeState,
                 1);
+            _projectFacades.Clear();
+            _projectResolvers.Clear();
         }
     }
 

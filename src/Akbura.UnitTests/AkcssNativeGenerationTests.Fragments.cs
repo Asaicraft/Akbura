@@ -411,6 +411,82 @@ public sealed partial class AkcssNativeGenerationTests
         }, CancellationToken.None);
     }
 
+    [Fact]
+    public async Task BuiltInPresenterUtilitiesStyleThePartAndFollowHover()
+    {
+        const string markup = """
+            using Avalonia.Controls;
+            using Avalonia.Media;
+            using Akbura.Markup;
+            using Akbura.Styles.akcss;
+
+            <StackPanel>
+                <Button Content="Primary" Width={120d} Height={40d}
+                        Background={Brushes.Beige} BorderThickness={new Avalonia.Thickness(1d)}
+                        presenter-bg-blue-500 ${hover}:presenter-bg-blue-700
+                        presenter-border-2 presenter-border-blue-600
+                        presenter-rounded-md presenter-padding-8 presenter-text-white presenter-shadow-md />
+                <Button Content="Sibling" Width={120d} Height={40d} />
+            </StackPanel>
+            """;
+        var assembly = Generate([("FragmentView.akbura", markup)], FragmentViewHost).Compile();
+
+        await AvaloniaHeadlessTestSession.GetSession().Dispatch(() =>
+        {
+            var app = Application.Current!;
+            var theme = new FluentTheme();
+            var viewType = assembly.GetType("HelloWorld.FragmentView")!;
+            var view = Assert.IsAssignableFrom<AkburaControl>(Activator.CreateInstance(viewType));
+            viewType.GetMethod("InitializeForTest")!.Invoke(view, null);
+            var panel = Assert.IsType<StackPanel>(view.Child);
+            var first = Assert.IsType<Button>(panel.Children[0]);
+            var sibling = Assert.IsType<Button>(panel.Children[1]);
+            var shadow = BoxShadows.Parse("0 2 4 0 #66000000");
+            var window = new Window { Width = 280d, Height = 180d, Content = view };
+            window.Resources["--color-blue-500"] = Brushes.Blue;
+            window.Resources["--color-blue-600"] = Brushes.Navy;
+            window.Resources["--color-blue-700"] = Brushes.DarkBlue;
+            window.Resources["--color-white"] = Brushes.White;
+            window.Resources["--radius-md"] = new CornerRadius(6d);
+            window.Resources["--shadow-md"] = shadow;
+            try
+            {
+                app.Styles.Add(theme);
+                window.Show();
+                first.ApplyTemplate();
+                sibling.ApplyTemplate();
+                PumpFragmentWindow(window);
+                var presenter = GetFragmentPresenter(first);
+                var siblingBackground = GetFragmentPresenter(sibling).Background;
+                Assert.Equal(Brushes.Blue, presenter.Background);
+                Assert.Equal(Brushes.Navy, presenter.BorderBrush);
+                Assert.Equal(new Thickness(2d), presenter.BorderThickness);
+                Assert.Equal(new CornerRadius(6d), presenter.CornerRadius);
+                Assert.Equal(new Thickness(8d), presenter.Padding);
+                Assert.Equal(Brushes.White, presenter.Foreground);
+                Assert.Equal(shadow, presenter.BoxShadow);
+                Assert.Equal(Brushes.Beige, first.Background);
+                Assert.Equal(new Thickness(1d), first.BorderThickness);
+
+                window.MouseMove(first.TranslatePoint(new Point(10d, 10d), window)!.Value, RawInputModifiers.None);
+                PumpFragmentWindow(window);
+                Assert.True(first.IsPointerOver);
+                Assert.Equal(Brushes.DarkBlue, presenter.Background);
+                window.Resources["--color-blue-700"] = Brushes.CornflowerBlue;
+                Assert.Equal(Brushes.CornflowerBlue, presenter.Background);
+                Assert.Equal(siblingBackground, GetFragmentPresenter(sibling).Background);
+                window.MouseMove(new Point(250d, 150d), RawInputModifiers.None);
+                PumpFragmentWindow(window);
+                Assert.Equal(Brushes.Blue, presenter.Background);
+            }
+            finally
+            {
+                window.Close();
+                app.Styles.Remove(theme);
+            }
+        }, CancellationToken.None);
+    }
+
     private static ContentPresenter GetFragmentPresenter(Button button) => Assert.Single(
         button.GetVisualDescendants().OfType<ContentPresenter>(), part => part.Name == "PART_ContentPresenter");
 

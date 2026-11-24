@@ -358,29 +358,19 @@ public sealed partial class AkburaSyntacticDocument
                 closeBrace = section.CloseBrace;
                 break;
 
-            case AkcssUtilityDeclarationSyntax utility:
-                openBrace = utility.OpenBrace;
-                closeBrace = utility.CloseBrace;
-                break;
-
-            case AkcssStyleRuleSyntax style:
-                openBrace = style.OpenBrace;
-                closeBrace = style.CloseBrace;
-                break;
-
-            case AkcssIfDirectiveSyntax ifDirective:
-                openBrace = ifDirective.OpenBrace;
-                closeBrace = ifDirective.CloseBrace;
-                break;
-
-            case AkcssPseudoBlockSyntax pseudoBlock:
-                openBrace = pseudoBlock.OpenBrace;
-                closeBrace = pseudoBlock.CloseBrace;
+            case AkcssMixinArgumentListSyntax arguments:
+                openBrace = arguments.OpenParen;
+                closeBrace = arguments.CloseParen;
                 break;
 
             default:
-                boundaries = default;
-                return false;
+                if (!TryGetAkcssBraces(node, out openBrace, out closeBrace))
+                {
+                    boundaries = default;
+                    return false;
+                }
+
+                break;
         }
 
         if (openBrace.IsMissing)

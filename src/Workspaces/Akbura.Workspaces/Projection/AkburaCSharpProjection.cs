@@ -406,6 +406,14 @@ internal static class AkburaCSharpProjectionFactory
 
     private static CSharpProbeProjection CreateExpressionProjection(AkburaSemanticModel semanticModel, AkburaSyntax root, AkburaEmbeddedCSharpContext context)
     {
+        if (context.OwnerKind == Akbura.Language.Syntax.SyntaxKind.AkcssMixinArgumentListSyntax &&
+            FindSyntax<AkcssMixinArgumentListSyntax>(root, context) is { } list &&
+            EmbeddedCSharpSyntaxFacts.TryGetEmptyIncludeArgumentSpan(list, out var argumentSpan) &&
+            argumentSpan == context.HostSpan)
+        {
+            return semanticModel.CreateAkcssEmptyIncludeArgumentProjection(list, context.RelativePosition);
+        }
+
         var syntax = context.OwnerKind == Akbura.Language.Syntax.SyntaxKind.MarkupExpressionBindingSyntax
             ? FindSyntax<MarkupExpressionBindingSyntax>(root, context)?.Expression
             : FindSyntax<CSharpExpressionSyntax>(root, context);

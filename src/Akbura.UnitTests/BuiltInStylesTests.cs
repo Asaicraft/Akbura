@@ -83,7 +83,7 @@ public sealed class BuiltInStylesTests
                         col-1 row-2 col-span-2>
                     <TextBlock text-center font-bold whitespace-nowrap />
                 </Border>
-                <Button px-4 py-2 bg-blue-500 text-white rounded-full />
+                <Button px-4 py-2 bg-blue-500 text-white rounded-full self-x-center self-y-end />
                 <Grid gap-x-2 />
                 <Row gap-3 gap-x-5 gap-y-7 />
             </StackPanel>
@@ -134,6 +134,14 @@ public sealed class BuiltInStylesTests
 
         AssertStaticUtility(operations["h-auto"], "h-auto");
         AssertStaticUtility(operations["self-center"], "self-center");
+        var horizontal = operations["self-x-center"];
+        var vertical = operations["self-y-end"];
+        AssertStaticUtility(horizontal, "self-x-center");
+        AssertStaticUtility(vertical, "self-y-end");
+        var horizontalSetter = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(Assert.Single(horizontal.Utility!.Operations));
+        var verticalSetter = Assert.IsAssignableFrom<IAkcssPropertySetterOperation>(Assert.Single(vertical.Utility!.Operations));
+        Assert.Equal(nameof(Control.HorizontalAlignment), horizontalSetter.Property?.Name);
+        Assert.Equal(nameof(Control.VerticalAlignment), verticalSetter.Property?.Name);
         AssertStaticUtility(operations["text-center"], "text-center");
         AssertStaticUtility(operations["font-bold"], "font-bold");
         AssertStaticUtility(operations["rounded-md"], "rounded-md");

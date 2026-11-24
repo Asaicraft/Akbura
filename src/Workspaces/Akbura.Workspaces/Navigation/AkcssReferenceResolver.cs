@@ -1,4 +1,5 @@
 using Akbura.Language;
+using Akbura.Language.Binder;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -7,7 +8,7 @@ using System.Collections.Immutable;
 
 namespace Akbura.Workspaces.Navigation;
 
-internal sealed class AkcssReferenceResolver
+internal sealed partial class AkcssReferenceResolver
 {
     public bool TryResolve(
         AkburaDocumentContext context,
@@ -36,6 +37,12 @@ internal sealed class AkcssReferenceResolver
         for (var node = token.Parent; node != null; node = node.Parent)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var contextual = GetContextualReferences(semanticModel, node, cancellationToken);
+            if (!contextual.IsEmpty && TrySelectReference(context, contextual, position, out reference))
+            {
+                return true;
+            }
+
             switch (node)
             {
                 case AkcssUsingDirectiveSyntax usingDirective
@@ -239,11 +246,15 @@ internal sealed class AkcssReferenceResolver
             AkburaSemanticModel semanticModel,
             AkcssAssignmentSyntax assignment)
     {
-        if (semanticModel.GetOperation(assignment) is not
-                IAkcssPropertySetterOperation { Property: { } property } ||
-            !AkcssPropertyReferenceFacts.TryGetSpans(
-                assignment.PropertyName,
-                out var spans))
+        var operation = semanticModel.GetOperation(assignment);
+        var context = (operation as AkcssContextualOperation)?.Context;
+        var property = operation switch
+        {
+            IAkcssPropertySetterOperation legacy => legacy.Property,
+            AkcssContextualOperation { Data: AkcssSetterData setter } => setter.Property,
+            _ => null,
+        };
+        if (property is null || !AkcssPropertyReferenceFacts.TryGetSpans(assignment.PropertyName, out var spans))
         {
             return ImmutableArray<AkcssResolvedReference>.Empty;
         }
@@ -265,9 +276,8 @@ internal sealed class AkcssReferenceResolver
             AkcssReferenceKind.Property,
             spans.PropertySpan,
             property,
-            property.WriteDefinition.IsDefault
-                ? property.ReadDefinition
-                : property.WriteDefinition));
+            property.WriteDefinition.IsDefault ? property.ReadDefinition : property.WriteDefinition,
+            context));
         return references.ToImmutable();
     }
 

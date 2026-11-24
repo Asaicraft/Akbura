@@ -6087,7 +6087,7 @@ public sealed partial class WorkspaceCompletionTests
         AkburaCSharpCompletionContextKind.Type,
         "StackPanel")]
     [InlineData(
-        "@using Avalonia.Controls;\n@intercept StackP|;",
+        "@using Avalonia.Controls;\nControl.card { @intercept StackP|; }",
         AkburaCSharpCompletionContextKind.Type,
         "StackPanel")]
     [InlineData(

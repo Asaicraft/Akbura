@@ -203,7 +203,7 @@ namespace Akbura.Language.Syntax
             new(GetRed(ref _members, 2));
 
         public SyntaxToken CloseBrace =>
-            new(this, Green.CloseBrace, GetChildPositionFromEnd(1), GetChildIndex(3));
+            new(this, Green.CloseBrace, GetChildPositionFromEnd(3), GetChildIndex(3));
 
         public AkcssNestedStyleRuleSyntax UpdateAkcssNestedStyleRuleSyntax(
             AkcssSelectorSyntax selector,

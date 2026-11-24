@@ -217,7 +217,7 @@ namespace Akbura.Language.Syntax
             (AkcssMixinArgumentListSyntax)GetRed(ref _arguments, 3)!;
 
         public SyntaxToken Semicolon =>
-            new(this, Green.Semicolon, GetChildPositionFromEnd(1), GetChildIndex(4));
+            new(this, Green.Semicolon, GetChildPositionFromEnd(4), GetChildIndex(4));
 
         public AkcssIncludeSyntax UpdateAkcssIncludeSyntax(
             SyntaxToken atToken,

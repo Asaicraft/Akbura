@@ -47,9 +47,7 @@ internal abstract partial class AkburaSemanticModel
 
         ValidateSyntaxTreeOwnership(expressionSyntax);
 
-        if (expressionSyntax.Parent is
-                AkcssAssignmentSyntax or
-                AkcssIfDirectiveSyntax)
+        if (AkcssSemanticFacts.IsEmbeddedExpression(expressionSyntax))
         {
             return CreateAkcssCSharpCompletionProjection(
                 expressionSyntax,
@@ -308,11 +306,7 @@ internal abstract partial class AkburaSemanticModel
 
         ValidateSyntaxTreeOwnership(typeSyntax);
 
-        if (typeSyntax.Parent is
-                AkcssStyleSelectorSyntax or
-                AkcssUtilitySelectorSyntax or
-                AkcssUtilityParameterSyntax or
-                AkcssInterceptDirectiveSyntax)
+        if (AkcssSemanticFacts.IsEmbeddedType(typeSyntax))
         {
             return CreateAkcssCSharpCompletionProjection(
                 typeSyntax,

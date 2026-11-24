@@ -8,6 +8,15 @@ internal static class AkcssSemanticFacts
     public static bool IsSourceDeclaration(AkburaSyntax syntax) =>
         syntax is AkcssSelectorRuleSyntax or AkcssThemeDeclarationSyntax or AkcssMixinDeclarationSyntax;
 
+    public static bool IsEmbeddedType(CSharpTypeSyntax syntax) =>
+        syntax.Parent is AkcssStyleSelectorSyntax or AkcssUtilitySelectorSyntax or AkcssUtilityParameterSyntax or
+            AkcssInterceptDirectiveSyntax or AkcssThemeDeclarationSyntax or AkcssMixinDeclarationSyntax or
+            AkcssMixinParameterSyntax or AkcssTypeSelectorSyntax or AkcssParenthesizedSelectorTypeSyntax;
+
+    public static bool IsEmbeddedExpression(CSharpExpressionSyntax syntax) =>
+        syntax.Parent is AkcssAssignmentSyntax or AkcssIfDirectiveSyntax or AkcssMixinArgumentListSyntax or
+            AkcssMixinParameterDefaultSyntax or AkcssBasedOnDirectiveSyntax;
+
     public static bool HasNativeApplication(IAkcssSymbol symbol) =>
         symbol is IMetadataAkcssSymbol { HasNativeBody: true } ||
         symbol.DeclarationSyntax is { } declaration && HasContextualBody(declaration);

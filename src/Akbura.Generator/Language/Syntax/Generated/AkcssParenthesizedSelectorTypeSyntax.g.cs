@@ -174,7 +174,7 @@ namespace Akbura.Language.Syntax
             (CSharpTypeSyntax)GetRed(ref _type, 1)!;
 
         public SyntaxToken CloseParen =>
-            new(this, Green.CloseParen, GetChildPositionFromEnd(1), GetChildIndex(2));
+            new(this, Green.CloseParen, GetChildPositionFromEnd(2), GetChildIndex(2));
 
         public AkcssParenthesizedSelectorTypeSyntax UpdateAkcssParenthesizedSelectorTypeSyntax(
             SyntaxToken openParen,

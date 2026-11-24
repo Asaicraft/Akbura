@@ -3615,7 +3615,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         var componentSymbolInfo = GetSymbolInfo(markupElement);
         var componentSymbol = componentSymbolInfo.Symbol as IMarkupComponentSymbol;
         if (componentSymbol == null && markupElement.StartTag is { CloseToken.IsMissing: true } startTag &&
-            TryResolveMarkupComponentForCompletion(startTag.Name.ToFullString().Trim(), out var incompleteComponent))
+            TryResolveMarkupComponentForCompletion(startTag.Name.ToFullString().Trim(), out var incompleteComponent, markupElement))
         {
             componentSymbol = incompleteComponent;
         }
@@ -5719,12 +5719,14 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             : CSharpProbeScope.Empty;
         var method = CSharpSyntaxFactory.MethodDeclaration(
                 CreateCSharpProbeReturnType(targetType),
-                "__AkburaSemanticProbe")
+                includeCompletionMembers ? CSharpProbeBuilder.ExpressionProbeMethodName : "__AkburaSemanticProbe")
             .WithParameterList(CreateAkcssExpressionParameterList(
                 containingSymbol,
-                receiver,
+                includeCompletionMembers ? default : receiver,
                 targetParameterName,
-                !includeCompletionMembers))
+                includeParameters: !includeCompletionMembers || containingSymbol is AkcssMixinSymbol &&
+                    completionScope?.Parent is not AkcssMixinParameterDefaultSyntax,
+                annotateParameters: includeCompletionMembers))
             .WithBody(CSharpSyntaxFactory.Block(
                 probeScope.LocalStatements.Add(returnStatement)));
 
@@ -5732,9 +5734,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax>.Rent();
         if (includeCompletionMembers)
         {
-            AddAkcssTargetCompletionMembers(
-                members,
-                containingSymbol);
+            AddAkcssTargetCompletionMembers(members, receiver);
         }
 
         members.AddRange(probeScope.MemberDeclarations);
@@ -5749,10 +5749,9 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
     private static void AddAkcssTargetCompletionMembers(
         ImmutableArrayBuilder<CSharp.MemberDeclarationSyntax> members,
-        IAkcssDeclarationOwner containingSymbol)
+        CSharpSymbolDefinition receiver)
     {
-        if (containingSymbol.TargetType.Symbol is not
-                INamedTypeSymbol targetType)
+        if (receiver.Symbol is not INamedTypeSymbol targetType)
         {
             return;
         }
@@ -6029,7 +6028,8 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         IAkcssDeclarationOwner owner,
         CSharpSymbolDefinition receiver,
         string targetParameterName,
-        bool includeParameters)
+        bool includeParameters,
+        bool annotateParameters)
     {
         using var builder = ImmutableArrayBuilder<CSharp.ParameterSyntax>.Rent();
         if (!receiver.IsDefault)
@@ -6040,10 +6040,17 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
 
         if (includeParameters)
         {
-            foreach (var (name, text, type) in GetAkcssExpressionParameters(owner))
+            foreach (var (name, text, type, source) in GetAkcssExpressionParameters(owner))
             {
-                builder.Add(CSharpSyntaxFactory.Parameter(CSharpSyntaxFactory.ParseToken(text))
-                    .WithType(CreateCSharpProbeReturnType(type.Symbol as ITypeSymbol)));
+                var parameter = CSharpSyntaxFactory.Parameter(CSharpSyntaxFactory.ParseToken(text))
+                    .WithType(CreateCSharpProbeReturnType(type.Symbol as ITypeSymbol));
+                if (annotateParameters && source is not null &&
+                    CSharpProbeBinder.TryCreateProjectedSymbolAnnotation(source, name, out var origin))
+                {
+                    parameter = parameter.WithAdditionalAnnotations(origin);
+                }
+
+                builder.Add(parameter);
             }
         }
 
@@ -6061,14 +6068,14 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
         return name;
     }
 
-    private static IEnumerable<(string Name, string Text, CSharpSymbolDefinition Type)> GetAkcssExpressionParameters(IAkcssDeclarationOwner owner)
+    private static IEnumerable<(string Name, string Text, CSharpSymbolDefinition Type, AkcssMixinParameterSymbol? Source)> GetAkcssExpressionParameters(IAkcssDeclarationOwner owner)
     {
         if (owner is ITailwindUtilitySymbol utility)
         {
             foreach (var parameter in utility.Parameters)
             {
                 var name = parameter.CSharpParameter?.Name ?? parameter.Name;
-                yield return (name, name, parameter.Type);
+                yield return (name, name, parameter.Type, null);
             }
         }
         else if (owner is AkcssMixinSymbol mixin)
@@ -6078,7 +6085,7 @@ internal abstract partial class AkburaSemanticModel : IOperationFactoryContext
             {
                 if (parameter.Name.Length > 0 && seen.Add(parameter.Name))
                 {
-                    yield return (parameter.Name, parameter.DeclarationSyntax.Name.Identifier.Text, parameter.Type);
+                    yield return (parameter.Name, parameter.DeclarationSyntax.Name.Identifier.Text, parameter.Type, parameter);
                 }
             }
         }

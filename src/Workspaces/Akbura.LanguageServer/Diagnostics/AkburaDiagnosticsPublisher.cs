@@ -100,6 +100,25 @@ internal sealed class AkburaDiagnosticsPublisher
         }
     }
 
+    public async Task RefreshChangedProjectsAsync(AkburaSolutionSnapshot previous, CancellationToken cancellationToken)
+    {
+        var snapshot = _state.Current;
+        foreach (var document in snapshot.OpenDocuments.Values)
+        {
+            if (document.ProjectId is { } id &&
+                snapshot.Solution.TryGetProject(id, out var project) &&
+                (!previous.TryGetProject(id, out var oldProject) || oldProject.Version != project.Version))
+            {
+                await PublishSemanticAsync(document.Uri, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        if (snapshot.ClientCapabilities.SupportsPullDiagnostics && snapshot.ClientCapabilities.SupportsDiagnosticRefresh)
+        {
+            await RequestRefreshAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     public async Task ClearAsync(
         Uri uri,
         CancellationToken cancellationToken)

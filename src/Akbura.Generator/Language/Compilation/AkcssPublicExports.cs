@@ -24,6 +24,37 @@ internal sealed record AkcssModuleExport(
 
 internal sealed class AkcssPublicExports(ImmutableDictionary<AkcssSyntaxTree, AkcssModuleExport> modules)
 {
+    private static readonly SyntaxAnnotation s_probeAnnotation = new();
+
+    public bool Contains(AkcssThemeSymbol theme) =>
+        theme.DefinitionModel.SyntaxTree is AkcssSyntaxTree tree &&
+        Find(tree) is { IsValid: true } export &&
+        export.Themes.Any(item => ReferenceEquals(item.Declaration, theme.DeclarationSyntax));
+
+    public AkcssThemeSymbol? FindSourceTheme(AkburaCompilation compilation, Microsoft.CodeAnalysis.ISymbol? symbol)
+    {
+        if (symbol is not Microsoft.CodeAnalysis.IPropertySymbol { IsStatic: true } property ||
+            !property.DeclaringSyntaxReferences.Any(static reference => reference.SyntaxTree.GetRoot().HasAnnotation(s_probeAnnotation)))
+        {
+            return null;
+        }
+
+        var id = DocumentationCommentId.CreateDeclarationId(property.ContainingType);
+        foreach (var item in modules)
+        {
+            var export = item.Value;
+            if (!export.IsValid || id != "T:" + export.MetadataName)
+            {
+                continue;
+            }
+
+            return export.Themes.FirstOrDefault(theme => theme.Declaration.Name.Identifier.ValueText == property.MetadataName)
+                ?.Resolve(compilation.GetSemanticModel(item.Key));
+        }
+
+        return null;
+    }
+
     public AkcssModuleExport? Find(AkcssSyntaxTree tree) =>
         modules.TryGetValue(tree, out var module) ? module : null;
 
@@ -173,7 +204,7 @@ internal sealed class AkcssPublicExports(ImmutableDictionary<AkcssSyntaxTree, Ak
 
         var options = compilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions;
         var tree = CSharpSyntaxTree.ParseText(source.ToString(), options, path: "__AkburaAkcssExports.g.cs");
-        return compilation.AddSyntaxTrees(tree);
+        return compilation.AddSyntaxTrees(tree.WithRootAndOptions(tree.GetRoot().WithAdditionalAnnotations(s_probeAnnotation), tree.Options));
     }
 
     private static bool IsIdentifier(string name) =>

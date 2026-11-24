@@ -246,7 +246,7 @@ namespace Akbura.Language.Syntax
         }
 
         public SyntaxToken Semicolon =>
-            new(this, Green.Semicolon, GetChildPositionFromEnd(1), GetChildIndex(5));
+            new(this, Green.Semicolon, GetChildPositionFromEnd(5), GetChildIndex(5));
 
         public AkcssTemplateBindSyntax UpdateAkcssTemplateBindSyntax(
             SyntaxToken atToken,

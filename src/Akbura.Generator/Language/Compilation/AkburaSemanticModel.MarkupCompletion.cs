@@ -21,7 +21,7 @@ internal partial class AkburaSemanticModel
                 ImmutableArray<MarkupAttachedPropertyLookupCandidate>>(
                     StringComparer.Ordinal);
 
-    internal ImmutableArray<MarkupAttachedPropertyLookupCandidate> LookupMarkupAttachedPropertiesForCompletion(string componentName, CancellationToken cancellationToken = default)
+    internal ImmutableArray<MarkupAttachedPropertyLookupCandidate> LookupMarkupAttachedPropertiesForCompletion(string componentName, CancellationToken cancellationToken = default, AkburaSyntax? site = null)
     {
         if (string.IsNullOrWhiteSpace(componentName))
         {
@@ -29,6 +29,11 @@ internal partial class AkburaSemanticModel
         }
 
         componentName = componentName.Trim();
+        if (site is not null)
+        {
+            return ComputeMarkupAttachedPropertiesForCompletion(componentName, cancellationToken, site);
+        }
+
         var snapshot = Volatile.Read(
             ref _completionMarkupAttachedProperties);
         if (snapshot.TryGetValue(componentName, out var cached))
@@ -47,11 +52,11 @@ internal partial class AkburaSemanticModel
             computed);
     }
 
-    private ImmutableArray<MarkupAttachedPropertyLookupCandidate> ComputeMarkupAttachedPropertiesForCompletion(string componentName, CancellationToken cancellationToken)
+    private ImmutableArray<MarkupAttachedPropertyLookupCandidate> ComputeMarkupAttachedPropertiesForCompletion(string componentName, CancellationToken cancellationToken, AkburaSyntax? site = null)
     {
         if (!TryResolveMarkupComponentForCompletion(
                 componentName,
-                out var target))
+                out var target, site))
         {
             return [];
         }
@@ -61,7 +66,7 @@ internal partial class AkburaSemanticModel
             string,
             INamedTypeSymbol?>(StringComparer.Ordinal);
 
-        foreach (var visibleNamespace in GetVisibleMarkupNamespaces())
+        foreach (var visibleNamespace in GetVisibleMarkupNamespaces(site))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var namespaceSymbol = GetNamespaceSymbol(

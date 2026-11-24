@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using AkburaSyntax = Akbura.Language.Syntax.AkburaSyntax;
 using AkburaDocumentSyntax = Akbura.Language.Syntax.AkburaDocumentSyntax;
 using MarkupElementSyntax = Akbura.Language.Syntax.MarkupElementSyntax;
 using MarkupRootSyntax = Akbura.Language.Syntax.MarkupRootSyntax;
@@ -28,8 +29,14 @@ internal partial class AkburaSemanticModel
     private ImmutableDictionary<string, ImmutableArray<TailwindUtilityLookupCandidate>> _completionTailwindUtilities =
         ImmutableDictionary.Create<string, ImmutableArray<TailwindUtilityLookupCandidate>>(StringComparer.Ordinal);
 
-    internal ImmutableArray<MarkupComponentLookupCandidate> LookupMarkupComponents(CancellationToken cancellationToken = default)
+    internal ImmutableArray<MarkupComponentLookupCandidate> LookupMarkupComponents(
+        CancellationToken cancellationToken = default, AkburaSyntax? site = null)
     {
+        if (site is not null)
+        {
+            return ComputeMarkupComponents(cancellationToken, site);
+        }
+
         var catalog = Volatile.Read(ref _completionComponentCatalog);
 
         if (catalog != null)
@@ -53,8 +60,14 @@ internal partial class AkburaSemanticModel
         return (catalog ?? created).Candidates;
     }
 
-    internal ImmutableArray<MarkupExtensionLookupCandidate> LookupMarkupExtensions(CancellationToken cancellationToken = default)
+    internal ImmutableArray<MarkupExtensionLookupCandidate> LookupMarkupExtensions(
+        CancellationToken cancellationToken = default, AkburaSyntax? site = null)
     {
+        if (site is not null)
+        {
+            return ComputeMarkupExtensions(cancellationToken, site);
+        }
+
         var catalog = Volatile.Read(ref _completionMarkupExtensionCatalog);
 
         if (catalog != null)
@@ -152,10 +165,10 @@ internal partial class AkburaSemanticModel
     }
 
     private ImmutableArray<MarkupExtensionLookupCandidate>
-        ComputeMarkupExtensions(CancellationToken cancellationToken)
+        ComputeMarkupExtensions(CancellationToken cancellationToken, AkburaSyntax? site = null)
     {
         var timer = Stopwatch.StartNew();
-        var visibleNamespaces = GetVisibleMarkupExtensionNamespaces();
+        var visibleNamespaces = GetVisibleMarkupExtensionNamespaces(site);
         var candidates = new Dictionary<
             string,
             MarkupExtensionLookupCandidate>(StringComparer.Ordinal);
@@ -188,10 +201,7 @@ internal partial class AkburaSemanticModel
             }
         }
 
-        AddMarkupExtensionTypeAliasCandidates(
-            candidates,
-            csharpCompilation,
-            cancellationToken);
+        AddMarkupExtensionTypeAliasCandidates(candidates, csharpCompilation, cancellationToken, site);
 
         var result = candidates.Values.ToSortedImmutableArray(s_extensionCompletionComparer);
         AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
@@ -201,10 +211,10 @@ internal partial class AkburaSemanticModel
     }
 
     private ImmutableArray<MarkupComponentLookupCandidate>
-        ComputeMarkupComponents(CancellationToken cancellationToken)
+        ComputeMarkupComponents(CancellationToken cancellationToken, AkburaSyntax? site = null)
     {
         var timer = Stopwatch.StartNew();
-        var visibleNamespaces = GetVisibleMarkupNamespaces();
+        var visibleNamespaces = GetVisibleMarkupNamespaces(site);
         AkburaWorkspaceDiagnostics.WriteCompletionElapsed(
             "Component catalog visible namespaces",
             timer.Elapsed);
@@ -293,7 +303,8 @@ internal partial class AkburaSemanticModel
 
     internal bool TryResolveMarkupComponentForCompletion(
         string componentName,
-        out IMarkupComponentSymbol component)
+        out IMarkupComponentSymbol component,
+        AkburaSyntax? site = null)
     {
         if (string.IsNullOrWhiteSpace(componentName))
         {
@@ -302,7 +313,7 @@ internal partial class AkburaSemanticModel
         }
 
         var name = componentName.Trim();
-        foreach (var metadataName in GetAkburaComponentCandidateMetadataNames(name))
+        foreach (var metadataName in GetAkburaComponentCandidateMetadataNames(name, site))
         {
             var akburaComponent = FindLocalAkburaComponent(metadataName) ??
                 Compilation
@@ -325,7 +336,8 @@ internal partial class AkburaSemanticModel
         CSharpBindingResult binding;
         try
         {
-            binding = BindCSharpType(SyntaxFactory.ParseTypeName(name));
+            binding = BindCSharpType(SyntaxFactory.ParseTypeName(name),
+                site is null ? default : GetMarkupCSharpUsingDirectives(site));
         }
         catch (InvalidOperationException)
         {
@@ -377,7 +389,7 @@ internal partial class AkburaSemanticModel
     }
 
     private IEnumerable<string>
-        GetAkburaComponentCandidateMetadataNames(string componentName, MarkupElementSyntax? site = null)
+        GetAkburaComponentCandidateMetadataNames(string componentName, AkburaSyntax? site = null)
     {
         var name = componentName.Trim();
         if (name.Length == 0)
@@ -467,7 +479,7 @@ internal partial class AkburaSemanticModel
             ? GetAkburaNamespaceText(document, SyntaxTree)
             : GetDefaultAkburaNamespaceText(SyntaxTree);
 
-    private ImmutableArray<VisibleMarkupNamespace> GetVisibleMarkupNamespaces()
+    private ImmutableArray<VisibleMarkupNamespace> GetVisibleMarkupNamespaces(AkburaSyntax? site = null)
     {
         using var builder =
             ImmutableArrayBuilder<VisibleMarkupNamespace>.Rent();
@@ -485,7 +497,7 @@ internal partial class AkburaSemanticModel
                 GetMarkupDocumentNamespace(),
                 alias: null);
 
-            foreach (var directive in GetCSharpUsingDirectives())
+            foreach (var directive in site is null ? GetCSharpUsingDirectives() : GetAkcssCSharpUsingDirectives(site))
             {
                 if (directive.StaticKeyword.RawKind != 0 ||
                     directive.Name == null)
@@ -516,7 +528,7 @@ internal partial class AkburaSemanticModel
     }
 
     private ImmutableArray<VisibleMarkupNamespace>
-        GetVisibleMarkupExtensionNamespaces()
+        GetVisibleMarkupExtensionNamespaces(AkburaSyntax? site)
     {
         using var builder =
             ImmutableArrayBuilder<VisibleMarkupNamespace>.Rent();
@@ -524,7 +536,7 @@ internal partial class AkburaSemanticModel
         try
         {
 
-            foreach (var visibleNamespace in GetVisibleMarkupNamespaces())
+            foreach (var visibleNamespace in GetVisibleMarkupNamespaces(site))
             {
                 AddVisibleMarkupNamespace(
                     builder,
@@ -554,9 +566,10 @@ internal partial class AkburaSemanticModel
     private void AddMarkupExtensionTypeAliasCandidates(
         Dictionary<string, MarkupExtensionLookupCandidate> candidates,
         CSharpCompilation csharpCompilation,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        AkburaSyntax? site)
     {
-        foreach (var directive in GetCSharpUsingDirectives())
+        foreach (var directive in site is null ? GetCSharpUsingDirectives() : GetAkcssCSharpUsingDirectives(site))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (directive.Alias == null ||

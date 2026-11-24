@@ -48,6 +48,9 @@ internal sealed class
                 case AkcssUtilityDeclarationSyntax utility:
                     AddUtilityClassifications(semanticModel, selectorTypes, utility, requestedSpan, builder);
                     break;
+                case CSharpTypeSyntax type:
+                    AddContextualType(selectorTypes, type, requestedSpan, builder);
+                    break;
             }
         }
     }
@@ -91,6 +94,19 @@ internal sealed class
                         builder);
                     break;
 
+                case CSharpTypeSyntax type:
+                    AddContextualType(selectorTypes, type, requestedSpan, builder);
+                    break;
+                case AkcssIncludeSyntax or AkcssBasedOnDirectiveSyntax or AkcssTemplateBindSyntax:
+                    AddContextualReferences(semanticModel, node, requestedSpan, builder, cancellationToken);
+                    break;
+                case CSharpExpressionSyntax expression when AkcssSemanticFacts.IsEmbeddedExpression(expression) &&
+                    (expression.Parent is not (AkcssAssignmentSyntax or AkcssIfDirectiveSyntax) ||
+                     AkcssSemanticFacts.FindOwner(expression) is { } owner &&
+                         (AkcssSemanticFacts.IsSourceDeclaration(owner) || AkcssSemanticFacts.HasContextualBody(owner))):
+                    AddContextualReferences(semanticModel, expression, requestedSpan, builder, cancellationToken);
+                    break;
+
                 case AkcssAssignmentSyntax assignment:
                     AddAssignmentClassifications(
                         context,
@@ -127,6 +143,50 @@ internal sealed class
                         cancellationToken);
                     break;
             }
+        }
+    }
+
+    private static void AddContextualType(SelectorTypeResolver resolver, CSharpTypeSyntax type,
+        TextSpan requestedSpan, ImmutableArrayBuilder<AkburaClassifiedSpan> builder)
+    {
+        if (type.Parent is AkcssThemeDeclarationSyntax or AkcssMixinDeclarationSyntax or AkcssMixinParameterSyntax or
+            AkcssTypeSelectorSyntax or AkcssParenthesizedSelectorTypeSyntax &&
+            resolver.TryResolve(type, out var target))
+        {
+            AddSelectorTargetType(type, target, requestedSpan, builder);
+        }
+    }
+
+    private void AddContextualReferences(AkburaSemanticModel model, AkburaSyntax syntax, TextSpan requested,
+        ImmutableArrayBuilder<AkburaClassifiedSpan> builder, CancellationToken cancellationToken)
+    {
+        if (!syntax.Span.OverlapsWith(requested))
+        {
+            return;
+        }
+
+        foreach (var reference in _referenceResolver.GetContextualReferences(model, syntax, cancellationToken))
+        {
+            var kind = reference.Symbol switch
+            {
+                AkcssThemeSymbol => AkburaClassificationKind.PropertyName,
+                AkcssMixinSymbol => AkburaClassificationKind.Utility,
+                AkcssMixinParameterSymbol => AkburaClassificationKind.ParameterName,
+                IMarkupNameSymbol => AkburaClassificationKind.Identifier,
+                Akbura.Language.Symbols.IPropertySymbol => AkburaClassificationKind.PropertyName,
+                _ => reference.CSharpDefinition.Symbol switch
+                {
+                    IMethodSymbol => AkburaClassificationKind.MethodName,
+                    INamedTypeSymbol => AkburaClassificationKind.ClassName,
+                    INamespaceSymbol => AkburaClassificationKind.Namespace,
+                    Microsoft.CodeAnalysis.IPropertySymbol => AkburaClassificationKind.PropertyName,
+                    IFieldSymbol => AkburaClassificationKind.FieldName,
+                    ILocalSymbol => AkburaClassificationKind.LocalName,
+                    IParameterSymbol => AkburaClassificationKind.ParameterName,
+                    _ => AkburaClassificationKind.Identifier,
+                },
+            };
+            AddClassification(reference.SourceSpan, requested, kind, builder);
         }
     }
 

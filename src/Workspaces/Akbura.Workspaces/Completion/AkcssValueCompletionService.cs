@@ -13,7 +13,7 @@ internal sealed class AkcssValueCompletionService
         CancellationToken cancellationToken)
     {
         if (!semanticModel.TryGetAkcssValueCompletionInfo(
-                context.ContainingDeclarationSpan,
+                context.OwnerSpan,
                 context.PropertyName,
                 out var info) ||
             info.ExpectedType is not { } expectedType)

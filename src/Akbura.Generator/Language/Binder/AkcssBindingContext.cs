@@ -104,7 +104,8 @@ internal enum AkcssPredicateKind
 }
 
 internal sealed record AkcssSelectorPredicate(
-    AkcssPredicateKind Kind, AkburaSyntax Syntax, string? Name, CSharpSymbolDefinition Type = default);
+    AkcssPredicateKind Kind, AkburaSyntax Syntax, string? Name, CSharpSymbolDefinition Type = default,
+    MarkupNameDeclaration? SourcePart = null);
 
 internal sealed record AkcssSelectorCompound(
     AkburaSyntax Syntax,
@@ -120,7 +121,8 @@ internal enum AkcssSelectorRelationship
 }
 
 internal sealed record AkcssSelectorStep(
-    AkcssSelectorRelationship Relationship, AkcssSelectorStepSyntax Syntax, AkcssSelectorCompound Target);
+    AkcssSelectorRelationship Relationship, AkcssSelectorStepSyntax Syntax, AkcssSelectorCompound Target,
+    AkcssTemplateContext? SourceTemplate = null);
 
 internal sealed record AkcssSelectorBinding(
     AkburaSyntax Syntax,

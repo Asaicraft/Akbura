@@ -11,6 +11,8 @@ internal sealed class MarkupNameSymbol : Symbol, IMarkupNameSymbol
         CSharpSymbolDefinition type,
         MarkupAttachedPropertyAttributeSyntax declarationSyntax,
         MarkupElementSyntax elementSyntax,
+        AkburaSyntax scopeOwner,
+        string filePath,
         ISymbol? containingSymbol = null)
         : base(containingSymbol)
     {
@@ -34,6 +36,8 @@ internal sealed class MarkupNameSymbol : Symbol, IMarkupNameSymbol
         Type = type;
         DeclarationSyntax = declarationSyntax ?? throw new ArgumentNullException(nameof(declarationSyntax));
         ElementSyntax = elementSyntax ?? throw new ArgumentNullException(nameof(elementSyntax));
+        ScopeOwner = scopeOwner;
+        FilePath = filePath;
     }
 
     public override SymbolKind Kind => SymbolKind.MarkupName;
@@ -49,6 +53,10 @@ internal sealed class MarkupNameSymbol : Symbol, IMarkupNameSymbol
     public MarkupAttachedPropertyAttributeSyntax DeclarationSyntax { get; }
 
     public MarkupElementSyntax ElementSyntax { get; }
+
+    public AkburaSyntax ScopeOwner { get; }
+
+    public string FilePath { get; }
 
     public override void Accept(SymbolVisitor visitor)
     {

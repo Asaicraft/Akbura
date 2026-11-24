@@ -159,9 +159,13 @@ internal static class AkburaRoslynCompletionItemSelector
             isIncomplete: false);
     }
 
-    private static bool IsUserVisible(CompletionItem item) =>
-        item.DisplayText != CSharpProbeBuilder.ExpressionProbeMethodName ||
-        !item.Tags.Contains(WellKnownTags.Method);
+    private static bool IsUserVisible(CompletionItem item) => item.DisplayText switch
+    {
+        CSharpProbeBuilder.ExpressionProbeMethodName => !item.Tags.Contains(WellKnownTags.Method),
+        "__AkburaSemanticProbe" or "__AkburaTypeProbe" or "__AkburaUsingProbe" => !item.Tags.Contains(WellKnownTags.Class),
+        "__akbura_type_probe" => !item.Tags.Contains(WellKnownTags.Field),
+        _ => true,
+    };
 
     internal static CompletionMatchKind GetMatchKind(
         string candidate,

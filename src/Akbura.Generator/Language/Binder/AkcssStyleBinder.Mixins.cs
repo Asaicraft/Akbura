@@ -1,3 +1,4 @@
+using Akbura.Collections;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -15,7 +16,8 @@ internal sealed partial class AkcssStyleBinder
     private BoundAkcssContextual BindAkcssMixin(
         AkcssMixinSymbol mixin, AkcssBindingContext context, AkburaSymbolInfo symbolInfo)
     {
-        var children = ImmutableArray.CreateBuilder<BoundNode>();
+        var members = mixin.DeclarationSyntax.Members;
+        var children = ImmutableArray.CreateBuilder<BoundNode>(mixin.Parameters.Length + members.Count);
         var optionalSeen = false;
         foreach (var parameter in mixin.Parameters)
         {
@@ -38,10 +40,14 @@ internal sealed partial class AkcssStyleBinder
                 diagnostics.ToImmutable()));
         }
 
-        children.AddRange(BindContextualMembers(mixin.DeclarationSyntax.Members, context));
+        foreach (var member in members)
+        {
+            children.Add(BindContextualMember(member, context));
+        }
+
         return new BoundAkcssContextual(BoundKind.AkcssMixin, mixin.DeclarationSyntax, this, context,
             new AkcssDeclarationData(mixin), symbolInfo, SemanticModel.GetCachedSemanticDiagnostics(mixin.DeclarationSyntax),
-            children.ToImmutable());
+            children.MoveToImmutable());
     }
 
     private BoundAkcssContextual BindAkcssInclude(
@@ -59,8 +65,6 @@ internal sealed partial class AkcssStyleBinder
 
         var mixin = matches[0];
         using var diagnostics = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
-        var children = ImmutableArray.CreateBuilder<BoundNode>();
-        var arguments = ImmutableArray.CreateBuilder<AkcssMixinArgument>();
         var inclusion = new AkcssInclusion(site, caller.Inclusion);
         var definitionContext = caller with
         {
@@ -92,41 +96,54 @@ internal sealed partial class AkcssStyleBinder
 
         var supplied = directive.Arguments.Arguments;
         if (supplied.Count > mixin.Parameters.Length ||
-            mixin.Parameters.Skip(supplied.Count).Any(static parameter => !parameter.IsOptional))
+            mixin.Parameters.Any(static (parameter, count) => parameter.Ordinal >= count && !parameter.IsOptional, supplied.Count))
         {
             diagnostics.Add(CreateContextDiagnostic(directive.Arguments, caller, ErrorCodes.AKBURA_SEMANTIC_AkcssMixin,
                 $"Mixin '{name}' cannot be called with {supplied.Count} argument(s).", mixin.DeclarationSyntax.Parameters));
         }
 
-        foreach (var parameter in mixin.Parameters)
+        var children = ArrayBuilder<BoundNode>.GetInstance();
+        var arguments = ArrayBuilder<AkcssMixinArgument>.GetInstance();
+        try
         {
-            if (parameter.Ordinal < supplied.Count)
+            foreach (var parameter in mixin.Parameters)
             {
-                var argumentSyntax = supplied[parameter.Ordinal];
-                using var argumentDiagnostics = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
-                var argument = BindAkcssSuppliedArgument(parameter, argumentSyntax, caller, argumentDiagnostics);
-                arguments.Add(argument);
-                children.Add(new BoundAkcssContextual(BoundKind.AkcssMixinArgument, argumentSyntax, this, caller,
-                    new AkcssMixinArgumentData(argument), AkburaSymbolInfo.Success(parameter), argumentDiagnostics.ToImmutable()));
+                if (parameter.Ordinal < supplied.Count)
+                {
+                    var argumentSyntax = supplied[parameter.Ordinal];
+                    using var argumentDiagnostics = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+                    var argument = BindAkcssSuppliedArgument(parameter, argumentSyntax, caller, argumentDiagnostics);
+                    arguments.Add(argument);
+                    children.Add(new BoundAkcssContextual(BoundKind.AkcssMixinArgument, argumentSyntax, this, caller,
+                        new AkcssMixinArgumentData(argument), AkburaSymbolInfo.Success(parameter), argumentDiagnostics.ToImmutable()));
+                }
+                else if (parameter.DeclarationSyntax.Default is { } parameterDefault)
+                {
+                    using var defaultDiagnostics = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
+                    var argument = definitionBinder.BindAkcssDefaultArgument(parameter, parameterDefault.Expression, defaultDiagnostics);
+                    arguments.Add(argument);
+                    children.Add(new BoundAkcssContextual(BoundKind.AkcssMixinArgument, parameterDefault.Expression, definitionBinder,
+                        definitionContext, new AkcssMixinArgumentData(argument), AkburaSymbolInfo.Success(parameter), defaultDiagnostics.ToImmutable()));
+                }
             }
-            else if (parameter.DeclarationSyntax.Default is { } parameterDefault)
-            {
-                using var defaultDiagnostics = ImmutableArrayBuilder<AkburaSemanticDiagnostic>.Rent();
-                var argument = definitionBinder.BindAkcssDefaultArgument(parameter, parameterDefault.Expression, defaultDiagnostics);
-                arguments.Add(argument);
-                children.Add(new BoundAkcssContextual(BoundKind.AkcssMixinArgument, parameterDefault.Expression, definitionBinder,
-                    definitionContext, new AkcssMixinArgumentData(argument), AkburaSymbolInfo.Success(parameter), defaultDiagnostics.ToImmutable()));
-            }
-        }
 
-        var boundArguments = arguments.ToImmutable();
-        if (diagnostics.Count == 0 && !children.Any(static child => child.HasErrors))
+            var boundArguments = arguments.ToImmutable();
+            if (diagnostics.Count == 0 && !children.Any(static child => child.HasErrors))
+            {
+                var bodyContext = definitionContext with { Arguments = boundArguments };
+                foreach (var member in mixin.DeclarationSyntax.Members)
+                {
+                    children.Add(definitionBinder.BindContextualMember(member, bodyContext));
+                }
+            }
+
+            return MakeInclude(mixin, caller, site, boundArguments, diagnostics.ToImmutable(), children.ToImmutable());
+        }
+        finally
         {
-            children.AddRange(definitionBinder.BindContextualMembers(mixin.DeclarationSyntax.Members,
-                definitionContext with { Arguments = boundArguments }));
+            arguments.Free();
+            children.Free();
         }
-
-        return MakeInclude(mixin, caller, site, boundArguments, diagnostics.ToImmutable(), children.ToImmutable());
     }
 
     private BoundAkcssContextual MakeInclude(

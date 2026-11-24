@@ -1,3 +1,4 @@
+using Akbura.Language;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
 using Microsoft.CodeAnalysis.Text;
@@ -138,7 +139,7 @@ internal sealed class AkburaDocumentSymbolService :
     }
 
     private static void AddAkcssMembers<TMember>(
-        IEnumerable<TMember> members,
+        SyntaxList<TMember> members,
         ImmutableArrayBuilder<AkburaDocumentSymbol> builder,
         CancellationToken cancellationToken)
         where TMember : AkburaSyntax
@@ -154,12 +155,56 @@ internal sealed class AkburaDocumentSymbolService :
                     var styleSelection = style.Selector.Name?.Span ??
                         style.Selector.TargetType?.Span ??
                         style.Selector.Span;
-                    builder.Add(CreateLeaf(
-                        styleName,
-                        "style",
-                        AkburaWorkspaceSymbolKind.Class,
-                        style,
-                        styleSelection));
+                    builder.Add(CreateAkcssContainer(styleName, "style", AkburaWorkspaceSymbolKind.Class,
+                        style, styleSelection, style.Members, cancellationToken));
+                    break;
+
+                case AkcssThemeDeclarationSyntax theme:
+                    builder.Add(CreateAkcssContainer(theme.Name.Identifier.ValueText, "theme " + theme.TargetType.ToString().Trim(),
+                        AkburaWorkspaceSymbolKind.Class, theme, theme.Name.Span, theme.Members, cancellationToken));
+                    break;
+
+                case AkcssMixinDeclarationSyntax mixin:
+                    builder.Add(CreateAkcssContainer(mixin.Name.Identifier.ValueText,
+                        "mixin " + mixin.TargetType.ToString().Trim() + " " + mixin.Parameters.ToString().Trim(),
+                        AkburaWorkspaceSymbolKind.Function, mixin, mixin.Name.Span, mixin.Members, cancellationToken));
+                    break;
+
+                case AkcssSelectorRuleSyntax rule:
+                    builder.Add(CreateAkcssContainer(rule.Selector.ToString().Trim(), "selector", AkburaWorkspaceSymbolKind.Class,
+                        rule, rule.Selector.Span, rule.Members, cancellationToken));
+                    break;
+
+                case AkcssNestedStyleRuleSyntax nested:
+                    builder.Add(CreateAkcssContainer(nested.Selector.ToString().Trim(), "nested selector", AkburaWorkspaceSymbolKind.Class,
+                        nested, nested.Selector.Span, nested.Members, cancellationToken));
+                    break;
+
+                case AkcssIfDirectiveSyntax condition:
+                    AddAkcssMembers(condition.Members, builder, cancellationToken);
+                    break;
+
+                case AkcssTemplateDirectiveSyntax template:
+                    var elements = ArrayBuilder<AkburaDocumentSymbol>.GetInstance();
+                    try
+                    {
+                        foreach (var content in template.Body.Content)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            if (content is MarkupElementContentSyntax child)
+                            {
+                                elements.Add(CreateMarkupElement(child.Element, cancellationToken, isTemplate: true));
+                            }
+                        }
+
+                        builder.Add(new AkburaDocumentSymbol("@template", "control template", AkburaWorkspaceSymbolKind.Object,
+                            template.Span, template.TemplateKeyword.Span, elements.ToImmutable()));
+                    }
+                    finally
+                    {
+                        elements.Free();
+                    }
+
                     break;
 
                 case AkcssUtilitiesSectionSyntax utilities:
@@ -169,7 +214,7 @@ internal sealed class AkburaDocumentSymbolService :
                         foreach (var utility in utilities.Utilities)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-                            children.Add(CreateUtility(utility));
+                            children.Add(CreateUtility(utility, cancellationToken));
                         }
 
                         builder.Add(new AkburaDocumentSymbol(
@@ -185,21 +230,22 @@ internal sealed class AkburaDocumentSymbolService :
         }
     }
 
-    private static AkburaDocumentSymbol CreateUtility(
-        AkcssUtilityDeclarationSyntax utility)
+    private static AkburaDocumentSymbol CreateUtility(AkcssUtilityDeclarationSyntax utility, CancellationToken cancellationToken) =>
+        CreateAkcssContainer(utility.Selector.Name.Identifier.ValueText, "utility", AkburaWorkspaceSymbolKind.Function,
+            utility, utility.Selector.Name.Span, utility.Members, cancellationToken);
+
+    private static AkburaDocumentSymbol CreateAkcssContainer(string name, string detail, AkburaWorkspaceSymbolKind kind,
+        AkburaSyntax node, TextSpan selection, SyntaxList<AkcssBodyMemberSyntax> members, CancellationToken cancellationToken)
     {
-        var name = utility.Selector.Name.Identifier.ValueText;
-        return CreateLeaf(
-            name,
-            "utility",
-            AkburaWorkspaceSymbolKind.Function,
-            utility,
-            utility.Selector.Name.Span);
+        using var children = ImmutableArrayBuilder<AkburaDocumentSymbol>.Rent();
+        AddAkcssMembers(members, children, cancellationToken);
+        return new AkburaDocumentSymbol(name, detail, kind, node.Span, selection, children.ToImmutable());
     }
 
     private static AkburaDocumentSymbol CreateMarkupElement(
         MarkupElementSyntax element,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool isTemplate = false)
     {
         var startTag = element.StartTag;
         if (startTag == null)
@@ -222,17 +268,24 @@ internal sealed class AkburaDocumentSymbolService :
             {
                 children.Add(CreateMarkupElement(
                     child.Element,
-                    cancellationToken));
+                    cancellationToken,
+                    isTemplate));
             }
         }
 
-        return new AkburaDocumentSymbol(
-            startTag.Name.ToString().Trim(),
-            "markup",
-            AkburaWorkspaceSymbolKind.Object,
-            element.Span,
-            startTag.Name.Span,
-            children.ToImmutable());
+        var name = startTag.Name.ToString().Trim();
+        var selection = startTag.Name.Span;
+        var detail = "markup";
+        if (isTemplate && startTag.Attributes.FirstOrDefault(AkburaSemanticModel.IsMarkupNameDirective) is
+                MarkupAttachedPropertyAttributeSyntax { Value: MarkupLiteralAttributeValueSyntax literal })
+        {
+            detail = name;
+            name = AkburaSemanticModel.GetMarkupLiteralAttributeValueText(literal);
+            selection = literal.Span.Length >= 2
+                ? new TextSpan(literal.Span.Start + 1, literal.Span.Length - 2) : literal.Span;
+        }
+
+        return new AkburaDocumentSymbol(name, detail, AkburaWorkspaceSymbolKind.Object, element.Span, selection, children.ToImmutable());
     }
 
     private static AkburaDocumentSymbol CreateLeaf(

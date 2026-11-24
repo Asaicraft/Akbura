@@ -16,7 +16,8 @@ public readonly struct AkcssSyntacticCompletionContext
         TextSpan ownerSpan = default,
         TextSpan containingDeclarationSpan = default,
         string? qualifier = null,
-        string? propertyName = null)
+        string? propertyName = null,
+        int? position = null)
     {
         Kind = kind;
         ApplicableSpan = applicableSpan;
@@ -26,6 +27,7 @@ public readonly struct AkcssSyntacticCompletionContext
         ContainingDeclarationSpan = containingDeclarationSpan;
         Qualifier = qualifier ?? string.Empty;
         PropertyName = propertyName ?? string.Empty;
+        Position = position ?? applicableSpan.End;
     }
 
     public AkcssCompletionContextKind Kind { get; }
@@ -39,6 +41,8 @@ public readonly struct AkcssSyntacticCompletionContext
     public string PropertyName { get; }
 
     public bool IsDefault => Kind == AkcssCompletionContextKind.None;
+
+    internal int Position { get; }
 
     internal SyntaxKind OwnerKind { get; }
 

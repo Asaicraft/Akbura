@@ -1,9 +1,8 @@
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Akbura.Language;
@@ -43,31 +42,46 @@ internal abstract partial class AkburaSemanticModel
     {
         var parameters = mixin.Parameters.Parameters;
         var types = ImmutableArray.CreateBuilder<CSharpSymbolDefinition>(parameters.Count);
-        var names = new HashSet<string>(StringComparer.Ordinal);
         var usings = GetAkcssCSharpUsingDirectives(mixin);
-        foreach (var parameter in parameters)
+        var names = PooledHashSet<string>.GetInstance();
+        try
         {
-            var type = BindCSharpType(parameter.Type.ToCSharp(), usings).TypeSymbol;
-            var diagnostics = ImmutableArray.CreateBuilder<AkburaSemanticDiagnostic>();
-            if (type is null or { TypeKind: Microsoft.CodeAnalysis.TypeKind.Error })
+            foreach (var parameter in parameters)
             {
-                diagnostics.Add(new AkburaSemanticDiagnostic(parameter.Type,
-                    ErrorCodes.AKBURA_SEMANTIC_AkcssMixin, [$"Cannot resolve parameter type '{parameter.Type.ToFullString().Trim()}'."]));
-                type = null;
+                var type = BindCSharpType(parameter.Type.ToCSharp(), usings).TypeSymbol;
+                AkburaSemanticDiagnostic? typeError = null;
+                if (type is null or { TypeKind: Microsoft.CodeAnalysis.TypeKind.Error })
+                {
+                    typeError = new AkburaSemanticDiagnostic(parameter.Type,
+                        ErrorCodes.AKBURA_SEMANTIC_AkcssMixin, [$"Cannot resolve parameter type '{parameter.Type.ToFullString().Trim()}'."]);
+                    type = null;
+                }
+
+                var name = parameter.Name.Identifier.ValueText;
+                AkburaSemanticDiagnostic? nameError = null;
+                if (!names.Add(name))
+                {
+                    nameError = new AkburaSemanticDiagnostic(parameter.Name,
+                        ErrorCodes.AKBURA_SEMANTIC_AkcssMixin, [$"Mixin parameter '{name}' is already declared."]);
+                }
+
+                ImmutableArray<AkburaSemanticDiagnostic> diagnostics = (typeError, nameError) switch
+                {
+                    (null, null) => [],
+                    ({ } error, null) => [error],
+                    (null, { } error) => [error],
+                    ({ } first, { } second) => [first, second],
+                };
+                SetSemanticDiagnosticsIfAbsent(parameter, diagnostics);
+                types.Add(type is null ? default : new CSharpSymbolDefinition(type));
             }
 
-            var name = parameter.Name.Identifier.ValueText;
-            if (!names.Add(name))
-            {
-                diagnostics.Add(new AkburaSemanticDiagnostic(parameter.Name,
-                    ErrorCodes.AKBURA_SEMANTIC_AkcssMixin, [$"Mixin parameter '{name}' is already declared."]));
-            }
-
-            SetSemanticDiagnosticsIfAbsent(parameter, diagnostics.ToImmutable());
-            types.Add(type is null ? default : new CSharpSymbolDefinition(type));
+            return types.MoveToImmutable();
         }
-
-        return types.MoveToImmutable();
+        finally
+        {
+            names.Free();
+        }
     }
 
     private AkburaSymbolInfo ResolveAkcssMixinParameter(AkcssMixinParameterSyntax parameter)
@@ -87,36 +101,55 @@ internal abstract partial class AkburaSemanticModel
         return AkburaSymbolInfo.None(Symbols.CandidateReason.NotFound);
     }
 
-    internal ImmutableArray<TSymbol> LookupAkcssSourceDeclarations<TSymbol>(AkburaSyntax site, string name, string? moduleName = null)
+    internal ImmutableArray<TSymbol> LookupAkcssSourceDeclarations<TSymbol>(AkburaSyntax site, string? name, string? moduleName = null)
         where TSymbol : AkcssSourceDeclarationSymbol
     {
-        var matches = ImmutableArray.CreateBuilder<TSymbol>();
-        var visited = new HashSet<AkcssSyntaxTree>();
-        if (moduleName is null)
+        var matches = ArrayBuilder<TSymbol>.GetInstance();
+        PooledHashSet<AkcssSyntaxTree>? visited = null;
+        PooledHashSet<string>? localNames = null;
+        try
         {
-            AddDeclarations(this, GetContainingAkcssTopLevelMembers(site));
-            if (matches.Count != 0)
+            if (moduleName is null)
             {
-                return matches.ToImmutable();
+                AddDeclarations(this, GetContainingAkcssTopLevelMembers(site));
+                if (name is not null && matches.Count != 0)
+                {
+                    return matches.ToImmutable();
+                }
+
+                if (matches.Count != 0)
+                {
+                    localNames = PooledHashSet<string>.GetInstance();
+                    foreach (var match in matches)
+                    {
+                        localNames.Add(match.Name);
+                    }
+                }
+
+                foreach (var import in GetAkcssImportNames(site))
+                {
+                    AddModule(import);
+                }
+            }
+            else
+            {
+                AddModule(moduleName + ".akcss");
             }
 
-            foreach (var import in GetAkcssImportNames(site))
-            {
-                AddModule(import);
-            }
+            return matches.ToImmutable();
         }
-        else
+        finally
         {
-            AddModule(moduleName + ".akcss");
+            localNames?.Free();
+            visited?.Free();
+            matches.Free();
         }
-
-        return matches.ToImmutable();
 
         void AddModule(string logicalName)
         {
             foreach (var tree in Compilation.GetLocalAkcssSyntaxTreesByLogicalName(logicalName))
             {
-                if (visited.Add(tree))
+                if ((visited ??= PooledHashSet<AkcssSyntaxTree>.GetInstance()).Add(tree))
                 {
                     AddDeclarations(Compilation.GetSemanticModel(tree), tree.GetRoot().Members);
                 }
@@ -128,10 +161,11 @@ internal abstract partial class AkburaSemanticModel
             foreach (var member in members)
             {
                 if ((member is AkcssThemeDeclarationSyntax theme && typeof(TSymbol) == typeof(AkcssThemeSymbol) &&
-                    theme.Name.Identifier.ValueText == name ||
+                    (name is null || theme.Name.Identifier.ValueText == name) ||
                     member is AkcssMixinDeclarationSyntax mixin && typeof(TSymbol) == typeof(AkcssMixinSymbol) &&
-                    mixin.Name.Identifier.ValueText == name) &&
-                    model.GetDeclarationSymbolInfo(member).Symbol is TSymbol match)
+                    (name is null || mixin.Name.Identifier.ValueText == name)) &&
+                    model.GetDeclarationSymbolInfo(member).Symbol is TSymbol match &&
+                    localNames?.Contains(match.Name) != true)
                 {
                     matches.Add(match);
                 }

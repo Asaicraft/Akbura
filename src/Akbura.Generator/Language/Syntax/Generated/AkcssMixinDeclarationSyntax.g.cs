@@ -353,7 +353,7 @@ namespace Akbura.Language.Syntax
             new(GetRed(ref _members, 6));
 
         public SyntaxToken CloseBrace =>
-            new(this, Green.CloseBrace, GetChildPositionFromEnd(1), GetChildIndex(7));
+            new(this, Green.CloseBrace, GetChildPositionFromEnd(7), GetChildIndex(7));
 
         public AkcssMixinDeclarationSyntax UpdateAkcssMixinDeclarationSyntax(
             SyntaxToken atToken,

@@ -1,7 +1,9 @@
+using Akbura.Collections;
 using Akbura.Language.Binder;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using System.Collections.Immutable;
@@ -21,7 +23,7 @@ internal sealed class AkcssNativePlanner(AkburaSemanticModel model, Cancellation
         ImmutableArray.CreateBuilder<AkburaSemanticDiagnostic>();
     private readonly INamedTypeSymbol? _styledElement =
         model.Compilation.CSharpCompilation.GetTypeByMetadataName("Avalonia.StyledElement");
-    private AkcssNativeNames _names = new([]);
+    private readonly AkcssNativeNames _names = new([]);
 
     public static AkcssNativeModulePlan? Create(in AkcssGenerationInput input, CancellationToken cancellationToken) =>
         Create(input.Module, input.SemanticModel, cancellationToken);
@@ -50,15 +52,24 @@ internal sealed class AkcssNativePlanner(AkburaSemanticModel model, Cancellation
             cancellationToken.ThrowIfCancellationRequested();
             if (AkcssSemanticFacts.HasNativeApplication(symbol) ||
                 symbol.DeclarationSyntax is not { } declaration ||
-                !declaration.DescendantNodes().OfType<AkcssApplyDirectiveSyntax>().Any())
+                !declaration.DescendantNodes().Any(static node => node is AkcssApplyDirectiveSyntax))
             {
                 continue;
             }
 
             foreach (var apply in EnumerateApplies(symbol.Operations))
             {
-                var visited = new HashSet<IAkcssSymbol>();
-                var dependency = FindNativeDependency(apply.AppliedSymbols, visited);
+                var visited = PooledHashSet<IAkcssSymbol>.GetInstance();
+                IAkcssSymbol? dependency;
+                try
+                {
+                    dependency = FindNativeDependency(apply.AppliedSymbols, visited);
+                }
+                finally
+                {
+                    visited.Free();
+                }
+
                 if (dependency != null)
                 {
                     diagnostics.Add(Error(apply.Syntax ?? declaration,
@@ -141,76 +152,115 @@ internal sealed class AkcssNativePlanner(AkburaSemanticModel model, Cancellation
             _diagnostics.AddRange(export.Diagnostics);
         }
 
-        var declarations = ImmutableArray.CreateBuilder<NativeOperation>();
-        foreach (var owner in module.Declarations)
+        var declarations = ArrayBuilder<AkcssContextualOperation>.GetInstance();
+        var pending = ArrayBuilder<NativeOperation>.GetInstance();
+        try
+        {
+            foreach (var owner in module.Declarations)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (owner.DeclarationSyntax is not { } syntax)
+                {
+                    continue;
+                }
+
+                if (owner is IAkcssSymbol legacy && !AkcssSemanticFacts.HasNativeApplication(legacy))
+                {
+                    continue;
+                }
+
+                var diagnosticStart = _diagnostics.Count;
+                foreach (var diagnostic in model.GetSemanticDiagnostics(syntax))
+                {
+                    if (diagnostic.Severity == AkburaDiagnosticSeverity.Error)
+                    {
+                        _diagnostics.Add(diagnostic);
+                    }
+                }
+
+                if (_diagnostics.Count != diagnosticStart)
+                {
+                    continue;
+                }
+
+                if (model.GetOperation(syntax) is { HasErrors: false } operation)
+                {
+                    ReserveNames(operation, pending);
+                    if (operation is AkcssContextualOperation contextual)
+                    {
+                        declarations.Add(contextual);
+                    }
+                }
+                else
+                {
+                    _diagnostics.Add(Error(syntax, "This declaration contains errors and cannot generate native AKCSS."));
+                }
+            }
+
+            var styles = ImmutableArray.CreateBuilder<AkcssNativeStylePlan>();
+            var themes = ImmutableArray.CreateBuilder<AkcssNativeThemePlan>();
+            var applications = ImmutableDictionary.CreateBuilder<AkburaSyntax, AkcssNativeApplicationPlan>();
+            foreach (var operation in declarations)
+            {
+                if (operation.Kind is OperationKind.AkcssStyleRule or OperationKind.AkcssUtilityDeclaration)
+                {
+                    if (BuildApplication(operation) is { } application)
+                    {
+                        applications.Add(operation.Syntax, application);
+                    }
+                }
+                else if (operation.Kind == OperationKind.AkcssSelectorRule && operation.Data is AkcssSelectorData selector)
+                {
+                    if (BuildStyle(operation, selector, s_emptyLocals) is { } style)
+                    {
+                        styles.Add(style);
+                    }
+                }
+                else if (operation.Kind == OperationKind.AkcssTheme &&
+                    operation.Data is AkcssDeclarationData { Declaration: AkcssThemeSymbol theme })
+                {
+                    if (ValidateTarget(theme.TargetType.Symbol, operation, "theme") is { } target)
+                    {
+                        themes.Add(new AkcssNativeThemePlan(theme, target,
+                            BuildMembers(operation.Children, s_emptyLocals, inTemplate: false)));
+                    }
+                }
+                // Mixin definitions are compile-time declarations. Includes lower their bound instances.
+            }
+
+            return new AkcssNativeModulePlan(styles.ToImmutable(), themes.ToImmutable(), applications.ToImmutable(), export,
+                _diagnostics.Distinct().ToImmutableArray(), _names.ToImmutable());
+        }
+        finally
+        {
+            pending.Free();
+            declarations.Free();
+        }
+    }
+
+    private void ReserveNames(NativeOperation declaration, ArrayBuilder<NativeOperation> pending)
+    {
+        pending.Push(declaration);
+        while (pending.TryPop(out var operation))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (owner.DeclarationSyntax is not { } syntax)
+            if (operation.CSharpDefinition.Syntax is { } syntax)
             {
-                continue;
+                foreach (var token in syntax.DescendantTokens())
+                {
+                    if (token.RawKind == (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind.IdentifierToken)
+                    {
+                        _names.Reserve(token.ValueText);
+                    }
+                }
             }
 
-            if (owner is IAkcssSymbol legacy && !AkcssSemanticFacts.HasNativeApplication(legacy))
+            var children = operation.Children;
+            for (var i = children.Length - 1; i >= 0; i--)
             {
-                continue;
-            }
-
-            var errors = model.GetSemanticDiagnostics(syntax)
-                .Where(static diagnostic => diagnostic.Severity == AkburaDiagnosticSeverity.Error).ToImmutableArray();
-            if (!errors.IsEmpty)
-            {
-                _diagnostics.AddRange(errors);
-                continue;
-            }
-
-            if (model.GetOperation(syntax) is { HasErrors: false } operation)
-            {
-                declarations.Add(operation);
-            }
-            else
-            {
-                _diagnostics.Add(Error(syntax, "This declaration contains errors and cannot generate native AKCSS."));
+                pending.Push(children[i]);
             }
         }
-
-        var reserved = AkcssNativeExpression.Enumerate(declarations.ToImmutable())
-            .SelectMany(static operation => operation.CSharpDefinition.Syntax?.DescendantTokens() ?? Enumerable.Empty<Microsoft.CodeAnalysis.SyntaxToken>())
-            .Where(static token => token.RawKind == (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind.IdentifierToken)
-            .Select(static token => token.ValueText);
-        _names = new AkcssNativeNames(reserved);
-        var styles = ImmutableArray.CreateBuilder<AkcssNativeStylePlan>();
-        var themes = ImmutableArray.CreateBuilder<AkcssNativeThemePlan>();
-        var applications = ImmutableDictionary.CreateBuilder<AkburaSyntax, AkcssNativeApplicationPlan>();
-        foreach (var operation in declarations.OfType<AkcssContextualOperation>())
-        {
-            if (operation.Kind is OperationKind.AkcssStyleRule or OperationKind.AkcssUtilityDeclaration)
-            {
-                if (BuildApplication(operation) is { } application)
-                {
-                    applications.Add(operation.Syntax, application);
-                }
-            }
-            else if (operation.Kind == OperationKind.AkcssSelectorRule && operation.Data is AkcssSelectorData selector)
-            {
-                if (BuildStyle(operation, selector, s_emptyLocals) is { } style)
-                {
-                    styles.Add(style);
-                }
-            }
-            else if (operation.Kind == OperationKind.AkcssTheme &&
-                operation.Data is AkcssDeclarationData { Declaration: AkcssThemeSymbol theme })
-            {
-                if (ValidateTarget(theme.TargetType.Symbol, operation, "theme") is { } target)
-                {
-                    themes.Add(new AkcssNativeThemePlan(theme, target,
-                        BuildMembers(operation.Children, s_emptyLocals, inTemplate: false)));
-                }
-            }
-            // Mixin definitions are compile-time declarations. Includes lower their bound instances.
-        }
-
-        return new AkcssNativeModulePlan(styles.ToImmutable(), themes.ToImmutable(), applications.ToImmutable(), export,
-            _diagnostics.Distinct().ToImmutableArray(), _names.ToImmutable());
     }
 
     private AkcssNativeApplicationPlan? BuildApplication(AkcssContextualOperation operation)
@@ -281,75 +331,88 @@ internal sealed class AkcssNativePlanner(AkburaSemanticModel model, Cancellation
     }
 
     private ImmutableArray<AkcssNativeMemberPlan> BuildMembers(ImmutableArray<NativeOperation> operations,
-        ImmutableDictionary<Symbols.ISymbol, string> locals, bool inTemplate, bool inApplication = false)
+        ImmutableDictionary<Symbols.ISymbol, string> locals, bool inTemplate, bool inApplication = false, bool markupConfiguration = false)
     {
-        var result = ImmutableArray.CreateBuilder<AkcssNativeMemberPlan>();
-        foreach (var operation in operations.OfType<AkcssContextualOperation>())
+        var result = ArrayBuilder<AkcssNativeMemberPlan>.GetInstance();
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            switch (operation.Data)
+            foreach (var child in operations)
             {
-                case AkcssSetterData setter:
-                    if (BuildSetter(operation, setter, locals, inTemplate, inApplication) is { } assignment)
-                    {
-                        result.Add(assignment);
-                    }
-                    break;
-                case AkcssSelectorData selector when !inTemplate:
-                    if (BuildStyle(operation, selector, locals, inApplication) is { } nested)
-                    {
-                        result.Add(nested);
-                    }
-                    break;
-                case AkcssIncludeData include when include.Mixin != null:
-                    result.Add(BuildInclude(operation, include, locals, inTemplate, inApplication));
-                    break;
-                case AkcssBaseThemeData baseTheme:
-                    if (baseTheme.SourceTheme is { } source)
-                    {
-                        result.Add(new AkcssNativeBaseThemePlan(operation.Syntax, GetModuleReference(source) + "." + GetThemeAccessor(source)));
-                    }
-                    else if (TryFormat(operation, baseTheme.ExternalTheme.OperationDefinition, locals, out var reference))
-                    {
-                        result.Add(new AkcssNativeBaseThemePlan(operation.Syntax, reference));
-                    }
-                    break;
-                case AkcssTemplateData { Template: { } template }:
-                    if (BuildTemplate(operation, template) is { } templatePlan)
-                    {
-                        result.Add(templatePlan);
-                    }
-                    break;
-                case AkcssTemplateBindingData bindings when inTemplate && !bindings.IsDeferred &&
-                    bindings.Template != null && bindings.Element != null:
-                    foreach (var entry in bindings.Properties)
-                    {
-                        if (GetPropertyHandle(entry.Source) is { } sourceField &&
-                            GetPropertyHandle(entry.Destination) is { } destinationField)
-                        {
-                            result.Add(new AkcssNativeTemplateBindingPlan(entry.Syntax, sourceField, destinationField));
-                        }
-                        else
-                        {
-                            Report(operation, "No native property handle is available for this template binding.", entry.Syntax);
-                        }
-                    }
-                    break;
-                case AkcssConditionData:
-                    Report(operation, "Reactive @if in a native style, theme, or template include is not supported.");
-                    break;
-                case AkcssApplyData:
-                    Report(operation, "@apply expansion in a native AKCSS body is unsupported. Use @include to compose native bodies.");
-                    break;
-                case AkcssMixinArgumentData:
-                    break;
-                default:
-                    Report(operation, $"Native generation is unavailable for {operation.Syntax.Kind} in this context.");
-                    break;
-            }
-        }
+                if (child is not AkcssContextualOperation operation ||
+                    markupConfiguration && operation.Data is not (AkcssIncludeData or AkcssTemplateBindingData))
+                {
+                    continue;
+                }
 
-        return result.ToImmutable();
+                cancellationToken.ThrowIfCancellationRequested();
+                switch (operation.Data)
+                {
+                    case AkcssSetterData setter:
+                        if (BuildSetter(operation, setter, locals, inTemplate, inApplication) is { } assignment)
+                        {
+                            result.Add(assignment);
+                        }
+                        break;
+                    case AkcssSelectorData selector when !inTemplate:
+                        if (BuildStyle(operation, selector, locals, inApplication) is { } nested)
+                        {
+                            result.Add(nested);
+                        }
+                        break;
+                    case AkcssIncludeData include when include.Mixin != null:
+                        result.Add(BuildInclude(operation, include, locals, inTemplate, inApplication));
+                        break;
+                    case AkcssBaseThemeData baseTheme:
+                        if (baseTheme.SourceTheme is { } source)
+                        {
+                            result.Add(new AkcssNativeBaseThemePlan(operation.Syntax, GetModuleReference(source) + "." + GetThemeAccessor(source)));
+                        }
+                        else if (TryFormat(operation, baseTheme.ExternalTheme.OperationDefinition, locals, out var reference))
+                        {
+                            result.Add(new AkcssNativeBaseThemePlan(operation.Syntax, reference));
+                        }
+                        break;
+                    case AkcssTemplateData { Template: { } template }:
+                        if (BuildTemplate(operation, template) is { } templatePlan)
+                        {
+                            result.Add(templatePlan);
+                        }
+                        break;
+                    case AkcssTemplateBindingData bindings when inTemplate && !bindings.IsDeferred &&
+                        bindings.Template != null && bindings.Element != null:
+                        foreach (var entry in bindings.Properties)
+                        {
+                            if (GetPropertyHandle(entry.Source) is { } sourceField &&
+                                GetPropertyHandle(entry.Destination) is { } destinationField)
+                            {
+                                result.Add(new AkcssNativeTemplateBindingPlan(entry.Syntax, sourceField, destinationField));
+                            }
+                            else
+                            {
+                                Report(operation, "No native property handle is available for this template binding.", entry.Syntax);
+                            }
+                        }
+                        break;
+                    case AkcssConditionData:
+                        Report(operation, "Reactive @if in a native style, theme, or template include is not supported.");
+                        break;
+                    case AkcssApplyData:
+                        Report(operation, "@apply expansion in a native AKCSS body is unsupported. Use @include to compose native bodies.");
+                        break;
+                    case AkcssMixinArgumentData:
+                        break;
+                    default:
+                        Report(operation, $"Native generation is unavailable for {operation.Syntax.Kind} in this context.");
+                        break;
+                }
+            }
+
+            return result.ToImmutable();
+        }
+        finally
+        {
+            result.Free();
+        }
     }
 
     private AkcssNativeIncludePlan BuildInclude(AkcssContextualOperation site, AkcssIncludeData include,
@@ -357,9 +420,9 @@ internal sealed class AkcssNativePlanner(AkburaSemanticModel model, Cancellation
     {
         var arguments = ImmutableArray.CreateBuilder<AkcssNativeArgumentPlan>();
         var locals = callerLocals;
-        foreach (var child in site.Children.OfType<AkcssContextualOperation>())
+        foreach (var operation in site.Children)
         {
-            if (child.Data is not AkcssMixinArgumentData { Argument: { } argument } ||
+            if (operation is not AkcssContextualOperation { Data: AkcssMixinArgumentData { Argument: { } argument } } child ||
                 argument.Parameter.Type.Symbol is not ITypeSymbol type)
             {
                 continue;
@@ -386,8 +449,13 @@ internal sealed class AkcssNativePlanner(AkburaSemanticModel model, Cancellation
     {
         var configurationStart = _diagnostics.Count;
         var configurations = ImmutableDictionary.CreateBuilder<MarkupElementSyntax, ImmutableArray<AkcssNativeMemberPlan>>();
-        foreach (var attribute in AkcssNativeExpression.Enumerate(operation.Children).OfType<IMarkupPropertySetterOperation>())
+        foreach (var child in AkcssNativeExpression.Enumerate(operation.Children))
         {
+            if (child is not IMarkupPropertySetterOperation attribute)
+            {
+                continue;
+            }
+
             if (attribute.ConvertedValue is AkcssAmxInvocationValue resource)
             {
                 if (GetPropertyHandle(attribute.Property) is null ||
@@ -409,26 +477,23 @@ internal sealed class AkcssNativePlanner(AkburaSemanticModel model, Cancellation
             }
         }
         var environment = BindingWriterEnvironment.Create(model.Compilation.CSharpCompilation, withinType: null);
-        foreach (var element in AkcssNativeExpression.Enumerate(operation.Children)
-            .OfType<AkcssContextualOperation>().Where(static child => child.Kind == OperationKind.MarkupElement))
+        foreach (var child in AkcssNativeExpression.Enumerate(operation.Children))
         {
-            if (element.Syntax is MarkupElementSyntax markup)
+            if (child is AkcssContextualOperation { Kind: OperationKind.MarkupElement, Syntax: MarkupElementSyntax markup } element)
             {
                 if (element.TargetSymbol is IMarkupComponentSymbol { ComponentType: INamedTypeSymbol type } &&
                     (type.IsAbstract || !IsClosed(type) || !environment.IsAccessible(type) ||
-                     !type.InstanceConstructors.Any(constructor => environment.IsAccessible(constructor) &&
-                         constructor.Parameters.All(static parameter => parameter.IsOptional || parameter.IsParams))))
+                     !type.InstanceConstructors.Any(static (constructor, scope) => scope.IsAccessible(constructor) &&
+                         constructor.Parameters.All(static parameter => parameter.IsOptional || parameter.IsParams), environment)))
                 {
                     Report(operation, $"Template element '{type.ToDisplayString()}' requires an accessible construction with no explicit arguments.", markup.StartTag?.Name);
                     continue;
                 }
 
-                var members = element.Children.OfType<AkcssContextualOperation>()
-                    .Where(static child => child.Data is AkcssIncludeData or AkcssTemplateBindingData)
-                    .Cast<NativeOperation>().ToImmutableArray();
-                if (!members.IsEmpty)
+                if (element.Children.Any(static member => member is AkcssContextualOperation
+                        { Data: AkcssIncludeData or AkcssTemplateBindingData }))
                 {
-                    configurations.Add(markup, BuildMembers(members, s_emptyLocals, inTemplate: true));
+                    configurations.Add(markup, BuildMembers(element.Children, s_emptyLocals, inTemplate: true, markupConfiguration: true));
                 }
             }
         }

@@ -15,14 +15,15 @@ public sealed partial class AkburaSyntacticDocument
     public AkburaSyntacticCompletionContext GetCompletionContext(int position, CancellationToken cancellationToken = default)
     {
         ValidatePosition(position);
-        if (SyntaxTree.Kind == SyntaxTreeKind.Akcss)
+        var template = GetAkcssMarkupTemplate(position);
+        if (template is null && TryGetAkcssRegion(position, out _))
         {
             return default;
         }
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var root = SyntaxTree.GetRootSyntax();
+        var root = (AkburaSyntax?)template?.Body ?? SyntaxTree.GetRootSyntax();
         if (TryGetMarkupExtensionTypeContext(
                 root,
                 position,
@@ -201,7 +202,7 @@ public sealed partial class AkburaSyntacticDocument
         CancellationToken cancellationToken = default)
     {
         ValidatePosition(position);
-        if (SyntaxTree.Kind == SyntaxTreeKind.Akcss)
+        if (TryGetAkcssRegion(position, out _) && GetAkcssMarkupTemplate(position) is null)
         {
             failureReason = "not-markup-syntax";
             return null;
@@ -251,7 +252,7 @@ public sealed partial class AkburaSyntacticDocument
         CancellationToken cancellationToken = default)
     {
         ValidatePosition(position);
-        if (SyntaxTree.Kind == SyntaxTreeKind.Akcss ||
+        if (TryGetAkcssRegion(position, out _) && GetAkcssMarkupTemplate(position) is null ||
             position == 0 || Text.Length == 0)
         {
             return null;
@@ -356,7 +357,7 @@ public sealed partial class AkburaSyntacticDocument
     {
         ValidatePosition(position);
         edit = default;
-        if (SyntaxTree.Kind == SyntaxTreeKind.Akcss ||
+        if (TryGetAkcssRegion(position, out _) && GetAkcssMarkupTemplate(position) is null ||
             position == 0 ||
             Text.Length == 0 ||
             Text[position - 1] != '/')

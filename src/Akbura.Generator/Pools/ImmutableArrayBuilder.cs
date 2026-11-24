@@ -103,6 +103,8 @@ internal ref struct ImmutableArrayBuilder<T>
         }
     }
 
+    public readonly void Sort(IComparer<T> comparer) => writer!.Sort(comparer);
+
     /// <summary>
     /// Removes all items written to the underlying buffer.
     /// </summary>
@@ -232,6 +234,8 @@ internal ref struct ImmutableArrayBuilder<T>
 
             index += items.Length;
         }
+
+        public void Sort(IComparer<T> comparer) => Array.Sort(array!, 0, index, comparer);
 
         public void Clear()
         {

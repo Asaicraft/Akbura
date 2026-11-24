@@ -267,7 +267,7 @@ namespace Akbura.Language.Syntax
         }
 
         public SyntaxToken CloseToken
-            => new(this, this.Green.CloseToken, GetChildPositionFromEnd(1), GetChildIndex(3));
+            => new(this, this.Green.CloseToken, GetChildPositionFromEnd(3), GetChildIndex(3));
 
         public MarkupStartTagSyntax UpdateMarkupStartTagSyntax(
             SyntaxToken lessToken,

@@ -120,7 +120,7 @@ public sealed partial class AkburaSyntacticDocument
                 position);
         }
 
-        if (isAkcss)
+        if (isAkcss && GetAkcssMarkupTemplate(position) is null)
         {
             return new AkburaPairContext(
                 AkburaPairContextKind.AkcssSyntax,

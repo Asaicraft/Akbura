@@ -261,7 +261,7 @@ namespace Akbura.Language.Syntax
             new(GetRed(ref _members, 5));
 
         public SyntaxToken CloseBrace =>
-            new(this, Green.CloseBrace, GetChildPositionFromEnd(1), GetChildIndex(6));
+            new(this, Green.CloseBrace, GetChildPositionFromEnd(6), GetChildIndex(6));
 
         public AkcssThemeDeclarationSyntax UpdateAkcssThemeDeclarationSyntax(
             SyntaxToken atToken,

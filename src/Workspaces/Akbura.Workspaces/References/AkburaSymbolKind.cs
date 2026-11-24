@@ -26,4 +26,8 @@ public enum AkburaSymbolKind
     CSharpSymbol,
     MarkupLoopLocal,
     MarkupLoopIndex,
+    AkcssTheme,
+    AkcssMixin,
+    AkcssMixinParameter,
+    AkcssTemplatePart,
 }

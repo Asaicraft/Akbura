@@ -148,6 +148,18 @@ public sealed class AkburaDocumentSnapshot
             isOpen);
     }
 
+    internal AkburaDocumentSnapshot WithProjectIdentity(string rootNamespace, string projectDirectory)
+    {
+        if (SyntaxTree is not AkcssSyntaxTree akcss)
+        {
+            return this;
+        }
+
+        var tree = akcss.WithLogicalName(GetAkcssLogicalName(FilePath, rootNamespace, projectDirectory));
+        return ReferenceEquals(tree, akcss) ? this :
+            new AkburaDocumentSnapshot(Id, ProjectId, Uri, FilePath, Version, Text, tree, IsOpen);
+    }
+
     internal static AkburaSyntaxTree CreateSyntaxTree(
         SourceText text,
         string filePath,
@@ -160,20 +172,8 @@ public sealed class AkburaDocumentSnapshot
                 ".akcss",
                 StringComparison.OrdinalIgnoreCase))
         {
-            var sourcePath =
-                GetProjectRelativeSourcePath(
-                    filePath,
-                    projectDirectory);
-            var logicalName =
-                AkcssGeneratedModuleNames.GetMetadataName(
-                    rootNamespace,
-                    sourcePath);
-
             return AkcssSyntaxTree.ParseText(
-                text,
-                filePath,
-                logicalName,
-                cancellationToken);
+                text, filePath, GetAkcssLogicalName(filePath, rootNamespace, projectDirectory), cancellationToken);
         }
 
         return ComponentSyntaxTree.ParseText(
@@ -181,6 +181,9 @@ public sealed class AkburaDocumentSnapshot
             filePath,
             cancellationToken);
     }
+
+    private static string GetAkcssLogicalName(string filePath, string rootNamespace, string projectDirectory) =>
+        AkcssGeneratedModuleNames.GetMetadataName(rootNamespace, GetProjectRelativeSourcePath(filePath, projectDirectory));
 
     private static string GetProjectRelativeSourcePath(
         string filePath,

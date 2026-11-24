@@ -198,6 +198,13 @@ internal sealed class AkburaFormattingService :
 
         var absoluteContentPosition =
             document.Text.Lines[lineNumber].Start + firstContent;
+        if (document.IsAkcssFormattingSensitive(line.Start, absoluteContentPosition, cancellationToken))
+        {
+            builder.Append(content);
+            builder.Append(lineBreak);
+            return;
+        }
+
         var isEmbeddedCSharp = document.TryGetCSharpCompletionContext(
             absoluteContentPosition,
             out _,

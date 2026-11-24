@@ -1,4 +1,5 @@
 using Akbura.Language;
+using Akbura.Language.Binder;
 using Akbura.Language.Operations;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
@@ -76,16 +77,6 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
                 cancellationToken);
         }
 
-        var projectedDefinition =
-            GetProjectedCSharpDefinition(
-                context,
-                position,
-                cancellationToken);
-        if (projectedDefinition != null)
-        {
-            return projectedDefinition;
-        }
-
         if (_referenceResolver.TryResolve(
                 context,
                 position,
@@ -100,6 +91,16 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             {
                 return nativeDefinition;
             }
+        }
+
+        var projectedDefinition =
+            GetProjectedCSharpDefinition(
+                context,
+                position,
+                cancellationToken);
+        if (projectedDefinition != null)
+        {
+            return projectedDefinition;
         }
 
         var root = document.SyntaxTree.GetRootSyntax();
@@ -1094,6 +1095,7 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             RoslynSymbol? csharpSymbol,
             CancellationToken cancellationToken)
     {
+        akburaSymbol ??= context.Project.Compilation.FindSourceAkcssTheme(csharpSymbol);
         if (akburaSymbol != null &&
             TryCreateAkburaDefinition(
                 context,
@@ -1258,47 +1260,22 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             return true;
         }
 
-        var declarationSyntax =
-            GetDeclarationSyntax(symbol);
-
-        if (declarationSyntax != null &&
-            TryFindDocument(
-                context.Project,
-                declarationSyntax,
-                out var declarationDocument))
+        if (GetDeclarationSyntax(symbol) is { } declarationSyntax)
         {
-            definition =
-                CreateAkburaDefinition(
-                    sourceSpan,
-                    declarationDocument,
-                    GetDeclarationNameSpan(
-                        declarationSyntax));
+            var targetSpan = symbol is IMarkupNameSymbol && CSharpProbeBinder.TryGetDeclarationSpan(symbol, out var nameSpan)
+                ? nameSpan
+                : GetDeclarationNameSpan(declarationSyntax);
+            if (TryFindDocument(context.Project, declarationSyntax, out var declarationDocument))
+            {
+                definition = CreateAkburaDefinition(sourceSpan, declarationDocument, targetSpan);
+                return true;
+            }
 
-            return true;
-        }
-
-        if (declarationSyntax != null &&
-            TryCreateCompilationReferenceDefinition(
-                context,
-                sourceSpan,
-                declarationSyntax,
-                GetDeclarationNameSpan(
-                    declarationSyntax),
-                out definition))
-        {
-            return true;
-        }
-
-        if (declarationSyntax != null &&
-            TryCreateReferencedAkburaDefinition(
-                context,
-                sourceSpan,
-                declarationSyntax,
-                GetDeclarationNameSpan(
-                    declarationSyntax),
-                out definition))
-        {
-            return true;
+            if (TryCreateCompilationReferenceDefinition(context, sourceSpan, declarationSyntax, targetSpan, out definition) ||
+                TryCreateReferencedAkburaDefinition(context, sourceSpan, declarationSyntax, targetSpan, out definition))
+            {
+                return true;
+            }
         }
 
         if (symbol is IMetadataAkcssModuleSymbol metadataModule &&
@@ -1351,6 +1328,9 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
                     AkburaComponent: { } component,
                 } => component.DeclarationSyntax,
 
+            AkcssSourceDeclarationSymbol source => source.DeclarationSyntax,
+            AkcssMixinParameterSymbol mixinParameter => mixinParameter.DeclarationSyntax,
+            IMarkupNameSymbol name => name.DeclarationSyntax,
             IAkcssSymbol akcss =>
                 akcss.DeclarationSyntax,
 
@@ -1380,6 +1360,9 @@ internal sealed class AkburaDefinitionService : IAkburaDefinitionService
             CommandDeclarationSyntax command =>
                 command.Name.Span,
 
+            AkcssThemeDeclarationSyntax theme => theme.Name.Span,
+            AkcssMixinDeclarationSyntax mixin => mixin.Name.Span,
+            AkcssMixinParameterSyntax parameter => parameter.Name.Span,
             AkcssUtilityDeclarationSyntax utility =>
                 utility
                     .Selector

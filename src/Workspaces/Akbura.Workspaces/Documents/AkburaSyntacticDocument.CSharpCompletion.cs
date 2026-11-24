@@ -1,4 +1,5 @@
 using Akbura.Language;
+using Akbura.Language.Binder;
 using Akbura.Language.Syntax;
 using Microsoft.CodeAnalysis.Text;
 
@@ -163,6 +164,11 @@ public sealed partial class AkburaSyntacticDocument
                     AddCandidate(AkburaCSharpCompletionContextKind.Statement, code,
                         code.Token.FullSpan, priority: 3);
                     break;
+                case AkcssMixinArgumentListSyntax list
+                    when EmbeddedCSharpSyntaxFacts.TryGetEmptyIncludeArgumentSpan(list, out var argumentSpan):
+                    AddCandidate(AkburaCSharpCompletionContextKind.Expression, list, argumentSpan, priority: 1);
+                    break;
+
                 case CSharpExpressionSyntax expression
                     when IsCSharpExpressionContext(expression):
                 {
@@ -243,15 +249,8 @@ public sealed partial class AkburaSyntacticDocument
                     (markupElseIf.CloseParenToken.IsMissing || position <= markupElseIf.CloseParenToken.Span.Start);
             }
 
-            if ((expression.Parent is AkcssAssignmentSyntax assignment &&
-                 ReferenceEquals(assignment.Expression, expression)) ||
-                (expression.Parent is AkcssIfDirectiveSyntax ifDirective &&
-                 ReferenceEquals(ifDirective.Condition, expression)))
-            {
-                return true;
-            }
-
-            return !IsInAkcssRegion(expression);
+            return AkcssSemanticFacts.IsEmbeddedExpression(expression) ||
+                !IsInAkcssRegion(expression) || AkcssSemanticFacts.FindTemplate(expression) is not null;
         }
 
         bool TryGetCSharpTypeContext(CSharpTypeSyntax type, out AkburaCSharpCompletionContextKind kind, out AkburaSyntax owner)
@@ -266,34 +265,15 @@ public sealed partial class AkburaSyntacticDocument
                 return true;
             }
 
-            switch (type.Parent)
+            if (AkcssSemanticFacts.IsEmbeddedType(type))
             {
-                case AkcssStyleSelectorSyntax selector
-                    when ReferenceEquals(selector.TargetType, type):
-                    kind = AkburaCSharpCompletionContextKind.Type;
-                    owner = type;
-                    return true;
-
-                case AkcssUtilitySelectorSyntax utilitySelector
-                    when ReferenceEquals(utilitySelector.TargetType, type):
-                    kind = AkburaCSharpCompletionContextKind.Type;
-                    owner = type;
-                    return true;
-
-                case AkcssUtilityParameterSyntax parameter
-                    when ReferenceEquals(parameter.Type, type):
-                    kind = AkburaCSharpCompletionContextKind.Type;
-                    owner = type;
-                    return true;
-
-                case AkcssInterceptDirectiveSyntax intercept
-                    when ReferenceEquals(intercept.Type, type):
-                    kind = AkburaCSharpCompletionContextKind.Type;
-                    owner = type;
-                    return true;
+                kind = AkburaCSharpCompletionContextKind.Type;
+                owner = type;
+                return true;
             }
 
-            if (IsInAkcssRegion(type))
+            if (IsInAkcssRegion(type) &&
+                (type.Parent is AkcssTemplateBindSyntax || AkcssSemanticFacts.FindTemplate(type) is null))
             {
                 kind = default;
                 owner = null!;

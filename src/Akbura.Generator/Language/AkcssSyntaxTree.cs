@@ -135,6 +135,11 @@ internal sealed class AkcssSyntaxTree : AkburaSyntaxTree
         return _root ??= (AkcssDocumentSyntax)GreenRoot.CreateRed();
     }
 
+    internal AkcssSyntaxTree WithLogicalName(string name) =>
+        string.Equals(LogicalName, name, StringComparison.Ordinal)
+            ? this
+            : new AkcssSyntaxTree(Text, FilePath, name, GreenRoot);
+
     public override AkburaSyntax GetRootSyntax()
     {
         return GetRoot();

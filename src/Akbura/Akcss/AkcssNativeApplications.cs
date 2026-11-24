@@ -1,4 +1,5 @@
 using Akbura.Markup;
+using Akbura.RuntimePools;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Styling;
@@ -12,6 +13,10 @@ internal sealed class AkcssNativeApplications
 {
     private static readonly AttachedProperty<object?> s_identity =
         AvaloniaProperty.RegisterAttached<StyledElement, object?>("AkcssNativeIdentity", typeof(AkcssNativeApplications));
+    private static readonly IComparer<Application> s_prefixesAbove =
+        Comparer<Application>.Create(static (left, right) => CompareApplications(left, right, UnprefixedUtilityPrecedence.Above));
+    private static readonly IComparer<Application> s_prefixesBelow =
+        Comparer<Application>.Create(static (left, right) => CompareApplications(left, right, UnprefixedUtilityPrecedence.Below));
     private static long s_nextGate;
 
     private readonly object _identity = new();
@@ -25,23 +30,42 @@ internal sealed class AkcssNativeApplications
             AkcssClassActivator { Class: IAkcssNativeStyleProvider };
 
     public static void Validate(object target, ImmutableArray<AkcssStyleActivator> styles) =>
-        Describe(target, styles, validateValues: false);
+        Describe(target, styles, validateValues: false, applications: default);
 
     public void Reconcile(object target, ImmutableArray<AkcssStyleActivator> styles)
     {
-        var applications = Describe(target, styles, validateValues: true);
+        using var applications = ImmutableArrayBuilder<Application>.Rent();
+        Describe(target, styles, validateValues: true, applications);
         if (target is not Control control)
         {
             return;
         }
 
         var previous = _installed;
-        var oldLeases = previous.ToDictionary(static lease => lease.Application.Key);
+        Dictionary<Key, Lease>? oldLeases = null;
         var proposed = new Lease[applications.Count];
-        for (var index = 0; index < applications.Count; index++)
+        var index = 0;
+        foreach (var application in applications.WrittenSpan)
         {
-            var application = applications[index];
-            oldLeases.TryGetValue(application.Key, out var old);
+            Lease? old = null;
+            if (index < previous.Length && previous[index].Application.Key == application.Key)
+            {
+                old = previous[index];
+            }
+            else if (previous.Length != 0)
+            {
+                if (oldLeases is null)
+                {
+                    oldLeases = new Dictionary<Key, Lease>(previous.Length);
+                    foreach (var lease in previous)
+                    {
+                        oldLeases.Add(lease.Application.Key, lease);
+                    }
+                }
+
+                oldLeases.TryGetValue(application.Key, out old);
+            }
+
             var candidate = application.Candidate;
             var ready = candidate?.IsReady ?? true;
             var active = ready && (candidate?.IsActive ?? application.Key.Activator.Condition);
@@ -72,7 +96,7 @@ internal sealed class AkcssNativeApplications
                 }
             }
 
-            proposed[index] = new Lease(application, gate, root, versions, active);
+            proposed[index++] = new Lease(application, gate, root, versions, active);
         }
 
         try
@@ -124,12 +148,25 @@ internal sealed class AkcssNativeApplications
     private void Publish(Control target, Lease[] before, Lease[] after, bool force = false)
     {
         var current = _container;
-        var roots = after.Where(static lease => lease.Root != null).Select(static lease => lease.Root!).ToArray();
-        var reorder = force || (current == null ? roots.Length != 0 : !current.SequenceEqual(roots));
+        var rootCount = 0;
+        var reorder = force;
+        foreach (var lease in after)
+        {
+            if (lease.Root is not { } root)
+            {
+                continue;
+            }
+
+            reorder |= current is null || rootCount >= current.Count ||
+                !EqualityComparer<IStyle>.Default.Equals(current[rootCount], root);
+            rootCount++;
+        }
+
+        reorder |= rootCount != (current?.Count ?? 0);
         var gates = (IPseudoClasses)target.Classes;
         foreach (var lease in before)
         {
-            if (reorder || !after.Any(next => next.Gate == lease.Gate && next.Active))
+            if (reorder || !IsGateActive(after, lease.Gate))
             {
                 gates.Remove(lease.Gate);
             }
@@ -143,7 +180,7 @@ internal sealed class AkcssNativeApplications
                 current.Clear();
                 RetireVisualFrames(target, removed);
             }
-            if (roots.Length == 0)
+            if (rootCount == 0)
             {
                 if (current != null)
                 {
@@ -152,21 +189,35 @@ internal sealed class AkcssNativeApplications
                 _container = null;
                 target.ClearValue(s_identity);
             }
-            else if (current == null)
-            {
-                var next = new Styles();
-                next.AddRange(roots);
-                _container = next;
-                target.SetValue(s_identity, _identity);
-                target.Styles.Add(next);
-            }
             else
             {
-                if (!target.Styles.Contains(current))
+                var roots = new IStyle[rootCount];
+                var index = 0;
+                foreach (var lease in after)
                 {
-                    target.Styles.Add(current);
+                    if (lease.Root is { } root)
+                    {
+                        roots[index++] = root;
+                    }
                 }
-                current.AddRange(roots);
+
+                if (current == null)
+                {
+                    var next = new Styles();
+                    next.AddRange(roots);
+                    _container = next;
+                    target.SetValue(s_identity, _identity);
+                    target.Styles.Add(next);
+                }
+                else
+                {
+                    if (!target.Styles.Contains(current))
+                    {
+                        target.Styles.Add(current);
+                    }
+
+                    current.AddRange(roots);
+                }
             }
         }
 
@@ -177,6 +228,19 @@ internal sealed class AkcssNativeApplications
                 gates.Add(lease.Gate);
             }
         }
+    }
+
+    private static bool IsGateActive(Lease[] leases, string gate)
+    {
+        foreach (var lease in leases)
+        {
+            if (lease.Active && lease.Gate == gate)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void RetireVisualFrames(Control control, IReadOnlyList<IStyle> removed)
@@ -219,10 +283,10 @@ internal sealed class AkcssNativeApplications
         }
     }
 
-    private static List<Application> Describe(object target, ImmutableArray<AkcssStyleActivator> styles, bool validateValues)
+    private static void Describe(object target, ImmutableArray<AkcssStyleActivator> styles, bool validateValues,
+        ImmutableArrayBuilder<Application> applications)
     {
-        var occurrences = new Dictionary<AkcssStyleActivator, int>(ReferenceEqualityComparer.Instance);
-        var result = new List<Application>();
+        var occurrences = applications.IsDefault ? null : new Dictionary<AkcssStyleActivator, int>(ReferenceEqualityComparer.Instance);
         string? group = null;
         var precedence = UnprefixedUtilityPrecedence.SourceOrder;
         var flat = false;
@@ -234,8 +298,13 @@ internal sealed class AkcssNativeApplications
                 continue;
             }
 
-            var occurrence = occurrences.GetValueOrDefault(activator);
-            occurrences[activator] = occurrence + 1;
+            var occurrence = 0;
+            if (occurrences is not null)
+            {
+                occurrence = occurrences.GetValueOrDefault(activator);
+                occurrences[activator] = occurrence + 1;
+            }
+
             if (activator is AkcssUtilityCandidateActivator candidate)
             {
                 var eligible = false;
@@ -243,7 +312,7 @@ internal sealed class AkcssNativeApplications
                 {
                     if (definition.Provider.NativeTargetType.IsInstanceOfType(target))
                     {
-                        Add(definition.Provider, candidate, definition.Index, index, occurrence);
+                        Add(applications, definition.Provider, candidate, definition.Index, index, occurrence);
                         eligible = true;
                     }
                 }
@@ -281,45 +350,53 @@ internal sealed class AkcssNativeApplications
             }
             else if (activator.Style is IAkcssNativeStyleProvider provider && provider.NativeTargetType.IsInstanceOfType(target))
             {
-                Add(provider, activator, 0, index, occurrence);
+                Add(applications, provider, activator, 0, index, occurrence);
             }
         }
 
-        if (group != null)
+        if (group != null && !applications.IsDefault)
         {
-            result.Sort((left, right) =>
-            {
-                var tier = Rank(left).CompareTo(Rank(right));
-                if (tier != 0)
-                {
-                    return tier;
-                }
-                var order = (left.Candidate?.Order ?? 0d).CompareTo(right.Candidate?.Order ?? 0d);
-                if (left.Candidate?.IsPrefixed == true && right.Candidate?.IsPrefixed == true && order != 0)
-                {
-                    return order;
-                }
-                var position = left.Position.CompareTo(right.Position);
-                return position != 0 ? position : left.Key.Implementation.CompareTo(right.Key.Implementation);
-            });
+            applications.Sort(precedence == UnprefixedUtilityPrecedence.Above ? s_prefixesAbove : s_prefixesBelow);
         }
-        return result;
 
-        int Rank(Application application) => application.Candidate?.IsPrefixed == true
-            ? precedence == UnprefixedUtilityPrecedence.Above ? 1 : -1
-            : 0;
-
-        void Add(IAkcssNativeStyleProvider provider, AkcssStyleActivator style, int implementation, int position, int occurrence)
+        void Add(ImmutableArrayBuilder<Application> result, IAkcssNativeStyleProvider provider, AkcssStyleActivator style,
+            int implementation, int position, int occurrence)
         {
             if (target is not Control)
             {
                 throw Unsupported(style, "the target must be an Avalonia Control");
             }
-            result.Add(new Application(new Key(style, occurrence, implementation), provider, position));
+
+            if (!result.IsDefault)
+            {
+                result.Add(new Application(new Key(style, occurrence, implementation), provider, position));
+            }
         }
 
         InvalidOperationException Unsupported(AkcssStyleActivator style, string reason) => new(
             $"Native AKCSS application '{style.Style.Name}' on '{target.GetType().Name}' is unsupported: {reason}.");
+    }
+
+    private static int CompareApplications(Application left, Application right, UnprefixedUtilityPrecedence precedence)
+    {
+        var leftPrefixed = left.Candidate?.IsPrefixed == true;
+        var rightPrefixed = right.Candidate?.IsPrefixed == true;
+        if (leftPrefixed != rightPrefixed)
+        {
+            return leftPrefixed == (precedence == UnprefixedUtilityPrecedence.Above) ? 1 : -1;
+        }
+
+        if (leftPrefixed)
+        {
+            var order = left.Candidate!.Order.CompareTo(right.Candidate!.Order);
+            if (order != 0)
+            {
+                return order;
+            }
+        }
+
+        var position = left.Position.CompareTo(right.Position);
+        return position != 0 ? position : left.Key.Implementation.CompareTo(right.Key.Implementation);
     }
 
     private static void Attempt(Action action, ref List<Exception>? failures)
@@ -341,7 +418,7 @@ internal sealed class AkcssNativeApplications
     }
 
     private readonly record struct Key(AkcssStyleActivator Activator, int Occurrence, int Implementation);
-    private sealed record Application(Key Key, IAkcssNativeStyleProvider Provider, int Position)
+    private readonly record struct Application(Key Key, IAkcssNativeStyleProvider Provider, int Position)
     {
         public AkcssUtilityCandidateActivator? Candidate => Key.Activator as AkcssUtilityCandidateActivator;
     }

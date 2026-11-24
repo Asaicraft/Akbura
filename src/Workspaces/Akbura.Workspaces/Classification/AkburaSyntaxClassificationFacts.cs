@@ -118,6 +118,34 @@ internal static class AkburaSyntaxClassificationFacts
                     return AkburaClassificationKind
                         .Directive;
 
+                case AkcssThemeDeclarationSyntax theme when HasSameSpan(theme.AtToken, token) || HasSameSpan(theme.ThemeKeyword, token):
+                case AkcssMixinDeclarationSyntax mixin when HasSameSpan(mixin.AtToken, token) || HasSameSpan(mixin.MixinKeyword, token):
+                case AkcssTemplateDirectiveSyntax template when HasSameSpan(template.AtToken, token) || HasSameSpan(template.TemplateKeyword, token):
+                case AkcssIncludeSyntax include when HasSameSpan(include.AtToken, token) || HasSameSpan(include.IncludeKeyword, token):
+                case AkcssBasedOnDirectiveSyntax based when HasSameSpan(based.AtToken, token) || HasSameSpan(based.BasedKeyword, token) ||
+                    HasSameSpan(based.MinusToken, token) || HasSameSpan(based.OnKeyword, token):
+                case AkcssTemplateBindSyntax bind when HasSameSpan(bind.AtToken, token) || HasSameSpan(bind.TemplateKeyword, token) ||
+                    HasSameSpan(bind.MinusToken, token) || HasSameSpan(bind.BindToken, token):
+                case AkcssTemplateTraversalSyntax traversal when HasSameSpan(traversal.OpenSlash, token) ||
+                    HasSameSpan(traversal.TemplateKeyword, token) || HasSameSpan(traversal.CloseSlash, token):
+                    return AkburaClassificationKind.Directive;
+
+                case AkcssThemeDeclarationSyntax theme when Contains(theme.Name, token):
+                    return AkburaClassificationKind.PropertyName;
+                case AkcssMixinDeclarationSyntax mixin when Contains(mixin.Name, token):
+                case AkcssIncludeSyntax include when Contains(include.Name, token):
+                    return AkburaClassificationKind.Utility;
+                case AkcssMixinParameterSyntax parameter when Contains(parameter.Name, token):
+                    return AkburaClassificationKind.ParameterName;
+                case AkcssTemplateBindSyntax binding when ContainsTemplateBindingProperty(binding, token):
+                    return token.Kind == SyntaxKind.IdentifierToken ? AkburaClassificationKind.PropertyName : AkburaClassificationKind.Punctuation;
+                case AkcssPseudoClassSelectorSyntax selector when Contains(selector.Name, token):
+                    return AkburaClassificationKind.UtilityModifier;
+                case AkcssClassSelectorSyntax selector when Contains(selector.Name, token):
+                    return AkburaClassificationKind.Utility;
+                case AkcssNameSelectorSyntax selector when Contains(selector.Name, token):
+                    return AkburaClassificationKind.Identifier;
+
                 case AkcssUsingDirectiveSyntax directive
                     when HasSameSpan(
                              directive.AtToken,
@@ -397,6 +425,19 @@ internal static class AkburaSyntaxClassificationFacts
         }
 
         return AkburaClassificationKind.Identifier;
+    }
+
+    private static bool ContainsTemplateBindingProperty(AkcssTemplateBindSyntax binding, SyntaxToken token)
+    {
+        foreach (var property in binding.PropertyNames)
+        {
+            if (Contains(property, token))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool Contains(

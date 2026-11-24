@@ -12,7 +12,7 @@ namespace Akbura.Workspaces.UnitTests;
 public sealed class WorkspaceClassificationTests
 {
     [Fact]
-    public void AkcssInvalidSelector_DoesNotReportBraceOnUsingDirective()
+    public void AkcssInvalidSelector_ReportsOnSelectorAfterUsingDirective()
     {
         const string source =
             "@using Akbura.Styles.akcss;\r\n\r\n" +
@@ -31,16 +31,10 @@ public sealed class WorkspaceClassificationTests
             "..class",
             StringComparison.Ordinal);
 
-        Assert.Contains(
-            diagnostics,
-            diagnostic =>
-                diagnostic.Code == ErrorCodes.ERR_LbraceExpected &&
-                diagnostic.Span.Start >= selectorStart);
-        Assert.DoesNotContain(
-            diagnostics,
-            diagnostic =>
-                diagnostic.Code == ErrorCodes.ERR_LbraceExpected &&
-                diagnostic.Span.Start < selectorStart);
+        var usingEnd = source.IndexOf(';') + 1;
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == ErrorCodes.ERR_SyntaxError && diagnostic.Span.Start >= selectorStart);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Span.Start < usingEnd);
     }
     [Fact]
     public void SyntacticDiagnostics_ReportSkippedTextWithoutSemanticContext()

@@ -1,5 +1,6 @@
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using System.Collections.Immutable;
 using System.Linq;
 
@@ -80,7 +81,7 @@ internal sealed partial class AkcssStyleBinder
     private AkcssSelectorBinding BindAkcssSelector(
         AkcssSelectorSyntax selector,
         AkcssBindingContext context,
-        ImmutableArray<AkburaSemanticDiagnostic>.Builder diagnostics)
+        ArrayBuilder<AkburaSemanticDiagnostic>? diagnostics)
     {
         AkcssSelectorCompound initial;
         if (selector.Initial is AkcssParentCompoundSelectorSyntax parent)
@@ -96,7 +97,7 @@ internal sealed partial class AkcssStyleBinder
             var anchor = new AkcssParentAnchor(parent.Anchor, parentKind, context.StructuralParent, context.Selector, context.Application);
             if (parentKind == AkcssParentAnchorKind.Missing)
             {
-                diagnostics.Add(CreateContextDiagnostic(parent.Anchor, context, ErrorCodes.AKBURA_SEMANTIC_AkcssSelector,
+                diagnostics?.Add(CreateContextDiagnostic(parent.Anchor, context, ErrorCodes.AKBURA_SEMANTIC_AkcssSelector,
                     "A parent selector requires an enclosing selector or a utility application."));
             }
 
@@ -124,7 +125,7 @@ internal sealed partial class AkcssStyleBinder
 
             if (isDirectThemeStyle && sawTemplate == (relationship == AkcssSelectorRelationship.Template))
             {
-                diagnostics.Add(CreateContextDiagnostic(step, context, ErrorCodes.AKBURA_SEMANTIC_AkcssSelector,
+                diagnostics?.Add(CreateContextDiagnostic(step, context, ErrorCodes.AKBURA_SEMANTIC_AkcssSelector,
                     sawTemplate
                         ? "A direct theme child can contain only one template traversal."
                         : "A descendant or child step in a direct theme child must follow a template traversal."));
@@ -134,7 +135,7 @@ internal sealed partial class AkcssStyleBinder
                 ? context.SubjectTemplate
                 : null;
             var boundTarget = BindAkcssCompound(target, target.Components, context, diagnostics, sourceTemplate: sourceTemplate);
-            steps.Add(new AkcssSelectorStep(relationship, step, boundTarget));
+            steps.Add(new AkcssSelectorStep(relationship, step, boundTarget, sourceTemplate));
             sawTemplate |= relationship == AkcssSelectorRelationship.Template;
             hasActivator |= HasActivationPredicate(boundTarget);
         }
@@ -146,17 +147,21 @@ internal sealed partial class AkcssStyleBinder
         AkcssSelectorCompoundSyntax syntax,
         SyntaxList<AkcssSelectorComponentSyntax> components,
         AkcssBindingContext context,
-        ImmutableArray<AkburaSemanticDiagnostic>.Builder diagnostics,
+        ArrayBuilder<AkburaSemanticDiagnostic>? diagnostics,
         AkcssParentAnchor? anchor = null,
         AkcssTemplateContext? sourceTemplate = null)
     {
         var predicates = ImmutableArray.CreateBuilder<AkcssSelectorPredicate>(components.Count);
         var receiver = anchor is null ? default : context.Subject;
+        var nameCount = 0;
+        var hasWrittenType = false;
+        MarkupNameDeclaration? knownPart = null;
         foreach (var component in components)
         {
             switch (component)
             {
                 case AkcssTypeSelectorSyntax type:
+                    hasWrittenType = true;
                     var typeSyntax = type.Type switch
                     {
                         CSharpTypeSyntax bare => bare,
@@ -165,7 +170,7 @@ internal sealed partial class AkcssStyleBinder
                     };
                     if (!context.DefinitionModel.TryResolveAkcssTargetType(typeSyntax, out var boundType))
                     {
-                        diagnostics.Add(CreateContextDiagnostic(type, context, ErrorCodes.AKBURA_SEMANTIC_AkcssSelector,
+                        diagnostics?.Add(CreateContextDiagnostic(type, context, ErrorCodes.AKBURA_SEMANTIC_AkcssSelector,
                             $"Cannot resolve selector type '{type.ToFullString().Trim()}'."));
                     }
 
@@ -176,22 +181,23 @@ internal sealed partial class AkcssStyleBinder
                     predicates.Add(new AkcssSelectorPredicate(AkcssPredicateKind.Class, @class, @class.Name.Identifier.ValueText));
                     break;
                 case AkcssNameSelectorSyntax name:
-                    predicates.Add(new AkcssSelectorPredicate(AkcssPredicateKind.Name, name, name.Name.Identifier.ValueText));
-                    if (sourceTemplate is not null &&
-                        !components.Any(static component => component is AkcssTypeSelectorSyntax) &&
-                        components.OfType<AkcssNameSelectorSyntax>().Count() == 1 &&
-                        sourceTemplate.NameScope.FindUniqueRootDeclaration(name.Name.Identifier.ValueText) is { } part &&
-                        sourceTemplate.Theme.DefinitionModel.GetSymbolInfo(part.Element).Symbol is IMarkupComponentSymbol
-                            { ComponentType: { } partType })
-                    {
-                        receiver = new AkcssReceiver(new CSharpSymbolDefinition(partType), AkcssReceiverOrigin.TemplatePart, part.Attribute);
-                    }
+                    var part = sourceTemplate?.NameScope.FindUniqueRootDeclaration(name.Name.Identifier.ValueText);
+                    predicates.Add(new AkcssSelectorPredicate(AkcssPredicateKind.Name, name, name.Name.Identifier.ValueText, SourcePart: part));
+                    nameCount++;
+                    knownPart = part;
 
                     break;
                 case AkcssPseudoClassSelectorSyntax pseudo:
                     predicates.Add(new AkcssSelectorPredicate(AkcssPredicateKind.PseudoClass, pseudo, pseudo.Name.Identifier.ValueText));
                     break;
             }
+        }
+
+        if (!hasWrittenType && nameCount == 1 && knownPart is not null &&
+            sourceTemplate!.Theme.DefinitionModel.GetSymbolInfo(knownPart.Element).Symbol is IMarkupComponentSymbol
+                { ComponentType: { } partType })
+        {
+            receiver = new AkcssReceiver(new CSharpSymbolDefinition(partType), AkcssReceiverOrigin.TemplatePart, knownPart.Attribute);
         }
 
         return new AkcssSelectorCompound(syntax, predicates.MoveToImmutable(), receiver, anchor);

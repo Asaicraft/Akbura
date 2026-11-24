@@ -24,12 +24,7 @@ internal sealed partial class AkcssStyleBinder
         switch (owner)
         {
             case AkcssSelectorRuleSymbol rule:
-                var diagnostics = ImmutableArray.CreateBuilder<AkburaSemanticDiagnostic>();
-                var selector = BindAkcssSelector(rule.DeclarationSyntax.Selector, context, diagnostics);
-                var selected = EnterAkcssSelector(context, syntax, selector);
-                result = new BoundAkcssContextual(BoundKind.AkcssSelectorRule, syntax, this, selected,
-                    new AkcssSelectorData(selector), symbolInfo, diagnostics.ToImmutable(),
-                    BindContextualMembers(rule.DeclarationSyntax.Members, selected));
+                result = BindAkcssSelectorRule(rule, context, symbolInfo);
                 break;
             case AkcssThemeSymbol theme:
                 result = BindAkcssTheme(theme, context, symbolInfo);
@@ -43,6 +38,24 @@ internal sealed partial class AkcssStyleBinder
 
         PublishAkcssContextualTree(result);
         return result;
+    }
+
+    private BoundAkcssContextual BindAkcssSelectorRule(
+        AkcssSelectorRuleSymbol rule, AkcssBindingContext context, AkburaSymbolInfo symbolInfo)
+    {
+        var syntax = rule.DeclarationSyntax;
+        var diagnostics = ArrayBuilder<AkburaSemanticDiagnostic>.GetInstance();
+        try
+        {
+            var selector = BindAkcssSelector(syntax.Selector, context, diagnostics);
+            var selected = EnterAkcssSelector(context, syntax, selector);
+            return new BoundAkcssContextual(BoundKind.AkcssSelectorRule, syntax, this, selected,
+                new AkcssSelectorData(selector), symbolInfo, diagnostics.ToImmutable(), BindContextualMembers(syntax.Members, selected));
+        }
+        finally
+        {
+            diagnostics.Free();
+        }
     }
 
     private ImmutableArray<BoundNode> BindLegacyAkcssBody(
@@ -110,20 +123,27 @@ internal sealed partial class AkcssStyleBinder
 
     private BoundAkcssContextual BindNestedAkcssRule(AkcssNestedStyleRuleSyntax rule, AkcssBindingContext context)
     {
-        var diagnostics = ImmutableArray.CreateBuilder<AkburaSemanticDiagnostic>();
-        var selector = BindAkcssSelector(rule.Selector, context, diagnostics);
-        if (context.OwningElement is not null)
+        var diagnostics = ArrayBuilder<AkburaSemanticDiagnostic>.GetInstance();
+        try
         {
-            diagnostics.Add(CreateContextDiagnostic(rule, context, ErrorCodes.AKBURA_SEMANTIC_AkcssMixin,
-                "A markup include configures its owning element and cannot introduce a selector rule."));
-            return new BoundAkcssContextual(BoundKind.AkcssNestedRule, rule, this, context, new AkcssSelectorData(selector),
-                AkburaSymbolInfo.None(CandidateReason.UnsupportedSyntax), diagnostics.ToImmutable());
-        }
+            var selector = BindAkcssSelector(rule.Selector, context, diagnostics);
+            if (context.OwningElement is not null)
+            {
+                diagnostics.Add(CreateContextDiagnostic(rule, context, ErrorCodes.AKBURA_SEMANTIC_AkcssMixin,
+                    "A markup include configures its owning element and cannot introduce a selector rule."));
+                return new BoundAkcssContextual(BoundKind.AkcssNestedRule, rule, this, context, new AkcssSelectorData(selector),
+                    AkburaSymbolInfo.None(CandidateReason.UnsupportedSyntax), diagnostics.ToImmutable());
+            }
 
-        var selected = EnterAkcssSelector(context, rule, selector);
-        return new BoundAkcssContextual(BoundKind.AkcssNestedRule, rule, this, selected, new AkcssSelectorData(selector),
-            AkburaSymbolInfo.None(CandidateReason.None), diagnostics.ToImmutable(), BindContextualMembers(rule.Members, selected),
-            hasErrors: rule.Selector.ContainsDiagnostics);
+            var selected = EnterAkcssSelector(context, rule, selector);
+            return new BoundAkcssContextual(BoundKind.AkcssNestedRule, rule, this, selected, new AkcssSelectorData(selector),
+                AkburaSymbolInfo.None(CandidateReason.None), diagnostics.ToImmutable(), BindContextualMembers(rule.Members, selected),
+                hasErrors: rule.Selector.ContainsDiagnostics);
+        }
+        finally
+        {
+            diagnostics.Free();
+        }
     }
 
     private BoundAkcssContextual BindContextualAkcssCondition(AkcssIfDirectiveSyntax syntax, AkcssBindingContext context)

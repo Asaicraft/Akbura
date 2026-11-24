@@ -1,8 +1,9 @@
+using Akbura.Collections;
 using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using CandidateReason = Akbura.Language.Symbols.CandidateReason;
@@ -16,25 +17,17 @@ internal sealed partial class AkcssStyleBinder
         AkcssThemeSymbol theme, AkcssBindingContext context, AkburaSymbolInfo symbolInfo)
     {
         var syntax = theme.DeclarationSyntax;
-        var baseDirective = syntax.Members.OfType<AkcssBasedOnDirectiveSyntax>().FirstOrDefault();
-        var templateDirective = syntax.Members.OfType<AkcssTemplateDirectiveSyntax>().FirstOrDefault();
+        GetThemeDirectives(syntax, out var baseDirective, out var templateDirective);
         var baseBinding = BindAkcssBaseReference(theme, baseDirective);
         var templateBinding = DescribeAkcssTemplate(theme, templateDirective);
-        var effectiveTemplate = templateBinding.Template;
-        if (baseBinding.Data?.SourceTheme is { } sourceBase && baseBinding.Diagnostics.IsEmpty)
+        var (effectiveTemplate, cycle) = GetEffectiveAkcssTemplate(theme, templateDirective, templateBinding.Template,
+            baseBinding.Diagnostics.IsEmpty ? baseBinding.Data : null);
+        if (!cycle.IsEmpty)
         {
-            var (inherited, cycle) = FindInheritedAkcssTemplate(theme, sourceBase);
-            if (!cycle.IsEmpty)
-            {
-                baseBinding = (baseBinding.Data, [new AkburaSemanticDiagnostic(baseDirective!,
-                    ErrorCodes.AKBURA_SEMANTIC_AkcssBaseTheme,
-                    [$"Theme inheritance cycle: {string.Join(" -> ", cycle.Select(static item => item.Name))}."],
-                    relatedSyntax: cycle.Select(static item => (AkburaSyntax)item.DeclarationSyntax).ToImmutableArray())]);
-            }
-            else if (templateDirective is null)
-            {
-                effectiveTemplate = inherited;
-            }
+            baseBinding = (baseBinding.Data, [new AkburaSemanticDiagnostic(baseDirective!,
+                ErrorCodes.AKBURA_SEMANTIC_AkcssBaseTheme,
+                [$"Theme inheritance cycle: {string.Join(" -> ", cycle.Select(static item => item.Name))}."],
+                relatedSyntax: cycle.SelectAsArray(static item => (AkburaSyntax)item.DeclarationSyntax))]);
         }
 
         context = context with { SubjectTemplate = effectiveTemplate };
@@ -92,33 +85,78 @@ internal sealed partial class AkcssStyleBinder
     }
 
     private static (AkcssTemplateContext? Template, ImmutableArray<AkcssThemeSymbol> Cycle)
-        FindInheritedAkcssTemplate(AkcssThemeSymbol derived, AkcssThemeSymbol firstBase)
+        GetEffectiveAkcssTemplate(AkcssThemeSymbol owner, AkcssTemplateDirectiveSyntax? directive,
+            AkcssTemplateContext? local, AkcssBaseThemeData? baseTheme)
     {
-        var chain = ImmutableArray.CreateBuilder<AkcssThemeSymbol>();
-        var seen = new HashSet<AkcssThemeSymbol> { derived };
-        chain.Add(derived);
-        AkcssTemplateContext? inherited = null;
-        var foundTemplate = false;
-        for (AkcssThemeSymbol? current = firstBase; current is not null;)
+        if (baseTheme?.SourceTheme is not { } source)
         {
-            chain.Add(current);
-            if (!seen.Add(current))
-            {
-                return (null, chain.ToImmutable());
-            }
-
-            if (!foundTemplate && current.DeclarationSyntax.Members.OfType<AkcssTemplateDirectiveSyntax>().FirstOrDefault() is { } template)
-            {
-                foundTemplate = true;
-                inherited = DescribeAkcssTemplate(current, template).Template;
-            }
-
-            var directive = current.DeclarationSyntax.Members.OfType<AkcssBasedOnDirectiveSyntax>().FirstOrDefault();
-            var next = BindAkcssBaseReference(current, directive);
-            current = next.Diagnostics.IsEmpty ? next.Data?.SourceTheme : null;
+            return (local, []);
         }
 
-        return (inherited, []);
+        var (inherited, cycle) = FindInheritedAkcssTemplate(owner, source);
+        return (directive is null ? inherited : local, cycle);
+    }
+
+    private static (AkcssTemplateContext? Template, ImmutableArray<AkcssThemeSymbol> Cycle)
+        FindInheritedAkcssTemplate(AkcssThemeSymbol derived, AkcssThemeSymbol firstBase)
+    {
+        var chain = ArrayBuilder<AkcssThemeSymbol>.GetInstance();
+        var seen = PooledHashSet<AkcssThemeSymbol>.GetInstance();
+        try
+        {
+            seen.Add(derived);
+            chain.Add(derived);
+            AkcssTemplateContext? inherited = null;
+            var foundTemplate = false;
+            for (AkcssThemeSymbol? current = firstBase; current is not null;)
+            {
+                chain.Add(current);
+                if (!seen.Add(current))
+                {
+                    return (null, chain.ToImmutable());
+                }
+
+                GetThemeDirectives(current.DeclarationSyntax, out var baseDirective, out var template);
+                if (!foundTemplate && template is not null)
+                {
+                    foundTemplate = true;
+                    inherited = DescribeAkcssTemplate(current, template).Template;
+                }
+
+                var next = BindAkcssBaseReference(current, baseDirective);
+                current = next.Diagnostics.IsEmpty ? next.Data?.SourceTheme : null;
+            }
+
+            return (inherited, []);
+        }
+        finally
+        {
+            seen.Free();
+            chain.Free();
+        }
+    }
+
+    private static void GetThemeDirectives(AkcssThemeDeclarationSyntax theme,
+        out AkcssBasedOnDirectiveSyntax? baseDirective, out AkcssTemplateDirectiveSyntax? template)
+    {
+        baseDirective = null;
+        template = null;
+        foreach (var member in theme.Members)
+        {
+            if (member is AkcssBasedOnDirectiveSyntax basedOn)
+            {
+                baseDirective ??= basedOn;
+            }
+            else if (member is AkcssTemplateDirectiveSyntax local)
+            {
+                template ??= local;
+            }
+
+            if (baseDirective is not null && template is not null)
+            {
+                break;
+            }
+        }
     }
 
     private static (AkcssBaseThemeData? Data, ImmutableArray<AkburaSemanticDiagnostic> Diagnostics)
@@ -142,7 +180,7 @@ internal sealed partial class AkcssStyleBinder
             if (matches.Length > 1)
             {
                 return (null, [Error($"The source theme '{candidate}' is ambiguous.",
-                    matches.Select(static match => (AkburaSyntax)match.DeclarationSyntax).ToImmutableArray())]);
+                    matches.SelectAsArray(static match => (AkburaSyntax)match.DeclarationSyntax))]);
             }
 
             if (matches.Length == 1)
@@ -229,9 +267,24 @@ internal sealed partial class AkcssStyleBinder
                 ["A control template requires a theme target derived from TemplatedControl."]));
         }
 
-        var roots = directive.Body.Content.Where(static content =>
-            content is not MarkupTextLiteralSyntax || !string.IsNullOrWhiteSpace(content.ToFullString())).ToImmutableArray();
-        if (roots.Length != 1 || roots[0] is not MarkupElementContentSyntax { Element: { } root })
+        AkburaSyntax? rootContent = null;
+        foreach (var content in directive.Body.Content)
+        {
+            if (content is MarkupTextLiteralSyntax && string.IsNullOrWhiteSpace(content.ToFullString()))
+            {
+                continue;
+            }
+
+            if (rootContent is not null)
+            {
+                rootContent = null;
+                break;
+            }
+
+            rootContent = content;
+        }
+
+        if (rootContent is not MarkupElementContentSyntax { Element: { } root })
         {
             diagnostics.Add(new AkburaSemanticDiagnostic(directive.Body, ErrorCodes.AKBURA_SEMANTIC_AkcssTemplate,
                 ["A control template requires exactly one markup element as its root."]));

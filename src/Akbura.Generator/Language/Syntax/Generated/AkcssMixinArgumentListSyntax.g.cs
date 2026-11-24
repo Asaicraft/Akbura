@@ -190,7 +190,7 @@ namespace Akbura.Language.Syntax
         }
 
         public SyntaxToken CloseParen =>
-            new(this, Green.CloseParen, GetChildPositionFromEnd(1), GetChildIndex(2));
+            new(this, Green.CloseParen, GetChildPositionFromEnd(2), GetChildIndex(2));
 
         public AkcssMixinArgumentListSyntax UpdateAkcssMixinArgumentListSyntax(
             SyntaxToken openParen,

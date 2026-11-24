@@ -513,11 +513,8 @@ internal sealed class AkburaCompletionSource :
                 syntacticDocument.GetAkcssCompletionContext(
                     position,
                     requestToken);
-            var isAkcssRegion =
-                isAkcss ||
-                syntacticDocument.TryGetAkcssCompletionRegion(
-                    position,
-                    out _);
+            var isAkcssRegion = (isAkcss || syntacticDocument.TryGetAkcssCompletionRegion(position, out _)) &&
+                (!akcssContext.IsDefault || syntacticDocument.GetAkcssMarkupTemplate(position) is null);
             var syntaxContext = isAkcssRegion
                 ? default
                 : syntacticDocument.GetCompletionContext(

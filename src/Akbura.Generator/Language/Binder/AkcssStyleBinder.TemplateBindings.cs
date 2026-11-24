@@ -1,6 +1,7 @@
 using Akbura.Language.BoundTree;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
+using Akbura.Pools;
 using Microsoft.CodeAnalysis;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -11,6 +12,24 @@ namespace Akbura.Language.Binder;
 
 internal sealed partial class AkcssStyleBinder
 {
+    private static readonly ObjectPool<Dictionary<RoslynSymbol, AkburaSyntax>> s_akcssConfigurationPool =
+        new(static () => new(SymbolEqualityComparer.Default));
+
+    internal static Dictionary<RoslynSymbol, AkburaSyntax> RentAkcssConfigurationMap() => s_akcssConfigurationPool.Allocate();
+
+    internal static void FreeAkcssConfigurationMap(Dictionary<RoslynSymbol, AkburaSyntax> configured)
+    {
+        if (configured.Count <= 64)
+        {
+            configured.Clear();
+            s_akcssConfigurationPool.Free(configured);
+        }
+        else
+        {
+            s_akcssConfigurationPool.ForgetTrackedObject(configured);
+        }
+    }
+
     internal BoundNode BindMisplacedAkcssMarkupConfiguration(AkburaSyntax syntax, AkburaSyntax declaration)
     {
         var symbolInfo = SemanticModel.GetDeclarationSymbolInfo(declaration);
@@ -34,7 +53,50 @@ internal sealed partial class AkcssStyleBinder
             return [];
         }
 
-        var context = CreateAkcssContext(owner) with
+        var context = EnterAkcssElement(CreateAkcssContext(owner), element);
+        var results = ArrayBuilder<BoundNode>.GetInstance();
+        var configured = RentAkcssConfigurationMap();
+        var diagnostics = ArrayBuilder<AkburaSemanticDiagnostic>.GetInstance();
+        try
+        {
+            AddAkcssAttributeConfigurations(element, configured);
+            foreach (var member in element.Body)
+            {
+                var bound = member switch
+                {
+                    MarkupIncludeDirectiveSyntax include => BindAkcssInclude(include, include.Directive, context),
+                    MarkupTemplateBindDirectiveSyntax binding => BindAkcssTemplateBinding(binding, binding.Directive, context),
+                    _ => null,
+                };
+                if (bound is null)
+                {
+                    continue;
+                }
+
+                CollectAkcssConfigurations(bound, configured, diagnostics);
+                if (diagnostics.Count > 0)
+                {
+                    bound = bound.WithDiagnostics(bound.Diagnostics.AddRange(diagnostics));
+                    diagnostics.Clear();
+                }
+
+                PublishAkcssContextualTree(bound);
+                results.Add(bound);
+            }
+
+            return results.ToImmutable();
+        }
+        finally
+        {
+            diagnostics.Free();
+            FreeAkcssConfigurationMap(configured);
+            results.Free();
+        }
+    }
+
+    private AkcssBindingContext EnterAkcssElement(AkcssBindingContext enclosing, MarkupElementSyntax element)
+    {
+        var context = enclosing with
         {
             OwningElement = element,
             IsMixinDefinition = false,
@@ -44,7 +106,7 @@ internal sealed partial class AkcssStyleBinder
                 ? new AkcssReceiver(new CSharpSymbolDefinition(type), AkcssReceiverOrigin.MarkupElement, element)
                 : default,
         };
-        if (owner is AkcssThemeSymbol theme &&
+        if (enclosing.Owner is AkcssThemeSymbol theme &&
             AkcssSemanticFacts.FindTemplate(element) is { } template &&
             ReferenceEquals(template.Parent, theme.DeclarationSyntax) &&
             !SemanticModel.BindingSession.MarkupTemplateContent.IsInsideDeferredContent(element))
@@ -52,90 +114,97 @@ internal sealed partial class AkcssStyleBinder
             context = context with { ActiveTemplate = DescribeAkcssTemplate(theme, template).Template };
         }
 
-        var results = ImmutableArray.CreateBuilder<BoundNode>();
-        var configured = new Dictionary<RoslynSymbol, AkburaSyntax>(SymbolEqualityComparer.Default);
-        if (element.StartTag is { } startTag)
-        {
-            foreach (var attribute in startTag.Attributes)
-            {
-                if (SemanticModel.GetSymbolInfo(attribute).Symbol is Symbols.IPropertySymbol property &&
-                    GetAkcssConfigurationIdentity(property) is { } identity && !configured.ContainsKey(identity))
-                {
-                    configured.Add(identity, attribute);
-                }
-            }
-        }
+        return context;
+    }
 
+    internal void CollectOtherConfiguredAkcssProperties(
+        AkcssBindingContext context, MarkupElementSyntax element, AkcssTemplateBindSyntax editing,
+        Dictionary<RoslynSymbol, AkburaSyntax> configured)
+    {
+        AddAkcssAttributeConfigurations(element, configured);
         foreach (var member in element.Body)
         {
             var bound = member switch
             {
                 MarkupIncludeDirectiveSyntax include => BindAkcssInclude(include, include.Directive, context),
-                MarkupTemplateBindDirectiveSyntax binding => BindAkcssTemplateBinding(binding, binding.Directive, context),
+                MarkupTemplateBindDirectiveSyntax binding when !ReferenceEquals(editing, binding.Directive) =>
+                    BindAkcssTemplateBinding(binding, binding.Directive, context),
                 _ => null,
             };
-            if (bound is null)
+            if (bound is not null)
             {
-                continue;
+                CollectAkcssConfigurations(bound, configured, diagnostics: null);
             }
+        }
+    }
 
-            var diagnostics = ImmutableArray.CreateBuilder<AkburaSemanticDiagnostic>();
-            CollectAkcssConfigurations(bound, configured, diagnostics);
-            if (diagnostics.Count > 0)
-            {
-                bound = bound.WithDiagnostics(bound.Diagnostics.AddRange(diagnostics));
-            }
-
-            PublishAkcssContextualTree(bound);
-            results.Add(bound);
+    private void AddAkcssAttributeConfigurations(MarkupElementSyntax element, Dictionary<RoslynSymbol, AkburaSyntax> configured)
+    {
+        if (element.StartTag is not { } tag)
+        {
+            return;
         }
 
-        return results.ToImmutable();
+        foreach (var attribute in tag.Attributes)
+        {
+            if (SemanticModel.GetSymbolInfo(attribute).Symbol is Symbols.IPropertySymbol property &&
+                GetAkcssConfigurationIdentity(property) is { } identity && !configured.ContainsKey(identity))
+            {
+                configured.Add(identity, attribute);
+            }
+        }
     }
 
     private BoundAkcssContextual BindAkcssTemplateBinding(
         AkburaSyntax site, AkcssTemplateBindSyntax directive, AkcssBindingContext context)
     {
         var properties = ImmutableArray.CreateBuilder<AkcssTemplateBindingProperty>(directive.PropertyNames.Count);
-        var diagnostics = ImmutableArray.CreateBuilder<AkburaSemanticDiagnostic>();
-        var isDeferred = context.IsMixinDefinition && context.ActiveTemplate is null;
-        var receiver = context.PropertyReceiver.Symbol as INamedTypeSymbol;
-        var parent = context.ActiveTemplate?.TemplatedParentType.Symbol as INamedTypeSymbol;
-        var canBindDestination = receiver is not null && (context.OwningElement is not null || isDeferred);
-        if (!isDeferred && (!canBindDestination || parent is null))
+        var diagnostics = ArrayBuilder<AkburaSemanticDiagnostic>.GetInstance();
+        try
         {
-            diagnostics.Add(CreateContextDiagnostic(site, context, ErrorCodes.AKBURA_SEMANTIC_AkcssTemplateBinding,
-                "Template binding requires an owning markup element and a typed control-template parent."));
-        }
-
-        foreach (var nameSyntax in directive.PropertyNames)
-        {
-            var name = nameSyntax.ToFullString().Trim();
-            Symbols.IPropertySymbol? destination = null;
-            Symbols.IPropertySymbol? source = null;
-            if (canBindDestination && !SemanticModel.TryGetAkcssPropertyReference(name, receiver!, context.Owner, out destination))
+            var isDeferred = context.IsMixinDefinition && context.ActiveTemplate is null;
+            var receiver = context.PropertyReceiver.Symbol as INamedTypeSymbol;
+            var parent = context.ActiveTemplate?.TemplatedParentType.Symbol as INamedTypeSymbol;
+            var canBindDestination = receiver is not null && (context.OwningElement is not null || isDeferred);
+            if (!isDeferred && (!canBindDestination || parent is null))
             {
-                diagnostics.Add(CreateContextDiagnostic(nameSyntax, context, ErrorCodes.AKBURA_SEMANTIC_AkcssTemplateBinding,
-                    $"'{receiver!.Name}' does not provide destination Avalonia property '{name}'."));
+                diagnostics.Add(CreateContextDiagnostic(site, context, ErrorCodes.AKBURA_SEMANTIC_AkcssTemplateBinding,
+                    "Template binding requires an owning markup element and a typed control-template parent."));
             }
 
-            if (parent is not null && !SemanticModel.TryGetAkcssPropertyReference(name, parent, context.Owner, out source))
+            foreach (var nameSyntax in directive.PropertyNames)
             {
-                diagnostics.Add(CreateContextDiagnostic(nameSyntax, context, ErrorCodes.AKBURA_SEMANTIC_AkcssTemplateBinding,
-                    $"Templated parent '{parent.Name}' does not provide source Avalonia property '{name}'."));
+                var name = nameSyntax.ToFullString().Trim();
+                Symbols.IPropertySymbol? destination = null;
+                Symbols.IPropertySymbol? source = null;
+                if (canBindDestination && !SemanticModel.TryGetAkcssPropertyReference(name, receiver!, context.Owner, out destination))
+                {
+                    diagnostics.Add(CreateContextDiagnostic(nameSyntax, context, ErrorCodes.AKBURA_SEMANTIC_AkcssTemplateBinding,
+                        $"'{receiver!.Name}' does not provide destination Avalonia property '{name}'."));
+                }
+
+                if (parent is not null && !SemanticModel.TryGetAkcssPropertyReference(name, parent, context.Owner, out source))
+                {
+                    diagnostics.Add(CreateContextDiagnostic(nameSyntax, context, ErrorCodes.AKBURA_SEMANTIC_AkcssTemplateBinding,
+                        $"Templated parent '{parent.Name}' does not provide source Avalonia property '{name}'."));
+                }
+
+                properties.Add(new AkcssTemplateBindingProperty(nameSyntax, source, destination));
             }
 
-            properties.Add(new AkcssTemplateBindingProperty(nameSyntax, source, destination));
+            return new BoundAkcssContextual(BoundKind.AkcssTemplateBinding, site, this, context,
+                new AkcssTemplateBindingData(context.ActiveTemplate, context.OwningElement, properties.MoveToImmutable(), isDeferred),
+                AkburaSymbolInfo.None(CandidateReason.None), diagnostics.ToImmutable(), hasErrors: directive.ContainsDiagnostics);
         }
-
-        return new BoundAkcssContextual(BoundKind.AkcssTemplateBinding, site, this, context,
-            new AkcssTemplateBindingData(context.ActiveTemplate, context.OwningElement, properties.MoveToImmutable(), isDeferred),
-            AkburaSymbolInfo.None(CandidateReason.None), diagnostics.ToImmutable(), hasErrors: directive.ContainsDiagnostics);
+        finally
+        {
+            diagnostics.Free();
+        }
     }
 
     private static void CollectAkcssConfigurations(
         BoundNode node, Dictionary<RoslynSymbol, AkburaSyntax> configured,
-        ImmutableArray<AkburaSemanticDiagnostic>.Builder diagnostics)
+        ArrayBuilder<AkburaSemanticDiagnostic>? diagnostics)
     {
         if (node is BoundAkcssContextual bound)
         {
@@ -171,7 +240,7 @@ internal sealed partial class AkcssStyleBinder
 
             if (configured.TryGetValue(identity, out var previous))
             {
-                diagnostics.Add(CreateContextDiagnostic(syntax, context, ErrorCodes.AKBURA_SEMANTIC_AkcssTemplateBinding,
+                diagnostics?.Add(CreateContextDiagnostic(syntax, context, ErrorCodes.AKBURA_SEMANTIC_AkcssTemplateBinding,
                     $"Property '{property.Name}' is configured more than once on this element.", previous));
             }
             else

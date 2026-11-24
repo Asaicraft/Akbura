@@ -468,7 +468,7 @@ internal sealed partial class CSharpProbeBuilder
         }
 
         if (sourceNode.FullSpan.Length == 0 &&
-            normalizedNode.Parent is CSharp.UsingDirectiveSyntax)
+            normalizedNode.Parent is CSharp.UsingDirectiveSyntax or CSharp.ReturnStatementSyntax)
         {
             var separatorTrivia = normalizedLeadingTrivia.Count != 0
                 ? normalizedLeadingTrivia
@@ -503,8 +503,7 @@ internal sealed partial class CSharpProbeBuilder
         if (relativePosition < 0 ||
             relativePosition > sourceExpression.FullSpan.Length)
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(relativePosition));
+            throw new ArgumentOutOfRangeException(nameof(relativePosition));
         }
 
         // Keep incomplete user code out of NormalizeWhitespace().
@@ -533,8 +532,8 @@ internal sealed partial class CSharpProbeBuilder
     private static CSharpProbeProjection CreateProjectionResult(CSharp.CompilationUnitSyntax root, SyntaxNode projectedNode, SyntaxAnnotation annotation, int relativePosition)
     {
         var stateNames = GetStateNames(root);
-        using var symbolOrigins =
-            ImmutableArrayBuilder<CSharpProbeSymbolOrigin>.Rent();
+        using var symbolOrigins = ImmutableArrayBuilder<CSharpProbeSymbolOrigin>.Rent();
+
         foreach (var node in root.GetAnnotatedNodes(CSharpProbeBinder.ProjectedSymbolAnnotationKind))
         {
             foreach (var symbolAnnotation in node.GetAnnotations(CSharpProbeBinder.ProjectedSymbolAnnotationKind))
@@ -602,11 +601,10 @@ internal sealed partial class CSharpProbeBuilder
 
     internal static ImmutableArray<CSharp.StatementSyntax> GetPrecedingLocalDeclarations(AkburaSyntax scope)
     {
-        using var builder =
-            ImmutableArrayBuilder<CSharp.StatementSyntax>.Rent();
-        AddPrecedingLocalDeclarations(
-            scope,
-            builder);
+        using var builder = ImmutableArrayBuilder<CSharp.StatementSyntax>.Rent();
+
+        AddPrecedingLocalDeclarations(scope, builder);
+
         return builder.ToImmutable();
     }
 
@@ -618,9 +616,8 @@ internal sealed partial class CSharpProbeBuilder
             return;
         }
 
-        AddPrecedingLocalDeclarations(
-            parent,
-            builder);
+        AddPrecedingLocalDeclarations(parent, builder);
+
         if (parent is AkburaDocumentSyntax document)
         {
             AddPrecedingLocalDeclarationsFromList(

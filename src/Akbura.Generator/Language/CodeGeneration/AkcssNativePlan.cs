@@ -51,6 +51,8 @@ internal sealed class AkcssNativeNames(IEnumerable<string> reserved)
     private readonly HashSet<string> _used = new(reserved, StringComparer.Ordinal);
     private int _next;
 
+    public void Reserve(string name) => _used.Add(name);
+
     public string Allocate(string prefix)
     {
         string name;

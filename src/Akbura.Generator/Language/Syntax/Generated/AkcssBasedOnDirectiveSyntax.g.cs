@@ -235,7 +235,7 @@ namespace Akbura.Language.Syntax
             (CSharpExpressionSyntax)GetRed(ref _expression, 4)!;
 
         public SyntaxToken Semicolon =>
-            new(this, Green.Semicolon, GetChildPositionFromEnd(1), GetChildIndex(5));
+            new(this, Green.Semicolon, GetChildPositionFromEnd(5), GetChildIndex(5));
 
         public AkcssBasedOnDirectiveSyntax UpdateAkcssBasedOnDirectiveSyntax(
             SyntaxToken atToken,

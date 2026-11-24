@@ -61,6 +61,14 @@ using HelloWorld;
 
 `global::HelloWorld.Hello.MyTheme` and `HelloWorld.Hello.MyTheme` also resolve in C# expressions. The theme property caches its definition. Avalonia builds a new presenter and name scope for each button. The presenter follows the button's properties through one-way template bindings. Native state styles override the template background while active.
 
+## Edit themes and mixins
+
+The editor offers AKCSS directives in rule bodies and switches to markup completion inside `@template`. In a selector such as `^ /template/ ContentPresenter#PART_ContentPresenter`, property completion uses `ContentPresenter`. Hover over `@template-bind` entries to see the templated parent's source property and the element's destination property.
+
+Signature help on a mixin call shows the declared receiver, arguments, and defaults. Go to Definition follows includes, source-theme inheritance, and known template parts to their original declarations. C# accesses to an exported theme also navigate to the original AKCSS theme.
+
+Rename supports source mixins, mixin parameters, local themes, and unambiguous template parts. Exported themes require cross-language rename because ordinary C# files can refer to them. Template-binding shorthand denotes two endpoints and uses the destination for Go to Definition.
+
 ## Install native rules
 
 ```csharp

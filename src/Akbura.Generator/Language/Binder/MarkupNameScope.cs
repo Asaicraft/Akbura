@@ -65,13 +65,16 @@ internal sealed class MarkupNameScope
                 var declaration = MarkupNameDeclaration.Create(
                     element,
                     attachedAttribute,
+                    owner,
                     originalDeclaration: null);
+
                 if (declaration.IsValid &&
                     scope.DeclarationsByName.TryGetValue(declaration.Name, out var originalDeclaration))
                 {
                     declaration = MarkupNameDeclaration.Create(
                         element,
                         attachedAttribute,
+                        owner,
                         originalDeclaration);
                 }
                 else if (declaration.IsValid)

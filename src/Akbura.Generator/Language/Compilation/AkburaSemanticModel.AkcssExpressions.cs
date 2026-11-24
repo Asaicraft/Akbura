@@ -1,5 +1,8 @@
+using Akbura.Collections;
 using Akbura.Language.Binder;
 using Akbura.Language.Operations;
+using Akbura.Language.Syntax;
+using Microsoft.CodeAnalysis.Text;
 using Akbura.Language.Symbols;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -99,9 +102,8 @@ internal abstract partial class AkburaSemanticModel
                 CSharp.IdentifierNameSyntax identifier => identifier,
                 _ => null,
             };
-            if (name is null || !binding.CandidateSymbols.OfType<IMethodSymbol>().Any(candidate =>
-                    GetRealAkcssAmxMethod(candidate, out var candidateKind) is not null &&
-                    candidateKind is AkcssAmxInvocationKind.StaticResource or AkcssAmxInvocationKind.DynamicResource))
+            if (name is null || !binding.CandidateSymbols.Any(
+                    static (candidate, model) => model.IsAkcssResourceMethod(candidate as IMethodSymbol), this))
             {
                 return false;
             }
@@ -138,30 +140,15 @@ internal abstract partial class AkburaSemanticModel
 
         var key = keyOperation is null ? default : new CSharpOperationDefinition(keyOperation);
         var typeArgument = method.TypeArguments.Length == 1 ? new CSharpSymbolDefinition(method.TypeArguments[0]) : default;
-        value = new AkcssAmxInvocationValue(kind,
-            typeArgument, invocation.ArgumentList.Arguments.Select(static argument => argument.Expression).ToImmutableArray(),
-            method, key);
-        return true;
-
-        IMethodSymbol? GetRealAkcssAmxMethod(IMethodSymbol? candidate, out AkcssAmxInvocationKind candidateKind)
+        var sourceArguments = invocation.ArgumentList.Arguments;
+        var arguments = ImmutableArray.CreateBuilder<CSharp.ExpressionSyntax>(sourceArguments.Count);
+        foreach (var argument in sourceArguments)
         {
-            candidateKind = AkcssAmxInvocationKind.None;
-            if (candidate is not { IsStatic: true, Arity: 1 } ||
-                Compilation.CSharpCompilation.GetTypeByMetadataName("Akbura.Amx") is not { ContainingAssembly.Name: "Akbura" } amx ||
-                !SymbolEqualityComparer.Default.Equals(candidate.ContainingType, amx))
-            {
-                return null;
-            }
-
-            candidateKind = candidate.Name switch
-            {
-                "DynamicResource" => AkcssAmxInvocationKind.DynamicResource,
-                "StaticResource" => AkcssAmxInvocationKind.StaticResource,
-                "Extend" => AkcssAmxInvocationKind.Extend,
-                _ => AkcssAmxInvocationKind.None,
-            };
-            return candidateKind == AkcssAmxInvocationKind.None ? null : candidate;
+            arguments.Add(argument.Expression);
         }
+
+        value = new AkcssAmxInvocationValue(kind, typeArgument, arguments.MoveToImmutable(), method, key);
+        return true;
 
         static IInvocationOperation? GetInvocation(CSharpBindingResult result)
         {
@@ -182,6 +169,110 @@ internal abstract partial class AkburaSemanticModel
             }
         }
     }
+
+    private static IMethodSymbol? GetRealAkcssAmxMethod(IMethodSymbol? candidate, out AkcssAmxInvocationKind candidateKind)
+    {
+        candidateKind = AkcssAmxInvocationKind.None;
+        // A source symbol from a probe has a different identity in the original compilation.
+        if (candidate is not { IsStatic: true, Arity: 1, ContainingAssembly: { Name: "Akbura" } assembly } ||
+            !SymbolEqualityComparer.Default.Equals(candidate.ContainingType, assembly.GetTypeByMetadataName("Akbura.Amx")))
+        {
+            return null;
+        }
+
+        candidateKind = candidate.Name switch
+        {
+            "DynamicResource" => AkcssAmxInvocationKind.DynamicResource,
+            "StaticResource" => AkcssAmxInvocationKind.StaticResource,
+            "Extend" => AkcssAmxInvocationKind.Extend,
+            _ => AkcssAmxInvocationKind.None,
+        };
+        return candidateKind == AkcssAmxInvocationKind.None ? null : candidate;
+    }
+
+    internal bool TryGetAmxResourceKey(CSharpExpressionSyntax expression, int position,
+        out TextSpan span, out ITypeSymbol? expectedType, CancellationToken cancellationToken)
+    {
+        span = default;
+        expectedType = null;
+        if (!EmbeddedCSharpSyntaxFacts.TryGetExpression(expression, out var source, out var host) ||
+            position < host.Start || position > host.End)
+        {
+            return false;
+        }
+
+        var local = position - host.Start + source.FullSpan.Start;
+        CSharp.InvocationExpressionSyntax? candidate = null;
+        foreach (var node in source.DescendantNodesAndSelf())
+        {
+            if (node is CSharp.InvocationExpressionSyntax call && call.ArgumentList.Arguments.Count != 0 &&
+                call.ArgumentList.Arguments[0].Expression is CSharp.LiteralExpressionSyntax literal &&
+                literal.Token.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.StringLiteralToken) &&
+                literal.Span.Start < local && local <= literal.Span.End)
+            {
+                candidate = call;
+            }
+        }
+
+        if (candidate?.ArgumentList.Arguments[0].Expression is not CSharp.LiteralExpressionSyntax key ||
+            !key.Token.Text.StartsWith("\"", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var projection = CreateCSharpCompletionProjection(expression, position - host.Start);
+        var model = CreateReferenceProbeSemanticModel(projection.Root, out var tree);
+        var root = tree.GetRoot(cancellationToken);
+        var projectedStart = projection.ProjectedSpan.Start + candidate.Span.Start - source.FullSpan.Start;
+        CSharp.InvocationExpressionSyntax? invocation = null;
+        for (var node = root.FindToken(projectedStart).Parent; node is not null; node = node.Parent)
+        {
+            if (node is CSharp.InvocationExpressionSyntax call &&
+                call.Span.Start == projectedStart && call.Span.Length == candidate.Span.Length)
+            {
+                invocation = call;
+                break;
+            }
+        }
+
+        if (invocation is null)
+        {
+            return false;
+        }
+
+        var info = model.GetSymbolInfo(invocation, cancellationToken);
+        var method = info.Symbol as IMethodSymbol ?? info.CandidateSymbols.FirstOrDefault(
+            static (symbol, model) => model.IsAkcssResourceMethod(symbol as IMethodSymbol), this) as IMethodSymbol;
+        if (!IsAkcssResourceMethod(method))
+        {
+            return false;
+        }
+
+        var start = host.Start + key.Token.SpanStart - source.FullSpan.Start + 1;
+        var end = start - 1 + key.Token.Span.Length;
+        if (key.Token.Text.Length > 1 && key.Token.Text.EndsWith("\"", StringComparison.Ordinal) && !key.ContainsDiagnostics)
+        {
+            end--;
+        }
+
+        if (position < start || position > end)
+        {
+            return false;
+        }
+
+        span = TextSpan.FromBounds(start, end);
+        expectedType = method!.TypeArguments[0] is { TypeKind: not TypeKind.TypeParameter and not TypeKind.Error } type
+            ? type
+            : GetAkcssEditorContext(expression) is { } context
+                ? GetAkcssExpressionExpectedType(expression, context)
+                : null;
+        return true;
+    }
+
+    private bool IsAkcssResourceMethod(IMethodSymbol? candidate) =>
+        GetRealAkcssAmxMethod(candidate, out var kind) is not null &&
+        kind is AkcssAmxInvocationKind.DynamicResource or AkcssAmxInvocationKind.StaticResource;
 
     internal bool TryGetAkcssPropertyReference(
         string name, INamedTypeSymbol receiver, IAkcssDeclarationOwner owner, out Symbols.IPropertySymbol property)

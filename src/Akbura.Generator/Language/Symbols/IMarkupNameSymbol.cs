@@ -11,4 +11,8 @@ internal interface IMarkupNameSymbol : ISymbol
     MarkupAttachedPropertyAttributeSyntax DeclarationSyntax { get; }
 
     MarkupElementSyntax ElementSyntax { get; }
+
+    AkburaSyntax ScopeOwner { get; }
+
+    string FilePath { get; }
 }

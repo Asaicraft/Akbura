@@ -1,3 +1,4 @@
+using Akbura.Language.Binder;
 using Akbura.Language.Symbols;
 using Akbura.Language.Syntax;
 using Akbura.Pools;
@@ -52,7 +53,7 @@ internal partial class AkburaSemanticModel
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var declaration = FindAkcssCompletionDeclaration(
+        var declaration = FindAkcssEditorSite(
             containingDeclarationSpan);
 
         if (declaration == null)
@@ -95,13 +96,10 @@ internal partial class AkburaSemanticModel
         out AkcssValueCompletionInfo info)
     {
         info = default;
-        var declaration = FindAkcssCompletionDeclaration(
+        var declaration = FindAkcssEditorSite(
             containingDeclarationSpan);
-        if (declaration == null ||
-            string.IsNullOrWhiteSpace(propertyReference) ||
-            !TryGetAkcssCompletionContainingSymbol(
-                declaration,
-                out var containingSymbol))
+        if (declaration == null || string.IsNullOrWhiteSpace(propertyReference) ||
+            GetAkcssEditorContext(declaration) is not { } context)
         {
             return false;
         }
@@ -117,27 +115,20 @@ internal partial class AkburaSemanticModel
         if (propertyName.Length == 0 ||
             !TryGetAkcssCompletionOwnerType(
                 declaration,
-                containingSymbol,
+                context,
                 qualifier,
                 out var ownerType))
         {
             return false;
         }
 
-        var appliedTargetType =
-            containingSymbol.TargetType.Symbol as ITypeSymbol;
-        if (appliedTargetType == null &&
-            TryGetDefaultAkcssStyleTargetType(
-                out var defaultTargetType))
-        {
-            appliedTargetType = defaultTargetType;
-        }
+        var appliedTargetType = context.PropertyReceiver.Symbol as ITypeSymbol;
 
         if (!TryCreateAkcssCompletionProperty(
                 ownerType,
                 propertyName,
                 appliedTargetType,
-                containingSymbol,
+                context.Owner,
                 preferAttached: qualifier.Length > 0,
                 out var property) ||
             !property.CanWrite)
@@ -145,9 +136,7 @@ internal partial class AkburaSemanticModel
             return false;
         }
 
-        info = new AkcssValueCompletionInfo(
-            containingSymbol,
-            property);
+        info = new AkcssValueCompletionInfo(context.Owner, property);
         return true;
     }
 
@@ -218,7 +207,7 @@ internal partial class AkburaSemanticModel
 
     internal ImmutableArray<AkcssExpectedValueLookupCandidate>
         LookupAkcssNamedColorsForCompletion(
-            IAkcssSymbol containingSymbol,
+            IAkcssDeclarationOwner containingSymbol,
             CancellationToken cancellationToken = default)
     {
         var colorsType = Compilation.CSharpCompilation
@@ -300,27 +289,14 @@ internal partial class AkburaSemanticModel
             bool requireReadable,
             CancellationToken cancellationToken)
     {
-        if (!TryGetAkcssCompletionContainingSymbol(
-                declaration,
-                out var containingSymbol) ||
-            !TryGetAkcssCompletionOwnerType(
-                declaration,
-                containingSymbol,
-                qualifier,
-                out var ownerType))
+        if (GetAkcssEditorContext(declaration) is not { } context ||
+            !TryGetAkcssCompletionOwnerType(declaration, context, qualifier, out var ownerType))
         {
-            return ImmutableArray<AkcssPropertyLookupCandidate>.Empty;
+            return [];
         }
 
-        var appliedTargetType =
-            containingSymbol.TargetType.Symbol as ITypeSymbol;
-        if (appliedTargetType == null &&
-            TryGetDefaultAkcssStyleTargetType(
-                out var defaultTargetType))
-        {
-            appliedTargetType = defaultTargetType;
-        }
-
+        var containingSymbol = context.Owner;
+        var appliedTargetType = context.PropertyReceiver.Symbol as ITypeSymbol;
         var names = PooledHashSet<string>.GetInstance();
         try
         {
@@ -388,7 +364,7 @@ internal partial class AkburaSemanticModel
     private void AddVisibleAttachedPropertiesForCompletion(
         ImmutableArrayBuilder<AkcssPropertyLookupCandidate> candidates,
         AkburaSyntax declaration,
-        IAkcssSymbol containingSymbol,
+        IAkcssDeclarationOwner containingSymbol,
         ITypeSymbol? appliedTargetType,
         bool requireReadable,
         CancellationToken cancellationToken)
@@ -682,15 +658,14 @@ internal partial class AkburaSemanticModel
 
     private bool TryGetAkcssCompletionOwnerType(
         AkburaSyntax declaration,
-        IAkcssSymbol containingSymbol,
+        AkcssBindingContext context,
         string qualifier,
         out INamedTypeSymbol ownerType)
     {
         if (string.IsNullOrWhiteSpace(qualifier))
         {
-            return TryGetAkcssPropertyOwner(
-                containingSymbol,
-                out ownerType);
+            ownerType = (context.PropertyReceiver.Symbol as INamedTypeSymbol)!;
+            return ownerType is not null;
         }
 
         ownerType = null!;
@@ -724,37 +699,35 @@ internal partial class AkburaSemanticModel
              current != null;
              current = current.BaseType)
         {
-            foreach (var property in current.GetMembers()
-                         .OfType<RoslynPropertySymbol>())
+            foreach (var member in current.GetMembers())
             {
-                if (!property.IsStatic &&
-                    property.DeclaredAccessibility ==
-                        Accessibility.Public &&
-                    property.Parameters.Length == 0)
+                if (member is RoslynPropertySymbol property)
                 {
-                    names.Add(property.Name);
+                    AddPropertyName(property);
                 }
-            }
-
-            foreach (var field in current.GetMembers()
-                         .OfType<RoslynFieldSymbol>())
-            {
-                AddAkcssPropertyFieldName(field, names);
+                else if (member is RoslynFieldSymbol field)
+                {
+                    AddAkcssPropertyFieldName(field, names);
+                }
             }
         }
 
         foreach (var @interface in ownerType.AllInterfaces)
         {
-            foreach (var property in @interface.GetMembers()
-                         .OfType<RoslynPropertySymbol>())
+            foreach (var member in @interface.GetMembers())
             {
-                if (!property.IsStatic &&
-                    property.DeclaredAccessibility ==
-                        Accessibility.Public &&
-                    property.Parameters.Length == 0)
+                if (member is RoslynPropertySymbol property)
                 {
-                    names.Add(property.Name);
+                    AddPropertyName(property);
                 }
+            }
+        }
+
+        void AddPropertyName(RoslynPropertySymbol property)
+        {
+            if (!property.IsStatic && property.DeclaredAccessibility == Accessibility.Public && property.Parameters.Length == 0)
+            {
+                names.Add(property.Name);
             }
         }
     }
@@ -779,7 +752,7 @@ internal partial class AkburaSemanticModel
         INamedTypeSymbol ownerType,
         string propertyName,
         ITypeSymbol? appliedTargetType,
-        IAkcssSymbol containingSymbol,
+        IAkcssDeclarationOwner containingSymbol,
         bool preferAttached,
         out PropertySymbol property)
     {

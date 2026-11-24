@@ -2,7 +2,32 @@
 @using Akbura;
 @using Avalonia;
 @using Avalonia.Controls;
+@using Avalonia.Controls.Presenters;
 @using Avalonia.Controls.Primitives;
+
+@mixin Button ButtonPresenterBackground(string resourceKey) {
+	^ /template/ ContentPresenter#PART_ContentPresenter {
+		Background: Amx.DynamicResource<IBrush>(resourceKey);
+	}
+}
+
+@mixin Button ButtonPresenterBorderBrush(string resourceKey) {
+	^ /template/ ContentPresenter#PART_ContentPresenter {
+		BorderBrush: Amx.DynamicResource<IBrush>(resourceKey);
+	}
+}
+
+@mixin Button ButtonPresenterBorderThickness(double width) {
+	^ /template/ ContentPresenter#PART_ContentPresenter {
+		BorderThickness: new Thickness(width);
+	}
+}
+
+@mixin Button ButtonPresenterForeground(string resourceKey) {
+	^ /template/ ContentPresenter#PART_ContentPresenter {
+		Foreground: Amx.DynamicResource<IBrush>(resourceKey);
+	}
+}
 
 @utilities {
 	// Sizing. Numeric values use the shared Tailwind spacing scale.
@@ -6619,5 +6644,117 @@
 
 	Border.shadow-(string size) {
 		BoxShadow: Amx.DynamicResource<BoxShadows>("--shadow-" + size);
+	}
+
+	// Button template visuals.
+	Button.presenter-bg-(string color) {
+		@include ButtonPresenterBackground("--color-" + color);
+	}
+
+	Button.presenter-bg-(string color)-(int shade) {
+		@include ButtonPresenterBackground("--color-" + color + "-" + shade);
+	}
+
+	Button.presenter-border {
+		@include ButtonPresenterBorderThickness(1d);
+	}
+
+	Button.presenter-border-(double width) {
+		@include ButtonPresenterBorderThickness(width);
+	}
+
+	Button.presenter-border-(string color)-(int shade) {
+		@include ButtonPresenterBorderBrush("--color-" + color + "-" + shade);
+	}
+
+	Button.presenter-border-transparent {
+		@include ButtonPresenterBorderBrush("--color-transparent");
+	}
+
+	Button.presenter-border-black {
+		@include ButtonPresenterBorderBrush("--color-black");
+	}
+
+	Button.presenter-border-white {
+		@include ButtonPresenterBorderBrush("--color-white");
+	}
+
+	Button.presenter-rounded-(string radius) {
+		^ /template/ ContentPresenter#PART_ContentPresenter {
+			CornerRadius: Amx.DynamicResource<CornerRadius>("--radius-" + radius);
+		}
+	}
+
+	Button.presenter-rounded-none {
+		^ /template/ ContentPresenter#PART_ContentPresenter {
+			CornerRadius: new CornerRadius(0d);
+		}
+	}
+
+	Button.presenter-rounded-full {
+		^ /template/ ContentPresenter#PART_ContentPresenter {
+			CornerRadius: new CornerRadius(9999d);
+		}
+	}
+
+	Button.presenter-padding-(double size) {
+		^ /template/ ContentPresenter#PART_ContentPresenter {
+			Padding: new Thickness(size);
+		}
+	}
+
+	Button.presenter-text-(string color) {
+		@include ButtonPresenterForeground("--color-" + color);
+	}
+
+	Button.presenter-text-(string color)-(int shade) {
+		@include ButtonPresenterForeground("--color-" + color + "-" + shade);
+	}
+
+	Button.presenter-shadow-(string size) {
+		^ /template/ ContentPresenter#PART_ContentPresenter {
+			BoxShadow: Amx.DynamicResource<BoxShadows>("--shadow-" + size);
+		}
+	}
+
+	// Alignment by axis.
+	Control.self-x-start {
+		HorizontalAlignment: Left;
+	}
+
+	Control.self-x-center {
+		HorizontalAlignment: Center;
+	}
+
+	Control.self-x-end {
+		HorizontalAlignment: Right;
+	}
+
+	Control.self-x-auto {
+		HorizontalAlignment: Stretch;
+	}
+
+	Control.self-x-stretch {
+		HorizontalAlignment: Stretch;
+	}
+
+	Control.self-y-start {
+		VerticalAlignment: Top;
+	}
+
+	Control.self-y-center {
+		VerticalAlignment: Center;
+	}
+
+	Control.self-y-end {
+		VerticalAlignment: Bottom;
+	}
+
+	Control.self-y-auto {
+		VerticalAlignment: Stretch;
+	}
+
+	Control.self-y-stretch {
+		VerticalAlignment: Stretch;
 	}
 }

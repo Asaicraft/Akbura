@@ -149,6 +149,30 @@ internal sealed partial class AkburaCompilation
         return Interlocked.CompareExchange(ref _lazyProbeCompilation, result, comparand: null) ?? result;
     }
 
+    internal AkcssThemeSymbol? FindSourceAkcssTheme(Microsoft.CodeAnalysis.ISymbol? symbol)
+    {
+        if (symbol is not Microsoft.CodeAnalysis.IPropertySymbol { IsStatic: true })
+        {
+            return null;
+        }
+
+        if (AkcssPublicExports.FindSourceTheme(this, symbol) is { } theme)
+        {
+            return theme;
+        }
+
+        foreach (var reference in CompilationReferences)
+        {
+            var compilation = reference.Compilation;
+            if (compilation.AkcssPublicExports.FindSourceTheme(compilation, symbol) is { } referencedTheme)
+            {
+                return referencedTheme;
+            }
+        }
+
+        return null;
+    }
+
     public ImmutableArray<AkburaSyntaxTree> SyntaxTrees => _syntaxAndDeclarations.SyntaxTrees;
 
     public ImmutableArray<AkcssSyntaxTree> AkcssSyntaxTrees => _syntaxAndDeclarations.AkcssSyntaxTrees;

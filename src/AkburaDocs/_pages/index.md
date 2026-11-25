@@ -12,6 +12,10 @@ summary: Learn how to build declarative, reactive Avalonia interfaces with Akbur
 | Binding | Full | Bindings are fully supported: both `ReflectionBinding` and `CompiledBinding` work, including `BindingPath` parsing, mode selection, converters, etc. |
 | TemplateContent | Full | Properties decorated with `[TemplateContent]` are automatically handled – Akbura generates an `IDeferredContent` implementation, so templates work out of the box. |
 
+## AKCSS control themes
+
+Use AKCSS to define native Avalonia control themes, share setters through typed mixins, and target named template parts with state selectors. See the [control theme guide](./akcss/native-styles-and-themes) or run the [interactive gallery example](https://asaicraft.github.io/Akbura/Gallery/akcss-themes/).
+
 ## Getting Started
 
 ::: warning Experimental
@@ -23,7 +27,7 @@ Akbura is under active development. Syntax, generated code, and runtime APIs may
 Install the current template package from NuGet:
 
 :::sh
-dotnet new install Akbura.Templates::12.0.4-beta.5
+dotnet new install Akbura.Templates::12.0.4-beta.7
 :::
 
 Create and run an Avalonia desktop application:
@@ -47,7 +51,7 @@ dotnet new akbura.app -n MyApp --di Splat.Locator
 Install Akbura into an existing Avalonia project:
 
 :::sh
-dotnet add package Akbura --version 12.0.4-beta.5
+dotnet add package Akbura --version 12.0.4-beta.7
 :::
 
 Then add `.UseAkbura()` to the existing `AppBuilder` chain in `Program.cs`,

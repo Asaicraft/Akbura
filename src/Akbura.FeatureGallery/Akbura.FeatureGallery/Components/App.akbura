@@ -71,6 +71,10 @@ state string currentUrl = out RouteSource.Url;
                                 <AkcssPage/>
                             </Page>
 
+                            <Page Url="/akcss-themes">
+                                <AkcssThemesPage/>
+                            </Page>
+
                             <Page Url="/utility-variants">
                                 <UtilityVariantsPage/>
                             </Page>

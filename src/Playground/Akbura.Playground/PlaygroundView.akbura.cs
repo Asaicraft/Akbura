@@ -50,6 +50,8 @@ public sealed partial class PlaygroundView : AkburaControl
         [
             new("Counter", "Preview.akbura"),
             new("Purity UI", "Examples/PurityUI/CreditCard.akbura"),
+            new("AKCSS control themes", "Examples/ControlThemes/ThemePreview.akbura",
+                "Examples/ControlThemes/ButtonThemes.akcss"),
         ];
         InitializeIfNeeded();
         ExampleSelector.ItemsSource = _examples;

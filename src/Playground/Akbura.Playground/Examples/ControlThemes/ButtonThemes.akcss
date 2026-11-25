@@ -1,0 +1,53 @@
+@using Avalonia;
+@using Avalonia.Controls;
+@using Avalonia.Controls.Presenters;
+@using Avalonia.Layout;
+@using Avalonia.Media;
+
+@mixin Button Surface(double radius, double horizontalPadding = 16d)
+{
+    BorderThickness: new Thickness(1);
+    CornerRadius: new CornerRadius(radius);
+    Foreground: Brushes.White;
+    HorizontalContentAlignment: HorizontalAlignment.Center;
+    Padding: new Thickness(horizontalPadding, 8);
+}
+
+@theme Button Primary
+{
+    @include Surface(8d);
+    Background: Brushes.Teal;
+    BorderBrush: Brushes.Aquamarine;
+
+    @template
+    {
+        <ContentPresenter x.Name="PART_ContentPresenter" RecognizesAccessKey={true}>
+            @template-bind Background, BorderBrush, BorderThickness, CornerRadius,
+                Content, ContentTemplate, Foreground, Padding,
+                HorizontalContentAlignment, VerticalContentAlignment;
+        </ContentPresenter>
+    }
+
+    ^:pointerover /template/ #PART_ContentPresenter
+    {
+        Background: Brushes.DarkCyan;
+    }
+
+    ^:pressed /template/ #PART_ContentPresenter
+    {
+        Background: Brushes.DarkSlateGray;
+    }
+
+    ^:focus-visible /template/ #PART_ContentPresenter
+    {
+        BorderBrush: Brushes.White;
+    }
+}
+
+@theme Button Secondary
+{
+    @based-on Primary;
+    @include Surface(8d, 20d);
+    Background: Brushes.SlateGray;
+    BorderBrush: Brushes.LightSlateGray;
+}

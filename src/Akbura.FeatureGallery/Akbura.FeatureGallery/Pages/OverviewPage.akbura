@@ -198,6 +198,9 @@ using Akbura.Markup;
 
         </FeatureView>
 
+        <Link Content="Explore AKCSS control themes"
+              Url="/akcss-themes"/>
+
     </StackPanel>
 
     <ViewThisPageInGithub/>

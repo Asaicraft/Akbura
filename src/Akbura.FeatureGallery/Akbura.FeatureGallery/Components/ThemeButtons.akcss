@@ -1,0 +1,73 @@
+@using Avalonia;
+@using Avalonia.Controls;
+@using Avalonia.Controls.Presenters;
+@using Avalonia.Layout;
+@using Avalonia.Media;
+
+@mixin Button ButtonAppearance(double radius, double horizontalPadding = 16d)
+{
+    BorderThickness: new Thickness(1);
+    CornerRadius: new CornerRadius(radius);
+    Foreground: Brushes.White;
+    HorizontalContentAlignment: HorizontalAlignment.Center;
+    Padding: new Thickness(horizontalPadding, 8);
+}
+
+@mixin ContentPresenter BindButtonProperties()
+{
+    @template-bind Background, BorderBrush, BorderThickness, CornerRadius,
+        Content, ContentTemplate, Foreground, Padding,
+        HorizontalContentAlignment, VerticalContentAlignment;
+}
+
+@theme Button Quiet
+{
+    @include ButtonAppearance(8d);
+    Background: Brushes.DarkSlateGray;
+    BorderBrush: Brushes.SlateGray;
+
+    @template
+    {
+        <ContentPresenter x.Name="PART_ContentPresenter" RecognizesAccessKey={true}>
+            @include BindButtonProperties();
+        </ContentPresenter>
+    }
+
+    ^:pointerover /template/ #PART_ContentPresenter
+    {
+        Background: Brushes.DarkCyan;
+    }
+
+    ^:pressed /template/ #PART_ContentPresenter
+    {
+        Background: Brushes.Teal;
+    }
+
+    ^:focus-visible /template/ #PART_ContentPresenter
+    {
+        BorderBrush: Brushes.White;
+    }
+
+    ^:disabled /template/ #PART_ContentPresenter
+    {
+        Opacity: 0.5d;
+    }
+}
+
+@theme Button Accent
+{
+    @based-on Quiet;
+    @include ButtonAppearance(8d, 20d);
+    Background: Brushes.RoyalBlue;
+    BorderBrush: Brushes.CornflowerBlue;
+
+    ^:pointerover /template/ #PART_ContentPresenter
+    {
+        Background: Brushes.DodgerBlue;
+    }
+
+    ^:pressed /template/ #PART_ContentPresenter
+    {
+        Background: Brushes.MidnightBlue;
+    }
+}

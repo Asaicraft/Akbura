@@ -30,6 +30,14 @@
       {
         "text": "Utility Variants",
         "link": "/akcss/utility-variants"
+      },
+      {
+        "text": "Native Styles and Control Themes",
+        "link": "/akcss/native-styles-and-themes"
+      },
+      {
+        "text": "Native Fragments in Utilities and Classes",
+        "link": "/akcss/native-application-fragments"
       }
     ]
   },

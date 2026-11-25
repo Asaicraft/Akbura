@@ -42,6 +42,9 @@ param string CurrentUrl = "";
             <Link Content="AKCSS"
                   Url="/akcss"/>
                   
+            <Link Content="AKCSS control themes"
+                  Url="/akcss-themes"/>
+
             <Link Content="Utility variants"
                   Url="/utility-variants"/>
 

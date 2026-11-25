@@ -21,7 +21,7 @@ Use .NET SDK 10.0.400 or later (Roslyn 5.9 or later).
 Install the current Akbura templates from NuGet:
 
 ```bash
-dotnet new install Akbura.Templates::12.0.4-beta.5
+dotnet new install Akbura.Templates::12.0.4-beta.7
 ```
 
 Create and run an Avalonia desktop application:
@@ -40,7 +40,7 @@ To add Akbura to an existing Avalonia project instead, install the package and
 create a component with the item template:
 
 ```bash
-dotnet add package Akbura --version 12.0.4-beta.5
+dotnet add package Akbura --version 12.0.4-beta.7
 dotnet new akbura.component -n Counter --namespace MyApp.Components -o Components
 ```
 

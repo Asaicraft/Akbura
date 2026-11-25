@@ -1,0 +1,29 @@
+using Akbura.Playground.Examples.ControlThemes;
+using Avalonia.Controls;
+
+state string message = "Choose a button to see its click action.";
+
+<StackPanel Margin="16" Spacing="14">
+
+    <TextBlock Text="AKCSS control themes"
+               FontSize="22"
+               FontWeight="SemiBold"
+               TextWrapping="Wrap"/>
+
+    <TextBlock Text={message} TextWrapping="Wrap"/>
+
+    <WrapPanel>
+
+        <Button Theme={ButtonThemes.Primary}
+                Content="Primary"
+                Click={message = "Primary button clicked."}
+                Margin="0,0,8,8"/>
+
+        <Button Theme={ButtonThemes.Secondary}
+                Content="Secondary"
+                Click={message = "Secondary button clicked."}
+                Margin="0,0,0,8"/>
+
+    </WrapPanel>
+
+</StackPanel>

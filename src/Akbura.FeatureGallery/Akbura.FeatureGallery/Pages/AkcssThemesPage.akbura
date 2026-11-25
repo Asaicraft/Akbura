@@ -1,0 +1,59 @@
+using Akbura.FeatureGallery.Models;
+using Akbura.FeatureGallery.Pages.Page.akcss;
+
+<StackPanel page ${md}:page-desktop>
+
+    <StackPanel page-header>
+        <TextBlock Text="AKCSS control themes"
+                   page-title ${md}:page-title-desktop whitespace-normal/>
+        <TextBlock Text="Build an Avalonia control theme from a reusable mixin, a template and native state selectors."
+                   page-description ${md}:page-description-desktop/>
+    </StackPanel>
+
+    <StackPanel page-section>
+
+        <StackPanel page-section-header>
+            <TextBlock Text="Two buttons with one template"
+                       page-section-title ${md}:page-section-title-desktop whitespace-normal/>
+            <TextBlock Text="Add a point to enable Reset. Hover over a button, hold it down, or use Tab to see its state styles."
+                       page-section-description/>
+        </StackPanel>
+
+        <FeatureView Path="Components/ThemeButtons.akcss + Components/ThemeButtonsDemo.akbura">
+            <FeatureView.Code>{ThemeButtonsDemoSource.Code}</FeatureView.Code>
+            <FeatureView.View><ThemeButtonsDemo/></FeatureView.View>
+        </FeatureView>
+
+    </StackPanel>
+
+    <StackPanel page-section>
+        <TextBlock Text="How the themes work"
+                   page-section-title ${md}:page-section-title-desktop whitespace-normal/>
+        <Grid page-grid-3 ${lg}:page-grid-3-desktop>
+            <Border page-card>
+                <StackPanel gap-3>
+                    <TextBlock Text="Bind the presenter" page-card-title whitespace-normal/>
+                    <TextBlock Text="The ContentPresenter receives the button's content, padding, brushes and border from @template-bind."
+                               page-card-description/>
+                </StackPanel>
+            </Border>
+            <Border page-cell-2 ${lg}:page-cell-2-desktop page-card>
+                <StackPanel gap-3>
+                    <TextBlock Text="Reuse the theme" page-card-title whitespace-normal/>
+                    <TextBlock Text="Accent inherits Quiet's template with @based-on. Both themes use the same typed mixin to set the corner radius and padding."
+                               page-card-description/>
+                </StackPanel>
+            </Border>
+            <Border page-cell-3 ${lg}:page-cell-3-desktop page-card-accent>
+                <StackPanel gap-3>
+                    <TextBlock Text="Style a state" page-card-title whitespace-normal/>
+                    <TextBlock Text="The ^:pointerover selector starts at the button and /template/ reaches its named presenter."
+                               page-card-description/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </StackPanel>
+
+    <ViewThisPageInGithub/>
+
+</StackPanel>

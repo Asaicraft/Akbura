@@ -1,0 +1,28 @@
+using Akbura.FeatureGallery.Components;
+using Avalonia.Controls;
+
+state int points = 0;
+
+<StackPanel Spacing="14">
+
+    <TextBlock Text={$"Score {points}"}
+               FontSize="24"
+               FontWeight="SemiBold"
+               Foreground="White"/>
+
+    <WrapPanel>
+
+        <Button Theme={ThemeButtons.Accent}
+                Content="Add a point"
+                Click={points++}
+                Margin="0,0,8,8"/>
+
+        <Button Theme={ThemeButtons.Quiet}
+                Content="Reset"
+                Click={points = 0}
+                IsEnabled={points > 0}
+                Margin="0,0,0,8"/>
+
+    </WrapPanel>
+
+</StackPanel>

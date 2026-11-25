@@ -108,9 +108,8 @@ dotnet new akbura.xplat -n DemoMobile `
 | `--no-restore` | Switch | Restore runs | Not available; no automatic restore |
 | `-page`, `--main-view-page-type` | `None`, `ContentPage`, `TabbedPage`, `DrawerPage`, `NavigationPage` | Not available | `None` |
 
-At the recorded source baseline, the defaults were Avalonia `12.0.4` and
-Akbura `12.0.4-beta.5`. Release automation stamps all application templates
-with the versions actually packed. Inspect `dotnet new akbura.mvvm --help` or
+Application templates default to the Akbura and Avalonia versions used to build
+the template package. Inspect `dotnet new akbura.mvvm --help` or
 `dotnet new akbura.xplat --help` for defaults of the installed package.
 
 `--mvvm` selects the ViewModel implementation; `--di` independently selects how

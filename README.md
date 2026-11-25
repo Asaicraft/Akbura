@@ -5,6 +5,7 @@
 [![Telegram](https://raw.githubusercontent.com/Patrolavia/telegram-badge/master/chat.svg)](https://t.me/akburaui)
 [![Documentation](https://img.shields.io/badge/documentation-Akbura-0ea5e9)](https://asaicraft.github.io/Akbura/)
 [![Gallery](https://img.shields.io/badge/gallery-Akbura-22c55e)](https://asaicraft.github.io/Akbura/Gallery/)
+[![Playground](https://img.shields.io/badge/playground-Akbura-7c3aed)](https://asaicraft.github.io/Akbura/Playground/)
 
 Akbura is an experimental declarative UI language and compiler for .NET and Avalonia, with reactive state and typed styling through AKCSS.
 

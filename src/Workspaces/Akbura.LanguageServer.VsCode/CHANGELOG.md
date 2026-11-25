@@ -1,5 +1,10 @@
 # Change Log
 
+## 12.0.19
+
+- Added AKCSS editing support for control themes, control templates, mixins, template bindings, and native Avalonia selectors.
+- Added context-aware completion, signature help for mixin calls, and navigation to themes and named template parts.
+
 ## 12.0.18
 
 - Reduced compiler and shared workspace allocations through pooling, symbol and metadata caches, and streaming symbol names.

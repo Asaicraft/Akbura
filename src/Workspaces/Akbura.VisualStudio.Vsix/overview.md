@@ -35,6 +35,11 @@ Visual Studio 2026 18.9 or later.
 The extension keeps its stable VSIX identity so installed copies receive future
 updates from the same Marketplace listing.
 
+## What's new in 12.0.4.20
+
+- Added AKCSS editing support for control themes, control templates, mixins, template bindings, and native Avalonia selectors.
+- Added context-aware completion, signature help for mixin calls, and navigation to themes and named template parts.
+
 ## What's new in 12.0.4.19
 
 - Open Akbura documents now refresh semantic diagnostics automatically when their project or a referenced project changes, including during project initialization and dependency restoration.

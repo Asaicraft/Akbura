@@ -157,9 +157,24 @@ jobs:
             --configuration Release \
             --no-build \
             --no-restore \
+            --filter 'FullyQualifiedName!~Akbura.UnitTests.AkburaBuildTargetsTests' \
             --logger "console;verbosity=normal" \
             --blame-hang \
             --blame-hang-timeout 2m
+
+      # These tests run several child builds, each with its own five-minute timeout.
+      - name: Test Akbura MSBuild integration
+        shell: bash
+        run: |
+          dotnet test "$TEST_PROJECT" \
+            --configuration Release \
+            --no-build \
+            --no-restore \
+            --disable-build-servers \
+            --filter 'FullyQualifiedName~Akbura.UnitTests.AkburaBuildTargetsTests' \
+            --logger "console;verbosity=normal" \
+            --blame-hang \
+            --blame-hang-timeout 10m
 
       - name: Pack Akbura
         shell: bash

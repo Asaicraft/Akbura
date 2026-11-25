@@ -446,23 +446,28 @@ public sealed partial class AkburaBuildTargetsTests
                 start.ArgumentList.Add(argument);
             }
 
+            // Persistent build servers can keep the redirected streams open after dotnet exits.
+            start.ArgumentList.Add("--disable-build-servers");
             start.Environment["DOTNET_CLI_UI_LANGUAGE"] = "en-US";
             start.Environment["MSBUILDDISABLENODEREUSE"] = "1";
             using var process = Process.Start(start)!;
-            var stdout = process.StandardOutput.ReadToEndAsync();
-            var stderr = process.StandardError.ReadToEndAsync();
             using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+            var stdout = process.StandardOutput.ReadToEndAsync(timeout.Token);
+            var stderr = process.StandardError.ReadToEndAsync(timeout.Token);
             try
             {
                 await process.WaitForExitAsync(timeout.Token);
+                return new ManifestBuildResult(process.ExitCode, await stdout + await stderr);
             }
-            catch
+            catch (OperationCanceledException exception) when (timeout.IsCancellationRequested)
             {
-                process.Kill(entireProcessTree: true);
-                throw;
-            }
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                }
 
-            return new ManifestBuildResult(process.ExitCode, await stdout + await stderr);
+                throw new TimeoutException($"dotnet {arguments[0]} did not complete and close its output streams within five minutes.", exception);
+            }
         }
 
         private void SaveProject()

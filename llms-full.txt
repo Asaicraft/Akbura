@@ -8302,6 +8302,203 @@ See also:
 - [Markup Extensions](akcss/markup-extensions)
 
 
+# Native styles and control themes
+Source: Akbura/akcss/native-styles-and-themes
+
+Standalone AKCSS files with native rules or named themes expose a C# facade. The project namespace and relative file path determine its name. For example, `Hello.akcss` in a project with root namespace `HelloWorld` produces `HelloWorld.Hello`.
+
+Open the [Feature Gallery](https://asaicraft.github.io/Akbura/Gallery/akcss-themes/) to see two buttons sharing a template. In the [Playground](https://asaicraft.github.io/Akbura/Playground/), choose **AKCSS control themes** and open `ButtonThemes.akcss` to change a brush or selector and see the preview update.
+
+## A button theme
+
+Save the following as `Hello.akcss`.
+
+```akcss
+@using Avalonia;
+@using Avalonia.Controls;
+@using Avalonia.Controls.Presenters;
+@using Avalonia.Media;
+
+@mixin ContentPresenter DefaultContentPresenterTBind()
+{
+    @template-bind Background, BorderBrush, BorderThickness, CornerRadius,
+        Content, ContentTemplate, Foreground, Padding,
+        HorizontalContentAlignment, VerticalContentAlignment;
+}
+
+@theme Button MyTheme
+{
+    Background: Amx.DynamicResource("ButtonBackground");
+
+    @template
+    {
+        <ContentPresenter
+            x.Name="PART_ContentPresenter"
+            RecognizesAccessKey={true}>
+            @include DefaultContentPresenterTBind();
+        </ContentPresenter>
+    }
+
+    ^:pointerover /template/ #PART_ContentPresenter
+    {
+        Background: Amx.DynamicResource("ButtonBackgroundPointerOver");
+    }
+
+    ^:pressed /template/ #PART_ContentPresenter
+    {
+        Background: Amx.DynamicResource("ButtonBackgroundPressed");
+    }
+}
+
+(global::Avalonia.Controls.Border) > TextBlock
+{
+    FontSize: 14d;
+}
+```
+
+Set the three brush resources on the window or another resource host above the button. Apply the theme with a C# expression in markup.
+
+```akbura
+using Avalonia.Controls;
+using HelloWorld;
+
+<Button Theme={Hello.MyTheme} Content="Hello" />
+```
+
+`global::HelloWorld.Hello.MyTheme` and `HelloWorld.Hello.MyTheme` also resolve in C# expressions. The theme property caches its definition. Avalonia builds a new presenter and name scope for each button. The presenter follows the button's properties through one-way template bindings. Native state styles override the template background while active.
+
+## Share a template across themes
+
+Add a typed mixin and a derived theme to `Hello.akcss`.
+
+```akcss
+@mixin Button SetButtonSurface(double radius, double horizontalPadding = 16d)
+{
+    CornerRadius: new CornerRadius(radius);
+    Padding: new Thickness(horizontalPadding, 8);
+    BorderThickness: new Thickness(1);
+}
+
+@theme Button AccentTheme
+{
+    @based-on MyTheme;
+    @include SetButtonSurface(8d, 20d);
+    Background: Brushes.RoyalBlue;
+    BorderBrush: Brushes.CornflowerBlue;
+    Foreground: Brushes.White;
+}
+```
+
+Set `Theme={Hello.AccentTheme}` on a second button. It shares the template defined by `MyTheme` and applies its own colors and border. A mixin declares its receiver type before its name. `SetButtonSurface` sets properties on a `Button` and declares a default for its padding parameter. `DefaultContentPresenterTBind` runs inside a `ContentPresenter` and binds each listed property to the same-named property on the templated button.
+
+For `^:pointerover /template/ #PART_ContentPresenter`, `^` starts at the themed button, `:pointerover` checks the button's state, and `/template/` reaches the element named by `x.Name`. The setter updates the presenter's background while that selector matches.
+
+## Edit themes and mixins
+
+The editor offers AKCSS directives in rule bodies and switches to markup completion inside `@template`. In a selector such as `^ /template/ ContentPresenter#PART_ContentPresenter`, property completion uses `ContentPresenter`. Hover over `@template-bind` entries to see the templated parent's source property and the element's destination property.
+
+Signature help on a mixin call shows the declared receiver, arguments, and defaults. Go to Definition follows includes, source-theme inheritance, and known template parts to their original declarations. C# accesses to an exported theme also navigate to the original AKCSS theme.
+
+Rename supports source mixins, mixin parameters, local themes, and unambiguous template parts. Exported themes require cross-language rename because ordinary C# files can refer to them. Template-binding shorthand denotes two endpoints and uses the destination for Go to Definition.
+
+## Install native rules
+
+```csharp
+host.Styles.Add(HelloWorld.Hello.CreateStyles());
+```
+
+Every call creates a fresh style collection. Native rules can combine predicates and relationships, as in `Border.frame.card` or `Border.frame > TextBlock`. Standalone imports make declarations available for lookup. A component installs general native rules from its inline `@akcss` blocks on its own `Styles` collection during initialization.
+
+A base theme can also be an existing C# `ControlTheme`. The derived theme can supply its own `@template`. Inside each native style or theme, the final setter for each Avalonia property wins after includes expand. Construction-time values and include arguments are evaluated in declaration order.
+
+Native setter values are evaluated during style or theme construction. Dynamic resource bindings resolve on the matched control. Receiver-dependent native setter expressions, context-free static resource setters, and reactive AKCSS `@if` in native bodies produce generation diagnostics. Mixin bodies are available from source in this stage. Restart the application to apply edits to native style and theme trees during development.
+
+See [Native fragments in utilities and classes](./native-application-fragments) for application-owned styles.
+
+
+# Native fragments in utilities and classes
+Source: Akbura/akcss/native-application-fragments
+
+A utility or named class with a nested selector or include applies its complete body as an Avalonia style tree. The application is scoped to the individual control. A rule can match its descendants and template parts using normal Avalonia selectors.
+
+## Style a Fluent Button presenter
+
+```akcss
+@using Avalonia.Controls;
+@using Avalonia.Controls.Presenters;
+
+@mixin Button PresenterBackground(object resourceKey)
+{
+    ^ /template/ ContentPresenter#PART_ContentPresenter
+    {
+        Background: Amx.DynamicResource(resourceKey);
+    }
+}
+
+@utilities
+{
+    Button.bg-red-300
+    {
+        @include PresenterBackground("--color-red-300");
+    }
+
+    Button.bg-red-700
+    {
+        @include PresenterBackground("--color-red-700");
+    }
+}
+```
+
+Define both brush resources on a resource host above the button. Import the AKCSS module and apply the utilities using the existing markup syntax.
+
+```akbura
+using Avalonia.Controls;
+using Akbura.Markup;
+using MyApp.Fragments.akcss;
+
+<StackPanel>
+    <Button Content="First" bg-red-300 ${hover}:bg-red-700 />
+    <Button Content="Unchanged" />
+</StackPanel>
+```
+
+The utility tracks the current template presenter. A resource change updates the active setter. Leaving hover restores the lower-ranked application. Removing the applications exposes the remaining native value or binding.
+
+The explicit `ContentPresenter` type sets the property-binding context for the part. The utility can apply to eligible derived buttons. The application anchor identifies the instance receiving the utility, and a nested `^` anchors to its enclosing style.
+
+## Apply a named class
+
+```akcss
+Button.interactive
+{
+    Opacity: 0.8d;
+
+    ^:pointerover
+    {
+        Opacity: 1d;
+    }
+}
+```
+
+```akbura
+<Button Content="Interactive" class="interactive" />
+```
+
+Root and nested setters share the same native tree and participate at style-trigger priority. Local values and animations have higher priority. Plain AKCSS declarations continue to use their scalar cascade, so conflicts between a plain declaration and a native fragment follow Avalonia priorities.
+
+## Order applications
+
+Unprefixed applications follow their order in markup. Ungrouped conditions with the `SourceOrder` policy share that order. A single named prefix group can sit uniformly above or below unprefixed applications. Inside that group, its declared order comes first, followed by markup order. `${hover}` and `${focus}` share the interaction group, with focus ranked higher.
+
+Each matching control receives its own contributions. An application with a higher rank on one part leaves lower-ranked rules available on other parts.
+
+## Generation boundaries
+
+Use `@include` to compose native bodies. A contextual `@apply` reports a generation error. Direct properties, receiver-dependent C# values, context-free static resources, reactive AKCSS `@if` in a native body, and incompatible prefix policies also produce errors.
+
+Compiled modules expose their native bodies through their existing utility and class definitions. Source mixins expand in the producing project. Native application changes use full replacement for Hot Reload. Restart the application to apply edits to shared native style and theme definitions.
+
+
 # Built-in Utility Variants
 Source: Akbura/akcss/built-in-utility-variants
 

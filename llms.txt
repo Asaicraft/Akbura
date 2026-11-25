@@ -53,6 +53,8 @@ AKCSS
  - [Utilities](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akcss/utilities.md): AKCSS Utilities
  - [Value Syntax](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akcss/value-syntax.md): AKCSS Value Syntax
  - [Utility Variants](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akcss/utility-variants.md)
+ - [Native Styles and Control Themes](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akcss/native-styles-and-themes.md): Native styles and control themes
+ - [Native Fragments in Utilities and Classes](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akcss/native-application-fragments.md): Native fragments in utilities and classes
 
 Built-in Styles
  - [Built-in Utility Variants](https://raw.githubusercontent.com/Asaicraft/Akbura/refs/heads/master/src/AkburaDocs/_pages/akcss/built-in-utility-variants.md)

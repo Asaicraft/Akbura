@@ -214,6 +214,16 @@ AKCSS									</span>
 										Utility Variants
 									</a>
 								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akcss/native-styles-and-themes" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full active font-semibold text-sky-500 before:bg-sky-500">
+										Native Styles and Control Themes
+									</a>
+								</li>
+								<li class="relative">
+									<a href="https://asaicraft.github.io/Akbura/akcss/native-application-fragments" class="block w-full pl-3.5 before:pointer-events-none before:absolute before:-left-1 before:top-1/2 before:h-1.5 before:w-1.5 before:-translate-y-1/2 before:rounded-full text-slate-500 before:hidden before:bg-slate-300 hover:text-slate-600 hover:before:block dark:text-slate-400 dark:before:bg-slate-700 dark:hover:text-slate-300">
+										Native Fragments in Utilities and Classes
+									</a>
+								</li>
 						</ul>
 								<a href="https://asaicraft.github.io/Akbura/akcss/built-in-styles" class="block flex items-center whitespace-nowrap">
 									<span class="p-2 pl-3 font-display font-medium text-slate-900 dark:text-white">
@@ -247,15 +257,18 @@ Built-in Styles									</span>
 
 				<div class="content">
 					<p>Standalone AKCSS files with native rules or named themes expose a C# facade. The project namespace and relative file path determine its name. For example, <code>Hello.akcss</code> in a project with root namespace <code>HelloWorld</code> produces <code>HelloWorld.Hello</code>.</p>
+<p>Open the <a href="https://asaicraft.github.io/Akbura/Gallery/akcss-themes/">Feature Gallery</a> to see two buttons sharing a template. In the <a href="https://asaicraft.github.io/Akbura/Playground/">Playground</a>, choose <strong>AKCSS control themes</strong> and open <code>ButtonThemes.akcss</code> to change a brush or selector and see the preview update.</p>
 <h2 id="a-button-theme">A button theme<a class="header-anchor" href="javascript:;" onclick="location.hash='#a-button-theme'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>Save the following as <code>Hello.akcss</code>.</p>
-<pre><code class="language-akcss">@using Avalonia.Controls;
+<pre><code class="language-akcss">@using Avalonia;
+@using Avalonia.Controls;
 @using Avalonia.Controls.Presenters;
+@using Avalonia.Media;
 
 @mixin ContentPresenter DefaultContentPresenterTBind()
 {
     @template-bind Background, BorderBrush, BorderThickness, CornerRadius,
-        Content, ContentTemplate, Padding,
+        Content, ContentTemplate, Foreground, Padding,
         HorizontalContentAlignment, VerticalContentAlignment;
 }
 
@@ -295,6 +308,26 @@ using HelloWorld;
 &lt;Button Theme={Hello.MyTheme} Content=&quot;Hello&quot; /&gt;
 </code></pre>
 <p><code>global::HelloWorld.Hello.MyTheme</code> and <code>HelloWorld.Hello.MyTheme</code> also resolve in C# expressions. The theme property caches its definition. Avalonia builds a new presenter and name scope for each button. The presenter follows the button's properties through one-way template bindings. Native state styles override the template background while active.</p>
+<h2 id="share-a-template-across-themes">Share a template across themes<a class="header-anchor" href="javascript:;" onclick="location.hash='#share-a-template-across-themes'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
+<p>Add a typed mixin and a derived theme to <code>Hello.akcss</code>.</p>
+<pre><code class="language-akcss">@mixin Button SetButtonSurface(double radius, double horizontalPadding = 16d)
+{
+    CornerRadius: new CornerRadius(radius);
+    Padding: new Thickness(horizontalPadding, 8);
+    BorderThickness: new Thickness(1);
+}
+
+@theme Button AccentTheme
+{
+    @based-on MyTheme;
+    @include SetButtonSurface(8d, 20d);
+    Background: Brushes.RoyalBlue;
+    BorderBrush: Brushes.CornflowerBlue;
+    Foreground: Brushes.White;
+}
+</code></pre>
+<p>Set <code>Theme={Hello.AccentTheme}</code> on a second button. It shares the template defined by <code>MyTheme</code> and applies its own colors and border. A mixin declares its receiver type before its name. <code>SetButtonSurface</code> sets properties on a <code>Button</code> and declares a default for its padding parameter. <code>DefaultContentPresenterTBind</code> runs inside a <code>ContentPresenter</code> and binds each listed property to the same-named property on the templated button.</p>
+<p>For <code>^:pointerover /template/ #PART_ContentPresenter</code>, <code>^</code> starts at the themed button, <code>:pointerover</code> checks the button's state, and <code>/template/</code> reaches the element named by <code>x.Name</code>. The setter updates the presenter's background while that selector matches.</p>
 <h2 id="edit-themes-and-mixins">Edit themes and mixins<a class="header-anchor" href="javascript:;" onclick="location.hash='#edit-themes-and-mixins'" aria-label="Permalink">&ZeroWidthSpace;</a></h2>
 <p>The editor offers AKCSS directives in rule bodies and switches to markup completion inside <code>@template</code>. In a selector such as <code>^ /template/ ContentPresenter#PART_ContentPresenter</code>, property completion uses <code>ContentPresenter</code>. Hover over <code>@template-bind</code> entries to see the templated parent's source property and the element's destination property.</p>
 <p>Signature help on a mixin call shows the declared receiver, arguments, and defaults. Go to Definition follows includes, source-theme inheritance, and known template parts to their original declarations. C# accesses to an exported theme also navigate to the original AKCSS theme.</p>
@@ -303,7 +336,7 @@ using HelloWorld;
 <pre><code class="language-csharp">host.Styles.Add(HelloWorld.Hello.CreateStyles());
 </code></pre>
 <p>Every call creates a fresh style collection. Native rules can combine predicates and relationships, as in <code>Border.frame.card</code> or <code>Border.frame &gt; TextBlock</code>. Standalone imports make declarations available for lookup. A component installs general native rules from its inline <code>@akcss</code> blocks on its own <code>Styles</code> collection during initialization.</p>
-<p>Use <code>@based-on</code> to inherit a source theme or an existing C# <code>ControlTheme</code>. A derived theme inherits the base template until it declares a local <code>@template</code>. Inside each native style or theme, the final setter for each Avalonia property wins after includes expand. Construction-time values and include arguments are evaluated in declaration order.</p>
+<p>A base theme can also be an existing C# <code>ControlTheme</code>. The derived theme can supply its own <code>@template</code>. Inside each native style or theme, the final setter for each Avalonia property wins after includes expand. Construction-time values and include arguments are evaluated in declaration order.</p>
 <p>Native setter values are evaluated during style or theme construction. Dynamic resource bindings resolve on the matched control. Receiver-dependent native setter expressions, context-free static resource setters, and reactive AKCSS <code>@if</code> in native bodies produce generation diagnostics. Mixin bodies are available from source in this stage. Restart the application to apply edits to native style and theme trees during development.</p>
 <p>See <a href="./native-application-fragments">Native fragments in utilities and classes</a> for application-owned styles.</p>
 
@@ -318,6 +351,27 @@ using HelloWorld;
 					</div>
 
 					<div class="not-prose my-20">
+								<nav class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 px-4 sm:px-0">
+									<div class="-mt-px flex w-0 flex-1">
+											<a href="https://asaicraft.github.io/Akbura/akcss/utility-variants" class="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												<!-- Heroicon name: mini/arrow-long-left -->
+												<svg class="mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+													<path fill-rule="evenodd" d="M18 10a.75.75 0 01-.75.75H4.66l2.1 1.95a.75.75 0 11-1.02 1.1l-3.5-3.25a.75.75 0 010-1.1l3.5-3.25a.75.75 0 111.02 1.1l-2.1 1.95h12.59A.75.75 0 0118 10z" clip-rule="evenodd"></path>
+												</svg>
+												Utility Variants
+											</a>
+									</div>
+									<div class="hidden md:-mt-px md:flex"></div>
+									<div class="-mt-px flex w-0 flex-1 justify-end">
+											<a href="https://asaicraft.github.io/Akbura/akcss/native-application-fragments" class="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-gray-500 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200">
+												Native Fragments in Utilities and Classes
+												<!-- Heroicon name: mini/arrow-long-right -->
+												<svg class="ml-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+													<path fill-rule="evenodd" d="M2 10a.75.75 0 01.75-.75h12.59l-2.1-1.95a.75.75 0 111.02-1.1l3.5 3.25a.75.75 0 010 1.1l-3.5 3.25a.75.75 0 11-1.02-1.1l2.1-1.95H2.75A.75.75 0 012 10z" clip-rule="evenodd"></path>
+												</svg>
+											</a>
+									</div>
+								</nav>
 					</div>
 			</div>
 				
@@ -331,6 +385,11 @@ using HelloWorld;
 									<li class="group text-gray-800 hover:text-gray-900">
 										<span v-hash="'#a-button-theme'" data-id="a-button-theme" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
 											A button theme
+										</span>
+									</li>
+									<li class="group text-gray-800 hover:text-gray-900">
+										<span v-hash="'#share-a-template-across-themes'" data-id="share-a-template-across-themes" class="cursor-pointer font-medium block text-sm transform transition-colors duration-200 py-2">
+											Share a template across themes
 										</span>
 									</li>
 									<li class="group text-gray-800 hover:text-gray-900">

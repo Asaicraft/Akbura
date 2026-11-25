@@ -369,6 +369,8 @@ public sealed partial class AkburaBuildTargetsTests
         {
             DirectoryPath = Path.Combine(Path.GetTempPath(), "AkburaManifestTests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(DirectoryPath);
+            // Child dotnet commands resolve their SDK from this temporary directory.
+            File.Copy(Path.Combine(_repositoryRoot, "global.json"), PathFor("global.json"));
             Write("Directory.Build.props", "<Project />");
             Write("Directory.Build.targets", "<Project />");
             Write("Directory.Packages.props", "<Project />");

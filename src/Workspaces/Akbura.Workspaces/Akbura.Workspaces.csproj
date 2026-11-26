@@ -29,4 +29,8 @@
 	  <ProjectReference Include="..\..\Akbura.Generator\Akbura.Generator.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<EmbeddedResource Include="Layout\Recipes\*.akbura" LogicalName="Akbura.Workspaces.Layout.Recipes.%(Filename)%(Extension)" />
+	</ItemGroup>
+
 </Project>

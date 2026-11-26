@@ -2,18 +2,9 @@ using System.Collections.Immutable;
 
 namespace Akbura.Workspaces.Utilities;
 
-public enum AkburaUtilityAvailability
-{
-    Available,
-    RequiresImport,
-}
-
-public enum AkburaUtilityOriginKind
-{
-    Source,
-    Library,
-}
-
+/// <summary>
+/// Describes an applicable utility definition, its signature, origin, and availability.
+/// </summary>
 public sealed record AkburaUtilityDescriptor(
     string Id,
     string Name,
@@ -28,8 +19,3 @@ public sealed record AkburaUtilityDescriptor(
     string? Category,
     string? Description,
     string? Example);
-
-public sealed record AkburaUtilityParameterDescriptor(string Name, string Type, bool IsOptional);
-
-/// <summary>A definition span in zero-based UTF-16 offsets.</summary>
-public sealed record AkburaUtilitySourceLocation(string FilePath, int Start, int Length);

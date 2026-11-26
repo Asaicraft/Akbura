@@ -1,0 +1,19 @@
+using Akbura;
+using Akbura.Markup;
+using Avalonia.Controls;
+using Akbura.Styles.akcss;
+
+<Row Columns="12" gap-3>
+    <Border Height="48" col-span-12 ${md}:col-span-6 ${lg}:col-span-4>
+        <TextBlock Text="Overview" />
+    </Border>
+    <Border Height="48" col-span-12 ${md}:col-span-6 ${lg}:col-span-4>
+        <TextBlock Text="Activity" />
+    </Border>
+    <Border Height="48" col-span-12 ${md}:col-span-6 ${lg}:col-span-4>
+        <TextBlock Text="Reports" />
+    </Border>
+    <Border Height="48" col-span-12 ${md}:col-span-6 ${lg}:col-span-4>
+        <TextBlock Text="Settings" />
+    </Border>
+</Row>

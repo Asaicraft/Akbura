@@ -15,7 +15,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Akbura.Mcp\Akbura.Mcp.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\Akbura.Mcp\Akbura.Mcp.csproj" />
     <ProjectReference Include="..\Akbura.Workspaces\Akbura.Workspaces.csproj" />
     <ProjectReference Include="..\Akbura.Workspaces.MSBuild\Akbura.Workspaces.MSBuild.csproj" />
     <ProjectReference Include="..\..\Akbura\Akbura.csproj" ReferenceOutputAssembly="false" />

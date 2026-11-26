@@ -8,6 +8,9 @@ using System.Threading;
 
 namespace Akbura.Language.Binder;
 
+/// <summary>
+/// Binds Akbura markup syntax to component symbols and operations.
+/// </summary>
 internal sealed partial class MarkupBinder
 {
     internal TailwindUtilityDefinitionLookup LookupTailwindUtilityDefinitions(

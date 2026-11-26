@@ -5,6 +5,9 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace Akbura.Workspaces.UnitTests;
 
+/// <summary>
+/// Checks utility applicability, import requirements, and lookup consistency across snapshots.
+/// </summary>
 public sealed class WorkspaceUtilityCatalogTests
 {
     private const string RowDocument = "using Akbura;\r\n<Row />";

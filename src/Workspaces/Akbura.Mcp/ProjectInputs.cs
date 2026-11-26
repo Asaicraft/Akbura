@@ -5,6 +5,9 @@ using System.Collections.Concurrent;
 
 namespace Akbura.Mcp;
 
+/// <summary>
+/// Tracks build inputs and saved source files that affect the loaded project snapshot.
+/// </summary>
 internal sealed class ProjectInputs : IDisposable
 {
     private static readonly StringComparer PathComparer =
@@ -215,6 +218,9 @@ internal sealed class ProjectInputs : IDisposable
         }
     }
 
+    /// <summary>
+    /// Captures the timestamps and length used to detect changes to a file.
+    /// </summary>
     internal readonly record struct FileRevision(DateTime LastWriteUtc, DateTime CreatedUtc, long Length)
     {
         public static FileRevision? Read(string path)
@@ -224,6 +230,9 @@ internal sealed class ProjectInputs : IDisposable
         }
     }
 
+    /// <summary>
+    /// Tracks one source file and its registrations in the loaded Roslyn solution.
+    /// </summary>
     internal sealed class SourceFile(string path)
     {
         private long _notifications;
@@ -235,5 +244,8 @@ internal sealed class ProjectInputs : IDisposable
         public void MarkChanged() => Interlocked.Increment(ref _notifications);
     }
 
+    /// <summary>
+    /// Identifies the source file's registration as a C# or additional project document.
+    /// </summary>
     internal readonly record struct SourceDocument(DocumentId Id, bool IsAdditional);
 }

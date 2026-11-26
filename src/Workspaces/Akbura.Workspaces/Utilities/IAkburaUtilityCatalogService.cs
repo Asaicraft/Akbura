@@ -1,6 +1,8 @@
 namespace Akbura.Workspaces.Utilities;
 
-/// <summary>Discovers applicable utility definitions in immutable workspace snapshots.</summary>
+/// <summary>
+/// Discovers applicable utility definitions in immutable workspace snapshots.
+/// </summary>
 public interface IAkburaUtilityCatalogService
 {
     AkburaUtilitySearchResult FindUtilities(

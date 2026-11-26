@@ -1,4 +1,5 @@
 using Akbura.Workspaces;
+using Akbura.Workspaces.Documents;
 using Akbura.Workspaces.Projects;
 using Akbura.Workspaces.Utilities;
 using ModelContextProtocol.Protocol;
@@ -11,15 +12,21 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace Akbura.Mcp;
 
+/// <summary>
+/// Exposes the Akbura MCP tools for the selected project session.
+/// </summary>
 [McpServerToolType]
-internal sealed class McpTools(ProjectSession session)
+internal sealed partial class McpTools(ProjectSession session)
 {
-    public const string Instructions =
-        "Call akbura_project_info before working on the UI. Utilities are markup attributes. " +
-        "Use akbura_find_utilities to check exact names and applicability for sizing, spacing, visibility, and layout. " +
-        "Prefer a matching standard utility when it expresses the intended behavior, and respect its target and required imports. " +
-        "Variants use the form ${variant}:utility. Verify that the project's references support the variant before using it. " +
-        "Use ordinary properties or custom styles when they express the behavior more clearly.";
+    public const string Instructions = """
+        Call akbura_project_info before working on the UI.
+        Use akbura_find_utilities to verify utility names, target types, and required imports. Utilities are markup attributes.
+        When a recipe's preconditions fit, call akbura_get_layout_recipe and adapt its reference component using your editing tools.
+        Save the document, call akbura_analyze_document, address its diagnostics, and analyze the new snapshot.
+        Variants use the form ${variant}:utility. Verify the project's support and use the documented width source for breakpoints.
+        Use ordinary properties or custom styles where they express the intended behavior more clearly.
+        Semantic checks cover language correctness. Visual appearance and runtime layout need their own verification.
+        """;
 
     public static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -31,7 +38,7 @@ internal sealed class McpTools(ProjectSession session)
         typeof(McpTools).Assembly.GetName().Version?.ToString() ?? "unknown";
 
     [McpServerTool(Name = "akbura_project_info", UseStructuredContent = true, ReadOnly = true, OpenWorld = false)]
-    [Description("Describe the selected MSBuild project, saved documents, resolved dependencies, and standard AKCSS imports.")]
+    [Description("Describe the selected MSBuild project, saved documents, resolved dependencies, AKCSS imports, and layout recipe IDs.")]
     public async Task<ProjectInfoResponse> ProjectInfoAsync(CancellationToken cancellationToken)
     {
         var view = await session.CaptureAsync(cancellationToken).ConfigureAwait(false);
@@ -43,13 +50,14 @@ internal sealed class McpTools(ProjectSession session)
 
         var project = view.Snapshot?.GetRequiredProject(session.Workspace.DefaultProjectId);
         var workspaceVersion = typeof(AkburaWorkspace).Assembly.GetName().Version?.ToString() ?? "unknown";
+        var recipes = GetRecipeSummaries();
         if (project == null)
         {
             diagnostics.Add(new(view.Status, view.Message!));
             return new(session.Options.ProjectPath, session.Settings.Configuration, session.Settings.TargetFramework,
                 view.Status, ServerVersion, AkburaWorkspace.CompilerVersion, workspaceVersion, "unknown",
                 [], [], null, null, null, false, diagnostics.ToArray(),
-                new(Instructions, null, null, []));
+                new(Instructions, null, null, []), recipes);
         }
 
         var documentPaths = new List<string>();
@@ -99,7 +107,7 @@ internal sealed class McpTools(ProjectSession session)
             session.Packages.ToArray(), assemblyVersions.ToArray(),
             new(documentPaths.Count, akcssCount, documentPaths.ToArray()),
             new(library.IsAvailable, library.UtilityImport, library.VariantImport),
-            view.Snapshot!.Version.ToString(), IsLoadComplete, diagnostics.ToArray(), guidance);
+            view.Snapshot!.Version.ToString(), IsLoadComplete, diagnostics.ToArray(), guidance, recipes);
     }
 
     [McpServerTool(Name = "akbura_find_utilities", UseStructuredContent = true, OutputSchemaType = typeof(UtilitySearchResponse),
@@ -139,27 +147,9 @@ internal sealed class McpTools(ProjectSession session)
             return Error(view.Status, view.Message!);
         }
 
-        var project = snapshot.GetRequiredProject(session.Workspace.DefaultProjectId);
-        var snapshotId = snapshot.Version.ToString();
-        string path;
-        try
+        if (SelectDocument(snapshot, documentPath, allowAkcss: false, out var error) is not { } context)
         {
-            path = Path.GetFullPath(documentPath, project.Context.ProjectDirectory);
-        }
-        catch (ArgumentException)
-        {
-            return Error("unknown_document", "The document path is invalid.", snapshotId);
-        }
-        catch (NotSupportedException)
-        {
-            return Error("unknown_document", "The document path is invalid.", snapshotId);
-        }
-
-        if (!Path.GetExtension(path).Equals(".akbura", StringComparison.OrdinalIgnoreCase) ||
-            !project.TryGetDocument(new Uri(path), out var document) ||
-            !snapshot.TryGetDocumentContext(document.Id, out var context))
-        {
-            return Error("unknown_document", "The document is not a registered .akbura input of the selected project.", snapshotId);
+            return Error("unknown_document", error!, snapshot.Version.ToString());
         }
 
         var request = new AkburaUtilitySearchRequest(position, targetType, query, category, includeImportable, limit);
@@ -196,6 +186,48 @@ internal sealed class McpTools(ProjectSession session)
             result.IsComplete && IsLoadComplete, result.Truncated, diagnostics.ToArray()));
     }
 
+    private AkburaDocumentContext? SelectDocument(
+        AkburaSolutionSnapshot snapshot, string documentPath, bool allowAkcss, out string? error)
+    {
+        var project = snapshot.GetRequiredProject(session.Workspace.DefaultProjectId);
+        string path;
+        try
+        {
+            path = Path.GetFullPath(documentPath, project.Context.ProjectDirectory);
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException)
+        {
+            error = "The document path is invalid.";
+            return null;
+        }
+
+        var extension = Path.GetExtension(path);
+        if ((extension.Equals(".akbura", StringComparison.OrdinalIgnoreCase) ||
+             (allowAkcss && extension.Equals(".akcss", StringComparison.OrdinalIgnoreCase))) &&
+            project.TryGetDocument(new Uri(path), out var document) &&
+            snapshot.TryGetDocumentContext(document.Id, out var context))
+        {
+            error = null;
+            return context;
+        }
+
+        error = allowAkcss
+            ? "The document is not a registered .akbura or .akcss input of the selected project."
+            : "The document is not a registered .akbura input of the selected project.";
+        return null;
+    }
+
+    private ToolDiagnostic[] GetLoadDiagnostics()
+    {
+        var diagnostics = new ToolDiagnostic[session.LoadDiagnostics.Length];
+        for (var index = 0; index < diagnostics.Length; index++)
+        {
+            var diagnostic = session.LoadDiagnostics[index];
+            diagnostics[index] = new("msbuild_" + diagnostic.Severity.ToString().ToLowerInvariant(), diagnostic.Message);
+        }
+        return diagnostics;
+    }
+
     private bool IsLoadComplete => !session.LoadDiagnostics.Any(static diagnostic =>
         diagnostic.Severity != AkburaProjectLoadDiagnosticSeverity.Information);
 
@@ -223,16 +255,16 @@ internal sealed class McpTools(ProjectSession session)
     private static CallToolResult Format(UtilitySearchResponse response)
     {
         var success = response.Status == "success";
-        return new CallToolResult
-        {
-            IsError = !success,
-            StructuredContent = JsonSerializer.SerializeToElement(response, JsonOptions),
-            Content = [new TextContentBlock
-            {
-                Text = success
-                    ? $"Found {response.Utilities.Length} applicable utility definitions."
-                    : response.Diagnostics[0].Message,
-            }],
-        };
+        return FormatResponse(response, !success, success
+            ? $"Found {response.Utilities.Length} applicable utility definitions."
+            : response.Diagnostics[0].Message);
     }
+
+    private static CallToolResult FormatResponse<T>(T response, bool isError, string summary) =>
+        new()
+        {
+            IsError = isError,
+            StructuredContent = JsonSerializer.SerializeToElement(response, JsonOptions),
+            Content = [new TextContentBlock { Text = summary }],
+        };
 }

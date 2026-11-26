@@ -8,6 +8,9 @@ using System.Text.Json;
 
 namespace Akbura.Mcp;
 
+/// <summary>
+/// Owns the loaded project and synchronizes saved inputs before capturing a request snapshot.
+/// </summary>
 internal sealed class ProjectSession : IDisposable
 {
     private readonly MsBuildProjectContextProvider _loader;
@@ -179,10 +182,10 @@ internal sealed class ProjectSession : IDisposable
             // Publish the prepared changes under the session gate. After publication, every request
             // retains its own immutable solution, including while a later request synchronizes.
             cancellationToken.ThrowIfCancellationRequested();
-            foreach (var update in updates)
+            foreach (var (Context, Documents) in updates)
             {
-                var project = Workspace.AddOrUpdateProject(update.Context);
-                Workspace.SynchronizeProjectDocuments(project.Id, update.Documents);
+                var project = Workspace.AddOrUpdateProject(Context);
+                Workspace.SynchronizeProjectDocuments(project.Id, Documents);
             }
             _roslynSolution = next;
             CommitFileRevisions();
@@ -268,7 +271,3 @@ internal sealed class ProjectSession : IDisposable
         return packages.ToImmutable();
     }
 }
-
-internal sealed record ProjectView(AkburaSolutionSnapshot? Snapshot, string Status, string? Message);
-
-internal sealed record DependencyVersion(string Name, string Version);

@@ -4,7 +4,9 @@ using System.Runtime.CompilerServices;
 
 namespace Akbura.Workspaces.MSBuild;
 
-/// <summary>Build settings obtained by evaluating a project, without executing build targets.</summary>
+/// <summary>
+/// Records the configuration, target framework, and inputs of an evaluated MSBuild project.
+/// </summary>
 public sealed class MsBuildProjectSettings
 {
     private MsBuildProjectSettings(

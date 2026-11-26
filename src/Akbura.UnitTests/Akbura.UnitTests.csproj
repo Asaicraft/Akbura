@@ -60,6 +60,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<EmbeddedResource Include="..\Workspaces\Akbura.Workspaces\Layout\Recipes\*.akbura"
+						  LogicalName="Akbura.UnitTests.LayoutRecipes.%(Filename)%(Extension)" />
 		<EmbeddedResource Include="..\Akbura.FeatureGallery\Akbura.FeatureGallery\Pages\AkcssPage.akbura"
 						  LogicalName="Akbura.UnitTests.Fixtures.AkcssPage.akbura" />
 	</ItemGroup>

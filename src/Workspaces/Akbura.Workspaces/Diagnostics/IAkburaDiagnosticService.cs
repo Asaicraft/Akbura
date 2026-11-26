@@ -3,6 +3,9 @@ using System.Collections.Immutable;
 
 namespace Akbura.Workspaces.Diagnostics;
 
+/// <summary>
+/// Collects Akbura diagnostics and projects source markers for editors.
+/// </summary>
 public interface IAkburaDiagnosticService
 {
     /// <summary>

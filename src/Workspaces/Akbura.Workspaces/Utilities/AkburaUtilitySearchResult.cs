@@ -2,17 +2,9 @@ using System.Collections.Immutable;
 
 namespace Akbura.Workspaces.Utilities;
 
-public enum AkburaUtilitySearchStatus
-{
-    Success,
-    InvalidDocument,
-    InvalidTargetSelection,
-    InvalidPosition,
-    UnresolvedTarget,
-    AmbiguousTarget,
-    MissingReferences,
-}
-
+/// <summary>
+/// Contains applicable utility definitions and completeness information for a captured snapshot.
+/// </summary>
 public sealed record AkburaUtilitySearchResult(
     AkburaUtilitySearchStatus Status,
     string? ResolvedTargetType,
@@ -21,15 +13,3 @@ public sealed record AkburaUtilitySearchResult(
     bool IsComplete,
     bool Truncated,
     ImmutableArray<AkburaUtilityCatalogDiagnostic> Diagnostics);
-
-public sealed record AkburaUtilityCatalogDiagnostic(string Code, string Message);
-
-/// <summary>Imports for standard features found in this project's references.</summary>
-public sealed record AkburaStandardUtilityLibrary(
-    string? UtilityImport,
-    string? VariantImport,
-    AkburaUtilityCatalogDiagnostic? Diagnostic,
-    bool SupportsGridBreakpointExample)
-{
-    public bool IsAvailable => UtilityImport != null;
-}

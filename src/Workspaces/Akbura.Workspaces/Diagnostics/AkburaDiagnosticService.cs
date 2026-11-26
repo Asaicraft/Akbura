@@ -1,11 +1,55 @@
 using Akbura.Diagnostics;
+using Akbura.Pools;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
 
 namespace Akbura.Workspaces.Diagnostics;
 
-internal sealed class AkburaDiagnosticService : IAkburaDiagnosticService
+/// <summary>
+/// Collects canonical diagnostics and derives the requested analysis stages or editor markers.
+/// </summary>
+internal sealed class AkburaDiagnosticService : IAkburaDiagnosticService, IAkburaDocumentAnalysisService
 {
+    public AkburaDocumentAnalysisResult AnalyzeDocument(
+        AkburaDocumentContext context,
+        AkburaDiagnosticAnalysisLevel level = AkburaDiagnosticAnalysisLevel.Semantic,
+        bool isProjectComplete = true,
+        CancellationToken cancellationToken = default)
+    {
+        if (context == null) throw new ArgumentNullException(nameof(context));
+        if (level is not (AkburaDiagnosticAnalysisLevel.Syntax or AkburaDiagnosticAnalysisLevel.Semantic))
+        {
+            throw new ArgumentOutOfRangeException(nameof(level));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        using var reasons = ImmutableArrayBuilder<string>.Rent();
+        var includeSemantic = level == AkburaDiagnosticAnalysisLevel.Semantic;
+        if (includeSemantic)
+        {
+            var compilation = context.Project.CSharpCompilation;
+            if (compilation.GetSpecialType(SpecialType.System_Object).TypeKind == TypeKind.Error ||
+                compilation.GetTypeByMetadataName("Avalonia.Controls.Control") == null ||
+                compilation.GetTypeByMetadataName("Akbura.AkburaControl") == null)
+            {
+                includeSemantic = false;
+                reasons.Add("Semantic analysis requires resolvable .NET, Avalonia, and Akbura references.");
+            }
+            if (!isProjectComplete)
+            {
+                reasons.Add("Project loading reported an incomplete design-time context.");
+            }
+        }
+
+        var diagnostics = CollectCanonical(context, includeSemantic, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        return new(context.Document.FilePath, AkburaDocumentSnapshotIdentity.Capture(context),
+            level, includeSemantic ? AkburaDiagnosticAnalysisLevel.Semantic : AkburaDiagnosticAnalysisLevel.Syntax,
+            reasons.Count == 0, diagnostics, reasons.ToImmutable());
+    }
+
     public ImmutableArray<AkburaDiagnosticSpan> GetSyntacticDiagnostics(
         AkburaSyntacticDocument document,
         TextSpan requestedSpan,
@@ -43,18 +87,30 @@ internal sealed class AkburaDiagnosticService : IAkburaDiagnosticService
         cancellationToken.ThrowIfCancellationRequested();
 
         var document = context.Document;
-        var semanticModel = context.Project.Compilation.GetSemanticModel(document.SyntaxTree);
-        var diagnostics = AkburaDiagnosticEngine.Collect(
-            document.SyntaxTree,
-            semanticModel,
-            cancellationToken: cancellationToken);
-
+        var diagnostics = CollectCanonical(context, includeSemantic: true, cancellationToken);
         return new AkburaDiagnosticReport(
-            diagnostics.Select(diagnostic => diagnostic with
-            {
-                Provenance = diagnostic.Provenance | DiagnosticProvenance.Workspaces,
-            }).ToImmutableArray(),
+            diagnostics,
             SelectDiagnostics(diagnostics, document.FilePath, document.Text.Length, requestedSpan, cancellationToken));
+    }
+
+    private static ImmutableArray<AkburaDiagnosticRecord> CollectCanonical(
+        AkburaDocumentContext context, bool includeSemantic, CancellationToken cancellationToken)
+    {
+        var tree = context.Document.SyntaxTree;
+        var model = includeSemantic ? context.Project.Compilation.GetSemanticModel(tree) : null;
+        var diagnostics = AkburaDiagnosticEngine.Collect(tree, model, includeSemantic, cancellationToken);
+        if (diagnostics.IsEmpty)
+        {
+            return diagnostics;
+        }
+
+        using var canonical = ImmutableArrayBuilder<AkburaDiagnosticRecord>.Rent(diagnostics.Length);
+        foreach (var diagnostic in diagnostics)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            canonical.Add(diagnostic with { Provenance = diagnostic.Provenance | DiagnosticProvenance.Workspaces });
+        }
+        return canonical.ToImmutable();
     }
 
     internal static ImmutableArray<AkburaDiagnosticSpan> SelectDiagnostics(

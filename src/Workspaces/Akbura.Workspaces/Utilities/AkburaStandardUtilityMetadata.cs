@@ -1,6 +1,9 @@
 namespace Akbura.Workspaces.Utilities;
 
 // Only attach these descriptions to definitions originating in Akbura.Styles.akcss.
+/// <summary>
+/// Provides descriptions and search terms for standard AKCSS utility definitions.
+/// </summary>
 internal sealed record AkburaStandardUtilityMetadata(
     string Category,
     string Description,

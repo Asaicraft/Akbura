@@ -1,7 +1,11 @@
+using Akbura.Workspaces.Layout;
 using Akbura.Workspaces.Utilities;
 
 namespace Akbura.Workspaces;
 
+/// <summary>
+/// Constructs the language services shared by Workspace consumers.
+/// </summary>
 internal sealed class AkburaLanguageServices :  IAkburaLanguageServices
 {
     public AkburaLanguageServices()
@@ -12,13 +16,17 @@ internal sealed class AkburaLanguageServices :  IAkburaLanguageServices
 
         Classification = new AkburaClassificationService(referenceResolver);
 
-        Diagnostics = new AkburaDiagnosticService();
+        var diagnostics = new AkburaDiagnosticService();
+        Diagnostics = diagnostics;
+        DocumentAnalysis = diagnostics;
 
         Definition = new AkburaDefinitionService(referenceResolver);
 
         Completion = new AkburaCompletionService();
 
-        UtilityCatalog = new AkburaUtilityCatalogService();
+        var utilityCatalog = new AkburaUtilityCatalogService();
+        UtilityCatalog = utilityCatalog;
+        LayoutRecipes = new AkburaLayoutRecipeService(utilityCatalog, DocumentAnalysis);
 
         ProjectedCSharp = new AkburaProjectedCSharpService();
 
@@ -49,11 +57,15 @@ internal sealed class AkburaLanguageServices :  IAkburaLanguageServices
 
     public IAkburaDiagnosticService Diagnostics { get; }
 
+    public IAkburaDocumentAnalysisService DocumentAnalysis { get; }
+
     public IAkburaDefinitionService Definition { get; }
 
     public IAkburaCompletionService Completion { get; }
 
     public IAkburaUtilityCatalogService UtilityCatalog { get; }
+
+    public IAkburaLayoutRecipeService LayoutRecipes { get; }
 
     public IAkburaProjectedCSharpService ProjectedCSharp { get; }
 

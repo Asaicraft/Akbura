@@ -9,6 +9,9 @@ using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
 
 namespace Akbura.Language;
 
+/// <summary>
+/// Provides syntax, symbol, and operation information for one Akbura syntax tree.
+/// </summary>
 internal partial class AkburaSemanticModel
 {
     internal INamedTypeSymbol? ResolveUtilityCatalogTarget(
@@ -58,12 +61,3 @@ internal partial class AkburaSemanticModel
             additionalImport, additionalModule, cancellationToken);
     }
 }
-
-internal readonly record struct TailwindUtilityDefinition(
-    ITailwindUtilitySymbol Symbol,
-    string? RequiredImport);
-
-internal readonly record struct TailwindUtilityDefinitionLookup(
-    ImmutableArray<TailwindUtilityDefinition> Definitions,
-    bool HasUnresolvedDefinitions,
-    bool HasUnresolvedImports);

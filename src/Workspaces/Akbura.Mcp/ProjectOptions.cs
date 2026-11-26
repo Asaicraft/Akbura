@@ -1,5 +1,8 @@
 namespace Akbura.Mcp;
 
+/// <summary>
+/// Holds the project, configuration, and target framework selected at server startup.
+/// </summary>
 internal sealed record ProjectOptions(string ProjectPath, string Configuration, string? TargetFramework)
 {
     public const string Usage = """

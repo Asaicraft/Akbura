@@ -19,8 +19,11 @@ using CSharp = Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Akbura.UnitTests;
 
+/// <summary>
+/// Verifies the semantic and runtime behavior of generated Akbura components.
+/// </summary>
 [Collection(AvaloniaHeadlessCollection.Name)]
-public sealed class BlackSilenceGeneratedBehaviorTests
+public sealed partial class BlackSilenceGeneratedBehaviorTests
 {
     private static readonly AkburaBlackSilenceGeneratorTests.TestAnalyzerConfigOptionsProvider s_options =
         new(string.Empty, string.Empty, publishDiagnostics: true);
@@ -5734,6 +5737,9 @@ public sealed class BlackSilenceGeneratedBehaviorTests
         Assert.False(browsable.Browsable);
     }
 
+    /// <summary>
+    /// Supplies an in-memory additional source file to the test generator.
+    /// </summary>
     private sealed class TestAdditionalText : AdditionalText
     {
         private readonly SourceText _text;

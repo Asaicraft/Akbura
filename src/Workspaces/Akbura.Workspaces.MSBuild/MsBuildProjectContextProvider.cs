@@ -7,6 +7,9 @@ using System.Collections.Immutable;
 
 namespace Akbura.Workspaces.MSBuild;
 
+/// <summary>
+/// Loads evaluated C# projects and their registered input documents for Workspaces.
+/// </summary>
 public sealed class MsBuildProjectContextProvider :
     IProjectContextProvider,
     IAkburaProjectLoader

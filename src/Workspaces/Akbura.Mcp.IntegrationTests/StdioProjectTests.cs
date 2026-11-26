@@ -11,12 +11,15 @@ using System.Xml.Linq;
 
 namespace Akbura.Mcp.IntegrationTests;
 
-public sealed class StdioProjectTests
+/// <summary>
+/// Exercises the MCP tools over stdio with an evaluated project and saved source files.
+/// </summary>
+public sealed partial class StdioProjectTests
 {
     private const string ViewSource = "using Akbura;\r\nusing Avalonia.Controls;\r\nusing Demo.Helpers.akcss;\r\n<Row />";
 
     [Fact]
-    public async Task ClientDiscoversTwoToolsAndObservesSavedChangesOverStdio()
+    public async Task ClientDiscoversFourToolsAndObservesSavedChangesOverStdio()
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
         var cancellationToken = timeout.Token;
@@ -40,7 +43,8 @@ public sealed class StdioProjectTests
                 new StreamClientTransport(server.StandardInput.BaseStream, protocol.Reader.AsStream()),
                 cancellationToken: cancellationToken);
             var tools = await client.ListToolsAsync(cancellationToken: cancellationToken);
-            Assert.Equal(["akbura_find_utilities", "akbura_project_info"], tools.Select(tool => tool.Name).Order());
+            Assert.Equal(["akbura_analyze_document", "akbura_find_utilities", "akbura_get_layout_recipe", "akbura_project_info"],
+                tools.Select(tool => tool.Name).Order());
             Assert.All(tools, tool => Assert.NotNull(tool.ProtocolTool.OutputSchema));
             var find = Assert.Single(tools, tool => tool.Name == "akbura_find_utilities");
             var properties = find.ProtocolTool.InputSchema.GetProperty("properties");
@@ -81,6 +85,7 @@ public sealed class StdioProjectTests
                 ["targetType"] = "Akbura.Row",
             });
             Content(unknown, "unknown_document", isError: true);
+            await VerifyLayoutWorkflowAsync(client, fixture, info, cancellationToken);
 
             await File.WriteAllTextAsync(fixture.ViewPath, "using Akbura.Styles.akcss;\r\n" + ViewSource, cancellationToken);
             var available = Content(await SearchAsync("Akbura.Row", "gap"), "success");
@@ -202,6 +207,9 @@ public sealed class StdioProjectTests
         }
         """;
 
+    /// <summary>
+    /// Builds the isolated project and supplies the files used by the stdio tests.
+    /// </summary>
     private sealed class ProjectFixture : IDisposable
     {
         private readonly TemporaryProjectDirectory _directory = new();
@@ -267,6 +275,9 @@ public sealed class StdioProjectTests
         }
     }
 
+    /// <summary>
+    /// Owns a temporary project directory with isolated MSBuild configuration files.
+    /// </summary>
     private sealed class TemporaryProjectDirectory : IDisposable
     {
         private readonly DirectoryInfo _directory = Directory.CreateTempSubdirectory("akbura-mcp-");

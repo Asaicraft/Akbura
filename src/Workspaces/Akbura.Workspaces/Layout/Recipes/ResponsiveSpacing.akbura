@@ -1,0 +1,7 @@
+using Akbura.Markup;
+using Avalonia.Controls;
+using Akbura.Styles.akcss;
+
+<Border p-2 ${md}:p-4 ${lg}:p-6>
+    <TextBlock Text="Window size controls the padding." />
+</Border>

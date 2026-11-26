@@ -1,7 +1,11 @@
+using Akbura.Workspaces.Layout;
 using Akbura.Workspaces.Utilities;
 
 namespace Akbura.Workspaces;
 
+/// <summary>
+/// Provides the semantic and editor services associated with a Workspace.
+/// </summary>
 public interface IAkburaLanguageServices
 {
     IAkburaTypingService Typing { get; }
@@ -10,11 +14,15 @@ public interface IAkburaLanguageServices
 
     IAkburaDiagnosticService Diagnostics { get; }
 
+    IAkburaDocumentAnalysisService DocumentAnalysis { get; }
+
     IAkburaDefinitionService Definition { get; }
 
     IAkburaCompletionService Completion { get; }
 
     IAkburaUtilityCatalogService UtilityCatalog { get; }
+
+    IAkburaLayoutRecipeService LayoutRecipes { get; }
 
     IAkburaProjectedCSharpService ProjectedCSharp { get; }
 

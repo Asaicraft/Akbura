@@ -1,6 +1,6 @@
 # Akbura MCP
 
-Akbura MCP is a local stdio server for one prepared C# project. Stage 1 reports the analyzed project context and finds AKCSS utilities for the actual control type in a saved `.akbura` document. The catalog lives in `Akbura.Workspaces` and is also available to editor integrations through `AkburaWorkspace.LanguageServices.UtilityCatalog`.
+Akbura MCP is a local stdio server for one prepared C# project. It describes the analyzed project, finds AKCSS utilities, retrieves layout reference components, and analyzes saved `.akbura` and `.akcss` documents. Workspaces supplies the shared utility, layout, and diagnostic services.
 
 ## Build and connect
 
@@ -49,7 +49,7 @@ Call with `{}`. The structured response includes `projectPath`, `configuration`,
 
 `serverVersion`, `compilerVersion`, and `workspaceVersion` identify the running tools. `packageVersions` comes from the selected target in `project.assets.json`. `assemblyVersions` reports the referenced Akbura and Avalonia assembly identities separately. `languageCompatibility` is `unknown` because version numbers alone do not verify compatibility with the project’s language features.
 
-`standardLibrary` reports whether the standard utility module is present and the imports for utilities and variants found in the references. `guidance` includes a checked example when the references provide the example’s utility and variant.
+`standardLibrary` reports whether the standard utility module is present and the imports for utilities and variants found in the references. `guidance` includes a checked example when the references provide the example’s utility and variant. `layoutRecipes` lists each recipe's ID, title, and description.
 
 ## `akbura_find_utilities`
 
@@ -95,16 +95,115 @@ A project that references the standard library without importing it can return a
 
 The response includes `status`, `resolvedTargetType`, `utilities`, `snapshotId`, `isComplete`, `truncated`, and `diagnostics`. Exact names rank first, then prefixes, then keyword or category matches, with ties sorted by name and signature. An empty successful search differs from errors such as `unknown_document`, `invalid_position`, `unresolved_target`, `ambiguous_target`, and `missing_references`.
 
+## `akbura_get_layout_recipe`
+
+Pass `documentPath` for a saved `.akbura` input and a `recipeId` from `akbura_project_info`.
+
+```json
+{
+  "documentPath": "Views/Heroes.akbura",
+  "recipeId": "responsive-card-grid"
+}
+```
+
+The result includes the recipe ID and revision, title, purpose, tags, required imports and definitions, and the complete `exampleSource` in `akbura` format. `recipe.suggestedFileName` identifies the reference component. `snapshot` gives the captured solution, project, and destination document versions. Adapt the example to the real component and its surrounding layout.
+
+| Recipe ID | Layout and preconditions |
+| --- | --- |
+| [`responsive-card-grid`](../Akbura.Workspaces/Layout/Recipes/ResponsiveCardGrid.akbura) | A `Row` with 12 logical columns and finite available parent width. Cards span 12 columns by default, 6 from 768 DIPs, and 4 from 1024 DIPs. `gap-3` sets both row and column spacing. |
+| [`responsive-spacing`](../Akbura.Workspaces/Layout/Recipes/ResponsiveSpacing.akbura) | A `Border` with padding scale values 2, 4, and 6 at the same thresholds. Narrowing the window restores the remaining active value. Actual padding comes from the active `--spacing` resource. |
+| [`responsive-secondary-content`](../Akbura.Workspaces/Layout/Recipes/ResponsiveSecondaryContent.akbura) | A vertical stack with stretchable primary content. At 1024 DIPs the secondary section appears below it with a gap of four spacing units. Below the threshold the primary content keeps the available width and the secondary section and gap take no layout space. |
+
+All three examples use the top-level client width for breakpoint conditions and expect a `double` value for the standard `--spacing` resource. The widths in the table are from the bundled `md` and `lg` definitions exercised by the repository tests. The parent determines the space it allocates to each component.
+
+`availability` is `available`, `requires_import`, `unavailable`, or `unknown`. `missingImports` lists imports needed in the destination document. `availabilityReasons` explains missing or shadowed definitions, validation failures, or incomplete project loading. A known recipe can return its reference source regardless of availability. An unknown ID is an `unknown_recipe` error.
+
+Representative validation fields for a project that references the standard library and needs the styles import follow.
+
+```json
+{
+  "status": "success",
+  "availability": "requires_import",
+  "missingImports": [
+    "using Akbura.Styles.akcss;"
+  ],
+  "validation": {
+    "status": "passed",
+    "completedLevel": "semantic",
+    "scope": "standalone_reference_component",
+    "hasRepositoryRuntimeTests": true,
+    "integratedDocumentValidated": false,
+    "projectRuntimeValidated": false
+  }
+}
+```
+
+`validation.status` is `passed`, `failed`, `incomplete`, or `not_run`. Validation uses an isolated Workspace snapshot with the example's own imports. `examplePath` is virtual. The repository's headless tests exercise the bundled examples. The destination document and runtime layout in your project each require separate verification.
+
+## `akbura_analyze_document`
+
+Pass `documentPath` for a registered saved `.akbura` or `.akcss` input. `analysisLevel` defaults to `semantic` and also accepts `syntax`. `maxDiagnostics` defaults to `100` and accepts `1` through `500`.
+
+```json
+{
+  "documentPath": "Views/Heroes.akbura",
+  "analysisLevel": "semantic",
+  "maxDiagnostics": 100
+}
+```
+
+Representative fields after successful semantic analysis with a utility-resolution error follow.
+
+```json
+{
+  "status": "completed",
+  "requestedLevel": "semantic",
+  "completedLevel": "semantic",
+  "scope": "saved_document_diagnostics",
+  "isComplete": true,
+  "hasErrors": true,
+  "truncated": false,
+  "counts": {
+    "total": 1,
+    "errors": 1,
+    "warnings": 0,
+    "information": 0,
+    "hidden": 0
+  },
+  "diagnostics": [
+    {
+      "code": "AKBURA_SEMANTIC_TailwindUtilityNotFound",
+      "severity": "error",
+      "kind": "semantic",
+      "sourceOwnership": "document"
+    }
+  ]
+}
+```
+
+`status` describes completion of the requested analysis. Language errors appear in `diagnostics` as ordinary results. `syntax` runs the parser and reports `completedLevel: syntax`. If essential project references are missing, a `semantic` request can return syntax diagnostics with `status: incomplete`. `incompleteReasons` and `projectDiagnostics` explain the limits. Invalid input and unavailable sessions are tool errors. `counts` and `hasErrors` describe the entire collected set even when the returned array is truncated.
+
+Diagnostics use the Workspace's canonical records and preserve path, provenance, related locations, and the logical ID. `sourceOwnership` identifies the requested document, a foreign document, a referenced module, or a locationless issue. Use the record's own path and `originalRange`. Lines, characters, and absolute `originalSpan` offsets are zero-based UTF-16, with an exclusive end. If an original Akbura location is unavailable, the result carries the known path and a mapping limitation. Locationless records have a null `location`.
+
+`snapshot` identifies the captured solution, project, and document versions. The scope is saved-document diagnostics, including related canonical issues emitted by that analysis. Project builds, application execution, previews, and runtime layout have separate verification paths.
+
 ## Working with saved sources
 
-The server synchronizes changes to registered `.akbura`, `.akcss`, and C# sources before capturing a request snapshot. If a project file, monitored build import, resolved reference, or project input membership changes, the server reports `reload_required`. Prepare the project again as needed and reconnect. Syntax-only or incomplete semantic information is reported through status and diagnostics.
+The server synchronizes changes to registered `.akbura`, `.akcss`, and C# sources before capturing a request snapshot. If a project file, monitored build import, resolved reference, or project input membership changes, the server reports `reload_required`. Prepare the project again as needed and reconnect.
 
-Call `akbura_project_info` first. Search for applicable standard utilities before implementing custom sizing, spacing, visibility, or layout behavior. Use utilities when they express the intended behavior and respect their target types and required imports. Verify variant support before using `${variant}:utility`. Use ordinary properties and custom styles where they express the behavior more clearly.
+1. Call `akbura_project_info` to learn the project context and available recipe IDs.
+2. Use `akbura_find_utilities` to verify names, target types, and imports.
+3. Retrieve a relevant recipe when its preconditions fit the task.
+4. Adapt the reference component with your usual editing tools and save the file.
+5. Call `akbura_analyze_document`, address the diagnostics, and analyze the new snapshot.
 
-Stage 1 covers saved documents and deterministic search vocabulary. It supports one selected `.csproj` per process and local stdio transport.
+Use breakpoint variants supported by the project and account for the window width that drives them. Check visual appearance with a separate runtime test. These instructions guide clients and agents. Each client decides when to call the tools.
+
+The host supports one selected `.csproj` per process and local stdio transport.
 
 ## Run the tests
 
 ```sh
 dotnet test src/Workspaces/Akbura.Mcp.IntegrationTests/Akbura.Mcp.IntegrationTests.csproj
+dotnet test src/Akbura.UnitTests/Akbura.UnitTests.csproj --filter FullyQualifiedName~LayoutRecipe_
 ```

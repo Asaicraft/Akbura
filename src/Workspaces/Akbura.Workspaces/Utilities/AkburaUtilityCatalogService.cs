@@ -11,6 +11,9 @@ using AkburaCandidateReason = Akbura.Language.Symbols.CandidateReason;
 
 namespace Akbura.Workspaces.Utilities;
 
+/// <summary>
+/// Resolves and ranks utility definitions available to a target in a captured document context.
+/// </summary>
 internal sealed class AkburaUtilityCatalogService : IAkburaUtilityCatalogService
 {
     private const string StandardModuleName = "Akbura.Styles.akcss";
@@ -47,7 +50,25 @@ internal sealed class AkburaUtilityCatalogService : IAkburaUtilityCatalogService
     public AkburaUtilitySearchResult FindUtilities(
         AkburaDocumentContext context,
         AkburaUtilitySearchRequest request,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        FindUtilities(context, request, exactStandardName: false, cancellationToken);
+
+    internal AkburaUtilitySearchResult FindStandardUtilityDefinitions(
+        AkburaDocumentContext context,
+        string targetType,
+        string utilityName,
+        CancellationToken cancellationToken) =>
+        FindUtilities(context, new(TargetType: targetType, Query: utilityName, Limit: 100),
+            exactStandardName: true, cancellationToken);
+
+    internal bool IsStandardUtility(AkburaProjectSnapshot project, ITailwindUtilitySymbol utility, CancellationToken cancellationToken) =>
+        IsStandardDefinition(utility, GetStandardLibraryContext(project, cancellationToken).Module);
+
+    private AkburaUtilitySearchResult FindUtilities(
+        AkburaDocumentContext context,
+        AkburaUtilitySearchRequest request,
+        bool exactStandardName,
+        CancellationToken cancellationToken)
     {
         if (context == null) throw new ArgumentNullException(nameof(context));
         if (request == null) throw new ArgumentNullException(nameof(request));
@@ -151,9 +172,12 @@ internal sealed class AkburaUtilityCatalogService : IAkburaUtilityCatalogService
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var utility = definition.Symbol;
-                var metadata = IsStandardDefinition(utility, standardModule)
-                    ? AkburaStandardUtilityMetadata.Find(utility.Name)
-                    : null;
+                var isStandard = IsStandardDefinition(utility, standardModule);
+                if (exactStandardName && (!isStandard || utility.Name != query))
+                {
+                    continue;
+                }
+                var metadata = isStandard ? AkburaStandardUtilityMetadata.Find(utility.Name) : null;
                 if (!string.IsNullOrEmpty(category) && metadata?.MatchesCategory(category!) != true)
                 {
                     continue;
@@ -391,8 +415,17 @@ internal sealed class AkburaUtilityCatalogService : IAkburaUtilityCatalogService
         return null;
     }
 
+    /// <summary>
+    /// Keeps the standard AKCSS module and its verified capabilities together for a project snapshot.
+    /// </summary>
     private sealed record StandardLibraryContext(IAkcssModuleSymbol? Module, AkburaStandardUtilityLibrary Library);
 
+    /// <summary>
+    /// Identifies the target type, markup scope, and import mode of a cached lookup.
+    /// </summary>
     private readonly record struct LookupKey(INamedTypeSymbol TargetType, int Scope, bool IncludeImportable);
+    /// <summary>
+    /// Keeps a utility descriptor with the rank and signature used for deterministic ordering.
+    /// </summary>
     private readonly record struct RankedUtility(int Rank, string Signature, AkburaUtilityDescriptor Descriptor);
 }

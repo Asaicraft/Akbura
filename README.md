@@ -57,6 +57,8 @@ NuGet package remains responsible for compiling those files as part of the
 project build. See [Editor completion](https://asaicraft.github.io/Akbura/akbura/editor-completion)
 for `x.DataType`, binding-path, resource-key, and library resource export support.
 
+For a local MCP client, see [Akbura MCP setup and tool contracts](src/Workspaces/Akbura.Mcp/README.md).
+
 ## First component
 
 ```csharp

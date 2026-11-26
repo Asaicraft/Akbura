@@ -24,22 +24,48 @@ public sealed class MsBuildProjectContextProvider :
     private int _disposeState;
 
     public MsBuildProjectContextProvider(bool workspaceDiagnosticsActive = false)
+        : this(ImmutableDictionary<string, string>.Empty, workspaceDiagnosticsActive)
     {
-        if (!MSBuildLocator.IsRegistered)
+    }
+
+    public MsBuildProjectContextProvider(
+        IReadOnlyDictionary<string, string> globalProperties,
+        bool workspaceDiagnosticsActive = false)
+    {
+        if (globalProperties == null) throw new ArgumentNullException(nameof(globalProperties));
+        EnsureMSBuildRegistered();
+
+        var properties = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in globalProperties)
         {
-            MSBuildLocator.RegisterDefaults();
+            properties.Add(property.Key, property.Value);
+        }
+        if (workspaceDiagnosticsActive)
+        {
+            properties["DesignTimeBuild"] = "true";
+            properties["AkburaWorkspaceDiagnosticsActive"] = "true";
         }
 
-        _workspace = workspaceDiagnosticsActive
-            ? MSBuildWorkspace.Create(new Dictionary<string, string>
-            {
-                ["DesignTimeBuild"] = "true",
-                ["AkburaWorkspaceDiagnosticsActive"] = "true",
-            })
-            : MSBuildWorkspace.Create();
+        _workspace = MSBuildWorkspace.Create(properties);
         _workspace.WorkspaceChanged += OnWorkspaceChanged;
         _workspace.WorkspaceFailed += OnWorkspaceFailed;
     }
+
+    private static readonly object RegistrationGate = new();
+
+    internal static void EnsureMSBuildRegistered()
+    {
+        lock (RegistrationGate)
+        {
+            if (!MSBuildLocator.IsRegistered)
+            {
+                MSBuildLocator.RegisterDefaults();
+            }
+        }
+    }
+
+    /// <summary>The evaluated Roslyn solution, including loaded project references.</summary>
+    public Solution CurrentSolution => _workspace.CurrentSolution;
 
     public event EventHandler<ProjectContextChangedEventArgs>?
         Changed;

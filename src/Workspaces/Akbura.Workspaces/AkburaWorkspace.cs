@@ -45,6 +45,10 @@ public sealed partial class AkburaWorkspace : IDisposable
 
     public IAkburaLanguageServices LanguageServices { get; }
 
+    /// <summary>The assembly version of the compiler used to create semantic snapshots.</summary>
+    public static string CompilerVersion { get; } =
+        typeof(AkburaCompilation).Assembly.GetName().Version?.ToString() ?? "unknown";
+
     public event EventHandler<AkburaWorkspaceChangedEventArgs>?
         Changed;
 

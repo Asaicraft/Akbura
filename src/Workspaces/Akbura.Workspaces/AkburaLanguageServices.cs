@@ -1,3 +1,5 @@
+using Akbura.Workspaces.Utilities;
+
 namespace Akbura.Workspaces;
 
 internal sealed class AkburaLanguageServices :  IAkburaLanguageServices
@@ -15,6 +17,8 @@ internal sealed class AkburaLanguageServices :  IAkburaLanguageServices
         Definition = new AkburaDefinitionService(referenceResolver);
 
         Completion = new AkburaCompletionService();
+
+        UtilityCatalog = new AkburaUtilityCatalogService();
 
         ProjectedCSharp = new AkburaProjectedCSharpService();
 
@@ -48,6 +52,8 @@ internal sealed class AkburaLanguageServices :  IAkburaLanguageServices
     public IAkburaDefinitionService Definition { get; }
 
     public IAkburaCompletionService Completion { get; }
+
+    public IAkburaUtilityCatalogService UtilityCatalog { get; }
 
     public IAkburaProjectedCSharpService ProjectedCSharp { get; }
 

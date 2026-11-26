@@ -1,3 +1,5 @@
+using Akbura.Workspaces.Utilities;
+
 namespace Akbura.Workspaces;
 
 public interface IAkburaLanguageServices
@@ -11,6 +13,8 @@ public interface IAkburaLanguageServices
     IAkburaDefinitionService Definition { get; }
 
     IAkburaCompletionService Completion { get; }
+
+    IAkburaUtilityCatalogService UtilityCatalog { get; }
 
     IAkburaProjectedCSharpService ProjectedCSharp { get; }
 

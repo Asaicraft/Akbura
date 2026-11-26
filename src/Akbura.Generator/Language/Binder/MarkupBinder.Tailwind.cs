@@ -1799,15 +1799,15 @@ internal sealed partial class MarkupBinder
         IAkcssSymbol symbol,
         IMarkupComponentSymbol? containingComponent)
     {
-        if (!symbol.HasTargetType)
-        {
-            return true;
-        }
+        return !symbol.HasTargetType ||
+            IsAkcssTargetCompatibleWithType(symbol, GetAkcssTargetComponentType(containingComponent));
+    }
 
-        var componentType = GetAkcssTargetComponentType(containingComponent);
-        return componentType != null &&
-            symbol.TargetType.Symbol is ITypeSymbol targetType &&
-            AkburaSemanticModel.IsAssignableTo(componentType, targetType);
+    private static bool IsAkcssTargetCompatibleWithType(IAkcssSymbol symbol, INamedTypeSymbol? componentType)
+    {
+        return !symbol.HasTargetType ||
+            (componentType != null && symbol.TargetType.Symbol is ITypeSymbol targetType &&
+             AkburaSemanticModel.IsAssignableTo(componentType, targetType));
     }
 
     private ImmutableArray<IAkcssSymbol> ResolveAkcssClassSymbolsForAttribute(
@@ -2033,10 +2033,11 @@ internal sealed partial class MarkupBinder
     }
 
     private ImmutableArray<ImmutableArray<AkcssUtilityDeclarationSyntax>> GetImportedAkcssUtilityDeclarationLayers(
-        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder)
+        ImmutableArrayBuilder<AkburaSemanticDiagnostic> diagnosticsBuilder,
+        ImmutableArray<string> imports = default)
     {
         using var layersBuilder = ImmutableArrayBuilder<ImmutableArray<AkcssUtilityDeclarationSyntax>>.Rent();
-        foreach (var importName in GetAkcssImportNames())
+        foreach (var importName in imports.IsDefault ? GetAkcssImportNames() : imports)
         {
             var matches = Compilation.GetLocalAkcssSyntaxTreesByLogicalName(importName);
             if (matches.Length == 0 &&
@@ -2068,10 +2069,11 @@ internal sealed partial class MarkupBinder
         return layersBuilder.ToImmutable();
     }
 
-    private ImmutableArray<ImmutableArray<ITailwindUtilitySymbol>> GetImportedAkcssUtilitySymbolLayers()
+    private ImmutableArray<ImmutableArray<ITailwindUtilitySymbol>> GetImportedAkcssUtilitySymbolLayers(
+        ImmutableArray<string> imports = default)
     {
         using var layersBuilder = ImmutableArrayBuilder<ImmutableArray<ITailwindUtilitySymbol>>.Rent();
-        foreach (var importName in GetAkcssImportNames())
+        foreach (var importName in imports.IsDefault ? GetAkcssImportNames() : imports)
         {
             if (Compilation.GetLocalAkcssSyntaxTreesByLogicalName(importName).Length > 0)
             {

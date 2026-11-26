@@ -144,6 +144,14 @@
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />
     </Project>
+    <Project Path="src/Workspaces/Akbura.Mcp.IntegrationTests/Akbura.Mcp.IntegrationTests.csproj">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+    </Project>
+    <Project Path="src/Workspaces/Akbura.Mcp/Akbura.Mcp.csproj">
+      <BuildType Solution="DebugStats|*" Project="Debug" />
+      <BuildType Solution="ReleaseStats|*" Project="Release" />
+    </Project>
     <Project Path="src/Workspaces/Akbura.VisualStudio.Vsix/Akbura.VisualStudio.Vsix.csproj" Id="e0c6426f-ece8-4de0-a40c-c22d196bbc1a">
       <BuildType Solution="DebugStats|*" Project="Debug" />
       <BuildType Solution="ReleaseStats|*" Project="Release" />

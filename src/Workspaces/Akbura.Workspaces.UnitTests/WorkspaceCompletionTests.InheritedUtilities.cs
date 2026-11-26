@@ -176,15 +176,17 @@ public sealed partial class WorkspaceCompletionTests
         }
     }
 
-    private static AkburaWorkspace CreateRuntimeUtilityWorkspace(ImmutableArray<MetadataReference> references)
+    internal static AkburaWorkspace CreateRuntimeUtilityWorkspace(ImmutableArray<MetadataReference> references, string? csharpSource = null)
     {
-        var compilation = CSharpCompilation.Create("InheritedUtilities", references: references,
+        var compilation = CSharpCompilation.Create("InheritedUtilities",
+            syntaxTrees: csharpSource == null ? null : [CSharpSyntaxTree.ParseText(csharpSource)],
+            references: references,
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         return new AkburaWorkspace(new ProjectContext(ProjectId.CreateNewId(), string.Empty,
             Environment.CurrentDirectory, string.Empty, compilation, ImmutableArray<ProjectReference>.Empty));
     }
 
-    private static ImmutableArray<MetadataReference> CreateRuntimeUtilityReferences()
+    internal static ImmutableArray<MetadataReference> CreateRuntimeUtilityReferences()
     {
         var output = new DirectoryInfo(AppContext.BaseDirectory);
         var src = output.Parent!.Parent!.Parent!.Parent!.Parent!;

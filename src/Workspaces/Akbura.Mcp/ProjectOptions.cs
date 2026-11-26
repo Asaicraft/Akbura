@@ -2,9 +2,9 @@ namespace Akbura.Mcp;
 
 internal sealed record ProjectOptions(string ProjectPath, string Configuration, string? TargetFramework)
 {
-    public const string Usage =
-        "Usage: dotnet akbura-mcp.dll --project <absolute-csproj-path> " +
-        "[--configuration <name>] [--target-framework <tfm>]";
+    public const string Usage = """
+        Usage: dotnet akbura-mcp.dll --project <absolute-csproj-path> [--configuration <name>] [--target-framework <tfm>]
+        """;
 
     public static ProjectOptions Parse(string[] args)
     {
